@@ -1,3 +1,11 @@
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '1mb',
+    },
+  },
+};
+
 export default async function handler(req, res) {
   // Handle CORS preflight
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,7 +20,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt } = req.body;
+  // Handle body whether parsed or raw string
+  let prompt;
+  try {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    prompt = body?.prompt;
+  } catch {
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
 
   if (!prompt) {
     return res.status(400).json({ error: 'No prompt provided' });
