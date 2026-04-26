@@ -7,7 +7,6 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  // Handle CORS preflight
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -20,17 +19,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Handle body whether parsed or raw string
-  let prompt;
+  let prompt, messages;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
+    messages = body?.messages;
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
   }
 
-  if (!prompt) {
-    return res.status(400).json({ error: 'No prompt provided' });
+  const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
+
+  if (!apiMessages || apiMessages.length === 0) {
+    return res.status(400).json({ error: 'No messages provided' });
   }
 
   try {
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
         max_tokens: 2500,
-        messages: [{ role: 'user', content: prompt }]
+        messages: apiMessages
       })
     });
 
