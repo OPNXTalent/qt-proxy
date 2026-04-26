@@ -1,0 +1,6 @@
+{
+  "name": "qt-proxy",
+  "version": "1.0.0",
+  "description": "Quantum Theology API proxy",
+  "private": true
+}
