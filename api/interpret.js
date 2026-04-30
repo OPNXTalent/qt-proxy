@@ -9,7 +9,7 @@ export const config = {
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const QUERY_LIMIT = 3;
-const WINDOW_HOURS = 72;
+const WINDOW_HOURS = 24;
 
 async function getQueryLog(ip) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/query_log?ip_address=eq.${encodeURIComponent(ip)}&limit=1`, {
