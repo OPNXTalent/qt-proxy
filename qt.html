@@ -536,9 +536,35 @@
     <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
       <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Free Query Limit Reached</div>
       <div class="limit-message" style="font-family:var(--crimson); font-size:19px; color:var(--text); line-height:1.8; margin-bottom:12px;">You've used all 3 free interpretations for today.</div>
-      <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.75; margin-bottom:28px;">The free version allows 3 queries every 24 hours.<br>Return tomorrow to continue exploring — or subscribe for $9.99/month<br>and remove the limit entirely.</div>
-      <a href="/" style="font-family:var(--mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); text-decoration:none; border:1px solid var(--border); padding:10px 24px; display:inline-block; margin-right:12px; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--gold-dim)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
-      <a href="/#access" style="font-family:var(--mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--bg); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:10px 24px; display:inline-block; transition:all 0.25s;">Subscribe — $9.99/mo →</a>
+      <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.75; margin-bottom:32px;">The free version allows 3 queries every 24 hours.<br>Return tomorrow to continue exploring — or subscribe to remove the limit entirely.</div>
+
+      <!-- Pricing tiers -->
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px; text-align:left;">
+        <!-- Scholar -->
+        <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface);">
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Scholar</div>
+          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$9.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
+          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">Unlimited queries.<br>Full framework access.</div>
+          <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Subscribe →</a>
+        </div>
+        <!-- Theologian -->
+        <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
+          <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Most Popular</div>
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Theologian</div>
+          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$24.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
+          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">Everything in Scholar<br>plus priority access.</div>
+          <a href="https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Subscribe →</a>
+        </div>
+        <!-- Companion -->
+        <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface);">
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Companion</div>
+          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$199<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/yr</span></div>
+          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">Full access, annually.<br>For serious practitioners.</div>
+          <a href="https://buy.stripe.com/8x27sL9j86iQaOtgPn18c06" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.08)';" onmouseout="this.style.background='transparent';">Subscribe →</a>
+        </div>
+      </div>
+
+      <a href="/" style="font-family:var(--mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); text-decoration:none; border:1px solid var(--border); padding:10px 24px; display:inline-block; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--gold-dim)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
     </div>
   </div>
 
