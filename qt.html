@@ -535,7 +535,7 @@
 
     <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:32px 36px; text-align:center; background:rgba(180,140,60,0.04);">
       <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; color:var(--gold); margin-bottom:12px; text-transform:uppercase;">Query Limit Reached</div>
-      <div style="font-family:var(--crimson); font-size:18px; color:var(--text-dim); line-height:1.7; margin-bottom:24px;">You've explored 3 passages through the QT framework.<br>Subscribe for unlimited access to the full interpreter.</div>
+      <div class="limit-message" style="font-family:var(--crimson); font-size:18px; color:var(--text-dim); line-height:1.7; margin-bottom:24px;">You've explored 3 passages through the QT framework.<br>Subscribe for unlimited access to the full interpreter.</div>
       <a href="/" style="font-family:var(--mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); text-decoration:none; border:1px solid var(--border); padding:10px 24px; display:inline-block; margin-right:12px; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--gold-dim)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
       <a href="/#access" style="font-family:var(--mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--bg); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:10px 24px; display:inline-block; transition:all 0.25s;">Subscribe →</a>
     </div>
@@ -692,33 +692,26 @@ Return this exact JSON object (start with { immediately):
 }`;
 }
 
-function enforcQueryLimit() {
-  document.getElementById('submitBtn').style.display = 'none';
-  document.getElementById('limitPrompt').style.display = 'block';
-}
+// --- Query limit state ---
+let sessionQueryCount = 0;
+const QUERY_LIMIT = 3;
 
-function scheduleQueryLock() {
-  // Lock fires after current result renders
-  const observer = new MutationObserver(() => {
-    const result = document.getElementById('resultBlock');
-    if (result && result.classList.contains('visible')) {
-      document.getElementById('submitBtn').style.display = 'none';
-      document.getElementById('limitPrompt').style.display = 'block';
-      observer.disconnect();
-    }
-  });
-  observer.observe(document.getElementById('resultBlock'), { attributes: true, attributeFilter: ['class'] });
+function applyQueryLock(customMessage) {
+  document.getElementById('submitBtn').style.display = 'none';
+  const prompt = document.getElementById('limitPrompt');
+  if (customMessage) {
+    const msgEl = prompt.querySelector('.limit-message');
+    if (msgEl) msgEl.textContent = customMessage;
+  }
+  prompt.style.display = 'block';
 }
 
 async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
-  // --- 3-query session limit ---
-  if (typeof sessionQueryCount === 'undefined') window.sessionQueryCount = 0;
-  if (window.sessionQueryCount >= 3) { enforcQueryLimit(); return; }
-  window.sessionQueryCount++;
-  if (window.sessionQueryCount >= 3) scheduleQueryLock();
+  // Hard gate — never proceed if limit reached
+  if (sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   // Reset conversation for new subject
   conversationHistory = [];
@@ -776,19 +769,30 @@ async function runInterpretation() {
     document.getElementById('downloadRow').style.display = 'block';
 
   } catch (err) {
-    document.getElementById('resultContent').innerHTML = `<div class="error-block">${escHtml(err.message)}</div>`;
+    if (err.message === 'RATE_LIMITED') return;
+    document.getElementById('resultContent').innerHTML = `<div class="error-block">${sessionQueryCount >= QUERY_LIMIT ? 'Maximum queries exceeded. Please subscribe for continued access.' : 'Unable to process your request. Please try again.'}</div>`;
     showResult();
   } finally {
     document.getElementById('loadingBlock').classList.remove('visible');
     document.getElementById('inputSection').style.opacity = '';
     document.getElementById('inputSection').style.pointerEvents = '';
-    document.getElementById('submitBtn').disabled = false;
+    // Increment counter after successful completion
+    sessionQueryCount++;
+    // Only re-enable button if limit not yet reached
+    if (sessionQueryCount >= QUERY_LIMIT) {
+      applyQueryLock();
+    } else {
+      document.getElementById('submitBtn').disabled = false;
+    }
   }
 }
 
 async function runFollowUp() {
   const input = document.getElementById('followUpInput').value.trim();
   if (!input) return;
+
+  // Hard gate — block follow-ups if limit reached
+  if (sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   document.getElementById('followUpBtn').disabled = true;
   document.getElementById('followUpInput').style.opacity = '0.4';
@@ -819,10 +823,11 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
     document.getElementById('followUpInput').value = '';
 
   } catch (err) {
+    if (err.message === 'RATE_LIMITED') return;
     const errEl = document.createElement('div');
     errEl.className = 'error-block';
     errEl.style.marginTop = '20px';
-    errEl.textContent = err.message;
+    errEl.textContent = sessionQueryCount >= QUERY_LIMIT ? 'Maximum queries exceeded. Please subscribe for continued access.' : 'Unable to process your request. Please try again.';
     document.getElementById('resultContent').appendChild(errEl);
   } finally {
     document.getElementById('followUpLoading').style.display = 'none';
@@ -838,6 +843,17 @@ async function callProxy(messages) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages })
   });
+
+  // Handle server-side rate limit (72hr window via Supabase)
+  if (response.status === 429) {
+    let rateLimitMsg = "You\'ve reached the query limit. Please subscribe for continued access.";
+    try {
+      const limitData = await response.json();
+      if (limitData.message) rateLimitMsg = limitData.message;
+    } catch {}
+    applyQueryLock(rateLimitMsg);
+    throw new Error('RATE_LIMITED');
+  }
 
   const rawText = await response.text();
   if (!rawText || rawText.trim() === '') throw new Error(`Empty response. Status: ${response.status}`);
