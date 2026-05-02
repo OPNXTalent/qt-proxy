@@ -737,15 +737,21 @@ let sessionQueryCount = 0;
 const QUERY_LIMIT = 3;
 
 function applyQueryLock(customMessage) {
-  document.getElementById('submitBtn').style.display = 'none';
-  const prompt = document.getElementById('limitPrompt');
-  if (customMessage) {
-    const msgEl = prompt.querySelector('.limit-message');
-    if (msgEl) msgEl.textContent = customMessage;
+    document.getElementById('submitBtn').style.display = 'none';
+    const prompt = document.getElementById('limitPrompt');
+    if (customMessage) {
+      const msgEl = prompt.querySelector('.limit-message');
+      if (msgEl) msgEl.textContent = customMessage;
+    }
+    prompt.style.display = 'block';
+    // Hide follow-up section and show limit prompt in its place
+    const followUp = document.getElementById('followUpSection');
+    if (followUp) {
+      followUp.style.display = 'none';
+      followUp.parentNode.insertBefore(prompt, followUp);
+    }
+    prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-  prompt.style.display = 'block';
-}
-
 async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
