@@ -518,7 +518,10 @@
   <div id="inputSection">
     <!-- Subscriber email unlock -->
 <div style="margin-bottom: 28px;">
-  <label class="input-label">Subscriber Email — <span style="color:var(--gold-dim); font-style:italic;">enter to unlock full access</span></label>
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+    <div id="subscriberPill" style="width:12px; height:22px; border-radius:20px; border:1px solid rgba(160,40,40,0.7); background:transparent; transition:all 0.4s; flex-shrink:0;"></div>
+    <label class="input-label" id="subscriberLabel" style="margin-bottom:0;">Subscriber Email — <span id="subscriberPrompt" style="color:var(--gold-dim); font-style:italic;">enter to unlock full access</span></label>
+  </div>
   <input
     type="email"
     id="subscriberEmail"
@@ -891,6 +894,7 @@ async function callProxy(messages) {
   });
 
   // Handle server-side rate limit (72hr window via Supabase)
+  if (data.subscriber === true) setSubscriberUnlocked();
   if (response.status === 429) {
     let rateLimitMsg = "You\'ve reached the query limit. Please subscribe for continued access.";
     try {
@@ -1255,10 +1259,22 @@ function resetForm() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.ctrlKey) runInterpretation();
 });
-// Persist subscriber email
+// Persist subscriber email + pill state
 const emailInput = document.getElementById('subscriberEmail');
 const savedEmail = localStorage.getItem('qt_subscriber_email');
 if (savedEmail) emailInput.value = savedEmail;
+
+function setSubscriberUnlocked() {
+  document.getElementById('subscriberPill').style.background = 'rgba(160,40,40,0.8)';
+  document.getElementById('subscriberPill').style.borderColor = 'rgba(200,60,60,0.9)';
+  document.getElementById('subscriberPill').style.boxShadow = '0 0 12px rgba(160,40,40,0.5)';
+  document.getElementById('subscriberPrompt').textContent = 'access unlocked';
+  document.getElementById('subscriberPrompt').style.color = 'rgba(160,40,40,0.8)';
+  document.getElementById('subscriberStatus').textContent = '✓ SUBSCRIBER ACTIVE';
+  document.getElementById('subscriberStatus').style.color = 'rgba(160,40,40,0.8)';
+  emailInput.style.borderColor = 'rgba(160,40,40,0.5)';
+}
+
 emailInput.addEventListener('change', () => {
   const val = emailInput.value.trim();
   if (val) {
