@@ -887,7 +887,7 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
 }
 
 async function callProxy(messages) {
-  const response = await fetch('https://qt-proxy-theta.vercel.app/api/interpret', {
+  const response = await fetch('https://quantumtheology.app/api/interpret', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, email: document.getElementById('subscriberEmail')?.value?.trim() || null })
