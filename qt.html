@@ -892,30 +892,32 @@ async function callProxy(messages) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, email: document.getElementById('subscriberEmail')?.value?.trim() || null })
   });
+  
+// Handle server-side rate limit (72hr window via Supabase)
+if (response.status === 429) {
+  let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
+  try {
+    const limitData = await response.json();
+    if (limitData.message) rateLimitMsg = limitData.message;
+  } catch {}
+  applyQueryLock(rateLimitMsg);
+  throw new Error('RATE_LIMITED');
+}
 
-  // Handle server-side rate limit (72hr window via Supabase)
-  if (data.subscriber === true) setSubscriberUnlocked();
-  if (response.status === 429) {
-    let rateLimitMsg = "You\'ve reached the query limit. Please subscribe for continued access.";
-    try {
-      const limitData = await response.json();
-      if (limitData.message) rateLimitMsg = limitData.message;
-    } catch {}
-    applyQueryLock(rateLimitMsg);
-    throw new Error('RATE_LIMITED');
-  }
+const rawText = await response.text();
+if (!rawText || rawText.trim() === '') throw new Error(`Empty response. Status: ${response.status}`);
 
-  const rawText = await response.text();
-  if (!rawText || rawText.trim() === '') throw new Error(`Empty response. Status: ${response.status}`);
+let data;
+try { data = JSON.parse(rawText); }
+catch { throw new Error(`Response not JSON: ${rawText.slice(0, 200)}`); }
 
-  let data;
-  try { data = JSON.parse(rawText); }
-  catch { throw new Error(`Response not JSON: ${rawText.slice(0, 200)}`); }
+if (data.subscriber === true) setSubscriberUnlocked();
 
-  const contentBlocks = data.content;
-  if (!contentBlocks || contentBlocks.length === 0) throw new Error(`No content: ${JSON.stringify(data).slice(0, 300)}`);
+const contentBlocks = data.content;
+if (!contentBlocks || contentBlocks.length === 0) throw new Error(`No content: ${JSON.stringify(data).slice(0, 300)}`);
 
-  return contentBlocks.map(b => b.text || '').join('');
+return contentBlocks.map(b => b.text || '').join('');
+
 }
 
 function showResult() {
