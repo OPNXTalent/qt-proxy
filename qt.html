@@ -1306,6 +1306,54 @@ emailInput.addEventListener('change', () => {
     document.getElementById('subscriberStatus').style.color = 'var(--gold-dim)';
   }
 });
+async function redeemAccessCode() {
+  const code = document.getElementById('accessCodeInput').value.trim().toUpperCase();
+  const email = document.getElementById('subscriberEmail').value.trim();
+  const statusEl = document.getElementById('accessCodeStatus');
+  const pillEl = document.getElementById('accessCodePill');
+  const promptEl = document.getElementById('accessCodePrompt');
+
+  if (!code) {
+    statusEl.textContent = 'ENTER A CODE';
+    statusEl.style.color = 'rgba(160,40,40,0.8)';
+    return;
+  }
+  if (!email) {
+    statusEl.textContent = 'ENTER YOUR EMAIL FIRST';
+    statusEl.style.color = 'rgba(160,40,40,0.8)';
+    return;
+  }
+
+  statusEl.textContent = 'VALIDATING...';
+  statusEl.style.color = 'var(--gold-dim)';
+
+  try {
+    const res = await fetch('https://quantumtheology.app/api/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, email })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      pillEl.style.background = 'rgba(160,40,40,0.8)';
+      pillEl.style.borderColor = 'rgba(200,60,60,0.9)';
+      pillEl.style.boxShadow = '0 0 12px rgba(160,40,40,0.5)';
+      promptEl.textContent = 'access granted — 30 days';
+      promptEl.style.color = 'rgba(160,40,40,0.8)';
+      statusEl.textContent = '✓ CODE ACCEPTED';
+      statusEl.style.color = 'rgba(160,40,40,0.8)';
+      document.getElementById('accessCodeInput').style.borderColor = 'rgba(160,40,40,0.5)';
+      localStorage.setItem('qt_access_code', code);
+    } else {
+      statusEl.textContent = data.message || 'INVALID CODE';
+      statusEl.style.color = 'rgba(160,40,40,0.8)';
+    }
+  } catch {
+    statusEl.textContent = 'ERROR — TRY AGAIN';
+    statusEl.style.color = 'rgba(160,40,40,0.8)';
+  }
+}
 </script>
 
 <div class="page-copyright">OPNX LLC &nbsp;·&nbsp; © 2026 All Rights Reserved &nbsp;·&nbsp; <a href="mailto:support@quantumtheology.app" style="color:inherit; text-decoration:none;">support@quantumtheology.app</a></div>
