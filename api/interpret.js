@@ -33,7 +33,25 @@ async function getSubscriber(email) {
   const data = await res.json();
   return data?.[0] || null;
 }
-
+async function getCodeRedemption(email) {
+  if (!email) return null;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/code_redemptions?email=eq.${encodeURIComponent(email)}&limit=1`,
+    {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  const data = await res.json();
+  if (!data || data.length === 0) return null;
+  const redemption = data[0];
+  const expires = new Date(redemption.access_expires_at);
+  if (expires > new Date()) return redemption;
+  return null;
+}
 async function getQueryLog(ip) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/query_log?ip_address=eq.${encodeURIComponent(ip)}&limit=1`,
@@ -113,28 +131,30 @@ export default async function handler(req, res) {
   try {
     if (userEmail) {
       const subscriber = await getSubscriber(userEmail);
-      if (subscriber && subscriber.status === 'active') {
-        // Active subscriber — skip rate limit, go straight to API
-        const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
-        if (!apiMessages || apiMessages.length === 0) {
-          return res.status(400).json({ error: 'No messages provided' });
-        }
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-5',
-            max_tokens: 2500,
-            messages: apiMessages
-          })
-        });
-        const data = await response.json();
-        return res.status(200).json({ ...data, subscriber: true, tier: subscriber.tier });
-      }
+      const redemption = await getCodeRedemption(userEmail);
+      if ((subscriber && subscriber.status === 'active') || redemption) {
+  // Active subscriber or valid code — skip rate limit, go straight to API
+  const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
+  if (!apiMessages || apiMessages.length === 0) {
+    return res.status(400).json({ error: 'No messages provided' });
+  }
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 2500,
+      messages: apiMessages
+    })
+  });
+  const data = await response.json();
+  const tier = subscriber?.tier || 'trial';
+  return res.status(200).json({ ...data, subscriber: true, tier });
+}
     }
   } catch (err) {
     console.error('Subscriber check failed:', err.message);
