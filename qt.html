@@ -519,7 +519,7 @@
     <!-- Subscriber email unlock -->
 <div style="margin-bottom: 28px;">
   <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-    <div id="subscriberPill" style="width:12px; height:22px; border-radius:20px; border:1px solid rgba(160,40,40,0.7); background:transparent; transition:all 0.4s; flex-shrink:0;"></div>
+    <div id="subscriberPill" style="width:12px; height:22px; border-radius:20px; border:1px solid rgba(40,140,60,0.7); background:transparent; transition:all 0.4s; flex-shrink:0;"></div>
     <label class="input-label" id="subscriberLabel" style="margin-bottom:0;">Subscriber Email — <span id="subscriberPrompt" style="color:var(--gold-dim); font-style:italic;">enter to unlock full access</span></label>
   </div>
   <input
@@ -536,7 +536,7 @@
     <!-- Access code field -->
     <div style="margin-bottom: 28px;">
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-        <div id="accessCodePill" style="width:12px; height:22px; border-radius:20px; border:1px solid rgba(160,40,40,0.7); background:transparent; transition:all 0.4s; flex-shrink:0;"></div>
+        <div id="accessCodePill" style="width:12px; height:22px; border-radius:20px; border:1px solid rgba(40,140,60,0.7); background:transparent; transition:all 0.4s; flex-shrink:0;"></div>
         <label class="input-label" style="margin-bottom:0;">Access Code — <span id="accessCodePrompt" style="color:var(--gold-dim); font-style:italic;">enter code from your book</span></label>
       </div>
       <div style="display:flex; gap:10px;">
@@ -1288,14 +1288,14 @@ const savedEmail = localStorage.getItem('qt_subscriber_email');
 if (savedEmail) emailInput.value = savedEmail;
 
 function setSubscriberUnlocked() {
-  document.getElementById('subscriberPill').style.background = 'rgba(160,40,40,0.8)';
-  document.getElementById('subscriberPill').style.borderColor = 'rgba(200,60,60,0.9)';
-  document.getElementById('subscriberPill').style.boxShadow = '0 0 12px rgba(160,40,40,0.5)';
+  document.getElementById('subscriberPill').style.background = 'rgba(40,140,60,0.8)';
+  document.getElementById('subscriberPill').style.borderColor = 'rgba(60,180,80,0.9)';
+  document.getElementById('subscriberPill').style.boxShadow = '0 0 12px rgba(40,140,60,0.5)';
   document.getElementById('subscriberPrompt').textContent = 'access unlocked';
-  document.getElementById('subscriberPrompt').style.color = 'rgba(160,40,40,0.8)';
+  document.getElementById('subscriberPrompt').style.color = 'rgba(40,140,60,0.8)';
   document.getElementById('subscriberStatus').textContent = '✓ SUBSCRIBER ACTIVE';
-  document.getElementById('subscriberStatus').style.color = 'rgba(160,40,40,0.8)';
-  emailInput.style.borderColor = 'rgba(160,40,40,0.5)';
+  document.getElementById('subscriberStatus').style.color = 'rgba(40,140,60,0.8)';
+  emailInput.style.borderColor = 'rgba(40,140,60,0.5)';
 }
 
 emailInput.addEventListener('change', () => {
@@ -1315,12 +1315,12 @@ async function redeemAccessCode() {
 
   if (!code) {
     statusEl.textContent = 'ENTER A CODE';
-    statusEl.style.color = 'rgba(160,40,40,0.8)';
+    statusEl.style.color = 'rgba(40,140,60,0.8)';
     return;
   }
   if (!email) {
     statusEl.textContent = 'ENTER YOUR EMAIL FIRST';
-    statusEl.style.color = 'rgba(160,40,40,0.8)';
+    statusEl.style.color = 'rgba(40,140,60,0.8)';
     return;
   }
 
@@ -1336,22 +1336,22 @@ async function redeemAccessCode() {
     const data = await res.json();
 
     if (data.success) {
-      pillEl.style.background = 'rgba(160,40,40,0.8)';
-      pillEl.style.borderColor = 'rgba(200,60,60,0.9)';
-      pillEl.style.boxShadow = '0 0 12px rgba(160,40,40,0.5)';
+      pillEl.style.background = 'rgba(40,140,60,0.8)';
+      pillEl.style.borderColor = 'rgba(60,180,80,0.9)';
+      pillEl.style.boxShadow = '0 0 12px rgba(40,140,60,0.5)';
       promptEl.textContent = 'access granted — 30 days';
-      promptEl.style.color = 'rgba(160,40,40,0.8)';
+      promptEl.style.color = 'rgba(40,140,60,0.8)';
       statusEl.textContent = '✓ CODE ACCEPTED';
-      statusEl.style.color = 'rgba(160,40,40,0.8)';
-      document.getElementById('accessCodeInput').style.borderColor = 'rgba(160,40,40,0.5)';
+      statusEl.style.color = 'rgba(40,140,60,0.8)';
+      document.getElementById('accessCodeInput').style.borderColor = 'rgba(40,140,60,0.5)';
       localStorage.setItem('qt_access_code', code);
     } else {
       statusEl.textContent = data.message || 'INVALID CODE';
-      statusEl.style.color = 'rgba(160,40,40,0.8)';
+      statusEl.style.color = 'rgba(40,140,60,0.8)';
     }
   } catch {
     statusEl.textContent = 'ERROR — TRY AGAIN';
-    statusEl.style.color = 'rgba(160,40,40,0.8)';
+    statusEl.style.color = 'rgba(40,140,60,0.8)';
   }
 }
 </script>
