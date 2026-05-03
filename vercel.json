@@ -3,6 +3,16 @@
     "api/interpret.js": {
       "memory": 128,
       "maxDuration": 30
+    },
+    "api/notify.js": {
+      "memory": 128,
+      "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/notify",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }
