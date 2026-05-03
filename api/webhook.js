@@ -144,6 +144,7 @@ export default async function handler(req, res) {
 
   try {
     switch (event.type) {
+
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = event.data.object;
@@ -238,6 +239,65 @@ export default async function handler(req, res) {
         }
         break;
       }
+
+      case 'payment_intent.payment_failed': {
+        const pi = event.data.object;
+        const email = pi.receipt_email || (pi.customer ? await getCustomerEmail(pi.customer) : null);
+        if (email) {
+          try {
+            await sendEmail(
+              email,
+              'Action Required — Payment Failed',
+              emailWrapper(`
+                <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your payment could not be processed.</p>
+                <p style="font-size:16px; line-height:1.8; color:#7a7890;">Please update your payment method to restore full Prism access.</p>
+                <div style="text-align:center; margin:40px 0;">
+                  <a href="https://billing.stripe.com" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Update Payment Method</a>
+                </div>
+              `)
+            );
+          } catch (emailErr) {
+            console.error('payment_intent.payment_failed email error:', emailErr.message);
+          }
+        }
+        break;
+      }
+
+      case 'payment_intent.requires_action': {
+        const pi = event.data.object;
+        const email = pi.receipt_email || (pi.customer ? await getCustomerEmail(pi.customer) : null);
+        if (email) {
+          try {
+            await sendEmail(
+              email,
+              'Action Required — Complete Your Payment',
+              emailWrapper(`
+                <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your payment requires additional verification.</p>
+                <p style="font-size:16px; line-height:1.8; color:#7a7890;">Your bank may be requesting authentication. Please complete the step to activate your Prism access.</p>
+                <div style="text-align:center; margin:40px 0;">
+                  <a href="https://billing.stripe.com" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Complete Payment</a>
+                </div>
+              `)
+            );
+          } catch (emailErr) {
+            console.error('payment_intent.requires_action email error:', emailErr.message);
+          }
+        }
+        break;
+      }
+
+      case 'payment_intent.canceled': {
+        const pi = event.data.object;
+        console.log('PaymentIntent canceled:', pi.id);
+        break;
+      }
+
+      case 'payment_intent.succeeded': {
+        const pi = event.data.object;
+        console.log('PaymentIntent succeeded:', pi.id);
+        break;
+      }
+
     }
   } catch (err) {
     console.error('Webhook handler error:', err.message);
