@@ -121,6 +121,54 @@ export default async function handler(req, res) {
         const tier = getTierFromAmount(amount);
         const email = await getCustomerEmail(customerId);
         await upsertSubscriber(email, customerId, subscriptionId, tier, status);
+        // Send welcome email via Resend
+if (email && status === 'active') {
+  const tierNames = {
+    scholar: 'Scholar',
+    theologian: 'Theologian',
+    companion: 'Companion'
+  };
+  const tierName = tierNames[tier] || 'Scholar';
+  const tierDesc = {
+    scholar: '150 queries per month to the Quantum Theology Prism.',
+    theologian: '350 queries per month to the Quantum Theology Prism.',
+    companion: '500 queries per month to the Quantum Theology Prism.'
+  }[tier] || '';
+
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'noreply@quantumtheology.app',
+        to: email,
+        subject: `Welcome to the QT Prism — ${tierName}`,
+        html: `
+          <div style="background:#06060a; color:#d8d4e8; font-family:Georgia,serif; max-width:600px; margin:0 auto; padding:48px 40px;">
+            <div style="text-align:center; margin-bottom:32px;">
+              <div style="font-family:serif; font-size:28px; color:#e8d5a0; letter-spacing:0.08em;">Quantum Theology</div>
+              <div style="font-size:14px; color:#7a6230; letter-spacing:0.2em; text-transform:uppercase; margin-top:4px;">Echad b'Emet</div>
+            </div>
+            <div style="border-top:1px solid #2a2a40; margin-bottom:32px;"></div>
+            <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your <strong style="color:#e8d5a0;">${tierName}</strong> subscription is active.</p>
+            <p style="font-size:16px; line-height:1.8; color:#7a7890;">${tierDesc} The framework applies relational ontology, Hebrew linguistic architecture, and the conceptual language of quantum mechanics to Scripture.</p>
+            <div style="text-align:center; margin:40px 0;">
+              <a href="https://quantumtheology.app/qt.html" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Enter the Prism →</a>
+            </div>
+            <div style="border-top:1px solid #2a2a40; margin-top:32px; padding-top:24px;">
+              <p style="font-size:13px; color:#3a384a; text-align:center;">Manage your subscription at <a href="https://billing.stripe.com" style="color:#7a6230;">billing.stripe.com</a> · Questions? <a href="mailto:support@quantumtheology.app" style="color:#7a6230;">support@quantumtheology.app</a></p>
+            </div>
+          </div>
+        `
+      })
+    });
+  } catch (emailErr) {
+    console.error('Welcome email failed:', emailErr.message);
+  }
+}
         break;
       }
       case 'customer.subscription.deleted': {
