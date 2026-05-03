@@ -10,6 +10,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 async function buffer(readable) {
   const chunks = [];
@@ -94,6 +95,38 @@ function getTierFromAmount(amount) {
   return 'scholar';
 }
 
+async function sendEmail(to, subject, html) {
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: 'noreply@quantumtheology.app',
+      to,
+      subject,
+      html
+    })
+  });
+}
+
+function emailWrapper(content) {
+  return `
+    <div style="background:#06060a; color:#d8d4e8; font-family:Georgia,serif; max-width:600px; margin:0 auto; padding:48px 40px;">
+      <div style="text-align:center; margin-bottom:32px;">
+        <div style="font-family:serif; font-size:28px; color:#e8d5a0; letter-spacing:0.08em;">Quantum Theology</div>
+        <div style="font-size:14px; color:#7a6230; letter-spacing:0.2em; text-transform:uppercase; margin-top:4px;">Echad b'Emet</div>
+      </div>
+      <div style="border-top:1px solid #2a2a40; margin-bottom:32px;"></div>
+      ${content}
+      <div style="border-top:1px solid #2a2a40; margin-top:32px; padding-top:24px;">
+        <p style="font-size:13px; color:#3a384a; text-align:center;">Questions? <a href="mailto:support@quantumtheology.app" style="color:#7a6230;">support@quantumtheology.app</a></p>
+      </div>
+    </div>
+  `;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -121,61 +154,83 @@ export default async function handler(req, res) {
         const tier = getTierFromAmount(amount);
         const email = await getCustomerEmail(customerId);
         await upsertSubscriber(email, customerId, subscriptionId, tier, status);
-        // Send welcome email via Resend
-if (email && status === 'active') {
-  const tierNames = {
-    scholar: 'Scholar',
-    theologian: 'Theologian',
-    companion: 'Companion'
-  };
-  const tierName = tierNames[tier] || 'Scholar';
-  const tierDesc = {
-    scholar: '150 queries per month to the Quantum Theology Prism.',
-    theologian: '350 queries per month to the Quantum Theology Prism.',
-    companion: '500 queries per month to the Quantum Theology Prism.'
-  }[tier] || '';
 
-  try {
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: 'noreply@quantumtheology.app',
-        to: email,
-        subject: `Welcome to the QT Prism — ${tierName}`,
-        html: `
-          <div style="background:#06060a; color:#d8d4e8; font-family:Georgia,serif; max-width:600px; margin:0 auto; padding:48px 40px;">
-            <div style="text-align:center; margin-bottom:32px;">
-              <div style="font-family:serif; font-size:28px; color:#e8d5a0; letter-spacing:0.08em;">Quantum Theology</div>
-              <div style="font-size:14px; color:#7a6230; letter-spacing:0.2em; text-transform:uppercase; margin-top:4px;">Echad b'Emet</div>
-            </div>
-            <div style="border-top:1px solid #2a2a40; margin-bottom:32px;"></div>
-            <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your <strong style="color:#e8d5a0;">${tierName}</strong> subscription is active.</p>
-            <p style="font-size:16px; line-height:1.8; color:#7a7890;">${tierDesc} The framework applies relational ontology, Hebrew linguistic architecture, and the conceptual language of quantum mechanics to Scripture.</p>
-            <div style="text-align:center; margin:40px 0;">
-              <a href="https://quantumtheology.app/qt.html" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Enter the Prism →</a>
-            </div>
-            <div style="border-top:1px solid #2a2a40; margin-top:32px; padding-top:24px;">
-              <p style="font-size:13px; color:#3a384a; text-align:center;">Manage your subscription at <a href="https://billing.stripe.com" style="color:#7a6230;">billing.stripe.com</a> · Questions? <a href="mailto:support@quantumtheology.app" style="color:#7a6230;">support@quantumtheology.app</a></p>
-            </div>
-          </div>
-        `
-      })
-    });
-  } catch (emailErr) {
-    console.error('Welcome email failed:', emailErr.message);
-  }
-}
+        if (email && status === 'active' && event.type === 'customer.subscription.created') {
+          const tierNames = { scholar: 'Scholar', theologian: 'Theologian', companion: 'Companion' };
+          const tierName = tierNames[tier] || 'Scholar';
+          const tierDesc = {
+            scholar: '150 queries per month to the Quantum Theology Prism.',
+            theologian: '350 queries per month to the Quantum Theology Prism.',
+            companion: '500 queries per month to the Quantum Theology Prism.'
+          }[tier] || '';
+
+          try {
+            await sendEmail(
+              email,
+              `Welcome to the QT Prism — ${tierName}`,
+              emailWrapper(`
+                <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your <strong style="color:#e8d5a0;">${tierName}</strong> subscription is active.</p>
+                <p style="font-size:16px; line-height:1.8; color:#7a7890;">${tierDesc} The framework applies relational ontology, Hebrew linguistic architecture, and the conceptual language of quantum mechanics to Scripture.</p>
+                <div style="text-align:center; margin:40px 0;">
+                  <a href="https://quantumtheology.app/qt.html" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Enter the Prism</a>
+                </div>
+                <p style="font-size:13px; color:#3a384a; text-align:center;">Manage your subscription at <a href="https://billing.stripe.com" style="color:#7a6230;">billing.stripe.com</a></p>
+              `)
+            );
+          } catch (emailErr) {
+            console.error('Welcome email failed:', emailErr.message);
+          }
+        }
         break;
       }
+
       case 'customer.subscription.deleted': {
         const sub = event.data.object;
         await updateSubscriberStatus(sub.id, 'inactive');
+        const email = await getCustomerEmail(sub.customer);
+        if (email) {
+          try {
+            await sendEmail(
+              email,
+              'Your QT Prism Subscription Has Been Cancelled',
+              emailWrapper(`
+                <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your subscription has been cancelled.</p>
+                <p style="font-size:16px; line-height:1.8; color:#7a7890;">We hope the Prism served you well. You still have access to 3 free queries every 24 hours. If you ever want to return, your subscription is one step away.</p>
+                <div style="text-align:center; margin:40px 0;">
+                  <a href="https://quantumtheology.app/index.html#access" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Resubscribe</a>
+                </div>
+              `)
+            );
+          } catch (emailErr) {
+            console.error('Cancellation email failed:', emailErr.message);
+          }
+        }
         break;
       }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+        const email = await getCustomerEmail(invoice.customer);
+        if (email) {
+          try {
+            await sendEmail(
+              email,
+              'Action Required — Payment Issue with Your QT Prism Subscription',
+              emailWrapper(`
+                <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">There was an issue processing your subscription payment.</p>
+                <p style="font-size:16px; line-height:1.8; color:#7a7890;">Stripe will retry the charge automatically. To avoid any interruption to your Prism access, please update your payment method at your earliest convenience.</p>
+                <div style="text-align:center; margin:40px 0;">
+                  <a href="https://billing.stripe.com" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Update Payment Method</a>
+                </div>
+              `)
+            );
+          } catch (emailErr) {
+            console.error('Payment failed email error:', emailErr.message);
+          }
+        }
+        break;
+      }
+
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
         if (invoice.subscription) {
