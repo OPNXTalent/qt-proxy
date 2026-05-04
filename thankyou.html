@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantum Theology — Welcome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #06060a;
+    --deep: #0d0d14;
+    --surface: #13131e;
+    --border: #2a2a40;
+    --gold: #c9a84c;
+    --gold-dim: #7a6230;
+    --gold-pale: #e8d5a0;
+    --text: #d8d4e8;
+    --text-dim: #7a7890;
+    --text-muted: #3a384a;
+    --hebrew: #b8a8d0;
+    --cinzel: 'Cinzel', serif;
+    --crimson: 'Crimson Pro', Georgia, serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--crimson);
+    font-size: 20px;
+    line-height: 1.7;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(200,180,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 10%, rgba(200,180,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 60%, rgba(200,180,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 15% 75%, rgba(200,180,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 50%, rgba(200,180,255,0.25) 0%, transparent 100%),
+      radial-gradient(2px 2px at 75% 35%, rgba(201,168,76,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 45% 45%, rgba(200,180,255,0.4) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .shell {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 60px 40px;
+    text-align: center;
+    animation: revealPage 1s ease both;
+  }
+
+  @keyframes revealPage {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .mark {
+    font-family: var(--cinzel);
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 20px;
+    animation: revealPage 1s ease 0.1s both;
+  }
+
+  .sigil {
+    font-size: 48px;
+    color: var(--gold-dim);
+    margin-bottom: 28px;
+    animation: revealPage 1s ease 0.2s both;
+  }
+
+  h1 {
+    font-family: var(--cinzel);
+    font-size: 38px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--gold-pale);
+    line-height: 1.2;
+    margin-bottom: 8px;
+    animation: revealPage 1s ease 0.3s both;
+  }
+
+  .hebrew {
+    font-family: var(--crimson);
+    font-size: 22px;
+    color: var(--hebrew);
+    letter-spacing: 0.05em;
+    margin-bottom: 32px;
+    direction: rtl;
+    animation: revealPage 1s ease 0.4s both;
+  }
+
+  .rule {
+    width: 120px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+    margin: 0 auto 40px;
+    animation: revealPage 1s ease 0.5s both;
+  }
+
+  .message {
+    font-size: 21px;
+    color: var(--text);
+    line-height: 1.8;
+    margin-bottom: 16px;
+    font-style: italic;
+    animation: revealPage 1s ease 0.6s both;
+  }
+
+  .sub-message {
+    font-size: 17px;
+    color: var(--text-dim);
+    line-height: 1.75;
+    margin-bottom: 48px;
+    animation: revealPage 1s ease 0.7s both;
+  }
+
+  .enter-btn {
+    display: inline-block;
+    font-family: var(--cinzel);
+    font-size: 15px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 18px 48px;
+    border: 1px solid var(--gold-dim);
+    background: transparent;
+    color: var(--gold-pale);
+    text-decoration: none;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    animation: revealPage 1s ease 0.8s both;
+  }
+
+  .enter-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(201,168,76,0.12), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .enter-btn:hover::before { opacity: 1; }
+  .enter-btn:hover { border-color: var(--gold); }
+
+  .footer-note {
+    margin-top: 48px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    animation: revealPage 1s ease 0.9s both;
+  }
+
+  .footer-note a {
+    color: var(--gold-dim);
+    text-decoration: none;
+  }
+
+  .footer-note a:hover {
+    color: var(--gold-pale);
+  }
+
+  .divider {
+    width: 1px;
+    height: 60px;
+    background: linear-gradient(180deg, transparent, var(--gold-dim), transparent);
+    margin: 40px auto;
+    animation: revealPage 1s ease 0.75s both;
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <div class="mark">Quantum Theology</div>
+    <div class="sigil">✦</div>
+    <h1>Access Granted</h1>
+    <div class="hebrew">אֶחָד בֶּאֱמֶת</div>
+    <div class="rule"></div>
+    <p class="message">Your subscription is active.</p>
+    <p class="sub-message">
+      A confirmation has been sent to your email.<br>
+      Enter your email in the Prism to unlock full access.
+    </p>
+    <a href="qt.html" class="enter-btn">Enter the Prism →</a>
+    <div class="divider"></div>
+    <div class="footer-note">
+      Questions? <a href="mailto:support@quantumtheology.app">support@quantumtheology.app</a>
+      &nbsp;·&nbsp; <a href="index.html">← Return to site</a>
+    </div>
+  </div>
+</body>
+</html>
