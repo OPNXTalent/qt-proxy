@@ -1447,19 +1447,18 @@ document.addEventListener('keydown', e => {
   micBtn.style.display = 'block'; // reveal only when supported
 
   const recognition = new SpeechRecognition();
-  recognition.continuous = false;
+  recognition.continuous = true;
   recognition.interimResults = true;
   recognition.lang = 'en-US';
 
   let listening = false;
-  let interimSpan = '';
 
   recognition.onstart = () => {
     listening = true;
     micBtn.classList.add('listening');
-    micBtn.title = 'Tap to stop';
+    micBtn.title = 'Tap to stop and interpret';
     micStatus.style.display = 'block';
-    micStatus.textContent = '● Listening — speak your verse or question';
+    micStatus.textContent = '● Listening — speak freely, tap 🎙 when done';
   };
 
   recognition.onresult = (e) => {
@@ -1470,7 +1469,6 @@ document.addEventListener('keydown', e => {
       if (e.results[i].isFinal) final += t;
       else interim += t;
     }
-    // Append confirmed final text; show interim as preview in status
     if (final) {
       const current = textarea.value;
       textarea.value = (current ? current.trimEnd() + ' ' : '') + final.trim();
@@ -1482,16 +1480,20 @@ document.addEventListener('keydown', e => {
   };
 
   recognition.onerror = (e) => {
+    if (e.error === 'no-speech') return; // ignore no-speech in continuous mode
     micStatus.textContent = e.error === 'not-allowed'
       ? 'Microphone access denied — enable it in browser settings'
       : 'Could not hear input — please try again';
     micStatus.style.color = 'rgba(200,80,70,0.8)';
-    stopListening();
+    listening = false;
+    micBtn.classList.remove('listening');
   };
 
   recognition.onend = () => {
-    stopListening();
-    // Auto-submit if there's content and we stopped naturally
+    // In continuous mode, onend only fires when we explicitly call stop()
+    listening = false;
+    micBtn.classList.remove('listening');
+    micBtn.title = 'Speak your input';
     if (textarea.value.trim()) {
       micStatus.textContent = '✓ Captured — interpreting…';
       setTimeout(() => {
@@ -1499,18 +1501,14 @@ document.addEventListener('keydown', e => {
         micStatus.style.color = 'var(--gold-dim)';
         runInterpretation();
       }, 600);
+    } else {
+      micStatus.style.display = 'none';
     }
   };
 
-  function stopListening() {
-    listening = false;
-    micBtn.classList.remove('listening');
-    micBtn.title = 'Speak your input';
-  }
-
   window.toggleMic = function() {
     if (listening) {
-      recognition.stop();
+      recognition.stop(); // user taps to stop — triggers onend → auto-submit
     } else {
       micStatus.style.color = 'var(--gold-dim)';
       textarea.value = '';
@@ -1532,7 +1530,7 @@ document.addEventListener('keydown', e => {
   followUpMicBtn.style.display = 'block';
 
   const followUpRecognition = new SpeechRecognition();
-  followUpRecognition.continuous = false;
+  followUpRecognition.continuous = true;
   followUpRecognition.interimResults = true;
   followUpRecognition.lang = 'en-US';
 
@@ -1541,9 +1539,9 @@ document.addEventListener('keydown', e => {
   followUpRecognition.onstart = () => {
     followUpListening = true;
     followUpMicBtn.classList.add('listening');
-    followUpMicBtn.title = 'Tap to stop';
+    followUpMicBtn.title = 'Tap to stop and submit';
     followUpMicStatus.style.display = 'block';
-    followUpMicStatus.textContent = '● Listening — speak your follow-up question';
+    followUpMicStatus.textContent = '● Listening — speak freely, tap 🎙 when done';
   };
 
   followUpRecognition.onresult = (e) => {
@@ -1562,6 +1560,7 @@ document.addEventListener('keydown', e => {
   };
 
   followUpRecognition.onerror = (e) => {
+    if (e.error === 'no-speech') return;
     followUpMicStatus.textContent = e.error === 'not-allowed'
       ? 'Microphone access denied — enable it in browser settings'
       : 'Could not hear input — please try again';
@@ -1581,12 +1580,14 @@ document.addEventListener('keydown', e => {
         followUpMicStatus.style.color = 'var(--gold-dim)';
         runFollowUp();
       }, 600);
+    } else {
+      followUpMicStatus.style.display = 'none';
     }
   };
 
   window.toggleFollowUpMic = function() {
     if (followUpListening) {
-      followUpRecognition.stop();
+      followUpRecognition.stop(); // user taps to stop — triggers onend → auto-submit
     } else {
       followUpMicStatus.style.color = 'var(--gold-dim)';
       followUpTextarea.value = '';
