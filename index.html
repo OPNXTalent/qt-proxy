@@ -895,41 +895,54 @@
     background: var(--gold-dim);
     color: var(--void);
     letter-spacing: 0.32em;
-}
-    footer {
-      padding: 32px 60px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .footer-mark {
-      font-family: var(--cormorant-sc);
-      font-size: 15px;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-      text-decoration: none;
-    }
-    .footer-mark:hover { color: var(--gold); }
-    .footer-copy {
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-    }
-    .footer-copy a { color: var(--text-muted); }
-    .footer-copy a:hover { color: var(--gold); }
-    .sep { margin: 0 0.6rem; }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @media (max-width: 960px) {
-      header { padding: 20px 28px; }
-      .header-links { display: none; }
-      footer { flex-direction: column; gap: 16px; text-align: center; padding: 28px; }
-      main { padding: 3rem 1.4rem 6rem; }
-    }
+  }
+
+  /* FOOTER */
+  footer {
+    padding: 32px 60px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-mark {
+    font-family: var(--cormorant-sc);
+    font-size: 17px;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+
+  .footer-mark img { width: 22px; height: 22px; object-fit: contain; }
+
+  .footer-links {
+    display: flex;
+    gap: 28px;
+    list-style: none;
+  }
+
+  .footer-links a {
+    font-family: var(--mono);
+    font-size: 17px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover { color: var(--gold-dim); }
+
+  .footer-copy {
+    font-family: var(--mono);
+    font-size: 17px;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
 
   /* REVEAL */
   .reveal {
