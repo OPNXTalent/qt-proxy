@@ -14,5 +14,9 @@
       "path": "/api/notify",
       "schedule": "0 9 * * *"
     }
+  ],
+  "rewrites": [
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/privacy", "destination": "/privacy.html" }
   ]
 }
