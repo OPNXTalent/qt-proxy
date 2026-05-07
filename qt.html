@@ -32,18 +32,32 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  .page-copyright {
-    position: fixed;
-    bottom: 14px;
-    right: 18px;
-    font-family: var(--mono);
-    font-size: 10px;
+  .site-footer {
+    padding: 32px 60px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-mark {
+    font-family: var(--cinzel);
+    font-size: 15px;
     letter-spacing: 0.12em;
     color: var(--text-muted);
-    opacity: 0.55;
-    z-index: 10;
-    pointer-events: none;
-    user-select: none;
+    text-decoration: none;
+  }
+  .footer-mark:hover { color: var(--gold); }
+  .footer-copy {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .footer-copy a { color: var(--text-muted); text-decoration: none; }
+  .footer-copy a:hover { color: var(--gold); }
+  .sep { margin: 0 0.6rem; }
+  @media (max-width: 768px) {
+    .site-footer { flex-direction: column; gap: 16px; text-align: center; padding: 28px; }
   }
 
   body {
@@ -1740,7 +1754,16 @@ async function redeemAccessCode() {
 }
 </script>
 
-<div class="page-copyright">OPNX LLC &nbsp;·&nbsp; © 2026 All Rights Reserved &nbsp;·&nbsp; <a href="mailto:support@quantumtheology.app" style="color:inherit; text-decoration:none;">support@quantumtheology.app</a> &nbsp;·&nbsp; <a href="/terms" style="color:inherit; text-decoration:none;">Terms</a> &nbsp;·&nbsp; <a href="/privacy" style="color:inherit; text-decoration:none;">Privacy</a></div>
+<footer class="site-footer">
+  <a href="/" class="footer-mark">Quantum Theology</a>
+  <div class="footer-copy">
+    OPNX LLC &nbsp;·&nbsp; © 2026 All Rights Reserved
+    <span class="sep">·</span>
+    <a href="/terms">Terms</a>
+    <span class="sep">·</span>
+    <a href="/privacy">Privacy</a>
+  </div>
+</footer>
   
 </body>
 </html>
