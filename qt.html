@@ -715,7 +715,11 @@
     <!-- FOLLOW-UP -->
     <div id="followUpSection" style="display:none; margin-top:40px; border-top:1px solid var(--border); padding-top:32px;">
       <div style="font-family:var(--mono); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:12px;">Continue the Exploration</div>
-      <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question — go deeper on any section, connect it to another passage, or explore a related theme…" rows="3" style="margin-bottom:16px;"></textarea>
+      <div style="position:relative; margin-bottom:16px;">
+        <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question — go deeper on any section, connect it to another passage, or explore a related theme…" rows="3" style="padding-right:52px;"></textarea>
+        <button id="followUpMicBtn" onclick="toggleFollowUpMic()" title="Speak your follow-up" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:15px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+      </div>
+      <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--gold-dim); margin-bottom:10px; text-transform:uppercase;"></div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <button class="new-query-btn" onclick="resetForm()">↺ New Subject</button>
         <button class="submit-btn" id="followUpBtn" onclick="runFollowUp()">Ask →</button>
@@ -1516,6 +1520,81 @@ document.addEventListener('keydown', e => {
       } catch(e) {
         micStatus.style.display = 'block';
         micStatus.textContent = 'Could not start microphone — try again';
+      }
+    }
+  };
+
+  // ── FOLLOW-UP MIC ─────────────────────────────────────────────────────────
+  const followUpMicBtn = document.getElementById('followUpMicBtn');
+  const followUpMicStatus = document.getElementById('followUpMicStatus');
+  const followUpTextarea = document.getElementById('followUpInput');
+
+  followUpMicBtn.style.display = 'block';
+
+  const followUpRecognition = new SpeechRecognition();
+  followUpRecognition.continuous = false;
+  followUpRecognition.interimResults = true;
+  followUpRecognition.lang = 'en-US';
+
+  let followUpListening = false;
+
+  followUpRecognition.onstart = () => {
+    followUpListening = true;
+    followUpMicBtn.classList.add('listening');
+    followUpMicBtn.title = 'Tap to stop';
+    followUpMicStatus.style.display = 'block';
+    followUpMicStatus.textContent = '● Listening — speak your follow-up question';
+  };
+
+  followUpRecognition.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    if (final) {
+      const current = followUpTextarea.value;
+      followUpTextarea.value = (current ? current.trimEnd() + ' ' : '') + final.trim();
+    }
+    if (interim) followUpMicStatus.textContent = '● ' + interim;
+  };
+
+  followUpRecognition.onerror = (e) => {
+    followUpMicStatus.textContent = e.error === 'not-allowed'
+      ? 'Microphone access denied — enable it in browser settings'
+      : 'Could not hear input — please try again';
+    followUpMicStatus.style.color = 'rgba(200,80,70,0.8)';
+    followUpListening = false;
+    followUpMicBtn.classList.remove('listening');
+  };
+
+  followUpRecognition.onend = () => {
+    followUpListening = false;
+    followUpMicBtn.classList.remove('listening');
+    followUpMicBtn.title = 'Speak your follow-up';
+    if (followUpTextarea.value.trim()) {
+      followUpMicStatus.textContent = '✓ Captured — submitting…';
+      setTimeout(() => {
+        followUpMicStatus.style.display = 'none';
+        followUpMicStatus.style.color = 'var(--gold-dim)';
+        runFollowUp();
+      }, 600);
+    }
+  };
+
+  window.toggleFollowUpMic = function() {
+    if (followUpListening) {
+      followUpRecognition.stop();
+    } else {
+      followUpMicStatus.style.color = 'var(--gold-dim)';
+      followUpTextarea.value = '';
+      try {
+        followUpRecognition.start();
+      } catch(e) {
+        followUpMicStatus.style.display = 'block';
+        followUpMicStatus.textContent = 'Could not start microphone — try again';
       }
     }
   };
