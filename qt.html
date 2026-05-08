@@ -325,6 +325,21 @@
     line-height: 1.6;
   }
 
+  /* Recognition threshold */
+  .qt-recognition {
+    padding: 28px 0 28px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .qt-recognition p {
+    font-family: var(--crimson);
+    font-size: 18.5px;
+    font-style: italic;
+    color: var(--text);
+    line-height: 1.8;
+    margin: 0;
+  }
+
   /* Section block */
   .qt-section {
     margin-bottom: 32px;
@@ -834,7 +849,7 @@ You are a Quantum Theology (QT) interpreter. Apply the QT framework to: "${input
 QT Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
 
 Return this exact JSON:
-{"verse_identified":"Most relevant Scripture","verse_text":"Verse quoted accurately","qt_summary":"Two sharp sentences","entanglement":"God's initiation here","coherence_alignment":"How this calls toward alignment","noise_decoherence":"What distortions this exposes","telos_insight":"Christ-form being called toward","olam_haba":"Time-transcendent view","kingdom_implication":"One crisp Kingdom punchline","key_terms":[{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"}]}`;
+{"recognition":"2-4 lines of plain-language recognition of the human tension inside this question — before any QT category. Name what the person is actually carrying.","verse_identified":"Most relevant Scripture","verse_text":"Verse quoted accurately","qt_summary":"Two sharp sentences","entanglement":"God's initiation here","coherence_alignment":"How this calls toward alignment","noise_decoherence":"What distortions this exposes","telos_insight":"Christ-form being called toward","olam_haba":"Time-transcendent view","kingdom_implication":"One crisp Kingdom punchline","key_terms":[{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"}]}`;
   }
 
   return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. NO BACKTICKS. START YOUR RESPONSE WITH { AND END WITH }. NOTHING ELSE.
@@ -889,6 +904,7 @@ The QT Framework you must apply:
 
 Return this exact JSON object (start with { immediately):
 {
+  "recognition": "2-4 lines of plain-language recognition of the human tension inside this question — before any QT category is introduced. Name what the visitor is actually carrying. They should feel seen before they feel instructed.",
   "verse_identified": "The most relevant Scripture reference(s)",
   "verse_text": "The actual verse text quoted accurately",
   "qt_summary": "Two sharp sentences capturing the QT essence",
@@ -1206,6 +1222,15 @@ function renderResult(d) {
     `;
   }
 
+  // Recognition threshold — unlabeled opening
+  if (d.recognition) {
+    html += `
+      <div class="qt-recognition">
+        <p>${escHtml(d.recognition)}</p>
+      </div>
+    `;
+  }
+
   // QT sections
   sections.forEach(s => {
     html += `
@@ -1384,6 +1409,21 @@ function downloadPDF(mode) {
     doc.setTextColor(...gold);
     doc.text(vLines, margin + 4, y);
     y += vLines.length * 6 + 8;
+  }
+
+  // Recognition threshold
+  const recognitionEl = document.querySelector('.qt-recognition p');
+  if (recognitionEl) {
+    checkPage(20);
+    y += 4;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(10);
+    doc.setTextColor(...dimText);
+    const rLines = doc.splitTextToSize(recognitionEl.innerText.trim(), contentW);
+    checkPage(rLines.length * 5 + 14);
+    doc.text(rLines, margin, y);
+    y += rLines.length * 5 + 10;
+    drawRule();
   }
 
   // Framework sections
