@@ -1004,6 +1004,11 @@ async function runInterpretation() {
     document.getElementById('followUpSection').style.display = 'block';
     document.getElementById('downloadRow').style.display = 'block';
 
+    sessionQueryCount++;
+    if (sessionQueryCount >= QUERY_LIMIT) {
+      applyQueryLock();
+    }
+
   } catch (err) {
     if (err.message === 'RATE_LIMITED') return;
     document.getElementById('resultContent').innerHTML = getErrorMessage(err);
@@ -1012,14 +1017,7 @@ async function runInterpretation() {
     document.getElementById('loadingBlock').classList.remove('visible');
     document.getElementById('inputSection').style.opacity = '';
     document.getElementById('inputSection').style.pointerEvents = '';
-    // Increment counter after successful completion
-    sessionQueryCount++;
-    // Only re-enable button if limit not yet reached
-    if (sessionQueryCount >= QUERY_LIMIT) {
-      applyQueryLock();
-    } else {
-      document.getElementById('submitBtn').disabled = false;
-    }
+    document.getElementById('submitBtn').disabled = false;
   }
 }
 
