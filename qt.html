@@ -925,6 +925,7 @@ Return this exact JSON object (start with { immediately):
 // --- Query limit state ---
 let sessionQueryCount = 0;
 const QUERY_LIMIT = 3;
+let isVerifiedUser = false;
 
 function applyQueryLock(customMessage) {
     document.getElementById('submitBtn').style.display = 'none';
@@ -946,8 +947,8 @@ async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
-  // Hard gate — never proceed if limit reached
-  if (sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Hard gate — never proceed if limit reached (verified users bypass)
+  if (!isVerifiedUser && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   // Reset conversation for new subject
   conversationHistory = [];
@@ -1005,7 +1006,7 @@ async function runInterpretation() {
     document.getElementById('downloadRow').style.display = 'block';
 
     sessionQueryCount++;
-    if (sessionQueryCount >= QUERY_LIMIT) {
+    if (!isVerifiedUser && sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
     }
 
@@ -1025,8 +1026,8 @@ async function runFollowUp() {
   const input = document.getElementById('followUpInput').value.trim();
   if (!input) return;
 
-  // Hard gate — block follow-ups if limit reached
-  if (sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Hard gate — block follow-ups if limit reached (verified users bypass)
+  if (!isVerifiedUser && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   document.getElementById('followUpBtn').disabled = true;
   document.getElementById('followUpInput').style.opacity = '0.4';
@@ -1743,6 +1744,7 @@ function setPillState(state) {
     prompt.style.color = 'var(--gold-dim)';
     status.textContent = '';
   } else if (state === 'verified') {
+    isVerifiedUser = true;
     pill.style.background = 'rgba(40,160,60,0.85)';
     pill.style.borderColor = 'rgba(60,200,80,0.9)';
     pill.style.boxShadow = '0 0 10px rgba(40,160,60,0.5)';
@@ -1844,6 +1846,7 @@ async function redeemAccessCode() {
     const data = await res.json();
 
     if (data.success) {
+      isVerifiedUser = true;
       pillEl.style.background = 'rgba(40,140,60,0.8)';
       pillEl.style.borderColor = 'rgba(60,180,80,0.9)';
       pillEl.style.boxShadow = '0 0 12px rgba(40,140,60,0.5)';
