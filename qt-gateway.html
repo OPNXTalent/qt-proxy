@@ -791,11 +791,16 @@
         document.getElementById('flow-copy').textContent  = 'Authentication verified. Your session is being prepared.';
         setTimeout(function() {
           localStorage.setItem('qt_user_email', email);
+          // Clear any existing thread history so new users start clean
+          Object.keys(localStorage).forEach(function(key) {
+            if (key.startsWith('qt_') && key !== 'qt_user_email') {
+              localStorage.removeItem(key);
+            }
+          });
           window.location.href = 'https://quantumtheology.app/qt.html?tier=' + tier;
         }, 2000);
       });
   }
-
   /* ── New User ── */
   async function handleRegister(btn) {
     var email    = document.getElementById('nu-email').value.trim();
