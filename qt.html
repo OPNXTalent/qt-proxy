@@ -89,6 +89,88 @@
     z-index: 0;
   }
 
+  /* ── SIDEBAR LAYOUT ── */
+  .page-wrap { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 280px; min-width: 280px;
+    background: var(--deep);
+    border-right: 1px solid var(--border);
+    display: none; flex-direction: column;
+    position: fixed; top: 0; left: 0; bottom: 0;
+    z-index: 200;
+    transform: translateX(-280px);
+    transition: transform 0.3s ease;
+    overflow: hidden;
+  }
+  .sidebar.visible { display: flex; }
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-toggle {
+    position: fixed; top: 20px; left: 20px; z-index: 300;
+    width: 36px; height: 36px;
+    background: rgba(6,6,10,0.9); border: 1px solid var(--border);
+    color: var(--gold-dim); cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    font-size: 14px; transition: all 0.2s; backdrop-filter: blur(8px);
+  }
+  .sidebar-toggle.visible { display: flex; }
+  .sidebar-toggle:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  .sidebar-header { padding: 24px 20px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .sidebar-logo { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.18em; color: var(--gold-pale); text-transform: uppercase; margin-bottom: 4px; }
+  .sidebar-tier { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--gold-dim); text-transform: uppercase; }
+
+  .sidebar-search { padding: 12px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .sidebar-search input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; padding: 8px 12px; outline: none; transition: border-color 0.2s; }
+  .sidebar-search input:focus { border-color: var(--gold-dim); }
+  .sidebar-search input::placeholder { color: var(--text-muted); font-style: italic; }
+
+  .sidebar-section-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--text-muted); padding: 14px 20px 8px; flex-shrink: 0; }
+
+  .sidebar-threads { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+  .sidebar-threads::-webkit-scrollbar { width: 3px; }
+  .sidebar-threads::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .thread-item { padding: 12px 20px; border-bottom: 1px solid rgba(42,42,64,0.5); cursor: pointer; transition: background 0.15s; position: relative; }
+  .thread-item:hover { background: rgba(255,255,255,0.02); }
+  .thread-item.active { background: rgba(201,168,76,0.05); border-left: 2px solid var(--gold-dim); padding-left: 18px; }
+  .thread-item.locked { cursor: default; }
+  .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text); line-height: 1.4; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-item.locked .thread-title { color: var(--text-muted); }
+  .thread-subtitle { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .thread-date { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--text-muted); }
+  .thread-badge { font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 2px 6px; border: 1px solid; white-space: nowrap; }
+  .badge-ok     { color: var(--gold-dim); border-color: var(--gold-dim); background: rgba(201,168,76,0.05); }
+  .badge-warn   { color: #c08040; border-color: #8a5a28; background: rgba(192,128,64,0.08); }
+  .badge-urgent { color: #b85c5c; border-color: #8a3a3a; background: rgba(184,92,92,0.08); }
+  .badge-expired{ color: var(--text-muted); border-color: var(--border); }
+  .badge-locked { color: var(--text-muted); border-color: var(--border); font-size: 10px; }
+
+  .thread-rename-wrap { display: none; padding: 8px 20px 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .thread-rename-wrap.visible { display: block; }
+  .thread-rename-input { width: 100%; background: var(--deep); border: 1px solid var(--gold-dim); color: var(--text); font-family: var(--crimson); font-size: 13px; padding: 6px 10px; outline: none; margin-bottom: 4px; }
+  .thread-rename-count { font-family: var(--mono); font-size: 9px; color: var(--text-muted); text-align: right; }
+
+  .thread-upgrade { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--gold-dim); padding: 5px 20px 10px; line-height: 1.5; border-bottom: 1px solid rgba(42,42,64,0.4); }
+  .thread-upgrade a { color: var(--gold); text-decoration: none; }
+  .thread-expired-note { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); padding: 5px 20px 8px; border-bottom: 1px solid rgba(42,42,64,0.4); }
+  .thread-expired-note a { color: var(--gold-dim); text-decoration: none; }
+
+  .sidebar-upgrade-prompt { margin: 12px 16px; padding: 14px 16px; border: 1px solid var(--border); background: rgba(201,168,76,0.03); font-family: var(--crimson); font-style: italic; font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+  .sidebar-upgrade-prompt a { color: var(--gold); text-decoration: none; font-style: normal; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; display: block; margin-top: 10px; text-transform: uppercase; }
+
+  .cancel-banner { padding: 10px 20px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; line-height: 1.6; border-bottom: 1px solid; flex-shrink: 0; }
+  .cancel-banner.stage-1 { background: rgba(201,168,76,0.05); color: var(--gold-dim); border-color: rgba(201,168,76,0.3); }
+  .cancel-banner.stage-2 { background: rgba(192,128,64,0.07); color: #c08040; border-color: #8a5a28; }
+  .cancel-banner.stage-3 { background: rgba(184,92,92,0.08); color: #b85c5c; border-color: #8a3a3a; }
+
+  .main-content { flex: 1; margin-left: 0; transition: margin-left 0.3s ease; min-width: 0; }
+  .main-content.sidebar-open { margin-left: 280px; }
+  @media (max-width: 900px) { .main-content.sidebar-open { margin-left: 0; } }
+
+
   .shell {
     position: relative;
     z-index: 1;
@@ -584,6 +666,45 @@
 </style>
 </head>
 <body>
+
+<!-- ── SIDEBAR TOGGLE ── -->
+<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle session history">☰</button>
+
+<div class="page-wrap">
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar" id="sidebar">
+
+  <div class="sidebar-header">
+    <div class="sidebar-logo">QT Prism</div>
+    <div class="sidebar-tier" id="sidebarTierLabel">Scholar &nbsp;·&nbsp; 30 Day Archive</div>
+  </div>
+
+  <!-- Cancellation warning banner (shown based on post-cancel state) -->
+  <div class="cancel-banner stage-1" id="cancelBanner" style="display:none;">
+    Your session history is now read-only. Conversations will be permanently deleted in <strong id="cancelDaysLeft">90</strong> days unless you resubscribe.
+  </div>
+
+  <div class="sidebar-search">
+    <input type="text" id="sidebarSearch" placeholder="Search sessions…" oninput="filterThreads(this.value)" />
+  </div>
+
+  <div class="sidebar-section-label">Recent Sessions</div>
+
+  <div class="sidebar-threads" id="sidebarThreads">
+    <!-- Threads injected by JS -->
+  </div>
+
+  <!-- Free user upgrade prompt (shown for free tier) -->
+  <div class="sidebar-upgrade-prompt" id="freeUpgradePrompt" style="display:none;">
+    Your interpretations are saved and organized when you subscribe. Start your archive.
+    <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank">Subscribe → Scholar</a>
+  </div>
+
+</aside>
+
+<!-- ── MAIN CONTENT ── -->
+<div class="main-content" id="mainContent">
 <div class="shell">
 
   <div style="position:fixed; top:20px; left:28px; z-index:100;">
@@ -716,7 +837,9 @@
     QT is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
   </div>
 
-</div>
+</div><!-- /.shell -->
+</div><!-- /.main-content -->
+</div><!-- /.page-wrap -->
 
 <script>
 const inputTypes = {
@@ -960,6 +1083,10 @@ async function runInterpretation() {
     if (sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
     }
+
+    // Show sidebar after first successful query
+    const queryText = document.getElementById('userInput').value.trim();
+    showSidebarAfterQuery(queryText);
 
   } catch (err) {
     if (err.message === 'RATE_LIMITED') return;
@@ -1674,6 +1801,302 @@ document.addEventListener('keydown', e => {
     }
   };
 })();
+
+// ── SIDEBAR SYSTEM ──
+
+const MOCK_TIER = 'scholar'; // scholar | theologian | companion | free
+
+const MOCK_THREADS = [
+  {
+    id: 'thread-001',
+    title: null,
+    query: 'Lamentations 3:31-32',
+    type: 'verse',
+    lastVisited: 'May 9 · 10:14 am',
+    daysLeft: 22,
+    expired: false,
+    archived: false
+  },
+  {
+    id: 'thread-002',
+    title: 'On being known vs. religious performance',
+    query: '"I never knew you" (Matthew 7:23)',
+    type: 'phrase',
+    lastVisited: 'May 7 · 3:40 pm',
+    daysLeft: 7,
+    expired: false,
+    archived: false
+  },
+  {
+    id: 'thread-003',
+    title: null,
+    query: 'Free will vs. Determinism — if God knows everything, are choices real?',
+    type: 'theme',
+    lastVisited: 'May 3 · 8:22 am',
+    daysLeft: 3,
+    expired: false,
+    archived: false
+  },
+  {
+    id: 'thread-004',
+    title: 'The slow drain of living faith',
+    query: 'If God is real, why does He feel so distant? I grew up in church but it all feels routine now',
+    type: 'freetext',
+    lastVisited: 'Apr 28 · 6:05 pm',
+    daysLeft: 0,
+    expired: true,
+    archived: false
+  },
+  {
+    id: 'thread-005',
+    title: null,
+    query: 'Romans 8:28 — and we know that in all things God works for the good',
+    type: 'verse',
+    lastVisited: 'Apr 22 · 11:30 am',
+    daysLeft: 0,
+    expired: true,
+    archived: false
+  },
+  {
+    id: 'thread-006',
+    title: null,
+    query: 'Sovereignty and suffering — the tension between providence and pain',
+    type: 'theme',
+    lastVisited: 'Apr 15 · 2:18 pm',
+    daysLeft: 0,
+    expired: true,
+    archived: false
+  }
+];
+
+let activeThreadId = null;
+let renameOpenId = null;
+let allThreads = [];
+let sidebarOpen = false;
+let sidebarHasAppeared = false;
+
+function getThreadTitle(thread) {
+  const saved = localStorage.getItem('qt_thread_title_' + thread.id);
+  if (saved) return saved;
+  if (thread.title) return thread.title;
+  return thread.query.length > 60 ? thread.query.slice(0, 60) + '…' : thread.query;
+}
+
+function getBadge(thread, tier) {
+  if (tier === 'free') return '<span class="thread-badge badge-locked">🔒</span>';
+  if (thread.expired) return '<span class="thread-badge badge-expired">Expired</span>';
+  if (thread.daysLeft <= 5)  return '<span class="thread-badge badge-urgent">' + thread.daysLeft + ' Days Left</span>';
+  if (thread.daysLeft <= 10) return '<span class="thread-badge badge-warn">' + thread.daysLeft + ' Days Left</span>';
+  return '<span class="thread-badge badge-ok">' + thread.daysLeft + ' Days Left</span>';
+}
+
+function getUpgradePrompt(thread, tier) {
+  if (tier !== 'scholar') return '';
+  if (thread.expired) return '';
+  if (thread.daysLeft <= 10 && thread.daysLeft > 0) {
+    return '<div class="thread-upgrade">Thread expires in ' + thread.daysLeft + ' day' + (thread.daysLeft === 1 ? '' : 's') + '. <a href="https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05" target="_blank">Upgrade to Theologian →</a></div>';
+  }
+  return '';
+}
+
+function getExpiredNote(thread, tier) {
+  if (!thread.expired) return '';
+  return '<div class="thread-expired-note">Content visible · Follow-up locked · <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank">Extend 30 days — $1.99 →</a></div>';
+}
+
+function renderThreads(threads) {
+  const container = document.getElementById('sidebarThreads');
+  const tier = MOCK_TIER;
+
+  if (tier === 'free') {
+    document.getElementById('freeUpgradePrompt').style.display = 'block';
+  }
+
+  if (!threads.length) {
+    container.innerHTML = '<div style="padding:20px; font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--text-muted); text-align:center;">No sessions found</div>';
+    return;
+  }
+
+  container.innerHTML = threads.map(function(thread) {
+    const isLocked = tier === 'free';
+    const isActive = thread.id === activeThreadId;
+    const title = getThreadTitle(thread);
+    const badge = getBadge(thread, tier);
+    const upgradePrompt = getUpgradePrompt(thread, tier);
+    const expiredNote = getExpiredNote(thread, tier);
+    const renameOpen = renameOpenId === thread.id;
+
+    var dblClick = !isLocked ? ' ondblclick="openRename(\'' + thread.id + '\')"' : '';
+    var parts = [
+      '<div class="thread-item' + (isLocked ? ' locked' : '') + (isActive ? ' active' : '') + '" id="' + thread.id + '"' + dblClick + ' onclick="selectThread(\'' + thread.id + '\')" title="Double-click to rename">',
+      '  <div class="thread-title">' + escHtml(title) + '</div>',
+      '  <div class="thread-subtitle">' + escHtml(thread.query.length > 50 ? thread.query.slice(0,50) + '\u2026' : thread.query) + '</div>',
+      '  <div class="thread-meta">',
+      '    <span class="thread-date">' + thread.lastVisited + '</span>',
+      '    ' + badge,
+      '  </div>',
+      '</div>',
+      upgradePrompt,
+      expiredNote,
+      '<div class="thread-rename-wrap' + (renameOpen ? ' visible' : '') + '" id="rename-' + thread.id + '">',
+      '  <input class="thread-rename-input" maxlength="60" id="rename-input-' + thread.id + '" value="' + escHtml(getThreadTitle(thread)) + '" oninput="updateRenameCount(\'' + thread.id + '\')" onkeydown="handleRenameKey(event,\'' + thread.id + '\')" placeholder="Rename this thread\u2026" />',
+      '  <div class="thread-rename-count" id="rename-count-' + thread.id + '">' + getThreadTitle(thread).length + ' / 60</div>',
+      '</div>'
+    ];
+    return parts.join('');
+  }).join('');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function selectThread(id) {
+  if (MOCK_TIER === 'free') return;
+  activeThreadId = id;
+  renderThreads(allThreads);
+}
+
+function openRename(id) {
+  renameOpenId = (renameOpenId === id) ? null : id;
+  renderThreads(allThreads);
+  if (renameOpenId) {
+    const inp = document.getElementById('rename-input-' + id);
+    if (inp) { inp.focus(); inp.select(); }
+  }
+}
+
+function updateRenameCount(id) {
+  const inp = document.getElementById('rename-input-' + id);
+  const cnt = document.getElementById('rename-count-' + id);
+  if (inp && cnt) cnt.textContent = inp.value.length + ' / 60';
+}
+
+function handleRenameKey(e, id) {
+  if (e.key === 'Enter') saveRename(id);
+  if (e.key === 'Escape') { renameOpenId = null; renderThreads(allThreads); }
+}
+
+function saveRename(id) {
+  const inp = document.getElementById('rename-input-' + id);
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (val) localStorage.setItem('qt_thread_title_' + id, val);
+  renameOpenId = null;
+  renderThreads(allThreads);
+}
+
+function filterThreads(query) {
+  if (!query.trim()) { renderThreads(allThreads); return; }
+  const q = query.toLowerCase();
+  const filtered = allThreads.filter(function(t) {
+    const title = getThreadTitle(t).toLowerCase();
+    const threadQuery = t.query.toLowerCase();
+    return title.includes(q) || threadQuery.includes(q);
+  });
+  renderThreads(filtered);
+}
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('mainContent');
+  const toggle = document.getElementById('sidebarToggle');
+  sidebar.classList.toggle('open', sidebarOpen);
+  main.classList.toggle('sidebar-open', sidebarOpen);
+  toggle.textContent = sidebarOpen ? '✕' : '☰';
+  localStorage.setItem('qt_sidebar_open', sidebarOpen ? '1' : '0');
+}
+
+function initSidebar() {
+  // Load tier label
+  const tierLabels = { scholar: 'Scholar · 30 Day Archive', theologian: 'Theologian · 90 Day Archive', companion: 'Companion · 3 Year Archive', free: 'Free Access' };
+  document.getElementById('sidebarTierLabel').textContent = tierLabels[MOCK_TIER] || 'Scholar · 30 Day Archive';
+
+  // Load threads from localStorage or use mock data
+  const saved = localStorage.getItem('qt_threads');
+  allThreads = saved ? JSON.parse(saved) : MOCK_THREADS;
+
+  // Sidebar starts hidden — appears after first query (handled in showSidebarAfterQuery)
+  const toggle = document.getElementById('sidebarToggle');
+  const sidebar = document.getElementById('sidebar');
+
+  // Restore open state if sidebar has appeared before
+  const hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
+  if (hasAppeared) {
+    sidebar.classList.add('visible');
+    toggle.classList.add('visible');
+    sidebarHasAppeared = true;
+    const wasOpen = localStorage.getItem('qt_sidebar_open') === '1';
+    if (wasOpen) {
+      sidebarOpen = true;
+      sidebar.classList.add('open');
+      document.getElementById('mainContent').classList.add('sidebar-open');
+      toggle.textContent = '✕';
+    }
+    renderThreads(allThreads);
+  }
+
+  // Demo: show cancel banner (remove to hide)
+  // document.getElementById('cancelBanner').style.display = 'block';
+}
+
+function showSidebarAfterQuery(queryText) {
+  if (sidebarHasAppeared) {
+    // Just add the new thread to the top
+    addThreadToSidebar(queryText);
+    return;
+  }
+  sidebarHasAppeared = true;
+  localStorage.setItem('qt_sidebar_appeared', '1');
+
+  const sidebar = document.getElementById('sidebar');
+  const toggle = document.getElementById('sidebarToggle');
+  sidebar.classList.add('visible');
+  toggle.classList.add('visible');
+
+  addThreadToSidebar(queryText);
+
+  // Auto-open sidebar on first appearance
+  setTimeout(function() {
+    sidebarOpen = true;
+    sidebar.classList.add('open');
+    document.getElementById('mainContent').classList.add('sidebar-open');
+    toggle.textContent = '✕';
+    localStorage.setItem('qt_sidebar_open', '1');
+  }, 400);
+}
+
+function addThreadToSidebar(queryText) {
+  const newThread = {
+    id: 'thread-' + Date.now(),
+    title: null,
+    query: queryText,
+    type: 'new',
+    lastVisited: formatNow(),
+    daysLeft: 30,
+    expired: false,
+    archived: false
+  };
+  allThreads.unshift(newThread);
+  localStorage.setItem('qt_threads', JSON.stringify(allThreads));
+  activeThreadId = newThread.id;
+  renderThreads(allThreads);
+}
+
+function formatNow() {
+  const now = new Date();
+  const month = now.toLocaleString('en-US', { month: 'short' });
+  const day = now.getDate();
+  let hours = now.getHours();
+  const mins = String(now.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12 || 12;
+  return month + ' ' + day + ' · ' + hours + ':' + mins + ' ' + ampm;
+}
+
+document.addEventListener('DOMContentLoaded', initSidebar);
+
 </script>
 
 <footer class="site-footer">
