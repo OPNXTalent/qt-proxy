@@ -448,8 +448,30 @@
 
       <div class="divider"></div>
 
+      <!-- ── ENTRY SELECTION ── -->
+      <div class="flow active" id="flow-select">
+        <div class="soft-prompt">
+          Where are you entering from?
+        </div>
+        <button class="btn-primary" onclick="showFlow('new-user')" style="margin-bottom:0.75rem;">
+          I'm new here
+        </button>
+        <button class="btn-primary" onclick="showFlow('returning')" style="margin-bottom:0.75rem;">
+          I have an account
+        </button>
+        <button class="btn-primary" onclick="showFlow('bookcode')" style="margin-bottom:0.75rem;">
+          I have a book code
+        </button>
+        <button class="btn-ghost" onclick="handleAnonymous()">
+          Just exploring
+        </button>
+        <div class="anon-note">
+          Anonymous access: 3 queries, nothing stored, no session preserved.
+        </div>
+      </div>
+
       <!-- ── NEW USER ── -->
-      <div class="flow active" id="flow-new-user">
+      <div class="flow" id="flow-new-user">
         <div class="soft-prompt">
           Create an account to preserve your conversations and access your full tier.
         </div>
@@ -474,6 +496,7 @@
           Anonymous access: 3 queries, nothing stored, no session preserved.
         </div>
         <div class="pivot-row">
+          <button class="pivot-link" onclick="showFlow('select')">← Back</button>
           <button class="pivot-link" onclick="showFlow('returning')">Already have an account</button>
         </div>
         <div class="benefit-list">
@@ -508,6 +531,7 @@
         </div>
         <button class="btn-primary" onclick="handleLogin(this)">Enter</button>
         <div class="pivot-row">
+          <button class="pivot-link" onclick="showFlow('select')">← Back</button>
           <button class="pivot-link" onclick="showFlow('new-user')">Create account</button>
           <button class="pivot-link" onclick="handleForgot()">Forgot password</button>
         </div>
@@ -656,6 +680,7 @@
           </div>
           <button class="btn-primary" onclick="handleBookCode(this)">Redeem →</button>
           <div class="pivot-row">
+            <button class="pivot-link" onclick="showFlow('select')">← Back</button>
             <button class="pivot-link" onclick="showFlow('new-user')">Create account instead</button>
             <button class="pivot-link" onclick="showFlow('returning')">Already have an account</button>
           </div>
@@ -681,9 +706,10 @@
   }
 
   /* ── Flow state ── */
-  var flowOrder = ['new-user', 'returning', 'legacy', 'errors', 'routing', 'bookcode'];
+  var flowOrder = ['select', 'new-user', 'returning', 'legacy', 'errors', 'routing', 'bookcode'];
 
   var flowTitles = {
+    'select':    'Enter the Prism',
     'new-user':  'Enter the Prism',
     'returning': 'Enter the Prism',
     'legacy':    'Welcome Back',
@@ -693,6 +719,7 @@
   };
 
   var flowCopies = {
+    'select':    'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
     'new-user':  'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
     'returning': 'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
     'legacy':    'Your access predates the current system. One step to continue — nothing else changes.',
