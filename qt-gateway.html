@@ -265,7 +265,7 @@
     font-size: 12px;
     font-weight: 300;
     letter-spacing: 0.15em;
-    color: var(--text-dim);
+    color: var(--text-muted);
     text-transform: uppercase;
     cursor: pointer;
     border: none;
@@ -275,7 +275,7 @@
     text-decoration: none;
   }
 
-  .pivot-link:hover { color: var(--gold); }
+  .pivot-link:hover { color: var(--text-dim); }
 
   /* ── Anonymous note ── */
   .anon-note {
@@ -790,6 +790,7 @@
         document.getElementById('flow-title').textContent = 'Access Confirmed';
         document.getElementById('flow-copy').textContent  = 'Authentication verified. Your session is being prepared.';
         setTimeout(function() {
+          localStorage.setItem('qt_user_email', email);
           window.location.href = 'https://quantumtheology.app/qt.html?tier=' + tier;
         }, 2000);
       });
@@ -813,6 +814,7 @@
       return;
     }
     await sb.from('subscribers').upsert({ email: email, tier: 'scholar', status: 'active' }, { onConflict: 'email' });
+    await fireReferralCredit(email);
     routeAfterAuth(email);
   }
 
@@ -930,17 +932,88 @@
     routeAfterAuth(email);
   }
 
-  /* ── Share link pre-population ── */
+  /* ── Share link pre-population + referral token ── */
+  var _refToken = null;
+
   (function() {
     var params = new URLSearchParams(window.location.search);
+
+    // Pre-populate email from share link
     var emailParam = params.get('email');
     if (emailParam) {
+      var decoded = decodeURIComponent(emailParam);
+      var newUserField   = document.getElementById('nu-email');
       var legacyField    = document.getElementById('leg-email');
       var returningField = document.getElementById('ru-email');
-      if (legacyField)    legacyField.value    = decodeURIComponent(emailParam);
-      if (returningField) returningField.value = decodeURIComponent(emailParam);
+      if (newUserField)   newUserField.value   = decoded;
+      if (legacyField)    legacyField.value    = decoded;
+      if (returningField) returningField.value = decoded;
+    }
+
+    // Capture referral token
+    var refParam = params.get('ref');
+    if (refParam) {
+      _refToken = refParam;
     }
   })();
+
+  /* ── Fire referral credit after successful registration ── */
+  async function fireReferralCredit(recipientEmail) {
+    if (!_refToken) return;
+    try {
+      // Look up the share record to get sender email
+      var res = await sb
+        .from('shares')
+        .select('sender_email')
+        .eq('token', _refToken)
+        .single();
+
+      if (res.error || !res.data) return;
+      var senderEmail = res.data.sender_email;
+
+      // Check if this referral has already been credited (idempotency)
+      var existing = await sb
+        .from('referrals')
+        .select('id')
+        .eq('share_token', _refToken)
+        .single();
+
+      if (existing.data) return; // already credited
+
+      // Insert referral record
+      await sb.from('referrals').insert({
+        share_token:     _refToken,
+        sender_email:    senderEmail,
+        recipient_email: recipientEmail,
+        credit_type:     'thread_reset'
+      });
+
+      // Increment or create thread reset credit for sender
+      var creditRes = await sb
+        .from('thread_resets')
+        .select('id, credits')
+        .eq('email', senderEmail)
+        .single();
+
+      if (creditRes.data) {
+        await sb
+          .from('thread_resets')
+          .update({
+            credits:    creditRes.data.credits + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', creditRes.data.id);
+      } else {
+        await sb.from('thread_resets').insert({
+          email:   senderEmail,
+          credits: 1
+        });
+      }
+    } catch (err) {
+      // Silent fail — don't interrupt registration flow
+      console.error('Referral credit error:', err.message);
+    }
+  }
 </script>
 
 </body>
