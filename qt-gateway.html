@@ -475,6 +475,7 @@
         <div class="soft-prompt">
           Create an account to preserve your conversations and access your full tier.
         </div>
+        <form autocomplete="on" onsubmit="return false;">
         <div class="field-group">
           <div class="field-wrap">
             <label class="field-label" for="nu-email">Email</label>
@@ -491,6 +492,7 @@
           </div>
         </div>
         <button class="btn-primary" onclick="handleRegister(this)">Create Account</button>
+        </form>
         <button class="btn-ghost" onclick="handleAnonymous()">Continue Without an Account</button>
         <div class="anon-note">
           Anonymous access: 3 queries, nothing stored, no session preserved.
@@ -517,6 +519,7 @@
 
       <!-- ── RETURNING USER ── -->
       <div class="flow" id="flow-returning">
+        <form autocomplete="on" onsubmit="return false;">
         <div class="field-group">
           <div class="field-wrap">
             <label class="field-label" for="ru-email">Email</label>
@@ -530,6 +533,7 @@
           </div>
         </div>
         <button class="btn-primary" onclick="handleLogin(this)">Enter</button>
+        </form>
         <div class="pivot-row">
           <button class="pivot-link" onclick="showFlow('select')">← Back</button>
           <button class="pivot-link" onclick="showFlow('new-user')">Create account</button>
@@ -544,6 +548,7 @@
           Your subscription was created before password accounts. Set a password to continue —
           your tier and access are unchanged.
         </div>
+        <form autocomplete="on" onsubmit="return false;">
         <div class="field-group">
           <div class="field-wrap">
             <label class="field-label" for="leg-email">Email</label>
@@ -556,6 +561,7 @@
               id="leg-email"
               type="email"
               placeholder="your@email.com"
+              autocomplete="email"
             />
           </div>
           <div class="field-wrap">
@@ -569,6 +575,7 @@
           </div>
         </div>
         <button class="btn-primary" onclick="handleLegacy(this)">Set Password and Continue</button>
+        </form>
         <div class="anon-note">
           Password creation is required to continue. There is no skip.
         </div>
@@ -667,6 +674,7 @@
           <div class="soft-prompt" style="text-align:left; margin-bottom:1.35rem;">
             Enter the access code printed in your copy of Quantum Theology. Your code grants extended Prism access — no subscription required.
           </div>
+          <form autocomplete="on" onsubmit="return false;">
           <div class="field-group">
             <div class="field-wrap">
               <label class="field-label" for="bc-email">Email</label>
@@ -679,6 +687,7 @@
             </div>
           </div>
           <button class="btn-primary" onclick="handleBookCode(this)">Redeem →</button>
+          </form>
           <div class="pivot-row">
             <button class="pivot-link" onclick="showFlow('select')">← Back</button>
             <button class="pivot-link" onclick="showFlow('new-user')">Create account instead</button>
