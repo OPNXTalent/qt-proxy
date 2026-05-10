@@ -45,42 +45,42 @@ async function sendShareEmail(recipientEmail, senderEmail, token, snapshot) {
     : 'A Quantum Theology interpretation';
 
   const html = `
-    <div style="background:#06060a; color:#d8d4e8; font-family:Georgia,serif; max-width:600px; margin:0 auto; padding:48px 40px;">
+    <div style="background:#ffffff; color:#1a1a2e; font-family:Georgia,serif; max-width:600px; margin:0 auto; padding:48px 40px; border:1px solid #e0dce8;">
       <div style="text-align:center; margin-bottom:32px;">
-        <div style="font-family:serif; font-size:28px; color:#e8d5a0; letter-spacing:0.08em;">Quantum Theology</div>
-        <div style="font-size:14px; color:#7a6230; letter-spacing:0.2em; text-transform:uppercase; margin-top:4px;">Echad b'Emet</div>
+        <div style="font-family:Georgia,serif; font-size:26px; color:#1a1a2e; letter-spacing:0.08em;">Quantum Theology</div>
+        <div style="font-size:12px; color:#7a6230; letter-spacing:0.2em; text-transform:uppercase; margin-top:6px;">Echad b'Emet</div>
       </div>
-      <div style="border-top:1px solid #2a2a40; margin-bottom:32px;"></div>
+      <div style="border-top:1px solid #e0dce8; margin-bottom:32px;"></div>
 
-      <p style="font-size:17px; color:#7a7890; line-height:1.8; margin-bottom:20px;">
-        Someone has shared a QT Prism interpretation with you.
+      <p style="font-size:16px; color:#4a4860; line-height:1.8; margin-bottom:24px;">
+        Someone shared a QT Prism interpretation with you.
       </p>
 
-      <div style="border-left:2px solid #7a6230; padding:16px 24px; background:rgba(201,168,76,0.04); margin-bottom:32px;">
-        <div style="font-family:monospace; font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:#7a6230; margin-bottom:8px;">From the interpretation</div>
-        <p style="font-size:18px; color:#e8d5a0; font-style:italic; line-height:1.7; margin:0;">${subjectPreview}</p>
+      <div style="border-left:3px solid #c9a84c; padding:16px 24px; background:#faf8f2; margin-bottom:32px;">
+        <div style="font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:#7a6230; margin-bottom:10px; font-family:monospace;">From the interpretation</div>
+        <p style="font-size:18px; color:#2a2840; font-style:italic; line-height:1.7; margin:0;">${subjectPreview}</p>
       </div>
 
-      <div style="text-align:center; margin:40px 0;">
-        <a href="${shareUrl}" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px; display:inline-block;">
+      <div style="text-align:center; margin:36px 0;">
+        <a href="${shareUrl}" style="font-family:monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#ffffff; text-decoration:none; background:#2a2840; padding:14px 32px; display:inline-block;">
           Read the Interpretation →
         </a>
       </div>
 
-      <div style="border-top:1px solid #2a2a40; margin:32px 0;"></div>
+      <div style="border-top:1px solid #e0dce8; margin:32px 0;"></div>
 
-      <p style="font-size:15px; color:#7a7890; line-height:1.8; text-align:center; font-style:italic;">
+      <p style="font-size:14px; color:#7a7890; line-height:1.8; text-align:center; font-style:italic;">
         The Prism applies Hebraic relational ontology and the conceptual language of quantum mechanics to Scripture — not as metaphor, but as structural confirmation.
       </p>
 
-      <div style="text-align:center; margin:32px 0 0;">
+      <div style="text-align:center; margin:28px 0 0;">
         <a href="${gatewayUrl}" style="font-family:monospace; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7a6230; text-decoration:none;">
           Experience it yourself →
         </a>
       </div>
 
-      <div style="border-top:1px solid #2a2a40; margin-top:32px; padding-top:24px;">
-        <p style="font-size:13px; color:#3a384a; text-align:center;">
+      <div style="border-top:1px solid #e0dce8; margin-top:32px; padding-top:24px;">
+        <p style="font-size:12px; color:#b0aac0; text-align:center;">
           Questions? <a href="mailto:support@quantumtheology.app" style="color:#7a6230;">support@quantumtheology.app</a>
         </p>
       </div>
