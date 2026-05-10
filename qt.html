@@ -547,24 +547,6 @@
     color: var(--text-dim);
   }
 
-  /* Auth buttons (Enter → on email + access code fields) */
-  .auth-btn {
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    padding: 12px 20px;
-    border: 1px solid var(--gold-dim);
-    background: transparent;
-    color: var(--gold-pale);
-    cursor: pointer;
-    transition: all 0.25s;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .auth-btn:hover { background: rgba(201,168,76,0.1); }
-  .auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
   /* Mic button active state */
   #micBtn.listening {
     border-color: rgba(220,60,60,0.8);
@@ -620,48 +602,6 @@
 
   <!-- INPUT FORM -->
   <div id="inputSection">
-    <!-- Subscriber email unlock -->
-<div style="margin-bottom: 28px;">
-  <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-    <div id="subscriberPill" style="width:12px; height:22px; border-radius:20px; border:1px solid rgba(100,100,130,0.5); background:transparent; transition:all 0.4s; flex-shrink:0;"></div>
-    <label class="input-label" style="margin-bottom:0;">Subscriber Email — <span id="subscriberPrompt" style="color:var(--gold-dim); font-style:italic;">enter email and press Enter to verify</span></label>
-  </div>
-  <div style="display:flex; gap:10px;">
-    <input
-      type="email"
-      id="subscriberEmail"
-      placeholder="your@email.com"
-      style="flex:1; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:13px; padding:12px 16px; outline:none; letter-spacing:0.08em; transition:border-color 0.2s;"
-      onfocus="this.style.borderColor='var(--gold-dim)'"
-      onblur="this.style.borderColor='var(--border)'"
-      onkeydown="if(event.key==='Enter'){event.preventDefault();verifySubscriberEmail();}"
-    />
-    <button onclick="verifySubscriberEmail()" class="auth-btn">Enter →</button>
-  </div>
-  <div id="subscriberStatus" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; margin-top:6px; height:14px;"></div>
-</div>
-
-    <!-- Access code field -->
-    <div style="margin-bottom: 28px;">
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-        <div id="accessCodePill" style="width:12px; height:22px; border-radius:20px; border:1px solid rgba(40,140,60,0.7); background:transparent; transition:all 0.4s; flex-shrink:0;"></div>
-        <label class="input-label" style="margin-bottom:0;">Access Code — <span id="accessCodePrompt" style="color:var(--gold-dim); font-style:italic;">enter code from your book</span></label>
-      </div>
-      <div style="display:flex; gap:10px;">
-        <input
-          type="text"
-          id="accessCodeInput"
-          placeholder="Enter your code"
-          style="flex:1; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:13px; padding:12px 16px; outline:none; letter-spacing:0.08em; text-transform:uppercase; transition:border-color 0.2s;"
-          onfocus="this.style.borderColor='var(--gold-dim)'"
-          onblur="this.style.borderColor='var(--border)'"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();redeemAccessCode();}"
-        />
-        <button onclick="redeemAccessCode()" class="auth-btn">Redeem →</button>
-      </div>
-      <div id="accessCodeStatus" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; margin-top:6px; height:14px;"></div>
-    </div>
-
         <div class="input-selector">
       <button class="type-btn active" data-type="verse" onclick="setType('verse', this)">Verse Reference</button>
       <button class="type-btn" data-type="phrase" onclick="setType('phrase', this)">Phrase</button>
@@ -685,36 +625,39 @@
 
     <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
       <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Free Query Limit Reached</div>
-      <div class="limit-message" style="font-family:var(--crimson); font-size:19px; color:var(--text); line-height:1.8; margin-bottom:12px;">You've used all 3 free interpretations for today.</div>
-      <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.75; margin-bottom:32px;">The free version allows 3 queries every 24 hours.<br>Return tomorrow to continue exploring — or subscribe to remove the limit entirely.</div>
+      <div class="limit-message" style="font-family:var(--crimson); font-size:19px; color:var(--text); line-height:1.8; margin-bottom:32px;">You've used your 3 free interpretations.</div>
 
-      <!-- Pricing tiers -->
+      <!-- Three-option wall -->
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px; text-align:left;">
-        <!-- Scholar -->
+
+        <!-- Buy queries -->
         <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface);">
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">One-Time</div>
+          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$1.99</div>
+          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">10 queries.<br>No subscription required.</div>
+          <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Buy 10 Queries →</a>
+        </div>
+
+        <!-- Subscribe -->
+        <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
+          <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Recommended</div>
           <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Scholar</div>
           <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$9.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
           <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">Unlimited queries.<br>Full framework access.</div>
-          <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Subscribe →</a>
+          <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Subscribe →</a>
         </div>
-        <!-- Theologian -->
-        <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
-          <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Most Popular</div>
-          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Theologian</div>
-          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$24.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
-          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">Everything in Scholar<br>plus priority access.</div>
-          <a href="https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Subscribe →</a>
-        </div>
-        <!-- Companion -->
-        <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface);">
-          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Companion</div>
-          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$199<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/yr</span></div>
-          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">Full access, annually.<br>For serious practitioners.</div>
-          <a href="https://buy.stripe.com/8x27sL9j86iQaOtgPn18c06" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.08)';" onmouseout="this.style.background='transparent';">Subscribe →</a>
-        </div>
-      </div>
 
-      <a href="/" style="font-family:var(--mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); text-decoration:none; border:1px solid var(--border); padding:10px 24px; display:inline-block; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--gold-dim)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
+        <!-- Return tomorrow -->
+        <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface); display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Free</div>
+            <div style="font-family:var(--cinzel); font-size:22px; color:var(--text-dim); margin-bottom:4px;">$0</div>
+            <div style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); line-height:1.6; margin-bottom:20px;">3 queries reset<br>every 24 hours.</div>
+          </div>
+          <a href="/" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--border-lit)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
+        </div>
+
+      </div>
     </div>
   </div>
 
@@ -925,7 +868,6 @@ Return this exact JSON object (start with { immediately):
 // --- Query limit state ---
 let sessionQueryCount = 0;
 const QUERY_LIMIT = 3;
-let isVerifiedUser = false;
 
 function applyQueryLock(customMessage) {
     document.getElementById('submitBtn').style.display = 'none';
@@ -947,8 +889,8 @@ async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
-  // Hard gate — never proceed if limit reached (verified users bypass)
-  if (!isVerifiedUser && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Hard gate — never proceed if limit reached
+  if (sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   // Reset conversation for new subject
   conversationHistory = [];
@@ -1006,7 +948,7 @@ async function runInterpretation() {
     document.getElementById('downloadRow').style.display = 'block';
 
     sessionQueryCount++;
-    if (!isVerifiedUser && sessionQueryCount >= QUERY_LIMIT) {
+    if (sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
     }
 
@@ -1026,8 +968,8 @@ async function runFollowUp() {
   const input = document.getElementById('followUpInput').value.trim();
   if (!input) return;
 
-  // Hard gate — block follow-ups if limit reached (verified users bypass)
-  if (!isVerifiedUser && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Hard gate — block follow-ups if limit reached
+  if (sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   document.getElementById('followUpBtn').disabled = true;
   document.getElementById('followUpInput').style.opacity = '0.4';
@@ -1102,7 +1044,7 @@ async function callProxy(messages) {
     response = await fetch('https://quantumtheology.app/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, email: document.getElementById('subscriberEmail')?.value?.trim() || null })
+      body: JSON.stringify({ messages })
     });
   } catch (networkErr) {
     const err = new Error('NETWORK_ERROR');
@@ -1150,8 +1092,6 @@ async function callProxy(messages) {
     err.type = 'parse';
     throw err;
   }
-
-  if (data.subscriber === true) setSubscriberUnlocked();
 
   const contentBlocks = data.content;
   if (!contentBlocks || contentBlocks.length === 0) {
@@ -1725,146 +1665,6 @@ document.addEventListener('keydown', e => {
     }
   };
 })();
-// Persist subscriber email + pill state
-const emailInput = document.getElementById('subscriberEmail');
-const savedEmail = localStorage.getItem('qt_subscriber_email');
-if (savedEmail) emailInput.value = savedEmail;
-
-function setPillState(state) {
-  const pill = document.getElementById('subscriberPill');
-  const prompt = document.getElementById('subscriberPrompt');
-  const status = document.getElementById('subscriberStatus');
-  const emailEl = document.getElementById('subscriberEmail');
-
-  if (state === 'checking') {
-    pill.style.background = 'rgba(201,168,76,0.4)';
-    pill.style.borderColor = 'rgba(201,168,76,0.6)';
-    pill.style.boxShadow = 'none';
-    prompt.textContent = 'verifying…';
-    prompt.style.color = 'var(--gold-dim)';
-    status.textContent = '';
-  } else if (state === 'verified') {
-    isVerifiedUser = true;
-    pill.style.background = 'rgba(40,160,60,0.85)';
-    pill.style.borderColor = 'rgba(60,200,80,0.9)';
-    pill.style.boxShadow = '0 0 10px rgba(40,160,60,0.5)';
-    prompt.textContent = 'subscriber verified';
-    prompt.style.color = 'rgba(60,200,80,0.85)';
-    status.textContent = '✓ ACCESS CONFIRMED';
-    status.style.color = 'rgba(60,200,80,0.7)';
-    emailEl.style.borderColor = 'rgba(40,160,60,0.4)';
-  } else if (state === 'unrecognized') {
-    pill.style.background = 'rgba(180,50,40,0.7)';
-    pill.style.borderColor = 'rgba(220,70,60,0.8)';
-    pill.style.boxShadow = '0 0 8px rgba(180,50,40,0.4)';
-    prompt.textContent = 'not recognized';
-    prompt.style.color = 'rgba(220,100,80,0.85)';
-    status.textContent = 'EMAIL NOT FOUND — CHECK YOUR SUBSCRIPTION OR USE AN ACCESS CODE BELOW';
-    status.style.color = 'rgba(200,80,70,0.7)';
-    emailEl.style.borderColor = 'rgba(180,50,40,0.4)';
-  } else if (state === 'saved') {
-    pill.style.background = 'rgba(201,168,76,0.25)';
-    pill.style.borderColor = 'rgba(201,168,76,0.5)';
-    pill.style.boxShadow = 'none';
-    prompt.textContent = 'email saved — verifying on next query';
-    prompt.style.color = 'var(--gold-dim)';
-    status.textContent = '○ SAVED LOCALLY';
-    status.style.color = 'var(--gold-dim)';
-  }
-}
-
-function setSubscriberUnlocked() {
-  setPillState('verified');
-  document.getElementById('subscriberEmail').style.borderColor = 'rgba(40,160,60,0.4)';
-}
-
-async function verifySubscriberEmail() {
-  const val = emailInput.value.trim();
-  if (!val || !val.includes('@')) return;
-
-  localStorage.setItem('qt_subscriber_email', val);
-  setPillState('checking');
-
-  try {
-    const res = await fetch('https://quantumtheology.app/api/interpret', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role: 'user', content: 'ping' }], email: val, ping: true })
-    });
-
-    if (res.status === 429) {
-      setPillState('verified');
-      return;
-    }
-
-    let data = null;
-    try { data = await res.json(); } catch {}
-
-    if (data && data.subscriber === true) {
-      setPillState('verified');
-    } else if (res.ok) {
-      setPillState('unrecognized');
-    } else {
-      setPillState('saved');
-    }
-  } catch {
-    setPillState('saved');
-  }
-}
-
-emailInput.addEventListener('change', () => {
-  const val = emailInput.value.trim();
-  if (val) localStorage.setItem('qt_subscriber_email', val);
-});
-async function redeemAccessCode() {
-  const code = document.getElementById('accessCodeInput').value.trim().toUpperCase();
-  const email = document.getElementById('subscriberEmail').value.trim();
-  const statusEl = document.getElementById('accessCodeStatus');
-  const pillEl = document.getElementById('accessCodePill');
-  const promptEl = document.getElementById('accessCodePrompt');
-
-  if (!code) {
-    statusEl.textContent = 'ENTER A CODE';
-    statusEl.style.color = 'rgba(40,140,60,0.8)';
-    return;
-  }
-  if (!email) {
-    statusEl.textContent = 'ENTER YOUR EMAIL FIRST';
-    statusEl.style.color = 'rgba(40,140,60,0.8)';
-    return;
-  }
-
-  statusEl.textContent = 'VALIDATING...';
-  statusEl.style.color = 'var(--gold-dim)';
-
-  try {
-    const res = await fetch('https://quantumtheology.app/api/redeem', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, email })
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      isVerifiedUser = true;
-      pillEl.style.background = 'rgba(40,140,60,0.8)';
-      pillEl.style.borderColor = 'rgba(60,180,80,0.9)';
-      pillEl.style.boxShadow = '0 0 12px rgba(40,140,60,0.5)';
-      promptEl.textContent = 'access granted — 30 days';
-      promptEl.style.color = 'rgba(40,140,60,0.8)';
-      statusEl.textContent = '✓ CODE ACCEPTED';
-      statusEl.style.color = 'rgba(40,140,60,0.8)';
-      document.getElementById('accessCodeInput').style.borderColor = 'rgba(40,140,60,0.5)';
-      localStorage.setItem('qt_access_code', code);
-    } else {
-      statusEl.textContent = data.message || 'INVALID CODE';
-      statusEl.style.color = 'rgba(40,140,60,0.8)';
-    }
-  } catch {
-    statusEl.textContent = 'ERROR — TRY AGAIN';
-    statusEl.style.color = 'rgba(40,140,60,0.8)';
-  }
-}
 </script>
 
 <footer class="site-footer">
