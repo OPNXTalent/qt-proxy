@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quantum Theology — Enter the Prism</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #06060a;
+    --deep: #0d0d14;
+    --surface: #13131e;
+    --surface-2: #1a1a28;
+    --border: #2a2a40;
+    --border-lit: #4a4a70;
+    --gold: #c9a84c;
+    --gold-dim: #7a6230;
+    --gold-pale: #e8d5a0;
+    --blue-deep: #1e2a4a;
+    --blue-mid: #2a3f70;
+    --blue-lit: #4a6aaa;
+    --text: #d8d4e8;
+    --text-dim: #7a7890;
+    --text-muted: #3a384a;
+    --hebrew: #b8a8d0;
+    --cinzel: 'Cinzel', serif;
+    --crimson: 'Crimson Pro', Georgia, serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    min-height: 100vh;
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--crimson);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1.25rem;
+    min-height: 100vh;
+  }
+
+  /* ── Page entrance animation ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .gateway-wrap {
+    width: 100%;
+    max-width: 460px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: fadeUp 0.7s ease both;
+  }
+
+  /* ── Logo ── */
+  .logo-seal {
+    width: 108px;
+    height: 108px;
+    object-fit: contain;
+    margin-bottom: 2.25rem;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  /* ── Gate card ── */
+  .gate-card {
+    width: 100%;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    padding: 2.5rem 2.25rem 2.25rem;
+    position: relative;
+    animation: fadeUp 0.7s 0.1s ease both;
+  }
+
+  .gate-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* ── Typography ── */
+  .gate-title {
+    font-family: var(--cinzel);
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    color: var(--gold-pale);
+    text-align: center;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+  }
+
+  .gate-copy {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-weight: 300;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 1.85rem;
+  }
+
+  .soft-prompt {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 1.4rem;
+    line-height: 1.6;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: var(--border);
+    margin-bottom: 1.75rem;
+  }
+
+  /* ── Fields ── */
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.35rem;
+  }
+
+  .field-wrap { display: flex; flex-direction: column; }
+
+  .field-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 300;
+    letter-spacing: 0.22em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .field-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--crimson);
+    font-size: 15px;
+    padding: 11px 14px;
+    outline: none;
+    border-radius: 0;
+    -webkit-appearance: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .field-input:focus {
+    border-color: var(--gold-dim);
+    background: var(--surface-2);
+  }
+
+  .field-input::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .field-input[readonly] {
+    color: var(--text-dim);
+    cursor: default;
+  }
+
+  .field-input.is-error {
+    border-color: #8b3a3a;
+  }
+
+  .field-error {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 300;
+    color: #b85c5c;
+    letter-spacing: 0.06em;
+    margin-top: 6px;
+    display: none;
+  }
+
+  .field-error.visible { display: block; }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: var(--cinzel);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 14px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.25s, color 0.2s;
+    margin-bottom: 0.9rem;
+    display: block;
+  }
+
+  .btn-primary:hover {
+    background: var(--gold-dim);
+    border-color: var(--gold);
+    color: var(--void);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.99);
+  }
+
+  .btn-ghost {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    margin-bottom: 0.75rem;
+    display: block;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--border-lit);
+    color: var(--text);
+  }
+
+  /* ── Pivot links ── */
+  .pivot-row {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 1.1rem;
+  }
+
+  .pivot-link {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    cursor: pointer;
+    border: none;
+    background: none;
+    transition: color 0.2s;
+    padding: 0;
+    text-decoration: none;
+  }
+
+  .pivot-link:hover { color: var(--text-dim); }
+
+  /* ── Anonymous note ── */
+  .anon-note {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.5;
+    margin-top: 0.9rem;
+  }
+
+  /* ── Benefit list ── */
+  .benefit-list {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .benefit-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .benefit-dot {
+    width: 4px;
+    height: 4px;
+    background: var(--gold-dim);
+    border-radius: 50%;
+    margin-top: 9px;
+    flex-shrink: 0;
+  }
+
+  .benefit-text {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.55;
+  }
+
+  /* ── Tier badge ── */
+  .tier-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 8px;
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-dim);
+    margin-bottom: 1rem;
+  }
+
+  /* ── Routing blocks ── */
+  .routing-block {
+    border: 1px solid var(--border);
+    padding: 1.1rem 1.25rem;
+    background: var(--surface);
+    margin-bottom: 0.75rem;
+  }
+
+  .routing-msg {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .progress-dots {
+    display: flex;
+    gap: 6px;
+    margin-top: 0.9rem;
+  }
+
+  .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+
+  .dot.on { background: var(--gold-dim); }
+
+  /* ── Error sections ── */
+  .error-section { margin-bottom: 1.5rem; }
+
+  .error-section + .error-section {
+    border-top: 1px solid var(--border);
+    padding-top: 1.4rem;
+  }
+
+  .error-section-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.15em;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    margin-bottom: 0.7rem;
+  }
+
+  /* ── Flow state management ── */
+  .flow { display: none; }
+  .flow.active { display: block; }
+
+  /* ── Dev nav (remove in production) ── */
+  .dev-nav {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 1.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .dev-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .dev-btn:hover, .dev-btn.active {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+    background: var(--deep);
+  }
+
+  .dev-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 0.75rem;
+    opacity: 0.5;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 520px) {
+    body { padding: 2rem 1rem; }
+    .gate-card { padding: 2rem 1.25rem 1.75rem; }
+    .logo-seal { width: 84px; height: 84px; margin-bottom: 1.75rem; }
+    .gate-title { font-size: 12px; }
+    .gate-copy { font-size: 14px; }
+    .pivot-row { gap: 1.25rem; }
+    .dev-btn { font-size: 7px; padding: 4px 8px; }
+  }
+</style>
+</head>
+<body>
+
+  <!--
+    DEV NAV — remove this block before production deployment.
+    In production, flow state is driven by authentication logic.
+  -->
+  <div class="dev-label">Workstream 2 — Flow Preview</div>
+  <div class="dev-nav">
+    <button class="dev-btn active" onclick="showFlow('new-user')">New User</button>
+    <button class="dev-btn" onclick="showFlow('returning')">Returning</button>
+    <button class="dev-btn" onclick="showFlow('legacy')">Legacy</button>
+    <button class="dev-btn" onclick="showFlow('errors')">Error States</button>
+    <button class="dev-btn" onclick="showFlow('routing')">Post-Auth Routing</button>
+  </div>
+  <!-- END DEV NAV -->
+
+  <div class="gateway-wrap">
+
+    <!--
+      LOGO — swap src for your hosted asset path before deployment.
+      e.g. src="/assets/qt-logo.png" or src="https://your-cdn.com/qt-logo.png"
+    -->
+    <img
+      class="logo-seal"
+      src="QT Logo.png"
+      alt="Quantum Theology — Echad B'Emet"
+    />
+
+    <div class="gate-card">
+
+      <div class="gate-title" id="flow-title">Enter the Prism</div>
+
+      <div class="gate-copy" id="flow-copy">
+        Every reader brings their own interpretations to the text — layered sediment of tradition,
+        disappointment, or need. This conversation begins where those interpretations end.
+        The door is open. What you carry through it is your own.
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ── NEW USER ── -->
+      <div class="flow active" id="flow-new-user">
+        <div class="soft-prompt">
+          Create an account to preserve your conversations and access your full tier.
+        </div>
+        <div class="field-group">
+          <div class="field-wrap">
+            <label class="field-label" for="nu-email">Email</label>
+            <input class="field-input" id="nu-email" type="email" placeholder="your@email.com" autocomplete="email" />
+          </div>
+          <div class="field-wrap">
+            <label class="field-label" for="nu-password">Password</label>
+            <input class="field-input" id="nu-password" type="password" placeholder="8 characters minimum" autocomplete="new-password" />
+          </div>
+          <div class="field-wrap">
+            <label class="field-label" for="nu-confirm">Confirm Password</label>
+            <input class="field-input" id="nu-confirm" type="password" placeholder="Repeat your password" autocomplete="new-password" />
+            <div class="field-error" id="nu-mismatch">Passwords do not match.</div>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="handleRegister()">Create Account</button>
+        <button class="btn-ghost" onclick="handleAnonymous()">Continue Without an Account</button>
+        <div class="anon-note">
+          Anonymous access: 3 queries, nothing stored, no session preserved.
+        </div>
+        <div class="pivot-row">
+          <button class="pivot-link" onclick="showFlow('returning')">Already have an account</button>
+        </div>
+        <div class="benefit-list">
+          <div class="benefit-row">
+            <div class="benefit-dot"></div>
+            <div class="benefit-text">Conversation history preserved across sessions</div>
+          </div>
+          <div class="benefit-row">
+            <div class="benefit-dot"></div>
+            <div class="benefit-text">Full query access for your subscription tier</div>
+          </div>
+          <div class="benefit-row">
+            <div class="benefit-dot"></div>
+            <div class="benefit-text">Tier-specific content and extended responses</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RETURNING USER ── -->
+      <div class="flow" id="flow-returning">
+        <div class="field-group">
+          <div class="field-wrap">
+            <label class="field-label" for="ru-email">Email</label>
+            <input class="field-input" id="ru-email" type="email" placeholder="your@email.com" autocomplete="email" />
+            <div class="field-error" id="ru-email-error">No account found. Create one or check the address.</div>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label" for="ru-password">Password</label>
+            <input class="field-input" id="ru-password" type="password" placeholder="Enter your password" autocomplete="current-password" />
+            <div class="field-error" id="ru-password-error">Incorrect password. Try again or reset.</div>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="handleLogin()">Enter</button>
+        <div class="pivot-row">
+          <button class="pivot-link" onclick="showFlow('new-user')">Create account</button>
+          <button class="pivot-link" onclick="handleForgot()">Forgot password</button>
+        </div>
+      </div>
+
+      <!-- ── LEGACY SUBSCRIBER ── -->
+      <div class="flow" id="flow-legacy">
+        <div class="tier-badge">Legacy Subscriber</div>
+        <div class="soft-prompt" style="text-align:left; margin-bottom:1.35rem;">
+          Your subscription was created before password accounts. Set a password to continue —
+          your tier and access are unchanged.
+        </div>
+        <div class="field-group">
+          <div class="field-wrap">
+            <label class="field-label" for="leg-email">Email</label>
+            <!--
+              In production: pre-populate value from the share link token or
+              session cookie identifying the legacy subscriber.
+            -->
+            <input
+              class="field-input"
+              id="leg-email"
+              type="email"
+              value="subscriber@email.com"
+              readonly
+            />
+          </div>
+          <div class="field-wrap">
+            <label class="field-label" for="leg-password">Create Password</label>
+            <input class="field-input" id="leg-password" type="password" placeholder="8 characters minimum" autocomplete="new-password" />
+          </div>
+          <div class="field-wrap">
+            <label class="field-label" for="leg-confirm">Confirm Password</label>
+            <input class="field-input" id="leg-confirm" type="password" placeholder="Repeat your password" autocomplete="new-password" />
+            <div class="field-error" id="leg-mismatch">Passwords do not match.</div>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="handleLegacy()">Set Password and Continue</button>
+        <div class="anon-note">
+          Password creation is required to continue. There is no skip.
+        </div>
+      </div>
+
+      <!-- ── ERROR STATES ── -->
+      <div class="flow" id="flow-errors">
+
+        <div class="error-section">
+          <div class="error-section-label">Wrong password</div>
+          <div class="field-wrap" style="margin-bottom:0.7rem;">
+            <label class="field-label">Email</label>
+            <input class="field-input" type="email" value="subscriber@email.com" readonly />
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Password</label>
+            <input class="field-input is-error" type="password" value="wrongpassword" />
+            <div class="field-error visible">Incorrect password. Try again or reset.</div>
+          </div>
+        </div>
+
+        <div class="error-section">
+          <div class="error-section-label">Unrecognized email</div>
+          <div class="field-wrap">
+            <label class="field-label">Email</label>
+            <input class="field-input is-error" type="email" value="unknown@nowhere.com" />
+            <div class="field-error visible">No account found. Create one or check the address.</div>
+          </div>
+        </div>
+
+        <div class="error-section">
+          <div class="error-section-label">Password mismatch</div>
+          <div class="field-wrap" style="margin-bottom:0.7rem;">
+            <label class="field-label">Password</label>
+            <input class="field-input" type="password" value="mypassword1" />
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Confirm Password</label>
+            <input class="field-input is-error" type="password" value="mypassword2" />
+            <div class="field-error visible">Passwords do not match.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── POST-AUTH ROUTING ── -->
+      <div class="flow" id="flow-routing">
+
+        <div class="routing-block">
+          <div class="tier-badge">Scholar</div>
+          <div class="routing-msg">
+            Access confirmed. Routing to the Prism — standard query depth, full conversation history.
+          </div>
+          <div class="progress-dots">
+            <div class="dot on"></div><div class="dot on"></div><div class="dot"></div>
+          </div>
+        </div>
+
+        <div class="routing-block">
+          <div class="tier-badge">Theologian</div>
+          <div class="routing-msg">
+            Access confirmed. Extended responses and source threading enabled.
+          </div>
+          <div class="progress-dots">
+            <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div>
+          </div>
+        </div>
+
+        <div class="routing-block">
+          <div class="tier-badge">Companion</div>
+          <div class="routing-msg">
+            Full access. All capabilities, priority session handling.
+          </div>
+          <div class="progress-dots">
+            <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div>
+          </div>
+        </div>
+
+        <div class="routing-block">
+          <div style="font-family:var(--mono); font-size:8px; letter-spacing:0.15em; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.85rem;">
+            Anonymous — no account
+          </div>
+          <div class="routing-msg">
+            3 queries available. Nothing stored. Session ends when you close the window.
+          </div>
+          <div class="progress-dots">
+            <div class="dot on"></div><div class="dot"></div><div class="dot"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- /.gate-card -->
+  </div><!-- /.gateway-wrap -->
+
+<script>
+  /* ── Flow state ── */
+  var flowOrder = ['new-user', 'returning', 'legacy', 'errors', 'routing'];
+
+  var flowTitles = {
+    'new-user':  'Enter the Prism',
+    'returning': 'Enter the Prism',
+    'legacy':    'Welcome Back',
+    'errors':    'Enter the Prism',
+    'routing':   'Access Confirmed'
+  };
+
+  var flowCopies = {
+    'new-user':  'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
+    'returning': 'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
+    'legacy':    'Your access predates the current system. One step to continue — nothing else changes.',
+    'errors':    'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
+    'routing':   'Authentication verified. Your session is being prepared.'
+  };
+
+  function showFlow(id) {
+    document.querySelectorAll('.flow').forEach(function(f) {
+      f.classList.remove('active');
+    });
+    document.querySelectorAll('.dev-btn').forEach(function(b, i) {
+      b.classList.toggle('active', flowOrder[i] === id);
+    });
+    var el = document.getElementById('flow-' + id);
+    if (el) el.classList.add('active');
+    document.getElementById('flow-title').textContent = flowTitles[id] || 'Enter the Prism';
+    document.getElementById('flow-copy').textContent  = flowCopies[id] || '';
+  }
+
+  /* ── Validation helpers ── */
+  function setError(fieldId, errorId, show) {
+    var field = document.getElementById(fieldId);
+    var err   = document.getElementById(errorId);
+    if (!field || !err) return;
+    field.classList.toggle('is-error', show);
+    err.classList.toggle('visible', show);
+  }
+
+  function clearErrors(ids) {
+    ids.forEach(function(pair) { setError(pair[0], pair[1], false); });
+  }
+
+  /* ── Handler stubs ─────────────────────────────────────────────────────────
+     Replace these with your Supabase auth calls.
+     Each function validates inputs, then hands off to your auth layer.
+  ── */
+
+  function handleRegister() {
+    var email    = document.getElementById('nu-email').value.trim();
+    var password = document.getElementById('nu-password').value;
+    var confirm  = document.getElementById('nu-confirm').value;
+    clearErrors([['nu-confirm', 'nu-mismatch']]);
+    if (password !== confirm) {
+      setError('nu-confirm', 'nu-mismatch', true);
+      return;
+    }
+    // TODO: supabase.auth.signUp({ email, password })
+    console.log('Register:', email);
+  }
+
+  function handleLogin() {
+    var email    = document.getElementById('ru-email').value.trim();
+    var password = document.getElementById('ru-password').value;
+    clearErrors([
+      ['ru-email',    'ru-email-error'],
+      ['ru-password', 'ru-password-error']
+    ]);
+    // TODO: supabase.auth.signInWithPassword({ email, password })
+    // On error: setError('ru-email', 'ru-email-error', true) OR
+    //           setError('ru-password', 'ru-password-error', true)
+    console.log('Login:', email);
+  }
+
+  function handleLegacy() {
+    var password = document.getElementById('leg-password').value;
+    var confirm  = document.getElementById('leg-confirm').value;
+    clearErrors([['leg-confirm', 'leg-mismatch']]);
+    if (password !== confirm) {
+      setError('leg-confirm', 'leg-mismatch', true);
+      return;
+    }
+    // TODO: supabase.auth.updateUser({ password })
+    console.log('Legacy password set');
+  }
+
+  function handleAnonymous() {
+    // TODO: set anonymous session flag, route to Prism with 3-query counter
+    console.log('Anonymous session started');
+  }
+
+  function handleForgot() {
+    var email = document.getElementById('ru-email').value.trim();
+    // TODO: supabase.auth.resetPasswordForEmail(email)
+    console.log('Password reset for:', email);
+  }
+
+  /* ── Share link pre-population ────────────────────────────────────────────
+     In production, read ?email= from the URL and pre-populate the legacy
+     email field (and optionally the returning-user field).
+  ── */
+  (function() {
+    var params = new URLSearchParams(window.location.search);
+    var emailParam = params.get('email');
+    if (emailParam) {
+      var legacyField = document.getElementById('leg-email');
+      if (legacyField) legacyField.value = decodeURIComponent(emailParam);
+      var returningField = document.getElementById('ru-email');
+      if (returningField) returningField.value = decodeURIComponent(emailParam);
+    }
+  })();
+</script>
+
+</body>
+</html>
