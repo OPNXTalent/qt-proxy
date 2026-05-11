@@ -818,11 +818,23 @@
       el.style.display = 'block';
       return;
     }
-    await sb.from('subscribers').upsert({ email: email, tier: 'scholar', status: 'active' }, { onConflict: 'email' });
+
+    // Use the session token from signup to authorize the upsert
+    var accessToken = data?.session?.access_token || SUPABASE_ANON;
+    await fetch(SUPABASE_URL + '/rest/v1/subscribers', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON,
+        'Authorization': 'Bearer ' + accessToken,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+    });
+
     await fireReferralCredit(email);
     routeAfterAuth(email);
   }
-
   /* ── Returning User ── */
   async function handleLogin(btn) {
     var email    = document.getElementById('ru-email').value.trim();
