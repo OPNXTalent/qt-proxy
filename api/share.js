@@ -96,7 +96,7 @@ async function sendShareEmail(recipientEmail, senderEmail, token, snapshot) {
     body: JSON.stringify({
       from: 'noreply@quantumtheology.app',
       to: recipientEmail,
-      subject: `A QT Prism interpretation has been shared with you`,
+      subject: `A QT Prism interpretation has been shared with you — ${subjectPreview.slice(0, 40)}`,
       html
     })
   });
