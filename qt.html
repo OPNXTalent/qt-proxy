@@ -1256,10 +1256,13 @@ async function callProxy(messages) {
     throw err;
   }
 
-  // Store tier from server response if present
+  // Store tier from server response if present and update sidebar label
   if (data.tier && data.tier !== 'trial') {
     localStorage.setItem('qt_user_tier', data.tier);
     CURRENT_TIER = data.tier;
+    var tierLabelsMap = { scholar: 'Scholar · 90 Day Archive', theologian: 'Theologian · 180 Day Archive', companion: 'Companion · 1 Year Archive', free: 'Free Access' };
+    var labelEl = document.getElementById('sidebarTierLabel');
+    if (labelEl) labelEl.textContent = tierLabelsMap[data.tier] || tierLabelsMap['free'];
   }
 
   return contentBlocks.map(b => b.text || '').join('');
@@ -1833,12 +1836,13 @@ document.addEventListener('keydown', e => {
 // Tier retention windows in days
 var TIER_RETENTION = { scholar: 90, theologian: 180, companion: 365, free: 1 };
 
-// Read actual tier from URL param or localStorage
+// Read actual tier — localStorage takes priority over URL if it has a paid tier
 function getActualTier() {
+  var stored = localStorage.getItem('qt_user_tier');
+  if (stored && stored !== 'free' && TIER_RETENTION[stored]) return stored;
   var urlParams = new URLSearchParams(window.location.search);
   var tierParam = urlParams.get('tier');
   if (tierParam && TIER_RETENTION[tierParam]) return tierParam;
-  var stored = localStorage.getItem('qt_user_tier');
   if (stored && TIER_RETENTION[stored]) return stored;
   return 'free';
 }
