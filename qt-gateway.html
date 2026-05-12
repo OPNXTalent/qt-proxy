@@ -821,18 +821,11 @@
       return;
     }
 
-    // Use the session token from signup to authorize the upsert
-    var accessToken = data?.session?.access_token || SUPABASE_ANON;
-    await fetch(SUPABASE_URL + '/rest/v1/subscribers', {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_ANON,
-        'Authorization': 'Bearer ' + accessToken,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
-    });
+await fetch('/api/register', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+});
 
     await fireReferralCredit(email);
     routeAfterAuth(email);
