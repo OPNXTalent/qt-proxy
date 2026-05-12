@@ -161,7 +161,16 @@ export default async function handler(req, res) {
   if (!apiMessages || apiMessages.length === 0) {
     return res.status(400).json({ error: 'No messages provided' });
   }
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const tier = subscriber?.tier || 'trial';
+
+  // Stream the response
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-QT-Tier', tier);
+  res.setHeader('X-QT-Subscriber', 'true');
+
+  const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -171,13 +180,44 @@ export default async function handler(req, res) {
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 4000,
+      stream: true,
       system: QT_SYSTEM_PROMPT,
       messages: apiMessages
     })
   });
-  const data = await response.json();
-  const tier = subscriber?.tier || 'trial';
-  return res.status(200).json({ ...data, subscriber: true, tier });
+
+  if (!anthropicRes.ok) {
+    const errText = await anthropicRes.text();
+    res.write(`data: ${JSON.stringify({ type: 'error', error: errText })}\n\n`);
+    return res.end();
+  }
+
+  const reader = anthropicRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+          } else if (parsed.type === 'message_stop') {
+            res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
+          }
+        } catch {}
+      }
+    }
+  }
+  return res.end();
 }
     }
   } catch (err) {
@@ -215,7 +255,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Stream for free tier too
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-QT-Tier', 'free');
+    res.setHeader('X-QT-Subscriber', 'false');
+
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -225,13 +272,46 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 3000,
+        stream: true,
         system: QT_SYSTEM_PROMPT,
         messages: apiMessages
       })
     });
-    const data = await response.json();
-    return res.status(200).json(data);
+
+    if (!anthropicRes.ok) {
+      const errText = await anthropicRes.text();
+      res.write(`data: ${JSON.stringify({ type: 'error', error: errText })}\n\n`);
+      return res.end();
+    }
+
+    const reader = anthropicRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+            } else if (parsed.type === 'message_stop') {
+              res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
+            }
+          } catch {}
+        }
+      }
+    }
+    return res.end();
   } catch (err) {
-    return res.status(500).json({ error: 'Proxy error', detail: err.message });
+    res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+    return res.end();
   }
 }
