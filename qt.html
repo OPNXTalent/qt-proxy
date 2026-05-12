@@ -703,6 +703,11 @@
     <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank">Subscribe → Scholar</a>
   </div>
 
+  <!-- Sidebar footer — logout -->
+  <div style="padding:16px 20px; border-top:1px solid var(--border); flex-shrink:0; margin-top:auto;">
+    <button onclick="handleLogout()" style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">Sign Out →</button>
+  </div>
+
 </aside>
 
 <div class="page-wrap">
@@ -2281,6 +2286,33 @@ function formatNow() {
 }
 
 document.addEventListener('DOMContentLoaded', initSidebar);
+
+async function handleLogout() {
+  // Sign out of Supabase Auth
+  try {
+    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    await fetch(sbUrl + '/auth/v1/logout', {
+      method: 'POST',
+      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon }
+    });
+  } catch(e) { /* silent — proceed with local clear regardless */ }
+
+  // Clear all QT session data
+  var keysToRemove = ['qt_user_email', 'qt_user_tier', 'qt_sidebar_appeared', 'qt_sidebar_open', 'qt_threads'];
+  keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+
+  // Clear any thread-specific data
+  Object.keys(localStorage).forEach(function(k) {
+    if (k.startsWith('qt_')) localStorage.removeItem(k);
+  });
+
+  // Clear session storage
+  sessionStorage.clear();
+
+  // Redirect to gateway
+  window.location.href = 'https://quantumtheology.app/qt-gateway.html';
+}
 
 /* ── SHARE MODAL ── */
 
