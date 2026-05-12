@@ -800,7 +800,8 @@
           <div>
             <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Free</div>
             <div style="font-family:var(--cinzel); font-size:22px; color:var(--text-dim); margin-bottom:4px;">$0</div>
-            <div style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); line-height:1.6; margin-bottom:20px;">3 queries reset<br>every 24 hours.</div>
+            <div id="returnTomorrowLabel" style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Return Tomorrow</div>
+            <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); line-height:1.6; margin-bottom:20px;">3 queries reset every 24 hours.</div>
           </div>
           <a href="/" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--border-lit)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
         </div>
@@ -1022,12 +1023,19 @@ Return this exact JSON object (start with { immediately):
 let sessionQueryCount = 0;
 const QUERY_LIMIT = 3;
 
-function applyQueryLock(customMessage) {
+function applyQueryLock(customMessage, hoursRemaining) {
     document.getElementById('submitBtn').style.display = 'none';
     const prompt = document.getElementById('limitPrompt');
     if (customMessage) {
       const msgEl = prompt.querySelector('.limit-message');
       if (msgEl) msgEl.textContent = customMessage;
+    }
+    // Inject dynamic reset time into the "Return Tomorrow" panel if we have it
+    if (hoursRemaining != null) {
+      const returnLabel = document.getElementById('returnTomorrowLabel');
+      const returnBody = document.getElementById('returnTomorrowBody');
+      if (returnLabel) returnLabel.textContent = hoursRemaining <= 1 ? 'Resets Soon' : 'Return in ' + hoursRemaining + ' Hour' + (hoursRemaining !== 1 ? 's' : '');
+      if (returnBody) returnBody.textContent = 'Your 3 free queries reset in ' + hoursRemaining + ' hour' + (hoursRemaining !== 1 ? 's' : '') + '.';
     }
     prompt.style.display = 'block';
     // Hide follow-up section and show limit prompt in its place
@@ -1042,8 +1050,9 @@ async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
-  // Hard gate — never proceed if limit reached
-  if (sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Hard gate — only applies to anonymous users; subscribers bypass via server
+  const _isAuthed = !!localStorage.getItem('qt_user_email');
+  if (!_isAuthed && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   // Reset conversation for new subject
   conversationHistory = [];
@@ -1126,6 +1135,7 @@ async function runInterpretation() {
 
   } catch (err) {
     if (err.message === 'RATE_LIMITED') return;
+    if (err.message === 'CRISIS_DETECTED') return;
     document.getElementById('resultContent').innerHTML = getErrorMessage(err);
     showResult();
   } finally {
@@ -1144,8 +1154,9 @@ async function runFollowUp() {
   const input = document.getElementById('followUpInput').value.trim();
   if (!input) return;
 
-  // Hard gate — block follow-ups if limit reached
-  if (sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Hard gate — only applies to anonymous users; subscribers bypass via server
+  const _isAuthedFU = !!localStorage.getItem('qt_user_email');
+  if (!_isAuthedFU && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   document.getElementById('followUpBtn').disabled = true;
   document.getElementById('followUpInput').style.opacity = '0.4';
@@ -1244,11 +1255,13 @@ async function callProxyStream(messages, targetEl) {
 
   if (response.status === 429) {
     let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
+    let hoursRemaining = null;
     try {
       const limitData = await response.json();
       if (limitData.message) rateLimitMsg = limitData.message;
+      if (limitData.hoursRemaining != null) hoursRemaining = limitData.hoursRemaining;
     } catch {}
-    applyQueryLock(rateLimitMsg);
+    applyQueryLock(rateLimitMsg, hoursRemaining);
     throw new Error('RATE_LIMITED');
   }
 
@@ -1314,11 +1327,13 @@ async function callProxy(messages) {
   // Handle rate limit before streaming
   if (response.status === 429) {
     let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
+    let hoursRemaining = null;
     try {
       const limitData = await response.json();
       if (limitData.message) rateLimitMsg = limitData.message;
+      if (limitData.hoursRemaining != null) hoursRemaining = limitData.hoursRemaining;
     } catch {}
-    applyQueryLock(rateLimitMsg);
+    applyQueryLock(rateLimitMsg, hoursRemaining);
     throw new Error('RATE_LIMITED');
   }
 
@@ -1332,6 +1347,23 @@ async function callProxy(messages) {
     const err = new Error(`SERVER_ERROR_${response.status}`);
     err.type = 'server';
     err.status = response.status;
+    throw err;
+  }
+
+  // ── CRISIS RESPONSE CHECK ────────────────────────────────────────────────────
+  // Server returns { crisis: true } as plain JSON (not SSE) when input triggers detection.
+  // We peek at Content-Type to decide whether to parse as JSON before streaming.
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    let bodyData = {};
+    try { bodyData = await response.json(); } catch {}
+    if (bodyData.crisis) {
+      showCrisisPanel();
+      throw new Error('CRISIS_DETECTED');
+    }
+    // Any other unexpected JSON — surface as server error
+    const err = new Error('Unexpected JSON response from server.');
+    err.type = 'server';
     throw err;
   }
 
@@ -2485,6 +2517,74 @@ async function submitShare() {
     statusEl.textContent = 'Connection error. Please try again.';
     statusEl.style.color = '#b85c5c';
     btn.disabled = false;
+  }
+}
+
+// ── CRISIS PANEL ─────────────────────────────────────────────────────────────
+function showCrisisPanel() {
+  // Hide loading, show result area
+  document.getElementById('loadingBlock').classList.remove('visible');
+  document.getElementById('resultBlock').classList.add('visible');
+
+  // Re-enable form
+  document.getElementById('inputSection').style.opacity = '';
+  document.getElementById('inputSection').style.pointerEvents = '';
+  document.getElementById('submitBtn').disabled = false;
+
+  document.getElementById('resultContent').innerHTML = `
+    <div id="crisisPanel" style="
+      border: 1px solid #4a3030;
+      background: linear-gradient(135deg, rgba(90,40,40,0.18), rgba(13,13,20,0.6));
+      padding: 40px 44px;
+      margin-bottom: 32px;
+    ">
+      <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; text-transform:uppercase; color:#c08080; margin-bottom:20px;">
+        Before We Continue
+      </div>
+      <div style="font-family:var(--crimson); font-size:20px; color:var(--text); line-height:1.85; margin-bottom:28px;">
+        Something in what you wrote suggests you may be carrying more than a theological question right now.
+        The framework will be here — but if you're in a place of real pain, you don't have to navigate it alone.
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:28px;">
+        <div style="border:1px solid #4a3030; padding:22px 20px; background:rgba(13,13,20,0.5);">
+          <div style="font-family:var(--cinzel); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:#c08080; margin-bottom:8px;">Crisis Line</div>
+          <div style="font-family:var(--crimson); font-size:17px; color:var(--text); line-height:1.6; margin-bottom:14px;">988 Suicide & Crisis Lifeline — call or text <strong style="color:var(--gold-pale);">988</strong> (US)</div>
+          <a href="tel:988" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:inline-block; transition:all 0.25s;">Call 988 →</a>
+        </div>
+        <div style="border:1px solid #4a3030; padding:22px 20px; background:rgba(13,13,20,0.5);">
+          <div style="font-family:var(--cinzel); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:#c08080; margin-bottom:8px;">Crisis Text Line</div>
+          <div style="font-family:var(--crimson); font-size:17px; color:var(--text); line-height:1.6; margin-bottom:14px;">Text <strong style="color:var(--gold-pale);">HOME</strong> to <strong style="color:var(--gold-pale);">741741</strong> — free, confidential, 24/7</div>
+          <a href="sms:741741?body=HOME" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:inline-block; transition:all 0.25s;">Text Now →</a>
+        </div>
+        <div style="border:1px solid #4a3030; padding:22px 20px; background:rgba(13,13,20,0.5);">
+          <div style="font-family:var(--cinzel); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:#c08080; margin-bottom:8px;">International</div>
+          <div style="font-family:var(--crimson); font-size:17px; color:var(--text); line-height:1.6; margin-bottom:14px;">A directory of crisis lines in over 50 countries</div>
+          <a href="https://www.iasp.info/resources/Crisis_Centres/" target="_blank" rel="noopener" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:inline-block; transition:all 0.25s;">Find Support →</a>
+        </div>
+      </div>
+      <div style="border-top:1px solid #4a3030; padding-top:24px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+        <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.7; flex:1; min-width:200px;">
+          If you'd still like to explore the framework, you can continue below. The Prism isn't going anywhere.
+        </div>
+        <button onclick="dismissCrisisPanel()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:11px 22px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; white-space:nowrap; transition:all 0.2s;">Continue to Framework →</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('resultContent').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function dismissCrisisPanel() {
+  var panel = document.getElementById('crisisPanel');
+  if (panel) {
+    panel.style.transition = 'opacity 0.4s ease';
+    panel.style.opacity = '0';
+    setTimeout(function() {
+      if (panel.parentNode) panel.parentNode.removeChild(panel);
+      document.getElementById('resultBlock').classList.remove('visible');
+      document.getElementById('userInput').focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 400);
   }
 }
 
