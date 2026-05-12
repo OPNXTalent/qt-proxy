@@ -1256,6 +1256,12 @@ async function callProxy(messages) {
     throw err;
   }
 
+  // Store tier from server response if present
+  if (data.tier && data.tier !== 'trial') {
+    localStorage.setItem('qt_user_tier', data.tier);
+    CURRENT_TIER = data.tier;
+  }
+
   return contentBlocks.map(b => b.text || '').join('');
 }
 
