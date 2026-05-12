@@ -1836,8 +1836,11 @@ document.addEventListener('keydown', e => {
 // Tier retention windows in days
 var TIER_RETENTION = { scholar: 90, theologian: 180, companion: 365, free: 1 };
 
-// Read actual tier — localStorage takes priority over URL if it has a paid tier
+// Read actual tier — requires a logged-in email to honor a paid tier
 function getActualTier() {
+  var userEmail = localStorage.getItem('qt_user_email');
+  // No email = anonymous session — always free regardless of stored tier
+  if (!userEmail) return 'free';
   var stored = localStorage.getItem('qt_user_tier');
   if (stored && stored !== 'free' && TIER_RETENTION[stored]) return stored;
   var urlParams = new URLSearchParams(window.location.search);
