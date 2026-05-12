@@ -19,6 +19,10 @@
     "api/redeem.js": {
       "memory": 128,
       "maxDuration": 10
+    },
+    "api/threads.js": {
+      "memory": 128,
+      "maxDuration": 10
     }
   },
   "crons": [
