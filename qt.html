@@ -1838,16 +1838,27 @@ var TIER_RETENTION = { scholar: 90, theologian: 180, companion: 365, free: 1 };
 
 // Read actual tier — requires a logged-in email to honor a paid tier
 function getActualTier() {
+  var urlParams = new URLSearchParams(window.location.search);
+  var userEmail = localStorage.getItem('qt_user_email');
+
+  // If URL has a paid tier and email is present — clear anon flag, honor paid tier
+  var tierParam = urlParams.get('tier');
+  if (tierParam && tierParam !== 'free' && TIER_RETENTION[tierParam] && userEmail) {
+    sessionStorage.removeItem('qt_anon_mode');
+    sessionStorage.removeItem('qt_anon');
+    localStorage.setItem('qt_user_tier', tierParam);
+    return tierParam;
+  }
+
   // Anonymous mode flag set by gateway — always free
   if (sessionStorage.getItem('qt_anon_mode') === '1') return 'free';
-  var urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('mode') === 'anon') return 'free';
-  var userEmail = localStorage.getItem('qt_user_email');
-  // No email = anonymous session — always free regardless of stored tier
+
+  // No email = anonymous session — always free
   if (!userEmail) return 'free';
+
   var stored = localStorage.getItem('qt_user_tier');
   if (stored && stored !== 'free' && TIER_RETENTION[stored]) return stored;
-  var tierParam = urlParams.get('tier');
   if (tierParam && TIER_RETENTION[tierParam]) return tierParam;
   if (stored && TIER_RETENTION[stored]) return stored;
   return 'free';
