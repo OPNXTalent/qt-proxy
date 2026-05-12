@@ -1158,18 +1158,21 @@ Their follow-up question is: "${input}"
 
 Respond within the QT framework — grounded in Echad b'Emet, relational ontology, entanglement/coherence/decoherence, telos, and Hebrew two-world cosmology where relevant. Be direct and precise. Plain prose, no JSON, no markdown headers.`;
 
-  try {
-    const responseText = await callProxy([{ role: 'user', content: followUpPrompt }]);
+  // Create follow-up element immediately so we can stream into it
+  const followUpEl = document.createElement('div');
+  followUpEl.style.cssText = 'margin-top:32px; border-top:1px solid var(--border); padding-top:28px;';
+  const followUpTextEl = document.createElement('div');
+  followUpTextEl.style.cssText = 'font-size:16.5px; color:var(--text); line-height:1.75;';
+  followUpEl.innerHTML = `<div style="font-family:var(--mono); font-size:17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Follow-up — ${escHtml(input)}</div>`;
+  followUpEl.appendChild(followUpTextEl);
+  document.getElementById('resultContent').appendChild(followUpEl);
+  followUpEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // Append follow-up to result content
-    const followUpEl = document.createElement('div');
-    followUpEl.style.cssText = 'margin-top:32px; border-top:1px solid var(--border); padding-top:28px;';
-    followUpEl.innerHTML = `
-      <div style="font-family:var(--mono); font-size: 17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Follow-up — ${escHtml(input)}</div>
-      <div style="font-size:16.5px; color:var(--text); line-height:1.75;">${escHtml(responseText).replace(/\n\n/g, '</p><p style="margin-top:12px;">').replace(/\n/g, '<br>')}</div>
-    `;
-    document.getElementById('resultContent').appendChild(followUpEl);
-    followUpEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try {
+    const responseText = await callProxyStream(
+      [{ role: 'user', content: followUpPrompt }],
+      followUpTextEl
+    );
 
     document.getElementById('followUpInput').value = '';
 
@@ -1188,13 +1191,82 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
     errEl.style.marginTop = '20px';
     errEl.innerHTML = getErrorMessage(err);
     document.getElementById('resultContent').appendChild(errEl);
-    document.getElementById('resultContent').appendChild(errEl);
   } finally {
     document.getElementById('followUpLoading').style.display = 'none';
     document.getElementById('followUpInput').style.opacity = '';
     document.getElementById('followUpInput').style.pointerEvents = '';
     document.getElementById('followUpBtn').disabled = false;
   }
+}
+
+async function callProxyStream(messages, targetEl) {
+  // Streams plain text response directly into targetEl
+  const userEmail = localStorage.getItem('qt_user_email') || null;
+  let response;
+
+  try {
+    response = await fetch('https://quantumtheology.app/api/interpret', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, email: userEmail })
+    });
+  } catch (networkErr) {
+    const err = new Error('NETWORK_ERROR');
+    err.type = 'network';
+    throw err;
+  }
+
+  if (response.status === 429) {
+    let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
+    try {
+      const limitData = await response.json();
+      if (limitData.message) rateLimitMsg = limitData.message;
+    } catch {}
+    applyQueryLock(rateLimitMsg);
+    throw new Error('RATE_LIMITED');
+  }
+
+  if (response.status === 504 || response.status === 524) {
+    const err = new Error('TIMEOUT'); err.type = 'timeout'; throw err;
+  }
+  if (!response.ok) {
+    const err = new Error(`SERVER_ERROR_${response.status}`); err.type = 'server'; throw err;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+
+  // Show streaming cursor in target element
+  if (targetEl) targetEl.innerHTML = '<span style="opacity:0.4; font-family:var(--mono); font-size:11px; letter-spacing:0.12em;">interpreting…</span>';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'delta' && parsed.text) {
+            fullText += parsed.text;
+            // Render accumulated text as formatted prose
+            if (targetEl) {
+              targetEl.innerHTML = escHtml(fullText)
+                .replace(/\n\n/g, '</p><p style="margin-top:12px;">')
+                .replace(/\n/g, '<br>');
+            }
+          }
+        } catch {}
+      }
+    }
+  }
+
+  return fullText;
 }
 
 async function callProxy(messages) {
