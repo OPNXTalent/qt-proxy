@@ -623,49 +623,15 @@
 
       <!-- ── POST-AUTH ROUTING ── -->
       <div class="flow" id="flow-routing">
-
-        <div class="routing-block">
-          <div class="tier-badge">Scholar</div>
-          <div class="routing-msg">
-            Access confirmed. Routing to the Prism — standard query depth, full conversation history.
-          </div>
-          <div class="progress-dots">
-            <div class="dot on"></div><div class="dot on"></div><div class="dot"></div>
-          </div>
-        </div>
-
-        <div class="routing-block">
-          <div class="tier-badge">Theologian</div>
-          <div class="routing-msg">
-            Access confirmed. Extended responses and source threading enabled.
+        <div class="routing-block" id="routing-confirmed-block">
+          <div class="tier-badge" id="routing-tier-badge">Scholar</div>
+          <div class="routing-msg" id="routing-tier-msg">
+            Access confirmed. Your session is being prepared.
           </div>
           <div class="progress-dots">
             <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div>
           </div>
         </div>
-
-        <div class="routing-block">
-          <div class="tier-badge">Companion</div>
-          <div class="routing-msg">
-            Full access. All capabilities, priority session handling.
-          </div>
-          <div class="progress-dots">
-            <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div>
-          </div>
-        </div>
-
-        <div class="routing-block">
-          <div style="font-family:var(--mono); font-size:8px; letter-spacing:0.15em; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.85rem;">
-            Anonymous — no account
-          </div>
-          <div class="routing-msg">
-            3 queries available. Nothing stored. Session ends when you close the window.
-          </div>
-          <div class="progress-dots">
-            <div class="dot on"></div><div class="dot"></div><div class="dot"></div>
-          </div>
-        </div>
-
       </div>
 
 
@@ -786,10 +752,21 @@
       .single()
       .then(function(res) {
         var tier = (res.data && res.data.tier) ? res.data.tier : 'free';
+        // Update routing block with actual tier before showing
+        var tierDisplayNames = { scholar: 'Scholar', theologian: 'Theologian', companion: 'Companion', free: 'Free Access' };
+        var tierMessages = {
+          scholar:    'Access confirmed. 250 queries per month, 90-day archive, full conversation history.',
+          theologian: 'Access confirmed. 350 queries per month, 180-day archive, extended depth.',
+          companion:  'Access confirmed. 500 queries per month, 1-year archive, full capabilities.',
+          free:       'Access confirmed. 5 queries per day. Subscribe to unlock full archive and depth.'
+        };
+        var badgeEl = document.getElementById('routing-tier-badge');
+        var msgEl   = document.getElementById('routing-tier-msg');
+        if (badgeEl) badgeEl.textContent = tierDisplayNames[tier] || 'Free Access';
+        if (msgEl)   msgEl.textContent   = tierMessages[tier]     || tierMessages['free'];
         showFlow('routing');
-        var tierDisplayNames = { scholar: 'Scholar', theologian: 'Theologian', companion: 'Companion', free: 'Free' };
         document.getElementById('flow-title').textContent = 'Access Confirmed';
-        document.getElementById('flow-copy').textContent  = 'Welcome back. ' + (tierDisplayNames[tier] || 'Free') + ' access verified. Your session is being prepared.';
+        document.getElementById('flow-copy').textContent  = 'Welcome back, ' + email.split('@')[0] + '. Your session is being prepared.';
 
         // Clear immediately before the redirect — not inside the timeout
         Object.keys(localStorage).forEach(function(key) {
