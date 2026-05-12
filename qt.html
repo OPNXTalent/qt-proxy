@@ -1088,9 +1088,10 @@ async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
-  // Hard gate — only applies to anonymous users; subscribers bypass via server
-  const _isAuthed = !!localStorage.getItem('qt_user_email');
-  if (!_isAuthed && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
+  const _isAnon = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+  const _isPaidTier = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+  if ((_isAnon || !_isPaidTier) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   // Reset conversation for new subject
   conversationHistory = [];
@@ -1149,8 +1150,10 @@ async function runInterpretation() {
     document.getElementById('downloadRow').style.display = 'block';
 
     sessionQueryCount++;
-    // Only lock the UI for anonymous users — subscribers are gated server-side
-    if (!localStorage.getItem('qt_user_email') && sessionQueryCount >= QUERY_LIMIT) {
+    // Only lock the UI for free/anonymous users — paid subscribers are gated server-side
+    const _isAnonPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+    const _isPaidPost = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+    if ((_isAnonPost || !_isPaidPost) && sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
     }
 
@@ -1193,9 +1196,10 @@ async function runFollowUp() {
   const input = document.getElementById('followUpInput').value.trim();
   if (!input) return;
 
-  // Hard gate — only applies to anonymous users; subscribers bypass via server
-  const _isAuthedFU = !!localStorage.getItem('qt_user_email');
-  if (!_isAuthedFU && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
+  const _isAnonFU = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+  const _isPaidTierFU = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+  if ((_isAnonFU || !_isPaidTierFU) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   document.getElementById('followUpBtn').disabled = true;
   document.getElementById('followUpInput').style.opacity = '0.4';
@@ -2393,9 +2397,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function runPreflightCheck() {
-  // Only run for anonymous users — authenticated users are never locked on the frontend
+  // Only run for free/anonymous users — paid subscribers are never locked on the frontend
   const userEmail = localStorage.getItem('qt_user_email');
-  if (userEmail) return;
+  const _anonMode = sessionStorage.getItem('qt_anon_mode') === '1';
+  const _paidTier = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+  if (userEmail && !_anonMode && _paidTier) return;
 
   try {
     const res = await fetch('https://quantumtheology.app/api/interpret', {
