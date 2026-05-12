@@ -1149,7 +1149,8 @@ async function runInterpretation() {
     document.getElementById('downloadRow').style.display = 'block';
 
     sessionQueryCount++;
-    if (sessionQueryCount >= QUERY_LIMIT) {
+    // Only lock the UI for anonymous users — subscribers are gated server-side
+    if (!localStorage.getItem('qt_user_email') && sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
     }
 
