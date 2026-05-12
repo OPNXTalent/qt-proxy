@@ -801,7 +801,8 @@
             <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Free</div>
             <div style="font-family:var(--cinzel); font-size:22px; color:var(--text-dim); margin-bottom:4px;">$0</div>
             <div id="returnTomorrowLabel" style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Return Tomorrow</div>
-            <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); line-height:1.6; margin-bottom:20px;">3 queries reset every 24 hours.</div>
+            <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); line-height:1.6; margin-bottom:12px;">3 queries reset every 24 hours.</div>
+            <div id="resetTicker" style="font-family:var(--mono); font-size:20px; letter-spacing:0.18em; color:var(--gold-dim); margin-bottom:20px; display:none;">--:--:--</div>
           </div>
           <a href="/" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--border-lit)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
         </div>
@@ -1023,19 +1024,56 @@ Return this exact JSON object (start with { immediately):
 let sessionQueryCount = 0;
 const QUERY_LIMIT = 3;
 
-function applyQueryLock(customMessage, hoursRemaining) {
+// Live ticker state
+let _tickerInterval = null;
+let _tickerSeconds = 0;
+
+function formatTicker(totalSeconds) {
+  if (totalSeconds <= 0) return '00:00:00';
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function startTicker(secondsRemaining) {
+  if (_tickerInterval) clearInterval(_tickerInterval);
+  _tickerSeconds = secondsRemaining;
+  const tickerEl = document.getElementById('resetTicker');
+  if (!tickerEl) return;
+  tickerEl.style.display = 'block';
+  tickerEl.textContent = formatTicker(_tickerSeconds);
+  _tickerInterval = setInterval(function() {
+    _tickerSeconds = Math.max(0, _tickerSeconds - 1);
+    if (tickerEl) tickerEl.textContent = formatTicker(_tickerSeconds);
+    if (_tickerSeconds === 0) {
+      clearInterval(_tickerInterval);
+      // Quietly re-enable the form when the window expires
+      if (tickerEl) tickerEl.textContent = 'Ready — refresh to continue';
+      document.getElementById('submitBtn').style.display = '';
+      document.getElementById('limitPrompt').style.display = 'none';
+      sessionQueryCount = 0;
+    }
+  }, 1000);
+}
+
+function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
     document.getElementById('submitBtn').style.display = 'none';
     const prompt = document.getElementById('limitPrompt');
     if (customMessage) {
       const msgEl = prompt.querySelector('.limit-message');
       if (msgEl) msgEl.textContent = customMessage;
     }
-    // Inject dynamic reset time into the "Return Tomorrow" panel if we have it
+    // Update the "Return Tomorrow" panel with precise reset info
     if (hoursRemaining != null) {
       const returnLabel = document.getElementById('returnTomorrowLabel');
       const returnBody = document.getElementById('returnTomorrowBody');
       if (returnLabel) returnLabel.textContent = hoursRemaining <= 1 ? 'Resets Soon' : 'Return in ' + hoursRemaining + ' Hour' + (hoursRemaining !== 1 ? 's' : '');
       if (returnBody) returnBody.textContent = 'Your 3 free queries reset in ' + hoursRemaining + ' hour' + (hoursRemaining !== 1 ? 's' : '') + '.';
+    }
+    // Start live countdown ticker
+    if (secondsRemaining != null) {
+      startTicker(secondsRemaining);
     }
     prompt.style.display = 'block';
     // Hide follow-up section and show limit prompt in its place
@@ -1256,12 +1294,16 @@ async function callProxyStream(messages, targetEl) {
   if (response.status === 429) {
     let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
     let hoursRemaining = null;
+    let secondsRemaining = null;
     try {
       const limitData = await response.json();
       if (limitData.message) rateLimitMsg = limitData.message;
-      if (limitData.hoursRemaining != null) hoursRemaining = limitData.hoursRemaining;
+      if (limitData.hoursRemaining != null) {
+        hoursRemaining = limitData.hoursRemaining;
+        secondsRemaining = limitData.secondsRemaining != null ? limitData.secondsRemaining : hoursRemaining * 3600;
+      }
     } catch {}
-    applyQueryLock(rateLimitMsg, hoursRemaining);
+    applyQueryLock(rateLimitMsg, hoursRemaining, secondsRemaining);
     throw new Error('RATE_LIMITED');
   }
 
@@ -1328,12 +1370,16 @@ async function callProxy(messages) {
   if (response.status === 429) {
     let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
     let hoursRemaining = null;
+    let secondsRemaining = null;
     try {
       const limitData = await response.json();
       if (limitData.message) rateLimitMsg = limitData.message;
-      if (limitData.hoursRemaining != null) hoursRemaining = limitData.hoursRemaining;
+      if (limitData.hoursRemaining != null) {
+        hoursRemaining = limitData.hoursRemaining;
+        secondsRemaining = limitData.secondsRemaining != null ? limitData.secondsRemaining : hoursRemaining * 3600;
+      }
     } catch {}
-    applyQueryLock(rateLimitMsg, hoursRemaining);
+    applyQueryLock(rateLimitMsg, hoursRemaining, secondsRemaining);
     throw new Error('RATE_LIMITED');
   }
 
@@ -2340,7 +2386,33 @@ function formatNow() {
   return month + ' ' + day + ' · ' + hours + ':' + mins + ' ' + ampm;
 }
 
-document.addEventListener('DOMContentLoaded', initSidebar);
+document.addEventListener('DOMContentLoaded', function() {
+  initSidebar();
+  runPreflightCheck();
+});
+
+async function runPreflightCheck() {
+  // Only run for anonymous users — authenticated users are never locked on the frontend
+  const userEmail = localStorage.getItem('qt_user_email');
+  if (userEmail) return;
+
+  try {
+    const res = await fetch('https://quantumtheology.app/api/interpret', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.locked) {
+      const hrs = data.hoursRemaining || 0;
+      const secs = data.secondsRemaining || hrs * 3600;
+      const msg = `You've used your ${data.queriesUsed || 3} free queries. Access resets in ${hrs} hour${hrs !== 1 ? 's' : ''}.`;
+      applyQueryLock(msg, hrs, secs);
+    }
+  } catch {
+    // Silent fail — preflight is best-effort; never block the user on a network error
+  }
+}
 
 // Thread deletion with undo
 var _deletedThread = null;
