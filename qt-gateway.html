@@ -779,30 +779,39 @@
   var sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   /* ── Route after auth ── */
- function routeAfterAuth(email) {
-    sb.from('subscribers')
-      .select('tier, status')
-      .eq('email', email)
-      .single()
-      .then(function(res) {
-        var tier = (res.data && res.data.tier) ? res.data.tier : 'free';
-        showFlow('routing');
-        document.getElementById('flow-title').textContent = 'Access Confirmed';
-        document.getElementById('flow-copy').textContent  = 'Authentication verified. Your session is being prepared.';
+ async function routeAfterAuth(email) {
+    showFlow('routing');
+    document.getElementById('flow-title').textContent = 'Access Confirmed';
+    document.getElementById('flow-copy').textContent  = 'Authentication verified. Your session is being prepared.';
 
-        // Clear session data but preserve user identity keys
-        Object.keys(localStorage).forEach(function(key) {
-          if (key.startsWith('qt_') && key !== 'qt_user_email' && key !== 'qt_user_tier' && key !== 'qt_sidebar_appeared' && key !== 'qt_sidebar_open' && key !== 'qt_threads') {
-            localStorage.removeItem(key);
-          }
-        });
-        localStorage.setItem('qt_user_email', email);
-        localStorage.setItem('qt_user_tier', tier);
+    var tier = 'free';
+    try {
+      var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+      var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+      var res = await fetch(
+        SUPA_URL + '/rest/v1/subscribers?email=eq.' + encodeURIComponent(email) + '&select=tier,status&limit=1',
+        { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON } }
+      );
+      var rows = await res.json();
+      if (rows && rows.length > 0 && rows[0].tier) {
+        tier = rows[0].tier;
+      }
+    } catch(e) {
+      console.error('Tier lookup failed:', e.message);
+    }
 
-        setTimeout(function() {
-          window.location.href = 'https://quantumtheology.app/qt.html?tier=' + tier;
-        }, 2000);
-      });
+    Object.keys(localStorage).forEach(function(key) {
+      if (key.startsWith('qt_') && key !== 'qt_user_email' && key !== 'qt_user_tier' && key !== 'qt_sidebar_appeared' && key !== 'qt_sidebar_open' && key !== 'qt_threads') {
+        localStorage.removeItem(key);
+      }
+    });
+    localStorage.setItem('qt_user_email', email);
+    localStorage.setItem('qt_user_tier', tier);
+
+    setTimeout(function() {
+      window.location.href = 'https://quantumtheology.app/qt.html?tier=' + tier;
+    }, 2000);
+  }
   }
   /* ── New User ── */
   async function handleRegister(btn) {
