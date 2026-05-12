@@ -881,8 +881,11 @@
 
   /* ── Anonymous ── */
   function handleAnonymous() {
+    // Override tier to anonymous — don't clear Supabase Auth session
+    // to avoid redirect loops. qt.html reads qt_anon_mode to enforce free tier.
     sessionStorage.setItem('qt_anon', '1');
     sessionStorage.setItem('qt_anon_queries', '0');
+    sessionStorage.setItem('qt_anon_mode', '1');
     window.location.href = 'https://quantumtheology.app/qt.html?mode=anon';
   }
 
