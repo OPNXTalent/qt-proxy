@@ -1256,6 +1256,14 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
 
     document.getElementById('followUpInput').value = '';
 
+    // Increment counter and apply lock for non-subscribers after successful follow-up
+    sessionQueryCount++;
+    const _isAnonFUPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+    const _isPaidFUPost = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+    if ((_isAnonFUPost || !_isPaidFUPost) && sessionQueryCount >= QUERY_LIMIT) {
+      applyQueryLock();
+    }
+
     // Save follow-up to localStorage
     if (activeThreadId) {
       const key = 'qt_followups_' + activeThreadId;
