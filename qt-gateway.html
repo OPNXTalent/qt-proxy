@@ -719,9 +719,9 @@
 
   var flowTitles = {
     'select':    'Enter the Prism',
-    'new-user':  'Enter the Prism',
-    'returning': 'Enter the Prism',
-    'legacy':    'Welcome Back',
+    'new-user':  'Create Your Account',
+    'returning': 'Welcome Back',
+    'legacy':    'Legacy Access',
     'errors':    'Enter the Prism',
     'routing':   'Access Confirmed',
     'bookcode':  'Redeem Your Code'
@@ -729,9 +729,9 @@
 
   var flowCopies = {
     'select':    'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
-    'new-user':  'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
-    'returning': 'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
-    'legacy':    'Your access predates the current system. One step to continue — nothing else changes.',
+    'new-user':  'Create a free account to save your interpretations and access the Prism across sessions. No payment required to begin.',
+    'returning': 'Enter your credentials to restore your session and pick up where you left off.',
+    'legacy':    'Your access predates the current system. Set a password to continue — nothing else changes.',
     'errors':    'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
     'routing':   'Authentication verified. Your session is being prepared.',
     'bookcode':  'Enter the access code printed in your copy of Quantum Theology. Your code unlocks extended access to the Prism.'
@@ -787,8 +787,9 @@
       .then(function(res) {
         var tier = (res.data && res.data.tier) ? res.data.tier : 'free';
         showFlow('routing');
+        var tierDisplayNames = { scholar: 'Scholar', theologian: 'Theologian', companion: 'Companion', free: 'Free' };
         document.getElementById('flow-title').textContent = 'Access Confirmed';
-        document.getElementById('flow-copy').textContent  = 'Authentication verified. Your session is being prepared.';
+        document.getElementById('flow-copy').textContent  = 'Welcome back. ' + (tierDisplayNames[tier] || 'Free') + ' access verified. Your session is being prepared.';
 
         // Clear immediately before the redirect — not inside the timeout
         Object.keys(localStorage).forEach(function(key) {
