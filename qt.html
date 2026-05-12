@@ -1098,9 +1098,17 @@ async function runInterpretation() {
     showSidebarAfterQuery(queryText);
 
     // Save full response to localStorage keyed by thread id
-    if (activeThreadId) {
-      localStorage.setItem('qt_response_' + activeThreadId, JSON.stringify(parsed));
-      localStorage.setItem('qt_input_' + activeThreadId, queryText);
+    // activeThreadId is set by showSidebarAfterQuery/addThreadToSidebar
+    if (activeThreadId && parsed) {
+      try {
+        localStorage.setItem('qt_response_' + activeThreadId, JSON.stringify(parsed));
+        localStorage.setItem('qt_input_' + activeThreadId, queryText);
+        console.log('Saved response for thread:', activeThreadId);
+      } catch(saveErr) {
+        console.error('Save failed:', saveErr.message);
+      }
+    } else {
+      console.warn('Save skipped — activeThreadId:', activeThreadId, 'parsed:', !!parsed);
     }
 
   } catch (err) {
