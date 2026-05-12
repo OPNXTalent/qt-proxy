@@ -746,40 +746,53 @@
 
   /* ── Route after auth ── */
  function routeAfterAuth(email) {
-    sb.from('subscribers')
-      .select('tier, status')
-      .eq('email', email)
-      .single()
-      .then(function(res) {
-        var tier = (res.data && res.data.tier) ? res.data.tier : 'free';
-        // Update routing block with actual tier before showing
-        var tierDisplayNames = { scholar: 'Scholar', theologian: 'Theologian', companion: 'Companion', free: 'Free Access' };
-        var tierMessages = {
-          scholar:    'Access confirmed. 250 queries per month, 90-day archive, full conversation history.',
-          theologian: 'Access confirmed. 350 queries per month, 180-day archive, extended depth.',
-          companion:  'Access confirmed. 500 queries per month, 1-year archive, full capabilities.',
-          free:       'Access confirmed. 5 queries per day. Subscribe to unlock full archive and depth.'
-        };
-        var badgeEl = document.getElementById('routing-tier-badge');
-        var msgEl   = document.getElementById('routing-tier-msg');
-        if (badgeEl) badgeEl.textContent = tierDisplayNames[tier] || 'Free Access';
-        if (msgEl)   msgEl.textContent   = tierMessages[tier]     || tierMessages['free'];
-        showFlow('routing');
-        document.getElementById('flow-title').textContent = 'Access Confirmed';
-        document.getElementById('flow-copy').textContent  = 'Welcome back, ' + email.split('@')[0] + '. Your session is being prepared.';
+    var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
 
-        // Clear immediately before the redirect — not inside the timeout
-        Object.keys(localStorage).forEach(function(key) {
-          if (key.startsWith('qt_') && key !== 'qt_user_email') {
-            localStorage.removeItem(key);
-          }
-        });
-        localStorage.setItem('qt_user_email', email);
+    var tierDisplayNames = { scholar: 'Scholar', theologian: 'Theologian', companion: 'Companion', free: 'Free Access' };
+    var tierMessages = {
+      scholar:    'Access confirmed. 250 queries per month, 90-day archive, full conversation history.',
+      theologian: 'Access confirmed. 350 queries per month, 180-day archive, extended depth.',
+      companion:  'Access confirmed. 500 queries per month, 1-year archive, full capabilities.',
+      free:       'Access confirmed. 5 queries per day. Subscribe to unlock full archive and depth.'
+    };
 
-        setTimeout(function() {
-          window.location.href = 'https://quantumtheology.app/qt.html?tier=' + tier;
-        }, 2000);
+    fetch(SUPA_URL + '/rest/v1/subscribers?email=eq.' + encodeURIComponent(email) + '&select=tier,status&limit=1', {
+      headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(rows) {
+      var tier = (rows && rows.length > 0 && rows[0].tier) ? rows[0].tier : 'free';
+
+      var badgeEl = document.getElementById('routing-tier-badge');
+      var msgEl   = document.getElementById('routing-tier-msg');
+      if (badgeEl) badgeEl.textContent = tierDisplayNames[tier] || 'Free Access';
+      if (msgEl)   msgEl.textContent   = tierMessages[tier]     || tierMessages['free'];
+
+      showFlow('routing');
+      document.getElementById('flow-title').textContent = 'Access Confirmed';
+      document.getElementById('flow-copy').textContent  = 'Welcome back, ' + email.split('@')[0] + '. Your session is being prepared.';
+
+      Object.keys(localStorage).forEach(function(key) {
+        if (key.startsWith('qt_') && key !== 'qt_user_email' && key !== 'qt_user_tier' && key !== 'qt_sidebar_appeared' && key !== 'qt_sidebar_open' && key !== 'qt_threads') {
+          localStorage.removeItem(key);
+        }
       });
+      localStorage.setItem('qt_user_email', email);
+      localStorage.setItem('qt_user_tier', tier);
+
+      setTimeout(function() {
+        window.location.href = 'https://quantumtheology.app/qt.html?tier=' + tier;
+      }, 2000);
+    })
+    .catch(function(err) {
+      console.error('Tier lookup failed:', err.message);
+      // Fallback — redirect with free tier
+      localStorage.setItem('qt_user_email', email);
+      setTimeout(function() {
+        window.location.href = 'https://quantumtheology.app/qt.html?tier=free';
+      }, 2000);
+    });
   }
   /* ── New User ── */
   async function handleRegister(btn) {
