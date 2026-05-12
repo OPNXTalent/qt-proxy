@@ -780,6 +780,10 @@
       });
       localStorage.setItem('qt_user_email', email);
       localStorage.setItem('qt_user_tier', tier);
+      // Mark sidebar as having appeared so it shows on login even with no threads
+      if (tier !== 'free') {
+        localStorage.setItem('qt_sidebar_appeared', '1');
+      }
 
       setTimeout(function() {
         window.location.href = 'https://quantumtheology.app/qt.html?tier=' + tier;
