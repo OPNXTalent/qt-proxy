@@ -155,6 +155,12 @@
 
   .thread-upgrade { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--gold-dim); padding: 5px 20px 10px; line-height: 1.5; border-bottom: 1px solid rgba(42,42,64,0.4); }
   .thread-upgrade a { color: var(--gold); text-decoration: none; }
+  .thread-delete-btn { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; opacity: 0; transition: opacity 0.15s, color 0.15s; padding: 4px 6px; line-height: 1; }
+  .thread-item:hover .thread-delete-btn { opacity: 1; }
+  .thread-delete-btn:hover { color: #b85c5c; }
+  .sidebar-undo-toast { position: absolute; bottom: 60px; left: 12px; right: 12px; background: var(--surface-2); border: 1px solid var(--border-lit); padding: 10px 14px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text); display: flex; align-items: center; justify-content: space-between; z-index: 10; animation: toastIn 0.2s ease; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .sidebar-undo-btn { color: var(--gold); background: transparent; border: none; cursor: pointer; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; padding: 0; }
   .thread-expired-note { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); padding: 5px 20px 8px; border-bottom: 1px solid rgba(42,42,64,0.4); }
   .thread-expired-note a { color: var(--gold-dim); text-decoration: none; }
 
@@ -704,8 +710,14 @@
   </div>
 
   <!-- Sidebar footer — logout -->
-  <div style="padding:16px 20px; border-top:1px solid var(--border); flex-shrink:0; margin-top:auto;">
+  <div style="padding:16px 20px; border-top:1px solid var(--border); flex-shrink:0; margin-top:auto; position:relative;">
     <button onclick="handleLogout()" style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">Sign Out →</button>
+  </div>
+
+  <!-- Undo toast -->
+  <div id="undoToast" class="sidebar-undo-toast" style="display:none;">
+    <span>Thread deleted</span>
+    <button class="sidebar-undo-btn" onclick="undoDelete()">Undo</button>
   </div>
 
 </aside>
@@ -2051,6 +2063,7 @@ function renderThreads(threads) {
     const renameOpen = renameOpenId === thread.id;
 
     var dblClick = !isLocked ? ' ondblclick="openRename(\'' + thread.id + '\')"' : '';
+    var deleteBtn = !isLocked ? '<button class="thread-delete-btn" onclick="event.stopPropagation(); deleteThread(\'' + thread.id + '\')" title="Delete thread">🗑</button>' : '';
     var parts = [
       '<div class="thread-item' + (isLocked ? ' locked' : '') + (isActive ? ' active' : '') + '" id="' + thread.id + '"' + dblClick + ' onclick="selectThread(\'' + thread.id + '\')" title="Double-click to rename">',
       '  <div class="thread-title">' + escHtml(title) + '</div>',
@@ -2059,6 +2072,7 @@ function renderThreads(threads) {
       '    <span class="thread-date">' + thread.lastVisited + '</span>',
       '    ' + badge,
       '  </div>',
+      '  ' + deleteBtn,
       '</div>',
       upgradePrompt,
       expiredNote,
@@ -2295,6 +2309,81 @@ function formatNow() {
 
 document.addEventListener('DOMContentLoaded', initSidebar);
 
+// Thread deletion with undo
+var _deletedThread = null;
+var _deleteTimer = null;
+
+function deleteThread(id) {
+  var thread = allThreads.find(function(t) { return t.id === id; });
+  if (!thread) return;
+
+  // Store for potential undo
+  _deletedThread = {
+    thread: thread,
+    response: localStorage.getItem('qt_response_' + id),
+    input: localStorage.getItem('qt_input_' + id),
+    followups: localStorage.getItem('qt_followups_' + id),
+    title: localStorage.getItem('qt_thread_title_' + id)
+  };
+
+  // Remove from allThreads and re-render
+  allThreads = allThreads.filter(function(t) { return t.id !== id; });
+  localStorage.setItem('qt_threads', JSON.stringify(allThreads));
+
+  // Clear active thread if it was the deleted one
+  if (activeThreadId === id) {
+    activeThreadId = null;
+    document.getElementById('resultBlock').classList.remove('visible');
+    document.getElementById('subjectBanner').style.display = 'none';
+    document.getElementById('followUpSection').style.display = 'none';
+    document.getElementById('downloadRow').style.display = 'none';
+  }
+
+  renderThreads(allThreads);
+
+  // Show undo toast
+  var toast = document.getElementById('undoToast');
+  toast.style.display = 'flex';
+
+  // Auto-confirm delete after 5 seconds
+  if (_deleteTimer) clearTimeout(_deleteTimer);
+  _deleteTimer = setTimeout(function() {
+    confirmDelete(id);
+  }, 5000);
+}
+
+function confirmDelete(id) {
+  // Hard delete all localStorage keys for this thread
+  localStorage.removeItem('qt_response_' + id);
+  localStorage.removeItem('qt_input_' + id);
+  localStorage.removeItem('qt_followups_' + id);
+  localStorage.removeItem('qt_thread_title_' + id);
+  _deletedThread = null;
+  var toast = document.getElementById('undoToast');
+  if (toast) toast.style.display = 'none';
+}
+
+function undoDelete() {
+  if (!_deletedThread) return;
+  if (_deleteTimer) clearTimeout(_deleteTimer);
+
+  // Restore thread
+  allThreads.unshift(_deletedThread.thread);
+  localStorage.setItem('qt_threads', JSON.stringify(allThreads));
+
+  // Restore associated data
+  if (_deletedThread.response) localStorage.setItem('qt_response_' + _deletedThread.thread.id, _deletedThread.response);
+  if (_deletedThread.input)    localStorage.setItem('qt_input_' + _deletedThread.thread.id, _deletedThread.input);
+  if (_deletedThread.followups) localStorage.setItem('qt_followups_' + _deletedThread.thread.id, _deletedThread.followups);
+  if (_deletedThread.title)    localStorage.setItem('qt_thread_title_' + _deletedThread.thread.id, _deletedThread.title);
+
+  _deletedThread = null;
+  renderThreads(allThreads);
+
+  var toast = document.getElementById('undoToast');
+  if (toast) toast.style.display = 'none';
+}
+
 async function handleLogout() {
   // Sign out of Supabase Auth
   try {
@@ -2306,14 +2395,9 @@ async function handleLogout() {
     });
   } catch(e) { /* silent — proceed with local clear regardless */ }
 
-  // Clear all QT session data
-  var keysToRemove = ['qt_user_email', 'qt_user_tier', 'qt_sidebar_appeared', 'qt_sidebar_open', 'qt_threads'];
+  // Clear session identity only — preserve thread history for when user logs back in
+  var keysToRemove = ['qt_user_email', 'qt_user_tier', 'qt_sidebar_appeared', 'qt_sidebar_open'];
   keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
-
-  // Clear any thread-specific data
-  Object.keys(localStorage).forEach(function(k) {
-    if (k.startsWith('qt_')) localStorage.removeItem(k);
-  });
 
   // Clear session storage
   sessionStorage.clear();
