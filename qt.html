@@ -1103,10 +1103,14 @@ async function runInterpretation() {
     document.getElementById('resultContent').innerHTML = getErrorMessage(err);
     showResult();
   } finally {
+    // loadingBlock already hidden by streaming handler
     document.getElementById('loadingBlock').classList.remove('visible');
     document.getElementById('inputSection').style.opacity = '';
     document.getElementById('inputSection').style.pointerEvents = '';
     document.getElementById('submitBtn').disabled = false;
+    // Remove stream indicator if still present
+    var si = document.getElementById('streamIndicator');
+    if (si) si.remove();
   }
 }
 
@@ -1194,8 +1198,9 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
 }
 
 async function callProxy(messages) {
-  let response;
   const userEmail = localStorage.getItem('qt_user_email') || null;
+  let response;
+
   try {
     response = await fetch('https://quantumtheology.app/api/interpret', {
       method: 'POST',
@@ -1208,7 +1213,7 @@ async function callProxy(messages) {
     throw err;
   }
 
-  // Handle server-side rate limit (72hr window via Supabase)
+  // Handle rate limit before streaming
   if (response.status === 429) {
     let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
     try {
@@ -1219,14 +1224,12 @@ async function callProxy(messages) {
     throw new Error('RATE_LIMITED');
   }
 
-  // Handle gateway timeout (504) specifically
   if (response.status === 504 || response.status === 524) {
     const err = new Error('TIMEOUT');
     err.type = 'timeout';
     throw err;
   }
 
-  // Handle other non-OK statuses
   if (!response.ok) {
     const err = new Error(`SERVER_ERROR_${response.status}`);
     err.type = 'server';
@@ -1234,38 +1237,72 @@ async function callProxy(messages) {
     throw err;
   }
 
-  const rawText = await response.text();
-  if (!rawText || rawText.trim() === '') {
-    const err = new Error('Empty response.');
+  // Read the SSE stream and accumulate full text
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+  let tierFromStream = null;
+
+  // Show streaming indicator
+  document.getElementById('loadingBlock').classList.remove('visible');
+  document.getElementById('resultBlock').classList.add('visible');
+  document.getElementById('resultContent').innerHTML =
+    '<div id="streamIndicator" style="font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); padding:20px 0; text-align:center;">Interpreting<span id="streamDots">...</span></div>';
+
+  // Animate the dots
+  var dotCount = 0;
+  var dotInterval = setInterval(function() {
+    dotCount = (dotCount + 1) % 4;
+    var dotsEl = document.getElementById('streamDots');
+    if (dotsEl) dotsEl.textContent = '.'.repeat(dotCount + 1);
+  }, 400);
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'delta' && parsed.text) {
+              fullText += parsed.text;
+            } else if (parsed.type === 'done') {
+              tierFromStream = parsed.tier;
+            } else if (parsed.type === 'error') {
+              throw new Error('Stream error: ' + parsed.error);
+            }
+          } catch(e) {
+            if (e.message && e.message.startsWith('Stream error')) throw e;
+          }
+        }
+      }
+    }
+  } finally {
+    clearInterval(dotInterval);
+  }
+
+  if (!fullText) {
+    const err = new Error('Empty stream response.');
     err.type = 'empty';
     throw err;
   }
 
-  let data;
-  try { data = JSON.parse(rawText); }
-  catch {
-    const err = new Error(`Response not JSON: ${rawText.slice(0, 200)}`);
-    err.type = 'parse';
-    throw err;
-  }
-
-  const contentBlocks = data.content;
-  if (!contentBlocks || contentBlocks.length === 0) {
-    const err = new Error(`No content: ${JSON.stringify(data).slice(0, 300)}`);
-    err.type = 'empty';
-    throw err;
-  }
-
-  // Store tier from server response if present and update sidebar label
-  if (data.tier && data.tier !== 'trial') {
-    localStorage.setItem('qt_user_tier', data.tier);
-    CURRENT_TIER = data.tier;
+  // Store tier from stream headers/events
+  if (tierFromStream && tierFromStream !== 'trial' && tierFromStream !== 'free') {
+    localStorage.setItem('qt_user_tier', tierFromStream);
+    CURRENT_TIER = tierFromStream;
     var tierLabelsMap = { scholar: 'Scholar · 90 Day Archive', theologian: 'Theologian · 180 Day Archive', companion: 'Companion · 1 Year Archive', free: 'Free Access' };
     var labelEl = document.getElementById('sidebarTierLabel');
-    if (labelEl) labelEl.textContent = tierLabelsMap[data.tier] || tierLabelsMap['free'];
+    if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
 
-  return contentBlocks.map(b => b.text || '').join('');
+  return fullText;
 }
 
 function getErrorMessage(err) {
