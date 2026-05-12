@@ -779,7 +779,7 @@
   var sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   /* ── Route after auth ── */
- async function routeAfterAuth(email) {
+ function routeAfterAuth(email) {
     showFlow('routing');
     document.getElementById('flow-title').textContent = 'Access Confirmed';
     document.getElementById('flow-copy').textContent  = 'Authentication verified. Your session is being prepared.';
