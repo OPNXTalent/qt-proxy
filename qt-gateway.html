@@ -790,13 +790,14 @@
         document.getElementById('flow-title').textContent = 'Access Confirmed';
         document.getElementById('flow-copy').textContent  = 'Authentication verified. Your session is being prepared.';
 
-        // Clear immediately before the redirect — not inside the timeout
+        // Clear session data but preserve user identity keys
         Object.keys(localStorage).forEach(function(key) {
-          if (key.startsWith('qt_') && key !== 'qt_user_email') {
+          if (key.startsWith('qt_') && key !== 'qt_user_email' && key !== 'qt_user_tier' && key !== 'qt_sidebar_appeared' && key !== 'qt_sidebar_open' && key !== 'qt_threads') {
             localStorage.removeItem(key);
           }
         });
         localStorage.setItem('qt_user_email', email);
+        localStorage.setItem('qt_user_tier', tier);
 
         setTimeout(function() {
           window.location.href = 'https://quantumtheology.app/qt.html?tier=' + tier;
