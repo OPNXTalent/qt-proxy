@@ -41,6 +41,25 @@ const TIER_LIMITS = {
   companion: 500,
 };
 
+// ── CRISIS DETECTION ──────────────────────────────────────────────────────────
+// Checked against the user's raw input before any Anthropic API call.
+// Phrases are lower-cased and matched as substrings so variations surface naturally.
+const CRISIS_SIGNALS = [
+  'want to die', 'want to kill myself', 'kill myself', 'end my life',
+  'ending my life', 'take my life', 'taking my life', 'suicide', 'suicidal',
+  'no reason to live', 'not worth living', 'life is not worth', 'rather be dead',
+  'better off dead', 'better off without me', "don't want to be here",
+  "don't want to be alive", 'hurt myself', 'harm myself', 'self-harm',
+  'cut myself', 'cutting myself', 'overdose', 'od myself',
+  'i give up', "can't go on", 'cannot go on', 'no way out',
+];
+
+function detectCrisis(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return CRISIS_SIGNALS.some(signal => lower.includes(signal));
+}
+
 async function getSubscriber(email) {
   if (!email) return null;
   const res = await fetch(
@@ -139,7 +158,7 @@ export default async function handler(req, res) {
 
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
-  // Parse body first so we can check email
+  // Parse body first so we can check email and run crisis detection
   let prompt, messages, userEmail;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
@@ -148,6 +167,24 @@ export default async function handler(req, res) {
     userEmail = body?.email || null;
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
+  }
+
+  // ── CRISIS DETECTION — runs before any auth or rate-limit check ──────────────
+  // Extract the last user-role message text for analysis
+  const lastUserText = (() => {
+    if (messages && messages.length > 0) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') {
+          const c = messages[i].content;
+          return typeof c === 'string' ? c : (Array.isArray(c) ? c.map(b => b.text || '').join(' ') : '');
+        }
+      }
+    }
+    return prompt || '';
+  })();
+
+  if (detectCrisis(lastUserText)) {
+    return res.status(200).json({ crisis: true });
   }
 
   // Check if subscriber
