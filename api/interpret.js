@@ -150,10 +150,50 @@ async function resetQueryLog(ip) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // ── GET /api/interpret — preflight status check ───────────────────────────
+  // Called on page load to pre-render lock state before a query is attempted.
+  // Authenticated users (email param present and active) are always unlocked.
+  if (req.method === 'GET') {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+    const { email } = req.query || {};
+
+    // Authenticated user — always unlocked, no rate limit applies
+    if (email) {
+      try {
+        const subscriber = await getSubscriber(email);
+        const redemption = await getCodeRedemption(email);
+        if ((subscriber && subscriber.status === 'active') || redemption) {
+          return res.status(200).json({ locked: false });
+        }
+      } catch {}
+    }
+
+    // Anonymous — check IP log
+    try {
+      const log = await getQueryLog(ip);
+      if (log) {
+        const firstQuery = new Date(log.first_query_at);
+        const hoursSinceFirst = (Date.now() - firstQuery.getTime()) / (1000 * 60 * 60);
+        if (hoursSinceFirst < WINDOW_HOURS && log.query_count >= QUERY_LIMIT) {
+          const hoursRemaining = WINDOW_HOURS - hoursSinceFirst; // float — send precise value for ticker
+          return res.status(200).json({
+            locked: true,
+            hoursRemaining: Math.ceil(hoursRemaining),   // rounded for display text
+            secondsRemaining: Math.floor(hoursRemaining * 3600), // precise for live ticker
+            queriesUsed: log.query_count
+          });
+        }
+      }
+    } catch {}
+
+    return res.status(200).json({ locked: false });
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
