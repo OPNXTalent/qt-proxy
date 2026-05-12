@@ -1824,70 +1824,22 @@ document.addEventListener('keydown', e => {
 
 // ── SIDEBAR SYSTEM ──
 
-const MOCK_TIER = 'scholar'; // scholar | theologian | companion | free
+// Tier retention windows in days
+var TIER_RETENTION = { scholar: 90, theologian: 180, companion: 365, free: 1 };
 
-const MOCK_THREADS = [
-  {
-    id: 'thread-001',
-    title: null,
-    query: 'Lamentations 3:31-32',
-    type: 'verse',
-    lastVisited: 'May 9 · 10:14 am',
-    daysLeft: 22,
-    expired: false,
-    archived: false
-  },
-  {
-    id: 'thread-002',
-    title: 'On being known vs. religious performance',
-    query: '"I never knew you" (Matthew 7:23)',
-    type: 'phrase',
-    lastVisited: 'May 7 · 3:40 pm',
-    daysLeft: 7,
-    expired: false,
-    archived: false
-  },
-  {
-    id: 'thread-003',
-    title: null,
-    query: 'Free will vs. Determinism — if God knows everything, are choices real?',
-    type: 'theme',
-    lastVisited: 'May 3 · 8:22 am',
-    daysLeft: 3,
-    expired: false,
-    archived: false
-  },
-  {
-    id: 'thread-004',
-    title: 'The slow drain of living faith',
-    query: 'If God is real, why does He feel so distant? I grew up in church but it all feels routine now',
-    type: 'freetext',
-    lastVisited: 'Apr 28 · 6:05 pm',
-    daysLeft: 0,
-    expired: true,
-    archived: false
-  },
-  {
-    id: 'thread-005',
-    title: null,
-    query: 'Romans 8:28 — and we know that in all things God works for the good',
-    type: 'verse',
-    lastVisited: 'Apr 22 · 11:30 am',
-    daysLeft: 0,
-    expired: true,
-    archived: false
-  },
-  {
-    id: 'thread-006',
-    title: null,
-    query: 'Sovereignty and suffering — the tension between providence and pain',
-    type: 'theme',
-    lastVisited: 'Apr 15 · 2:18 pm',
-    daysLeft: 0,
-    expired: true,
-    archived: false
-  }
-];
+// Read actual tier from URL param or localStorage
+function getActualTier() {
+  var urlParams = new URLSearchParams(window.location.search);
+  var tierParam = urlParams.get('tier');
+  if (tierParam && TIER_RETENTION[tierParam]) return tierParam;
+  var stored = localStorage.getItem('qt_user_tier');
+  if (stored && TIER_RETENTION[stored]) return stored;
+  return 'free';
+}
+
+var CURRENT_TIER = getActualTier();
+// Persist tier to localStorage so it survives navigation
+if (CURRENT_TIER !== 'free') localStorage.setItem('qt_user_tier', CURRENT_TIER);
 
 let activeThreadId = null;
 let renameOpenId = null;
@@ -1921,12 +1873,12 @@ function getUpgradePrompt(thread, tier) {
 
 function getExpiredNote(thread, tier) {
   if (!thread.expired) return '';
-  return '<div class="thread-expired-note">Content visible · Follow-up locked · <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank">Extend 30 days — $1.99 →</a></div>';
+  return '<div class="thread-expired-note">Content visible · Follow-up locked · <a href="https://quantumtheology.app/qt-gateway.html" target="_blank">Upgrade to extend →</a></div>';
 }
 
 function renderThreads(threads) {
   const container = document.getElementById('sidebarThreads');
-  const tier = MOCK_TIER;
+  const tier = CURRENT_TIER;
 
   if (tier === 'free') {
     document.getElementById('freeUpgradePrompt').style.display = 'block';
@@ -1972,7 +1924,7 @@ function escHtml(str) {
 }
 
 function selectThread(id) {
-  if (MOCK_TIER === 'free') return;
+  if (CURRENT_TIER === 'free') return;
 
   // Find thread
   const thread = allThreads.find(t => t.id === id);
@@ -2086,25 +2038,41 @@ function toggleSidebar() {
 
 function initSidebar() {
   // Load tier label
-  const tierLabels = { scholar: 'Scholar · 30 Day Archive', theologian: 'Theologian · 90 Day Archive', companion: 'Companion · 3 Year Archive', free: 'Free Access' };
-  document.getElementById('sidebarTierLabel').textContent = tierLabels[MOCK_TIER] || 'Scholar · 30 Day Archive';
+  var tierLabels = { scholar: 'Scholar · 90 Day Archive', theologian: 'Theologian · 180 Day Archive', companion: 'Companion · 1 Year Archive', free: 'Free Access' };
+  document.getElementById('sidebarTierLabel').textContent = tierLabels[CURRENT_TIER] || 'Scholar · 30 Day Archive';
 
-  // Load threads from localStorage or use mock data
-  const saved = localStorage.getItem('qt_threads');
-  allThreads = saved ? JSON.parse(saved) : MOCK_THREADS;
+  // Load threads from localStorage, enforce tier retention expiration
+  var saved = localStorage.getItem('qt_threads');
+  var rawThreads = saved ? JSON.parse(saved) : [];
+  var retentionDays = TIER_RETENTION[CURRENT_TIER] || 1;
+  var now = Date.now();
+  // Mark threads as expired based on actual tier retention window
+  allThreads = rawThreads.map(function(t) {
+    var createdAt = t.createdAt || now;
+    var ageInDays = (now - createdAt) / (1000 * 60 * 60 * 24);
+    var daysLeft = Math.max(0, Math.floor(retentionDays - ageInDays));
+    return Object.assign({}, t, {
+      daysLeft: daysLeft,
+      expired: daysLeft === 0
+    });
+  });
+  // Save back with updated expiry state
+  localStorage.setItem('qt_threads', JSON.stringify(allThreads));
 
-  // Sidebar starts hidden — appears after first query (handled in showSidebarAfterQuery)
-  const toggle = document.getElementById('sidebarToggle');
-  const sidebar = document.getElementById('sidebar');
+  // Show sidebar immediately on login if threads exist OR if sidebar has appeared before
+  var toggle = document.getElementById('sidebarToggle');
+  var sidebar = document.getElementById('sidebar');
 
-  // Restore open state if sidebar has appeared before
-  const hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
-  if (hasAppeared) {
+  var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
+  var hasThreads = allThreads.length > 0;
+
+  if (hasAppeared || hasThreads) {
     sidebar.classList.add('visible');
     toggle.classList.add('visible');
     sidebarHasAppeared = true;
-    const wasOpen = localStorage.getItem('qt_sidebar_open') === '1';
-    if (wasOpen) {
+    localStorage.setItem('qt_sidebar_appeared', '1');
+    var wasOpen = localStorage.getItem('qt_sidebar_open') === '1';
+    if (wasOpen || hasThreads) {
       sidebarOpen = true;
       sidebar.classList.add('open');
       document.getElementById('mainContent').classList.add('sidebar-open');
@@ -2144,13 +2112,15 @@ function showSidebarAfterQuery(queryText) {
 }
 
 function addThreadToSidebar(queryText) {
+  var tsNow = Date.now();
   const newThread = {
-    id: 'thread-' + Date.now(),
+    id: 'thread-' + tsNow,
     title: null,
     query: queryText,
     type: 'new',
     lastVisited: formatNow(),
-    daysLeft: 30,
+    createdAt: tsNow,
+    daysLeft: TIER_RETENTION[CURRENT_TIER] || 90,
     expired: false,
     archived: false
   };
