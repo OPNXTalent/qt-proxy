@@ -314,27 +314,8 @@
   /* SUBMIT */
   .submit-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    justify-content: flex-end;
     margin-bottom: 52px;
-  }
-
-  .new-subject-top-btn {
-    font-family: var(--mono);
-    font-size: 13px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    background: transparent;
-    border: 1px solid var(--border);
-    padding: 16px 28px;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: none;
-  }
-  .new-subject-top-btn:hover {
-    border-color: var(--border-lit);
-    color: var(--text-dim);
   }
 
   .submit-btn {
@@ -785,7 +766,6 @@
     </div>
 
     <div class="submit-row">
-      <button class="new-subject-top-btn" id="newSubjectTopBtn" onclick="resetForm()">↺ New Subject</button>
       <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
     </div>
 
@@ -834,6 +814,14 @@
 
       </div>
     </div>
+  </div>
+
+  <!-- NEW SUBJECT ROW — outside inputSection so opacity fade doesn't hide it -->
+  <div id="newSubjectRow" style="display:none; margin-top:-52px; margin-bottom:52px;">
+    <button id="newSubjectTopBtn" onclick="resetForm()"
+      onmouseover="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'"
+      style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); background:transparent; border:1px solid var(--border); padding:16px 28px; cursor:pointer; transition:all 0.2s;">↺ New Subject</button>
   </div>
 
   <!-- LOADING -->
@@ -1556,8 +1544,8 @@ function getErrorMessage(err) {
 function showResult() {
   document.getElementById('loadingBlock').classList.remove('visible');
   document.getElementById('resultBlock').classList.add('visible');
-  var btn = document.getElementById('newSubjectTopBtn');
-  if (btn) btn.style.display = 'block';
+  var row = document.getElementById('newSubjectRow');
+  if (row) row.style.display = 'block';
 }
 
 function renderResult(d) {
@@ -1915,6 +1903,8 @@ function resetForm() {
   if (document.getElementById('followUpInput')) document.getElementById('followUpInput').value = '';
   var btn = document.getElementById('newSubjectTopBtn');
   if (btn) btn.style.display = 'none';
+  var row = document.getElementById('newSubjectRow');
+  if (row) row.style.display = 'none';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
