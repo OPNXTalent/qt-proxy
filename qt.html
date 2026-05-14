@@ -1209,6 +1209,7 @@ async function runInterpretation() {
   } catch (err) {
     if (err.message === 'RATE_LIMITED') return;
     if (err.message === 'CRISIS_DETECTED') return;
+    if (err.message === 'SURVEY_DETECTED') return;
     document.getElementById('resultContent').innerHTML = getErrorMessage(err);
     showResult();
   } finally {
@@ -1440,9 +1441,9 @@ async function callProxy(messages) {
     throw err;
   }
 
-  // ── CRISIS RESPONSE CHECK ────────────────────────────────────────────────────
-  // Server returns { crisis: true } as plain JSON (not SSE) when input triggers detection.
-  // We peek at Content-Type to decide whether to parse as JSON before streaming.
+  // ── CRISIS + SURVEY RESPONSE CHECK ──────────────────────────────────────────
+  // Server returns { crisis: true } or { survey: true, redirect: "..." } as plain JSON
+  // (not SSE) when input triggers detection. Peek at Content-Type before streaming.
   const contentType = response.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
     let bodyData = {};
@@ -1450,6 +1451,10 @@ async function callProxy(messages) {
     if (bodyData.crisis) {
       showCrisisPanel();
       throw new Error('CRISIS_DETECTED');
+    }
+    if (bodyData.survey) {
+      showSurveyPanel(bodyData.redirect);
+      throw new Error('SURVEY_DETECTED');
     }
     // Any other unexpected JSON — surface as server error
     const err = new Error('Unexpected JSON response from server.');
@@ -2719,6 +2724,58 @@ function dismissCrisisPanel() {
     setTimeout(function() {
       if (panel.parentNode) panel.parentNode.removeChild(panel);
       document.getElementById('resultBlock').classList.remove('visible');
+      document.getElementById('userInput').focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 400);
+  }
+}
+
+// ── SURVEY PANEL ──────────────────────────────────────────────────────────────
+function showSurveyPanel(redirectMessage) {
+  document.getElementById('loadingBlock').classList.remove('visible');
+  document.getElementById('resultBlock').classList.add('visible');
+
+  // Re-enable form
+  document.getElementById('inputSection').style.opacity = '';
+  document.getElementById('inputSection').style.pointerEvents = '';
+  document.getElementById('submitBtn').disabled = false;
+
+  var message = redirectMessage || "The question you're carrying is real — but the Prism works from a specific point of entry, not from altitude. Bring a verse that sits at the center of this tension and ask what it's actually holding.";
+
+  document.getElementById('resultContent').innerHTML = `
+    <div id="surveyPanel" style="
+      border: 1px solid var(--border-lit);
+      background: linear-gradient(135deg, rgba(74,106,170,0.08), rgba(13,13,20,0.6));
+      padding: 40px 44px;
+      margin-bottom: 32px;
+    ">
+      <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:20px;">
+        A Different Entry Point
+      </div>
+      <div style="font-family:var(--crimson); font-size:20px; color:var(--text); line-height:1.85; margin-bottom:32px;">
+        ${escHtml(message)}
+      </div>
+      <div style="border-top:1px solid var(--border); padding-top:24px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+        <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.7; flex:1; min-width:200px;">
+          The Prism opens from a specific passage. Bring the verse — and the tension inside it will surface.
+        </div>
+        <button onclick="dismissSurveyPanel()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:11px 22px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; white-space:nowrap; transition:all 0.2s;">Try a Verse →</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('resultContent').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function dismissSurveyPanel() {
+  var panel = document.getElementById('surveyPanel');
+  if (panel) {
+    panel.style.transition = 'opacity 0.4s ease';
+    panel.style.opacity = '0';
+    setTimeout(function() {
+      if (panel.parentNode) panel.parentNode.removeChild(panel);
+      document.getElementById('resultBlock').classList.remove('visible');
+      document.getElementById('userInput').value = '';
       document.getElementById('userInput').focus();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 400);
