@@ -1132,6 +1132,10 @@ async function runInterpretation() {
       const firstBrace = cleaned.indexOf('{');
       const lastBrace = cleaned.lastIndexOf('}');
       if (firstBrace !== -1 && lastBrace !== -1) cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+      // Sanitize: fix unescaped newlines/tabs inside JSON string values
+      cleaned = cleaned.replace(/"((?:[^"\\]|\\.)*)"/g, (m, inner) =>
+        '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"'
+      );
       parsed = JSON.parse(cleaned);
     } catch {
       try {
@@ -1142,6 +1146,10 @@ async function runInterpretation() {
         let candidate = match[0];
         // Replace smart quotes with standard quotes
         candidate = candidate.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+        // Sanitize: fix unescaped newlines/tabs inside string values
+        candidate = candidate.replace(/"((?:[^"\\]|\\.)*)"/g, (m, inner) =>
+          '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"'
+        );
         // Truncated JSON: try to close any open string then close the object
         try {
           parsed = JSON.parse(candidate);
