@@ -183,7 +183,7 @@ export default async function handler(req, res) {
   // Authenticated users (email param present and active) are always unlocked.
   if (req.method === 'GET') {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
-    const urlObj = new URL(req.url, \`https://\${req.headers.host}\`);
+    const urlObj = new URL(req.url, 'https://' + req.headers.host);
     const email = urlObj.searchParams.get('email');
 
     // Authenticated user — always unlocked, no rate limit applies
