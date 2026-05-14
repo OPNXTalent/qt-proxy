@@ -314,8 +314,7 @@
   /* SUBMIT */
   .submit-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    justify-content: flex-end;
     margin-bottom: 52px;
   }
 
@@ -766,13 +765,9 @@
       <div id="charCount" style="font-family:var(--mono); font-size: 17px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 600</div>
     </div>
 
-  </div><!-- /#inputSection closes here -->
-
-  <!-- SUBMIT ROW — lives outside inputSection so opacity fade never affects it -->
-  <div class="submit-row" id="submitRow">
-    <button id="newSubjectTopBtn" onclick="resetForm()" onmouseover="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'" style="display:none;font-family:var(--mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);background:transparent;border:1px solid var(--border);padding:16px 28px;cursor:pointer;transition:all 0.2s;">↺ New Subject</button>
-    <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
-  </div>
+    <div class="submit-row">
+      <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
+    </div>
 
     <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
       <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Free Query Limit Reached</div>
@@ -830,7 +825,10 @@
   <!-- RESULT ---->
   <div class="result" id="resultBlock">
     <div id="subjectBanner" style="display:none; margin-bottom:28px;">
-      <div style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Current Subject</div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+        <div style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim);">Current Subject</div>
+        <button onclick="resetForm()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-dim); background:transparent; border:1px solid var(--border); padding:6px 14px; cursor:pointer; transition:all 0.2s; white-space:nowrap;" onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">+ New Subject</button>
+      </div>
       <div id="subjectText" style="font-size:17px; color:var(--text-dim); font-style:italic;"></div>
     </div>
     <div id="resultContent"></div>
@@ -1069,7 +1067,6 @@ function startTicker(secondsRemaining) {
 
 function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
     document.getElementById('submitBtn').style.display = 'none';
-    document.getElementById('newSubjectTopBtn').style.display = 'none';
     const prompt = document.getElementById('limitPrompt');
     if (customMessage) {
       const msgEl = prompt.querySelector('.limit-message');
@@ -1136,22 +1133,9 @@ async function runInterpretation() {
       parsed = JSON.parse(cleaned);
     } catch {
       try {
-        // Second attempt: extract and repair common JSON issues
-        let raw = apiRawText;
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error('no json');
-        let candidate = match[0];
-        // Replace smart quotes with standard quotes
-        candidate = candidate.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
-        // Truncated JSON: try to close any open string then close the object
-        try {
-          parsed = JSON.parse(candidate);
-        } catch {
-          // Strip trailing incomplete key-value pair and close the object
-          candidate = candidate.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/, '').replace(/,\s*"[^"]*"\s*:\s*$/, '');
-          if (!candidate.endsWith('}')) candidate = candidate.replace(/,?\s*$/, '') + '}';
-          parsed = JSON.parse(candidate);
-        }
+        const match = apiRawText.match(/\{[\s\S]*\}/);
+        if (match) parsed = JSON.parse(match[0]);
+        else throw new Error('no json');
       } catch {
         document.getElementById('resultContent').innerHTML = `
           <div class="error-block">
@@ -1496,23 +1480,6 @@ async function callProxy(messages) {
         }
       }
     }
-    // Flush any remaining buffered data after stream ends
-    if (buffer.trim()) {
-      const lines = buffer.split('\n');
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'delta' && parsed.text) {
-              fullText += parsed.text;
-            } else if (parsed.type === 'done') {
-              tierFromStream = parsed.tier;
-            }
-          } catch(e) { /* ignore malformed final chunk */ }
-        }
-      }
-    }
   } finally {
     clearInterval(dotInterval);
   }
@@ -1569,7 +1536,6 @@ function getErrorMessage(err) {
 function showResult() {
   document.getElementById('loadingBlock').classList.remove('visible');
   document.getElementById('resultBlock').classList.add('visible');
-  document.getElementById('newSubjectTopBtn').style.display = 'block';
 }
 
 function renderResult(d) {
@@ -1925,7 +1891,6 @@ function resetForm() {
   document.getElementById('resultContent').innerHTML = '';
   document.getElementById('userInput').value = '';
   if (document.getElementById('followUpInput')) document.getElementById('followUpInput').value = '';
-  document.getElementById('newSubjectTopBtn').style.display = 'none';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
