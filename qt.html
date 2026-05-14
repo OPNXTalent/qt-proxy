@@ -1139,9 +1139,22 @@ async function runInterpretation() {
       parsed = JSON.parse(cleaned);
     } catch {
       try {
-        const match = apiRawText.match(/\{[\s\S]*\}/);
-        if (match) parsed = JSON.parse(match[0]);
-        else throw new Error('no json');
+        // Second attempt: extract and repair common JSON issues
+        let raw = apiRawText;
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('no json');
+        let candidate = match[0];
+        // Replace smart quotes with standard quotes
+        candidate = candidate.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+        // Truncated JSON: try to close any open string then close the object
+        try {
+          parsed = JSON.parse(candidate);
+        } catch {
+          // Strip trailing incomplete key-value pair and close the object
+          candidate = candidate.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/, '').replace(/,\s*"[^"]*"\s*:\s*$/, '');
+          if (!candidate.endsWith('}')) candidate = candidate.replace(/,?\s*$/, '') + '}';
+          parsed = JSON.parse(candidate);
+        }
       } catch {
         document.getElementById('resultContent').innerHTML = `
           <div class="error-block">
