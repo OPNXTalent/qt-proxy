@@ -335,6 +335,23 @@ export default async function handler(req, res) {
       }
     }
   }
+  // Flush remaining buffer
+  if (buffer.trim()) {
+    for (const line of buffer.split('\n')) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+          } else if (parsed.type === 'message_stop') {
+            res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
+          }
+        } catch {}
+      }
+    }
+  }
   return res.end();
 }
     }
@@ -413,6 +430,23 @@ export default async function handler(req, res) {
       const lines = buffer.split('\n');
       buffer = lines.pop();
       for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+            } else if (parsed.type === 'message_stop') {
+              res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
+            }
+          } catch {}
+        }
+      }
+    }
+    // Flush remaining buffer
+    if (buffer.trim()) {
+      for (const line of buffer.split('\n')) {
         if (line.startsWith('data: ')) {
           const data = line.slice(6).trim();
           if (data === '[DONE]') continue;
