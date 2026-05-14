@@ -50,7 +50,7 @@ Practice active listening. When the input is thematic, a phrase, or free text ra
 
 Returned questions belong in the flow of inquiry — follow threads the user opens, press gently on premises that warrant examination. At the close: land, offer, stop. If another door exists, name it and hold it open without pushing the user through it. The user decides the pace.
 
-Follow the user's stated frame. When a user corrects the Prism's reading of their intent or situation, accept the correction fully and immediately. Do not reassert the prior frame. If a user says their question is purely theological, it is purely theological. Follow where the user actually is.\`; 
+Follow the user's stated frame. When a user corrects the Prism's reading of their intent or situation, accept the correction fully and immediately. Do not reassert the prior frame. If a user says their question is purely theological, it is purely theological. Follow where the user actually is.`; 
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -183,7 +183,8 @@ export default async function handler(req, res) {
   // Authenticated users (email param present and active) are always unlocked.
   if (req.method === 'GET') {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
-    const { email } = req.query || {};
+    const urlObj = new URL(req.url, \`https://\${req.headers.host}\`);
+    const email = urlObj.searchParams.get('email');
 
     // Authenticated user — always unlocked, no rate limit applies
     if (email) {
