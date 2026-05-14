@@ -768,22 +768,9 @@
 
   </div><!-- /#inputSection closes here -->
 
-  <!-- SUBMIT ROW — lives outside inputSection so it never inherits opacity fade -->
+  <!-- SUBMIT ROW — lives outside inputSection so opacity fade never affects it -->
   <div class="submit-row" id="submitRow">
-    <button id="newSubjectTopBtn" onclick="resetForm()" style="
-      display: none;
-      font-family: var(--mono);
-      font-size: 13px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      background: transparent;
-      border: 1px solid var(--border);
-      padding: 16px 28px;
-      cursor: pointer;
-      transition: all 0.2s;
-    " onmouseover="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'"
-       onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">↺ New Subject</button>
+    <button id="newSubjectTopBtn" onclick="resetForm()" onmouseover="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'" style="display:none;font-family:var(--mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);background:transparent;border:1px solid var(--border);padding:16px 28px;cursor:pointer;transition:all 0.2s;">↺ New Subject</button>
     <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
   </div>
 
