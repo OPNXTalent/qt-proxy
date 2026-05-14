@@ -92,90 +92,6 @@ const TIER_LIMITS = {
   companion: 500,
 };
 
-// ── SURVEY DETECTION ──────────────────────────────────────────────────────────
-// Catches queries that are research/orientation requests rather than interpretation.
-// These are structurally too broad for the Prism and will cause generation timeouts.
-// Checked before any Anthropic API call — zero tokens consumed on a match.
-
-const SURVEY_OPENER_PATTERNS = [
-  /^what can you tell me about\b/i,
-  /^tell me about\b/i,
-  /^explain (the history|everything|all|the difference|the relationship)\b/i,
-  /^give me (an overview|a summary|a history|background)\b/i,
-  /^what is the history of\b/i,
-  /^compare\b/i,
-  /^what('s| is) the difference between\b/i,
-];
-
-// Structural connectors that signal a multi-subject survey query
-const SURVEY_CONJUNCTION_PATTERNS = [
-  /\bversus\b/i,
-  /\bvs\.?\b/i,
-  /\bthe intersection between\b/i,
-  /\bas it stands (in|contained in|within)\b/i,
-  /\bthe relationship between\b/i,
-  /\bcompared to\b/i,
-];
-
-// Verse reference pattern — presence of this anchors a query and exempts it from gating
-const VERSE_REFERENCE_PATTERN = /\b(genesis|exodus|leviticus|numbers|deuteronomy|joshua|judges|ruth|samuel|kings|chronicles|ezra|nehemiah|esther|job|psalm|psalms|proverbs|ecclesiastes|song|isaiah|jeremiah|lamentations|ezekiel|daniel|hosea|joel|amos|obadiah|jonah|micah|nahum|habakkuk|zephaniah|haggai|zechariah|malachi|matthew|mark|luke|john|acts|romans|corinthians|galatians|ephesians|philippians|colossians|thessalonians|timothy|titus|philemon|hebrews|james|peter|jude|revelation)\s+\d+:\d+/i;
-
-function detectSurvey(text) {
-  if (!text || text.length < 40) return false;
-
-  // If the query contains a specific verse reference, let it through
-  if (VERSE_REFERENCE_PATTERN.test(text)) return false;
-
-  const hasOpener = SURVEY_OPENER_PATTERNS.some(p => p.test(text.trim()));
-  const hasConjunction = SURVEY_CONJUNCTION_PATTERNS.some(p => p.test(text));
-
-  // Either a survey opener OR a conjunction in a long query triggers the gate
-  if (hasOpener) return true;
-  if (hasConjunction && text.length > 120) return true;
-
-  return false;
-}
-
-const SURVEY_REDIRECT_SYSTEM_PROMPT = `You are the QT Prism gate. A user has submitted a query that is a research or survey question rather than an interpretation request. The Prism works from a specific point of entry — a passage, a verse, a tension the user is holding — not from altitude.
-
-Your response must do exactly three things, in this order:
-1. In one sentence, acknowledge what the user is genuinely reaching for in their question. Name the real thing underneath the survey request.
-2. In one sentence, name why this is an orientation question rather than an interpretation question — without apologizing for the boundary.
-3. In one sentence, suggest one specific verse or point of entry derived directly from their query that they could bring to the Prism instead.
-
-Three sentences. No more. QT voice — present, not preachy. Do not use the word "unfortunately." Do not explain the Prism's design. Do not list multiple options. One door, held open.
-
-Respond only with a valid JSON object in this exact shape:
-{"redirect": "your three-sentence response here"}`;
-
-async function generateSurveyRedirect(queryText) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 200,
-      system: SURVEY_REDIRECT_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: queryText }]
-    })
-  });
-
-  if (!res.ok) return null;
-  const data = await res.json();
-  const raw = data?.content?.[0]?.text || '';
-  try {
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
-    return parsed.redirect || null;
-  } catch {
-    return null;
-  }
-}
-
 // ── CRISIS DETECTION ──────────────────────────────────────────────────────────
 // Checked against the user's raw input before any Anthropic API call.
 // Phrases are lower-cased and matched as substrings so variations surface naturally.
@@ -363,17 +279,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ crisis: true });
   }
 
-  // ── SURVEY GATE — runs before auth or rate-limit check ───────────────────────
-  // Broad research/orientation queries are redirected before any main API call.
-  // A small redirect call (~200 tokens) replaces a timeout-risk 3000-4000 token generation.
-  if (detectSurvey(lastUserText)) {
-    const redirectMessage = await generateSurveyRedirect(lastUserText);
-    return res.status(200).json({
-      survey: true,
-      redirect: redirectMessage || "The question you're carrying is real — but the Prism works from a specific point of entry, not from altitude. Bring a verse that sits at the center of this tension and ask what it's actually holding."
-    });
-  }
-
   // Check if subscriber
   try {
     if (userEmail) {
@@ -403,7 +308,7 @@ export default async function handler(req, res) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1200,
+      max_tokens: 4000,
       stream: true,
       system: QT_SYSTEM_PROMPT,
       messages: apiMessages
@@ -512,7 +417,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1200,
+        max_tokens: 3000,
         stream: true,
         system: QT_SYSTEM_PROMPT,
         messages: apiMessages
