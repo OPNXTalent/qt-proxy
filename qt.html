@@ -314,7 +314,8 @@
   /* SUBMIT */
   .submit-row {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 52px;
   }
 
@@ -765,9 +766,26 @@
       <div id="charCount" style="font-family:var(--mono); font-size: 17px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 600</div>
     </div>
 
-    <div class="submit-row">
-      <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
-    </div>
+  </div><!-- /#inputSection closes here -->
+
+  <!-- SUBMIT ROW — lives outside inputSection so it never inherits opacity fade -->
+  <div class="submit-row" id="submitRow">
+    <button id="newSubjectTopBtn" onclick="resetForm()" style="
+      display: none;
+      font-family: var(--mono);
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      padding: 16px 28px;
+      cursor: pointer;
+      transition: all 0.2s;
+    " onmouseover="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'"
+       onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">↺ New Subject</button>
+    <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
+  </div>
 
     <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
       <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Free Query Limit Reached</div>
@@ -814,14 +832,6 @@
 
       </div>
     </div>
-  </div>
-
-  <!-- NEW SUBJECT ROW — outside inputSection so opacity fade doesn't hide it -->
-  <div id="newSubjectRow" style="display:none; margin-top:-52px; margin-bottom:52px;">
-    <button id="newSubjectTopBtn" onclick="resetForm()"
-      onmouseover="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'"
-      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'"
-      style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); background:transparent; border:1px solid var(--border); padding:16px 28px; cursor:pointer; transition:all 0.2s;">↺ New Subject</button>
   </div>
 
   <!-- LOADING -->
@@ -1075,6 +1085,7 @@ function startTicker(secondsRemaining) {
 
 function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
     document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('newSubjectTopBtn').style.display = 'none';
     const prompt = document.getElementById('limitPrompt');
     if (customMessage) {
       const msgEl = prompt.querySelector('.limit-message');
@@ -1544,8 +1555,7 @@ function getErrorMessage(err) {
 function showResult() {
   document.getElementById('loadingBlock').classList.remove('visible');
   document.getElementById('resultBlock').classList.add('visible');
-  var row = document.getElementById('newSubjectRow');
-  if (row) row.style.display = 'block';
+  document.getElementById('newSubjectTopBtn').style.display = 'block';
 }
 
 function renderResult(d) {
@@ -1901,10 +1911,7 @@ function resetForm() {
   document.getElementById('resultContent').innerHTML = '';
   document.getElementById('userInput').value = '';
   if (document.getElementById('followUpInput')) document.getElementById('followUpInput').value = '';
-  var btn = document.getElementById('newSubjectTopBtn');
-  if (btn) btn.style.display = 'none';
-  var row = document.getElementById('newSubjectRow');
-  if (row) row.style.display = 'none';
+  document.getElementById('newSubjectTopBtn').style.display = 'none';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
