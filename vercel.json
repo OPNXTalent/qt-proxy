@@ -1,9 +1,9 @@
 {
   "functions": {
     "api/interpret.js": {
-      "memory": 128,
-      "maxDuration": 30
-    },
+  "memory": 128,
+  "maxDuration": 60
+},
     "api/notify.js": {
       "memory": 128,
       "maxDuration": 10
