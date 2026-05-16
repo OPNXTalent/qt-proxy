@@ -155,12 +155,12 @@
 
   .thread-upgrade { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--gold-dim); padding: 5px 20px 10px; line-height: 1.5; border-bottom: 1px solid rgba(42,42,64,0.4); }
   .thread-upgrade a { color: var(--gold); text-decoration: none; }
-  .thread-delete-btn { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; opacity: 0; transition: opacity 0.15s, color 0.15s; padding: 4px 6px; line-height: 1; }
-  .thread-item:hover .thread-delete-btn { opacity: 1; }
-  .thread-delete-btn:hover { color: #b85c5c; }
-  .thread-reset-btn { position: absolute; top: 50%; right: 32px; transform: translateY(-50%); background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity 0.15s, color 0.15s; padding: 4px 6px; line-height: 1; }
-  .thread-item:hover .thread-reset-btn { opacity: 1; }
-  .thread-reset-btn:hover { color: #4a9eda; }
+  .thread-action-btns { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+  .thread-item:hover .thread-action-btns { opacity: 1; }
+  .thread-delete-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 3px 5px; line-height: 1; transition: color 0.15s; border-radius: 2px; }
+  .thread-delete-btn:hover { color: #b85c5c; background: rgba(184,92,92,0.1); }
+  .thread-reset-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 3px 5px; line-height: 1; transition: color 0.15s; border-radius: 2px; }
+  .thread-reset-btn:hover { color: #4a9eda; background: rgba(74,158,218,0.1); }
   .sidebar-undo-toast { position: absolute; bottom: 60px; left: 12px; right: 12px; background: var(--surface-2); border: 1px solid var(--border-lit); padding: 10px 14px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text); display: flex; align-items: center; justify-content: space-between; z-index: 10; animation: toastIn 0.2s ease; }
   @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   .sidebar-undo-btn { color: var(--gold); background: transparent; border: none; cursor: pointer; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; padding: 0; }
@@ -2249,16 +2249,10 @@ function renderThreads(threads) {
     metaEl.appendChild(badge);
     item.appendChild(metaEl);
 
-    // Delete + Reset buttons — appear on hover
+    // Action buttons container — appears on hover, top right
     if (!isLocked) {
-      var delBtn = document.createElement('button');
-      delBtn.className = 'thread-delete-btn';
-      delBtn.title = 'Delete thread';
-      delBtn.textContent = '✕';
-      delBtn.addEventListener('click', (function(id) {
-        return function(e) { e.stopPropagation(); deleteThread(id); };
-      })(thread.id));
-      item.appendChild(delBtn);
+      var actionBtns = document.createElement('div');
+      actionBtns.className = 'thread-action-btns';
 
       var resetBtn = document.createElement('button');
       resetBtn.className = 'thread-reset-btn';
@@ -2267,7 +2261,18 @@ function renderThreads(threads) {
       resetBtn.addEventListener('click', (function(id) {
         return function(e) { e.stopPropagation(); resetThreadExpiry(id); };
       })(thread.id));
-      item.appendChild(resetBtn);
+      actionBtns.appendChild(resetBtn);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'thread-delete-btn';
+      delBtn.title = 'Delete thread';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', (function(id) {
+        return function(e) { e.stopPropagation(); deleteThread(id); };
+      })(thread.id));
+      actionBtns.appendChild(delBtn);
+
+      item.appendChild(actionBtns);
     }
 
     list.appendChild(item);
