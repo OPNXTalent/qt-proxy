@@ -2432,6 +2432,18 @@ function showSidebarAfterQuery(queryText) {
   addThreadToSidebar(queryText);
 }
 
+// TOGGLE SIDEBAR
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  var sidebar = document.getElementById('sidebar');
+  var main    = document.getElementById('mainContent');
+  var toggle  = document.getElementById('sidebarToggle');
+  if (sidebar) sidebar.classList.toggle('open', sidebarOpen);
+  if (main)    main.classList.toggle('sidebar-open', sidebarOpen);
+  if (toggle)  toggle.textContent = sidebarOpen ? '\u2715' : '\u2630';
+  localStorage.setItem('qt_sidebar_open', sidebarOpen ? '1' : '0');
+}
+
 // INIT SIDEBAR
 function initSidebar() {
   var tierLabels = { scholar: 'Scholar \u00b7 90 Day Archive', theologian: 'Theologian \u00b7 180 Day Archive',
