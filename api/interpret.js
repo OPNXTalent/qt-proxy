@@ -222,8 +222,7 @@ async function saveThread({ userId, query, queryType, response, tier }) {
     const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
     const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // Parse and slim the response — store only essential fields
-    // to keep payload size small for Vercel outbound request limits
+    // Parse and slim response to keep payload within Vercel outbound limits
     let title = '';
     let slimResponse = {};
     try {
@@ -231,7 +230,6 @@ async function saveThread({ userId, query, queryType, response, tier }) {
       title = (parsed?.verse_identified && parsed.verse_identified.trim())
         ? parsed.verse_identified.trim()
         : query.substring(0, 60);
-      // Store only the fields needed for display — skip verbose sections
       slimResponse = {
         recognition:         parsed?.recognition         || '',
         verse_identified:    parsed?.verse_identified    || '',
@@ -247,24 +245,8 @@ async function saveThread({ userId, query, queryType, response, tier }) {
       };
     } catch {
       title = query.substring(0, 60);
-      slimResponse = { raw: response?.substring(0, 500) || '' };
+      slimResponse = {};
     }
-
-    console.log('[saveThread] payload size:', JSON.stringify(slimResponse).length, 'bytes');
-
-    const threadData = {
-      user_id:          userId,
-      title:            title.trim(),
-      query:            query,
-      response:         slimResponse,
-      query_type:       queryType || 'free_text',
-      tier_at_creation: tier,
-      retention_days:   retentionDays,
-      expires_at:       expiresAt.toISOString(),
-      grace_ends_at:    graceEndsAt.toISOString(),
-    };
-
-    console.log('[saveThread] attempting insert for userId:', userId);
 
     const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/threads`, {
       method: 'POST',
@@ -274,20 +256,29 @@ async function saveThread({ userId, query, queryType, response, tier }) {
         'Content-Type':  'application/json',
         'Prefer':        'return=representation'
       },
-      body: JSON.stringify(threadData)
+      body: JSON.stringify({
+        user_id:          userId,
+        title:            title.trim(),
+        query:            query,
+        response:         slimResponse,
+        query_type:       queryType || 'free_text',
+        tier_at_creation: tier,
+        retention_days:   retentionDays,
+        expires_at:       expiresAt.toISOString(),
+        grace_ends_at:    graceEndsAt.toISOString(),
+      })
     });
 
     if (!saveRes.ok) {
       const err = await saveRes.text();
-      console.error('[saveThread] failed:', err);
+      console.error('saveThread failed:', err);
       return null;
     }
 
     const saved = await saveRes.json();
-    console.log('[saveThread] success, threadId:', saved?.[0]?.id);
     return saved?.[0]?.id || null;
   } catch (err) {
-    console.error('[saveThread] error:', err.message, err.cause?.message || '');
+    console.error('saveThread error:', err.message);
     return null;
   }
 }
@@ -400,12 +391,18 @@ export default async function handler(req, res) {
 
   // ── CRISIS DETECTION — runs before any auth or rate-limit check ──────────────
   // Extract the last user-role message text for analysis
+  // Guard against system prompt contamination in message content
   const lastUserText = (() => {
     if (messages && messages.length > 0) {
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === 'user') {
           const c = messages[i].content;
-          return typeof c === 'string' ? c : (Array.isArray(c) ? c.map(b => b.text || '').join(' ') : '');
+          const raw = typeof c === 'string' ? c : (Array.isArray(c) ? c.map(b => b.text || '').join(' ') : '');
+          // Strip if it looks like a system prompt leaked in
+          if (raw.toUpperCase().startsWith('RESPOND WITH') || raw.length > 2000) {
+            continue;
+          }
+          return raw;
         }
       }
     }
