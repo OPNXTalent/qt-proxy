@@ -82,14 +82,23 @@ OUTPUT FORMAT — NON-NEGOTIABLE: Respond only with a valid JSON object. No prea
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const QUERY_LIMIT = 3;
 const WINDOW_HOURS = 24;
 
-// Tier query limits per month (approximate daily = monthly/30)
+// Tier query limits per month
 const TIER_LIMITS = {
-  scholar: 150,
-  theologian: 350,
-  companion: 500,
+  scholar:    100,
+  theologian: 250,
+  trial:      250, // book code redeemers
+};
+
+// Retention days by tier
+const RETENTION_DAYS = {
+  scholar:    90,
+  theologian: 180,
+  trial:      30,
+  free:       1,
 };
 
 // ── CRISIS DETECTION ──────────────────────────────────────────────────────────
@@ -145,9 +154,14 @@ async function getCodeRedemption(email) {
   if (expires > new Date()) return redemption;
   return null;
 }
+// ── ANONYMOUS IP RATE LIMITING ───────────────────────────────────────────────
+// Uses a separate ip_rate_limits approach via query_log table
+// query_log is now a per-user audit log — anonymous rate limiting
+// uses the ip_address field on query_log for backward compatibility
+
 async function getQueryLog(ip) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/query_log?ip_address=eq.${encodeURIComponent(ip)}&limit=1`,
+    `${SUPABASE_URL}/rest/v1/query_log?select=id,cost,created_at&user_id=is.null&channel_context=eq.solo&order=created_at.desc&limit=100`,
     {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -156,8 +170,17 @@ async function getQueryLog(ip) {
       }
     }
   );
+  // For anonymous rate limiting we count recent entries from this IP
+  // stored as query_type = ip:<address> for identification
   const data = await res.json();
-  return data?.[0] || null;
+  const ipEntries = (data || []).filter(r => r.query_type === `ip:${ip}`);
+  const windowStart = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
+  const recent = ipEntries.filter(r => new Date(r.created_at) > windowStart);
+  if (recent.length === 0) return null;
+  return {
+    query_count: recent.length,
+    first_query_at: recent[recent.length - 1].created_at
+  };
 }
 
 async function insertQueryLog(ip) {
@@ -169,34 +192,124 @@ async function insertQueryLog(ip) {
       'Content-Type': 'application/json',
       'Prefer': 'return=minimal'
     },
-    body: JSON.stringify({ ip_address: ip, query_count: 1, first_query_at: new Date().toISOString() })
+    body: JSON.stringify({
+      query_type: `ip:${ip}`,
+      credit_source: 'free_tier',
+      cost: 1,
+      channel_context: 'solo'
+    })
   });
 }
 
-async function incrementQueryLog(ip, currentCount) {
-  await fetch(`${SUPABASE_URL}/rest/v1/query_log?ip_address=eq.${encodeURIComponent(ip)}`, {
-    method: 'PATCH',
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal'
-    },
-    body: JSON.stringify({ query_count: currentCount + 1 })
-  });
+async function incrementQueryLog(ip) {
+  // Each anonymous query is its own row — just insert
+  await insertQueryLog(ip);
 }
 
 async function resetQueryLog(ip) {
-  await fetch(`${SUPABASE_URL}/rest/v1/query_log?ip_address=eq.${encodeURIComponent(ip)}`, {
-    method: 'PATCH',
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal'
-    },
-    body: JSON.stringify({ query_count: 1, first_query_at: new Date().toISOString() })
-  });
+  // No-op — rows are immutable, window is time-based
+}
+
+// ── THREAD PERSISTENCE ────────────────────────────────────────────────────────
+// Saves completed Prism responses to the threads table.
+// Uses service role key to bypass RLS — called server-side only.
+// Non-blocking: failure is logged but does not affect the user response.
+
+async function saveThread({ userId, query, queryType, response, tier }) {
+  try {
+    const retentionDays = RETENTION_DAYS[tier] || RETENTION_DAYS.free;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
+    const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    // Auto-generate title from verse_identified or first 60 chars of query
+    let title = '';
+    try {
+      const parsed = typeof response === 'string' ? JSON.parse(response) : response;
+      title = parsed?.verse_identified || query.substring(0, 60);
+    } catch {
+      title = query.substring(0, 60);
+    }
+
+    const threadData = {
+      user_id:          userId,
+      title:            title.trim(),
+      query:            query,
+      response:         typeof response === 'string' ? JSON.parse(response) : response,
+      query_type:       queryType || 'free_text',
+      tier_at_creation: tier,
+      retention_days:   retentionDays,
+      expires_at:       expiresAt.toISOString(),
+      grace_ends_at:    graceEndsAt.toISOString(),
+    };
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/threads`, {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=representation'
+      },
+      body: JSON.stringify(threadData)
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('saveThread failed:', err);
+      return null;
+    }
+
+    const saved = await res.json();
+    return saved?.[0]?.id || null;
+  } catch (err) {
+    console.error('saveThread error:', err.message);
+    return null;
+  }
+}
+
+// ── SUBSCRIBER QUERY COUNT ────────────────────────────────────────────────────
+// Increments query_count on the subscriber record and writes to query_log.
+// Uses service role key — called server-side only after successful response.
+
+async function updateQueryCount({ userId, tier, threadId }) {
+  try {
+    // Increment subscriber query_count
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/subscribers?id=eq.${userId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type':  'application/json',
+          'Prefer':        'return=minimal'
+        },
+        body: JSON.stringify({ query_count: '(query_count + 1)' })
+      }
+    );
+
+    // Write to query_log audit trail
+    await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
+      },
+      body: JSON.stringify({
+        user_id:         userId,
+        thread_id:       threadId || null,
+        query_type:      'prism',
+        credit_source:   'monthly',
+        cost:            1,
+        channel_context: 'solo'
+      })
+    });
+  } catch (err) {
+    console.error('updateQueryCount error:', err.message);
+  }
 }
 
 export default async function handler(req, res) {
@@ -291,6 +404,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'No messages provided' });
   }
   const tier = subscriber?.tier || 'trial';
+  const userId = subscriber?.id || null;
+
+  // Determine query type from the last user message
+  const queryType = (() => {
+    const text = lastUserText.toLowerCase();
+    if (/^[1-9][a-z]+ \d+:\d+/i.test(lastUserText.trim())) return 'verse_reference';
+    if (messages?.length > 1) return 'free_text'; // follow-up
+    return 'free_text';
+  })();
 
   // Stream the response
   res.setHeader('Content-Type', 'text/event-stream');
@@ -324,6 +446,7 @@ export default async function handler(req, res) {
   const reader = anthropicRes.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let fullResponse = ''; // accumulate complete response for thread persistence
 
   while (true) {
     const { done, value } = await reader.read();
@@ -338,8 +461,28 @@ export default async function handler(req, res) {
         try {
           const parsed = JSON.parse(data);
           if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            fullResponse += parsed.delta.text;
             res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
           } else if (parsed.type === 'message_stop') {
+            // Save thread to Supabase — non-blocking, fires after stream closes
+            const isFollowUp = messages && messages.length > 1;
+            if (!isFollowUp && userId) {
+              setImmediate(async () => {
+                const threadId = await saveThread({
+                  userId,
+                  query:     lastUserText,
+                  queryType,
+                  response:  fullResponse,
+                  tier
+                });
+                await updateQueryCount({ userId, tier, threadId });
+              });
+            } else if (isFollowUp && userId) {
+              // Follow-up: just update query count, thread already exists
+              setImmediate(async () => {
+                await updateQueryCount({ userId, tier, threadId: null });
+              });
+            }
             res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
           }
         } catch {}
@@ -355,6 +498,7 @@ export default async function handler(req, res) {
         try {
           const parsed = JSON.parse(data);
           if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            fullResponse += parsed.delta.text;
             res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
           } else if (parsed.type === 'message_stop') {
             res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
