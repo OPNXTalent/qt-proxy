@@ -2750,7 +2750,38 @@ function dismissSurveyPanel() {
 }
 
 // Close modal on backdrop click
+function formatNow() {
+  var now   = new Date();
+  var month = now.toLocaleString('en-US', { month: 'short' });
+  var day   = now.getDate();
+  var hours = now.getHours();
+  var mins  = String(now.getMinutes()).padStart(2, '0');
+  var ampm  = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12 || 12;
+  return month + ' ' + day + ' \u00b7 ' + hours + ':' + mins + ' ' + ampm;
+}
+
+async function runPreflightCheck() {
+  var userEmail = localStorage.getItem('qt_user_email');
+  var _anonMode = sessionStorage.getItem('qt_anon_mode') === '1';
+  var _paidTier = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+  if (userEmail && !_anonMode && _paidTier) return;
+  try {
+    var res = await fetch('https://quantumtheology.app/api/interpret', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+    if (!res.ok) return;
+    var data = await res.json();
+    if (data.locked) {
+      var hrs  = data.hoursRemaining || 0;
+      var secs = data.secondsRemaining || hrs * 3600;
+      var msg  = "You've used your " + (data.queriesUsed || 3) + " free queries. Access resets in " + hrs + " hour" + (hrs !== 1 ? "s" : "") + ".";
+      applyQueryLock(msg, hrs, secs);
+    }
+  } catch(e) {}
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+  initSidebar();
+  runPreflightCheck();
   var modal = document.getElementById('shareModal');
   if (modal) {
     modal.addEventListener('click', function(e) {
