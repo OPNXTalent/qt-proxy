@@ -1298,7 +1298,7 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
       applyQueryLock();
     }
 
-    // Save follow-up via unified saveFollowUp (localStorage + Supabase)
+    // Save follow-up via unified saveFollowUp
     if (activeThreadId) {
       saveFollowUp(activeThreadId, input, responseText);
     }
@@ -2148,12 +2148,12 @@ var CURRENT_TIER = getActualTier();
 if (CURRENT_TIER !== 'free') localStorage.setItem('qt_user_tier', CURRENT_TIER);
 
 let activeThreadId = null;
-// ─── SIDEBAR STATE ────────────────────────────────────────────────────────────
+
+// SIDEBAR STATE
 let renameOpenId  = null;
 let allThreads    = [];
 let sidebarOpen   = false;
 let sidebarHasAppeared = false;
-let _pendingFollowUp   = null; // tracks { threadId, question, response } for Supabase save
 
 const API_BASE = 'https://quantumtheology.app';
 
@@ -2161,175 +2161,165 @@ function userEmail() {
   return localStorage.getItem('qt_user_email') || null;
 }
 
-// ─── THREAD TITLE ─────────────────────────────────────────────────────────────
 function getThreadTitle(thread) {
-  // Local rename takes priority, then Supabase title, then query
-  const local = localStorage.getItem('qt_thread_title_' + thread.id);
+  var local = localStorage.getItem('qt_thread_title_' + thread.id);
   if (local) return local;
   if (thread.title) return thread.title;
   return thread.query ? (thread.query.length > 60 ? thread.query.slice(0, 60) + '\u2026' : thread.query) : 'Untitled';
 }
 
-// ─── RENDER THREADS ───────────────────────────────────────────────────────────
+// RENDER THREADS - CSP-safe, no innerHTML, no eval
 function renderThreads(threads) {
-  const list = document.getElementById('threadList');
+  var list = document.getElementById('threadList');
   if (!list) return;
+  while (list.firstChild) list.removeChild(list.firstChild);
+
   if (!threads || threads.length === 0) {
-    list.innerHTML = '<div style="padding:20px 16px; color:var(--text-dim); font-size:12px; text-align:center; letter-spacing:0.1em;">No sessions yet</div>';
+    var empty = document.createElement('div');
+    empty.style.cssText = 'padding:20px 16px;color:var(--text-dim);font-size:12px;text-align:center;letter-spacing:0.1em;';
+    empty.textContent = 'No sessions yet';
+    list.appendChild(empty);
     return;
   }
 
-  list.innerHTML = threads.map(function(thread) {
-    const title    = getThreadTitle(thread);
-    const preview  = thread.query ? (thread.query.length > 60 ? thread.query.slice(0, 60) + '\u2026' : thread.query) : '';
-    const isActive = thread.id === activeThreadId;
-    const isLocked = thread.isLocked || false;
-    const expired  = thread.expired || false;
-    const daysLeft = thread.daysLeft != null ? thread.daysLeft : 90;
+  threads.forEach(function(thread) {
+    var title    = getThreadTitle(thread);
+    var preview  = thread.query ? (thread.query.length > 60 ? thread.query.slice(0, 60) + '\u2026' : thread.query) : '';
+    var isActive = thread.id === activeThreadId;
+    var isLocked = thread.isLocked || false;
+    var expired  = thread.expired || false;
+    var daysLeft = thread.daysLeft != null ? thread.daysLeft : 90;
 
-    const daysLabel = expired
-      ? '<span class="days-badge expired">EXPIRED</span>'
-      : '<span class="days-badge">' + daysLeft + ' DAYS LEFT</span>';
+    var item = document.createElement('div');
+    item.className = 'thread-item' + (isActive ? ' active' : '') + (isLocked ? ' locked' : '');
+    item.id = 'ti-' + thread.id;
+    item.title = 'Double-click to rename';
+    item.addEventListener('click', (function(id) { return function() { selectThread(id); }; })(thread.id));
+    item.addEventListener('dblclick', (function(id) { return function(e) { e.stopPropagation(); startRename(id); }; })(thread.id));
 
-    const lockIcon = isLocked
-      ? '<span style="float:right; color:var(--gold-dim); font-size:11px;">\uD83D\uDD12</span>'
-      : '';
+    if (isLocked) {
+      var lock = document.createElement('span');
+      lock.style.cssText = 'float:right;color:var(--gold-dim);font-size:11px;';
+      lock.textContent = '[locked]';
+      item.appendChild(lock);
+    }
 
-    const isRenaming = renameOpenId === thread.id;
-    const titleHtml = isRenaming
-      ? '<input id="rename-input-' + thread.id + '" class="rename-input" value="' + escHtml(title) + '" onblur="saveRename(\'' + thread.id + '\')" onkeydown="handleRenameKey(event, \'' + thread.id + '\')" onclick="event.stopPropagation()" style="width:100%; background:transparent; border:none; border-bottom:1px solid var(--gold-dim); color:var(--text); font-size:14px; font-family:inherit; outline:none; padding:0 0 2px 0;" autofocus>'
-      : escHtml(title);
+    var titleEl = document.createElement('div');
+    titleEl.className = 'thread-title';
+    if (renameOpenId === thread.id) {
+      var inp = document.createElement('input');
+      inp.id = 'rename-input-' + thread.id;
+      inp.className = 'rename-input';
+      inp.value = title;
+      inp.style.cssText = 'width:100%;background:transparent;border:none;border-bottom:1px solid var(--gold-dim);color:var(--text);font-size:14px;font-family:inherit;outline:none;padding:0 0 2px 0;';
+      inp.addEventListener('blur',    (function(id) { return function()  { saveRename(id); }; })(thread.id));
+      inp.addEventListener('keydown', (function(id) { return function(e) { handleRenameKey(e, id); }; })(thread.id));
+      inp.addEventListener('click',   function(e) { e.stopPropagation(); });
+      titleEl.appendChild(inp);
+    } else {
+      titleEl.textContent = title;
+    }
+    item.appendChild(titleEl);
 
-    return [
-      '<div class="thread-item' + (isActive ? ' active' : '') + (isLocked ? ' locked' : '') + '"',
-      '  id="ti-' + thread.id + '"',
-      '  onclick="selectThread(\'' + thread.id + '\')"',
-      '  ondblclick="startRename(\'' + thread.id + '\')"',
-      '  title="Double-click to rename">',
-      '  ' + lockIcon,
-      '  <div class="thread-title">' + titleHtml + '</div>',
-      '  <div class="thread-preview">' + escHtml(preview) + '</div>',
-      '  <div class="thread-meta">',
-      '    <span class="thread-date">' + (thread.lastVisited || '') + '</span>',
-      '    ' + daysLabel,
-      '  </div>',
-      '</div>'
-    ].join('\n');
-  }).join('\n');
+    var previewEl = document.createElement('div');
+    previewEl.className = 'thread-preview';
+    previewEl.textContent = preview;
+    item.appendChild(previewEl);
 
-  // Focus rename input if open
+    var metaEl = document.createElement('div');
+    metaEl.className = 'thread-meta';
+    var dateEl = document.createElement('span');
+    dateEl.className = 'thread-date';
+    dateEl.textContent = thread.lastVisited || '';
+    metaEl.appendChild(dateEl);
+    var badge = document.createElement('span');
+    badge.className = 'days-badge' + (expired ? ' expired' : '');
+    badge.textContent = expired ? 'EXPIRED' : (daysLeft + ' DAYS LEFT');
+    metaEl.appendChild(badge);
+    item.appendChild(metaEl);
+    list.appendChild(item);
+  });
+
   if (renameOpenId) {
-    var inp = document.getElementById('rename-input-' + renameOpenId);
-    if (inp) { inp.focus(); inp.select(); }
+    var ri = document.getElementById('rename-input-' + renameOpenId);
+    if (ri) { ri.focus(); ri.select(); }
   }
 }
 
-// ─── SELECT THREAD ────────────────────────────────────────────────────────────
+// SELECT THREAD
 function selectThread(id) {
-  const thread = allThreads.find(function(t) { return t.id === id; });
+  var thread = allThreads.find(function(t) { return t.id === id; });
   if (!thread) return;
-
   activeThreadId = id;
   renderThreads(allThreads);
 
-  // Restore input
-  const savedInput = localStorage.getItem('qt_input_' + id) || thread.query || '';
-  const inputEl = document.getElementById('userInput');
+  var savedInput = localStorage.getItem('qt_input_' + id) || thread.query || '';
+  var inputEl = document.getElementById('userInput');
   if (inputEl) inputEl.value = savedInput;
 
-  // Restore response — localStorage first, then Supabase thread.response
-  const localResponse = localStorage.getItem('qt_response_' + id);
-  const supabaseResponse = thread.response && typeof thread.response === 'object' && Object.keys(thread.response).length > 0
-    ? thread.response : null;
-  const responseData = localResponse
-    ? (function() { try { return JSON.parse(localResponse); } catch { return null; } })()
-    : supabaseResponse;
+  var localRaw = localStorage.getItem('qt_response_' + id);
+  var localParsed = null;
+  if (localRaw) { try { localParsed = JSON.parse(localRaw); } catch(e) {} }
+  var supaResp = (thread.response && typeof thread.response === 'object' && Object.keys(thread.response).length > 0) ? thread.response : null;
+  var responseData = localParsed || supaResp;
 
   if (responseData) {
     renderResult(responseData);
     showResult();
-    var subjectEl = document.getElementById('subjectText');
-    if (subjectEl) subjectEl.textContent = savedInput;
-    var bannerEl = document.getElementById('subjectBanner');
-    if (bannerEl) bannerEl.style.display = 'block';
-    var fuSection = document.getElementById('followUpSection');
-    if (fuSection) fuSection.style.display = 'block';
-    var dlRow = document.getElementById('downloadRow');
-    if (dlRow) dlRow.style.display = 'block';
-
-    // Restore follow-ups
+    var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
+    var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
+    var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
+    var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     restoreFollowUps(id);
   } else {
-    // No response — pre-fill input ready to re-run
-    var rb = document.getElementById('resultBlock');
-    if (rb) rb.classList.remove('visible');
-    var sb = document.getElementById('subjectBanner');
-    if (sb) sb.style.display = 'none';
-    var fs = document.getElementById('followUpSection');
-    if (fs) fs.style.display = 'none';
-    var dr = document.getElementById('downloadRow');
-    if (dr) dr.style.display = 'none';
+    var rb = document.getElementById('resultBlock');      if (rb)  rb.classList.remove('visible');
+    var sb = document.getElementById('subjectBanner');    if (sb)  sb.style.display = 'none';
+    var fs = document.getElementById('followUpSection'); if (fs)  fs.style.display = 'none';
+    var dr = document.getElementById('downloadRow');      if (dr)  dr.style.display = 'none';
   }
-
-  // Scroll to top of main content
   var mc = document.getElementById('mainContent');
   if (mc) mc.scrollTop = 0;
 }
 
-// ─── RESTORE FOLLOW-UPS ───────────────────────────────────────────────────────
+// RESTORE FOLLOW-UPS
 function restoreFollowUps(id) {
-  // Helper to render a list of follow-up objects
   function renderFU(list) {
     list.forEach(function(fu) {
       var el = document.createElement('div');
-      el.style.cssText = 'margin-top:32px; border-top:1px solid var(--border); padding-top:28px;';
+      el.style.cssText = 'margin-top:32px;border-top:1px solid var(--border);padding-top:28px;';
       var question = fu.question || fu.query || '';
-      var resp = fu.response && typeof fu.response === 'object'
-        ? (fu.response.text || JSON.stringify(fu.response))
-        : (fu.response || '');
-      el.innerHTML =
-        '<div style="font-family:var(--mono); font-size:17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Follow-up \u2014 ' + escHtml(question) + '</div>' +
-        '<div style="font-size:16.5px; color:var(--text); line-height:1.75;">' + escHtml(resp).replace(/\n\n/g, '</p><p style="margin-top:12px;">').replace(/\n/g, '<br>') + '</div>';
+      var resp = (fu.response && typeof fu.response === 'object') ? (fu.response.text || '') : (fu.response || '');
+      var label = document.createElement('div');
+      label.style.cssText = 'font-family:var(--mono);font-size:17px;letter-spacing:0.16em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:10px;';
+      label.textContent = 'Follow-up \u2014 ' + question;
+      var body = document.createElement('div');
+      body.style.cssText = 'font-size:16.5px;color:var(--text);line-height:1.75;';
+      body.textContent = resp;
+      el.appendChild(label);
+      el.appendChild(body);
       var rc = document.getElementById('resultContent');
       if (rc) rc.appendChild(el);
     });
   }
-
-  // Try localStorage first (fast path — current device)
   var local = [];
-  try { local = JSON.parse(localStorage.getItem('qt_followups_' + id) || '[]'); } catch {}
-  if (local.length > 0) {
-    renderFU(local);
-    return;
-  }
-
-  // Fetch from Supabase for cross-device threads
+  try { local = JSON.parse(localStorage.getItem('qt_followups_' + id) || '[]'); } catch(e) {}
+  if (local.length > 0) { renderFU(local); return; }
   if (!id.startsWith('pending-') && userEmail()) {
-    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), {
-      headers: { 'x-user-email': userEmail() }
-    })
+    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-user-email': userEmail() } })
     .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.followUps && data.followUps.length > 0) {
-        renderFU(data.followUps);
-      }
-    })
+    .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFU(data.followUps); })
     .catch(function() {});
   }
 }
 
-// ─── SAVE FOLLOW-UP ───────────────────────────────────────────────────────────
+// SAVE FOLLOW-UP
 function saveFollowUp(threadId, question, response) {
   if (!threadId) return;
-
-  // localStorage — always
   var key = 'qt_followups_' + threadId;
   var list = [];
-  try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch {}
+  try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
   list.push({ question: question, response: response });
   localStorage.setItem(key, JSON.stringify(list));
-
-  // Supabase — if real thread (not pending)
   if (!threadId.startsWith('pending-') && userEmail()) {
     fetch(API_BASE + '/api/followups', {
       method: 'POST',
@@ -2339,31 +2329,22 @@ function saveFollowUp(threadId, question, response) {
   }
 }
 
-// ─── RENAME ───────────────────────────────────────────────────────────────────
-function startRename(id) {
-  renameOpenId = id;
-  renderThreads(allThreads);
-}
-
+// RENAME
+function startRename(id) { renameOpenId = id; renderThreads(allThreads); }
 function handleRenameKey(e, id) {
   if (e.key === 'Enter') saveRename(id);
   if (e.key === 'Escape') { renameOpenId = null; renderThreads(allThreads); }
 }
-
 function saveRename(id) {
   var inp = document.getElementById('rename-input-' + id);
   if (!inp) return;
   var val = inp.value.trim();
   if (val) {
     localStorage.setItem('qt_thread_title_' + id, val);
-    allThreads = allThreads.map(function(t) {
-      return t.id === id ? Object.assign({}, t, { title: val }) : t;
-    });
-    // Persist to Supabase for real threads
+    allThreads = allThreads.map(function(t) { return t.id === id ? Object.assign({}, t, { title: val }) : t; });
     if (!id.startsWith('pending-') && userEmail()) {
       fetch(API_BASE + '/api/threads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
         body: JSON.stringify({ threadId: id, title: val })
       }).catch(function() {});
     }
@@ -2372,192 +2353,132 @@ function saveRename(id) {
   renderThreads(allThreads);
 }
 
-// ─── SEARCH ───────────────────────────────────────────────────────────────────
+// SEARCH
 function filterThreads(query) {
   if (!query.trim()) { renderThreads(allThreads); return; }
   var q = query.toLowerCase();
   renderThreads(allThreads.filter(function(t) {
-    return getThreadTitle(t).toLowerCase().includes(q) ||
-           (t.query || '').toLowerCase().includes(q);
+    return getThreadTitle(t).toLowerCase().includes(q) || (t.query || '').toLowerCase().includes(q);
   }));
 }
 
-// ─── DELETE ───────────────────────────────────────────────────────────────────
+// DELETE
 var _deletedThread = null;
-
 function deleteThread(id) {
   var thread = allThreads.find(function(t) { return t.id === id; });
   if (!thread) return;
-  _deletedThread = {
-    thread:    thread,
-    title:     localStorage.getItem('qt_thread_title_' + id),
-    response:  localStorage.getItem('qt_response_' + id),
-    input:     localStorage.getItem('qt_input_' + id),
-    followups: localStorage.getItem('qt_followups_' + id)
-  };
+  _deletedThread = { thread: thread, title: localStorage.getItem('qt_thread_title_' + id),
+    response: localStorage.getItem('qt_response_' + id), input: localStorage.getItem('qt_input_' + id),
+    followups: localStorage.getItem('qt_followups_' + id) };
   allThreads = allThreads.filter(function(t) { return t.id !== id; });
   renderThreads(allThreads);
   if (activeThreadId === id) {
     activeThreadId = null;
-    var rb = document.getElementById('resultBlock');
-    if (rb) rb.classList.remove('visible');
+    var rb = document.getElementById('resultBlock'); if (rb) rb.classList.remove('visible');
   }
-  // Show undo toast
-  var toast = document.getElementById('undoToast');
-  if (toast) toast.style.display = 'flex';
+  var toast = document.getElementById('undoToast'); if (toast) toast.style.display = 'flex';
   setTimeout(function() { confirmDelete(id); }, 5000);
 }
-
 function confirmDelete(id) {
   if (!_deletedThread || _deletedThread.thread.id !== id) return;
-  // Hard delete from Supabase
   if (!id.startsWith('pending-') && userEmail()) {
     fetch(API_BASE + '/api/threads', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
+      method: 'DELETE', headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
       body: JSON.stringify({ threadId: id })
     }).catch(function() {});
   }
-  // Clear localStorage
-  localStorage.removeItem('qt_response_'      + id);
-  localStorage.removeItem('qt_input_'         + id);
-  localStorage.removeItem('qt_followups_'     + id);
-  localStorage.removeItem('qt_thread_title_'  + id);
+  ['qt_response_', 'qt_input_', 'qt_followups_', 'qt_thread_title_'].forEach(function(k) {
+    localStorage.removeItem(k + id);
+  });
   _deletedThread = null;
-  var toast = document.getElementById('undoToast');
-  if (toast) toast.style.display = 'none';
+  var toast = document.getElementById('undoToast'); if (toast) toast.style.display = 'none';
 }
 
-// ─── ADD THREAD TO SIDEBAR ────────────────────────────────────────────────────
+// ADD THREAD TO SIDEBAR
 function addThreadToSidebar(queryText) {
-  var tsNow = Date.now();
-  var tempId = 'pending-' + tsNow;
-  var newThread = {
-    id:          tempId,
-    title:       queryText.length > 60 ? queryText.slice(0, 60) + '\u2026' : queryText,
-    query:       queryText,
-    lastVisited: formatNow(),
-    createdAt:   tsNow,
-    daysLeft:    TIER_RETENTION[CURRENT_TIER] || 90,
-    expired:     false,
-    response:    null
-  };
-  allThreads.unshift(newThread);
+  var tsNow = Date.now(), tempId = 'pending-' + tsNow;
+  allThreads.unshift({ id: tempId, title: queryText.length > 60 ? queryText.slice(0, 60) + '\u2026' : queryText,
+    query: queryText, lastVisited: formatNow(), createdAt: tsNow,
+    daysLeft: TIER_RETENTION[CURRENT_TIER] || 90, expired: false, response: null });
   activeThreadId = tempId;
   renderThreads(allThreads);
-
-  // Refresh from Supabase after delay to get real UUID
   if (userEmail()) {
     setTimeout(function() {
-      fetch(API_BASE + '/api/threads', {
-        headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() }
-      })
+      fetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() } })
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (!data.threads) return;
         allThreads = data.threads;
-        // Set active to most recent thread
         if (allThreads.length > 0) activeThreadId = allThreads[0].id;
         renderThreads(allThreads);
-      })
-      .catch(function() {});
+      }).catch(function() {});
     }, 2500);
   }
 }
 
-// ─── SHOW SIDEBAR AFTER QUERY ────────────────────────────────────────────────
+// SHOW SIDEBAR AFTER QUERY
 function showSidebarAfterQuery(queryText) {
-  var toggle  = document.getElementById('sidebarToggle');
-  var sidebar = document.getElementById('sidebar');
+  var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
-
   if (!sidebarHasAppeared) {
-    sidebar.classList.add('visible');
-    if (toggle) toggle.classList.add('visible');
-    sidebarHasAppeared = true;
-    localStorage.setItem('qt_sidebar_appeared', '1');
+    sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
+    sidebarHasAppeared = true; localStorage.setItem('qt_sidebar_appeared', '1');
   }
   if (!sidebarOpen) {
-    sidebarOpen = true;
-    sidebar.classList.add('open');
-    var mc = document.getElementById('mainContent');
-    if (mc) mc.classList.add('sidebar-open');
-    if (toggle) toggle.textContent = '\u2715';
-    localStorage.setItem('qt_sidebar_open', '1');
+    sidebarOpen = true; sidebar.classList.add('open');
+    var mc = document.getElementById('mainContent'); if (mc) mc.classList.add('sidebar-open');
+    if (toggle) toggle.textContent = '\u2715'; localStorage.setItem('qt_sidebar_open', '1');
   }
   addThreadToSidebar(queryText);
 }
 
-// ─── INIT SIDEBAR ────────────────────────────────────────────────────────────
+// INIT SIDEBAR
 function initSidebar() {
-  var tierLabels = {
-    scholar:    'Scholar \u00b7 90 Day Archive',
-    theologian: 'Theologian \u00b7 180 Day Archive',
-    companion:  'Companion \u00b7 1 Year Archive',
-    free:       'Free Access'
-  };
+  var tierLabels = { scholar: 'Scholar \u00b7 90 Day Archive', theologian: 'Theologian \u00b7 180 Day Archive',
+    companion: 'Companion \u00b7 1 Year Archive', free: 'Free Access' };
   var labelEl = document.getElementById('sidebarTierLabel');
   if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || 'Scholar \u00b7 90 Day Archive';
 
-  var toggle  = document.getElementById('sidebarToggle');
-  var sidebar = document.getElementById('sidebar');
-  var email   = userEmail();
+  var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
+  var email  = userEmail();
 
-  if (!email || CURRENT_TIER === 'free') {
-    allThreads = [];
-    renderThreads(allThreads);
-    return;
-  }
+  if (!email || CURRENT_TIER === 'free') { allThreads = []; renderThreads(allThreads); return; }
 
-  // Restore open/visible state immediately
   var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
   var wasOpen     = localStorage.getItem('qt_sidebar_open') === '1';
   if (hasAppeared && sidebar) {
-    sidebar.classList.add('visible');
-    if (toggle) toggle.classList.add('visible');
+    sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
     sidebarHasAppeared = true;
     if (wasOpen) {
-      sidebarOpen = true;
-      sidebar.classList.add('open');
-      var mc = document.getElementById('mainContent');
-      if (mc) mc.classList.add('sidebar-open');
+      sidebarOpen = true; sidebar.classList.add('open');
+      var mc = document.getElementById('mainContent'); if (mc) mc.classList.add('sidebar-open');
       if (toggle) toggle.textContent = '\u2715';
     }
   }
 
-  // Fetch threads from Supabase
-  fetch(API_BASE + '/api/threads', {
-    headers: { 'Content-Type': 'application/json', 'x-user-email': email }
-  })
+  fetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': email } })
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (!data.threads) return;
     allThreads = data.threads;
-
-    // One-time localStorage migration
     if (!localStorage.getItem('qt_migration_done')) {
       var raw = localStorage.getItem('qt_threads');
-      var local = raw ? JSON.parse(raw) : [];
+      var local = [];
+      try { if (raw) local = JSON.parse(raw); } catch(e) {}
       if (local.length > 0) {
         fetch(API_BASE + '/api/migrate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-email': email },
           body: JSON.stringify({ threads: local })
         }).catch(function() {});
       }
       localStorage.setItem('qt_migration_done', '1');
     }
-
     if (allThreads.length > 0 && sidebar) {
-      sidebar.classList.add('visible');
-      if (toggle) toggle.classList.add('visible');
-      sidebarHasAppeared = true;
-      localStorage.setItem('qt_sidebar_appeared', '1');
+      sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
+      sidebarHasAppeared = true; localStorage.setItem('qt_sidebar_appeared', '1');
       if (!sidebarOpen) {
-        sidebarOpen = true;
-        sidebar.classList.add('open');
-        var mc = document.getElementById('mainContent');
-        if (mc) mc.classList.add('sidebar-open');
+        sidebarOpen = true; sidebar.classList.add('open');
+        var mc2 = document.getElementById('mainContent'); if (mc2) mc2.classList.add('sidebar-open');
         if (toggle) toggle.textContent = '\u2715';
       }
     }
@@ -2565,12 +2486,13 @@ function initSidebar() {
   })
   .catch(function(err) {
     console.error('initSidebar error:', err.message);
-    // Fallback to localStorage
     var raw = localStorage.getItem('qt_threads');
-    allThreads = raw ? JSON.parse(raw) : [];
+    allThreads = [];
+    try { if (raw) allThreads = JSON.parse(raw); } catch(e) {}
     renderThreads(allThreads);
   });
 }
+
 function undoDelete() {
   if (!_deletedThread) return;
   if (_deleteTimer) clearTimeout(_deleteTimer);
