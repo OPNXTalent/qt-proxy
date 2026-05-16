@@ -2170,7 +2170,7 @@ function getThreadTitle(thread) {
 
 // RENDER THREADS - CSP-safe, no innerHTML, no eval
 function renderThreads(threads) {
-  var list = document.getElementById('threadList');
+  var list = document.getElementById('sidebarThreads');
   if (!list) return;
   while (list.firstChild) list.removeChild(list.firstChild);
 
