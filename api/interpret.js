@@ -378,13 +378,14 @@ export default async function handler(req, res) {
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
   // Parse body first so we can check email and run crisis detection
-  let prompt, messages, userEmail, rawQuery;
+  let prompt, messages, userEmail, rawQuery, isFollowUp;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
     messages = body?.messages;
     userEmail = body?.email || null;
-    rawQuery = body?.rawQuery || null; // raw user input from frontend, uncontaminated
+    rawQuery = body?.rawQuery || null;
+    isFollowUp = body?.isFollowUp || false; // explicit flag from frontend
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
   }
@@ -538,8 +539,9 @@ export default async function handler(req, res) {
 
   // Stream fully complete — save to Supabase after SSE connection closes
   if (streamDone && userId) {
-    const isFollowUp = messages && messages.length > 1;
-    if (!isFollowUp) {
+    // Use explicit flag if sent, otherwise fall back to message count
+    const isFollowUpQuery = isFollowUp || (messages && messages.length > 1);
+    if (!isFollowUpQuery) {
       const threadId = await saveThread({
         userId,
         query:     lastUserText,
