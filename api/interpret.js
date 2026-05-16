@@ -273,9 +273,7 @@ async function saveThread({ userId, query, queryType, response, tier }) {
 // Uses service role key — called server-side only after successful response.
 
 async function updateQueryCount({ userId, tier, threadId }) {
-  try {
-    // Use draw_query RPC for atomic increment
-    // Handles monthly vs purchased credit logic and writes query_log automatically
+ try {
     const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_query`, {
       method: 'POST',
       headers: {
@@ -294,7 +292,6 @@ async function updateQueryCount({ userId, tier, threadId }) {
       return;
     }
 
-    // Link the most recent query_log entry to this thread
     if (threadId) {
       await fetch(
         `${SUPABASE_URL}/rest/v1/query_log?user_id=eq.${userId}&thread_id=is.null&order=created_at.desc&limit=1`,
@@ -310,6 +307,9 @@ async function updateQueryCount({ userId, tier, threadId }) {
         }
       );
     }
+  } catch (err) {
+    console.error('updateQueryCount error:', err.message);
+  }
   } catch (err) {
     console.error('updateQueryCount error:', err.message);
   }
