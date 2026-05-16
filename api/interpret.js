@@ -226,9 +226,13 @@ async function saveThread({ userId, query, queryType, response, tier }) {
     let slimResponse = {};
     try {
       const parsed = typeof response === 'string' ? JSON.parse(response) : response;
-      title = (parsed?.verse_identified && parsed.verse_identified.trim())
-        ? parsed.verse_identified.trim()
-        : query.substring(0, 60);
+      // Use verse_identified as title only for verse reference queries
+      // For theme, phrase, free text — use the user's own query
+      if (queryType === 'verse_reference' && parsed?.verse_identified && parsed.verse_identified.trim()) {
+        title = parsed.verse_identified.trim();
+      } else {
+        title = query.substring(0, 60);
+      }
       slimResponse = {
         recognition:         parsed?.recognition         || '',
         verse_identified:    parsed?.verse_identified    || '',
