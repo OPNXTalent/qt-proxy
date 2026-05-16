@@ -464,26 +464,23 @@ export default async function handler(req, res) {
             fullResponse += parsed.delta.text;
             res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
           } else if (parsed.type === 'message_stop') {
-            // Save thread to Supabase — non-blocking, fires after stream closes
+            // Send done event to client first
+            res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
+            // Save thread to Supabase before function terminates
+            // Must happen before res.end() in serverless environment
             const isFollowUp = messages && messages.length > 1;
             if (!isFollowUp && userId) {
-              setImmediate(async () => {
-                const threadId = await saveThread({
-                  userId,
-                  query:     lastUserText,
-                  queryType,
-                  response:  fullResponse,
-                  tier
-                });
-                await updateQueryCount({ userId, tier, threadId });
+              const threadId = await saveThread({
+                userId,
+                query:     lastUserText,
+                queryType,
+                response:  fullResponse,
+                tier
               });
+              await updateQueryCount({ userId, tier, threadId });
             } else if (isFollowUp && userId) {
-              // Follow-up: just update query count, thread already exists
-              setImmediate(async () => {
-                await updateQueryCount({ userId, tier, threadId: null });
-              });
+              await updateQueryCount({ userId, tier, threadId: null });
             }
-            res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
           }
         } catch {}
       }
