@@ -158,6 +158,9 @@
   .thread-delete-btn { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; opacity: 0; transition: opacity 0.15s, color 0.15s; padding: 4px 6px; line-height: 1; }
   .thread-item:hover .thread-delete-btn { opacity: 1; }
   .thread-delete-btn:hover { color: #b85c5c; }
+  .thread-reset-btn { position: absolute; top: 50%; right: 32px; transform: translateY(-50%); background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity 0.15s, color 0.15s; padding: 4px 6px; line-height: 1; }
+  .thread-item:hover .thread-reset-btn { opacity: 1; }
+  .thread-reset-btn:hover { color: #4a9eda; }
   .sidebar-undo-toast { position: absolute; bottom: 60px; left: 12px; right: 12px; background: var(--surface-2); border: 1px solid var(--border-lit); padding: 10px 14px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text); display: flex; align-items: center; justify-content: space-between; z-index: 10; animation: toastIn 0.2s ease; }
   @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   .sidebar-undo-btn { color: var(--gold); background: transparent; border: none; cursor: pointer; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; padding: 0; }
@@ -2221,10 +2224,13 @@ function renderThreads(threads) {
     }
     item.appendChild(titleEl);
 
-    var previewEl = document.createElement('div');
-    previewEl.className = 'thread-subtitle';
-    previewEl.textContent = preview;
-    item.appendChild(previewEl);
+    // Only show subtitle if different from title
+    if (preview && preview !== title) {
+      var previewEl = document.createElement('div');
+      previewEl.className = 'thread-subtitle';
+      previewEl.textContent = preview;
+      item.appendChild(previewEl);
+    }
 
     var metaEl = document.createElement('div');
     metaEl.className = 'thread-meta';
@@ -2242,6 +2248,28 @@ function renderThreads(threads) {
     badge.textContent = expired ? 'Expired' : (isLocked ? 'Locked' : daysLeft + ' Days Left');
     metaEl.appendChild(badge);
     item.appendChild(metaEl);
+
+    // Delete + Reset buttons — appear on hover
+    if (!isLocked) {
+      var delBtn = document.createElement('button');
+      delBtn.className = 'thread-delete-btn';
+      delBtn.title = 'Delete thread';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', (function(id) {
+        return function(e) { e.stopPropagation(); deleteThread(id); };
+      })(thread.id));
+      item.appendChild(delBtn);
+
+      var resetBtn = document.createElement('button');
+      resetBtn.className = 'thread-reset-btn';
+      resetBtn.title = 'Reset expiry clock (costs 1 query)';
+      resetBtn.textContent = '↺';
+      resetBtn.addEventListener('click', (function(id) {
+        return function(e) { e.stopPropagation(); resetThreadExpiry(id); };
+      })(thread.id));
+      item.appendChild(resetBtn);
+    }
+
     list.appendChild(item);
   });
 
@@ -2365,6 +2393,37 @@ function filterThreads(query) {
   renderThreads(allThreads.filter(function(t) {
     return getThreadTitle(t).toLowerCase().includes(q) || (t.query || '').toLowerCase().includes(q);
   }));
+}
+
+// RESET THREAD EXPIRY
+function resetThreadExpiry(id) {
+  var thread = allThreads.find(function(t) { return t.id === id; });
+  if (!thread) return;
+  var email = userEmail();
+  if (!email) return;
+
+  // Optimistic update — reset daysLeft in UI immediately
+  var retentionDays = TIER_RETENTION[CURRENT_TIER] || 90;
+  allThreads = allThreads.map(function(t) {
+    return t.id === id ? Object.assign({}, t, { daysLeft: retentionDays, expired: false }) : t;
+  });
+  renderThreads(allThreads);
+
+  // Call server to reset expiry and draw 1 query
+  fetch(API_BASE + '/api/threads', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+    body: JSON.stringify({ threadId: id, action: 'reset_expiry' })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      console.error('Reset failed:', data.error);
+      // Revert optimistic update on failure
+      initSidebar();
+    }
+  })
+  .catch(function() { initSidebar(); });
 }
 
 // DELETE
