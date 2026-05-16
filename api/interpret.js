@@ -378,20 +378,24 @@ export default async function handler(req, res) {
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
   // Parse body first so we can check email and run crisis detection
-  let prompt, messages, userEmail;
+  let prompt, messages, userEmail, rawQuery;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
     messages = body?.messages;
     userEmail = body?.email || null;
+    rawQuery = body?.rawQuery || null; // raw user input from frontend, uncontaminated
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
   }
 
   // ── CRISIS DETECTION — runs before any auth or rate-limit check ──────────────
   // Extract the last user-role message text for analysis
-  // Skip messages that look like system prompt contamination
+  // rawQuery is the clean uncontaminated input sent directly from the frontend
   const lastUserText = (() => {
+    // Prefer rawQuery — direct from frontend, no prompt contamination
+    if (rawQuery && rawQuery.trim().length > 0) return rawQuery.trim();
+
     const isContaminated = (text) =>
       !text ||
       text.toUpperCase().startsWith('RESPOND WITH') ||
@@ -399,7 +403,6 @@ export default async function handler(req, res) {
       text.length > 3000;
 
     if (messages && messages.length > 0) {
-      // Try last user message first
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === 'user') {
           const c = messages[i].content;
@@ -407,16 +410,6 @@ export default async function handler(req, res) {
           if (!isContaminated(raw)) return raw;
         }
       }
-      // Fallback: find shortest user message (most likely the real query)
-      const userMsgs = messages
-        .filter(m => m.role === 'user')
-        .map(m => {
-          const c = m.content;
-          return typeof c === 'string' ? c : (Array.isArray(c) ? c.map(b => b.text || '').join(' ') : '');
-        })
-        .filter(t => !isContaminated(t))
-        .sort((a, b) => a.length - b.length);
-      if (userMsgs.length > 0) return userMsgs[0];
     }
     return prompt || '';
   })();
