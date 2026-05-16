@@ -274,39 +274,43 @@ async function saveThread({ userId, query, queryType, response, tier }) {
 
 async function updateQueryCount({ userId, tier, threadId }) {
   try {
-    // Increment subscriber query_count
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/subscribers?id=eq.${userId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          'Content-Type':  'application/json',
-          'Prefer':        'return=minimal'
-        },
-        body: JSON.stringify({ query_count: '(query_count + 1)' })
-      }
-    );
-
-    // Write to query_log audit trail
-    await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
+    // Use RPC draw_query for atomic increment — handles monthly vs purchased credit logic
+    // draw_query also writes to query_log automatically
+    const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_query`, {
       method: 'POST',
       headers: {
         'apikey':        SUPABASE_SERVICE_ROLE_KEY,
         'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal'
+        'Content-Type':  'application/json'
       },
-      body: JSON.stringify({
-        user_id:         userId,
-        thread_id:       threadId || null,
-        query_type:      'prism',
-        credit_source:   'monthly',
-        cost:            1,
-        channel_context: 'solo'
-      })
+      body: JSON.stringify({ p_user_id: userId, p_cost: 1 })
     });
+
+    if (!rpcRes.ok) {
+      const err = await rpcRes.text();
+      // INSUFFICIENT_QUERIES is expected when allocation is exhausted — not an error
+      if (!err.includes('INSUFFICIENT_QUERIES')) {
+        console.error('draw_query failed:', err);
+      }
+      return;
+    }
+
+    // If we have a threadId, update the query_log row with the thread reference
+    if (threadId) {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/query_log?user_id=eq.${userId}&thread_id=is.null&order=created_at.desc&limit=1`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type':  'application/json',
+            'Prefer':        'return=minimal'
+          },
+          body: JSON.stringify({ thread_id: threadId })
+        }
+      );
+    }
   } catch (err) {
     console.error('updateQueryCount error:', err.message);
   }
