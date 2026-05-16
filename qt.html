@@ -1284,7 +1284,8 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
     const responseText = await callProxyStream(
       [{ role: 'user', content: followUpPrompt }],
       followUpTextEl,
-      input
+      input,
+      true  // isFollowUp — prevents saving as new thread
     );
 
     document.getElementById('followUpInput').value = '';
@@ -1320,7 +1321,7 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
   }
 }
 
-async function callProxyStream(messages, targetEl, rawQuery) {
+async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
   // Streams plain text response directly into targetEl
   const userEmail = localStorage.getItem('qt_user_email') || null;
   let response;
@@ -1329,7 +1330,7 @@ async function callProxyStream(messages, targetEl, rawQuery) {
     response = await fetch('https://quantumtheology.app/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '' })
+      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '', isFollowUp: isFollowUp || false })
     });
   } catch (networkErr) {
     const err = new Error('NETWORK_ERROR');
