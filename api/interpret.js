@@ -390,27 +390,45 @@ export default async function handler(req, res) {
   }
 
   // ── CRISIS DETECTION — runs before any auth or rate-limit check ──────────────
-  // Extract the last user-role message text for analysis
-  // rawQuery is the clean uncontaminated input sent directly from the frontend
+  // Extract the actual user input from the request
+  // Priority: rawQuery (clean) > extracted from prompt string > prompt field
   const lastUserText = (() => {
-    // Prefer rawQuery — direct from frontend, no prompt contamination
+    // 1. rawQuery — clean input sent directly from frontend
     if (rawQuery && rawQuery.trim().length > 0) return rawQuery.trim();
 
-    const isContaminated = (text) =>
-      !text ||
-      text.toUpperCase().startsWith('RESPOND WITH') ||
-      text.toUpperCase().startsWith('YOU ARE THE QT') ||
-      text.length > 3000;
+    // 2. Extract input embedded in the prompt string
+    // qt.html embeds input as: Apply the QT framework to: "${input}"
+    // or: The user has submitted ...: "${input}"
+    // or: Their follow-up question is: "${input}"
+    const extractFromPrompt = (text) => {
+      if (!text) return null;
+      // Match the input value embedded in quotes after key phrases
+      const patterns = [
+        /Apply the QT framework to:\s*"([^"]+)"/,
+        /The user has submitted[^:]+:\s*"([^"]+)"/,
+        /Their follow-up question is:\s*"([^"]+)"/,
+        /Apply the complete 8-part QT framework[^"]*"([^"]{1,500})"/,
+      ];
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match && match[1] && match[1].trim().length > 0) {
+          return match[1].trim();
+        }
+      }
+      return null;
+    };
 
     if (messages && messages.length > 0) {
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === 'user') {
           const c = messages[i].content;
           const raw = typeof c === 'string' ? c : (Array.isArray(c) ? c.map(b => b.text || '').join(' ') : '');
-          if (!isContaminated(raw)) return raw;
+          const extracted = extractFromPrompt(raw);
+          if (extracted) return extracted;
         }
       }
     }
+
     return prompt || '';
   })();
 
