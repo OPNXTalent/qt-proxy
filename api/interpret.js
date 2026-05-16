@@ -307,7 +307,9 @@ async function updateQueryCount({ userId, tier, threadId }) {
         }
       );
     }
-  
+  } catch (err) {
+    console.error('updateQueryCount error:', err.message);
+  }
 }
 
 export default async function handler(req, res) {
