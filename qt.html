@@ -1298,23 +1298,13 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
       applyQueryLock();
     }
 
-    // Save follow-up to localStorage and Supabase
+    // Save follow-up to localStorage
     if (activeThreadId) {
       const key = 'qt_followups_' + activeThreadId;
       let followUps = [];
       try { followUps = JSON.parse(localStorage.getItem(key) || '[]'); } catch {}
       followUps.push({ question: input, response: responseText });
       localStorage.setItem(key, JSON.stringify(followUps));
-
-      // Also save to Supabase if this is a real thread (uuid, not pending-)
-      const userEmail = localStorage.getItem('qt_user_email');
-      if (userEmail && !activeThreadId.startsWith('pending-')) {
-        fetch('https://quantumtheology.app/api/followups', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
-          body: JSON.stringify({ threadId: activeThreadId, question: input, response: responseText })
-        }).catch(function() {});
-      }
     }
 
   } catch (err) {
@@ -2282,41 +2272,19 @@ function selectThread(id) {
       document.getElementById('followUpSection').style.display = 'block';
       document.getElementById('downloadRow').style.display = 'block';
 
-      // Restore follow-ups — localStorage first, then Supabase
-      const renderFollowUps = function(followUps) {
+      // Restore follow-ups from localStorage
+      try {
+        const followUps = JSON.parse(localStorage.getItem('qt_followups_' + id) || '[]');
         followUps.forEach(function(fu) {
           const followUpEl = document.createElement('div');
           followUpEl.style.cssText = 'margin-top:32px; border-top:1px solid var(--border); padding-top:28px;';
-          const question = fu.question || fu.query || '';
-          const response = fu.response?.text || fu.response || '';
           followUpEl.innerHTML = `
-            <div style="font-family:var(--mono); font-size:17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Follow-up — ${escHtml(question)}</div>
-            <div style="font-size:16.5px; color:var(--text); line-height:1.75;">${escHtml(response).replace(/\n\n/g, '</p><p style="margin-top:12px;">').replace(/\n/g, '<br>')}</div>
+            <div style="font-family:var(--mono); font-size:17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Follow-up — ${escHtml(fu.question)}</div>
+            <div style="font-size:16.5px; color:var(--text); line-height:1.75;">${escHtml(fu.response).replace(/\n\n/g, '</p><p style="margin-top:12px;">').replace(/\n/g, '<br>')}</div>
           `;
           document.getElementById('resultContent').appendChild(followUpEl);
         });
-      };
-
-      // Try localStorage first (fast, works for current-device threads)
-      const localFollowUps = JSON.parse(localStorage.getItem('qt_followups_' + id) || '[]');
-      if (localFollowUps.length > 0) {
-        renderFollowUps(localFollowUps);
-      } else if (!id.startsWith('pending-')) {
-        // Fetch from Supabase for cross-device threads
-        const userEmail = localStorage.getItem('qt_user_email');
-        if (userEmail) {
-          fetch('https://quantumtheology.app/api/followups?threadId=' + id, {
-            headers: { 'x-user-email': userEmail }
-          })
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            if (data.followUps && data.followUps.length > 0) {
-              renderFollowUps(data.followUps);
-            }
-          })
-          .catch(function() {});
-        }
-      }
+      } catch(fe) {}
 
     } catch(e) {
       document.getElementById('resultBlock').classList.remove('visible');
