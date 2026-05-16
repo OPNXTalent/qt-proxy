@@ -222,56 +222,51 @@ async function saveThread({ userId, query, queryType, response, tier }) {
     const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
     const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // Auto-generate title from verse_identified or first 60 chars of query
+    // Parse and slim the response — store only essential fields
+    // to keep payload size small for Vercel outbound request limits
     let title = '';
-    let parsedResponse = null;
+    let slimResponse = {};
     try {
-      parsedResponse = typeof response === 'string' ? JSON.parse(response) : response;
-      title = parsedResponse?.verse_identified || query.substring(0, 60);
+      const parsed = typeof response === 'string' ? JSON.parse(response) : response;
+      title = (parsed?.verse_identified && parsed.verse_identified.trim())
+        ? parsed.verse_identified.trim()
+        : query.substring(0, 60);
+      // Store only the fields needed for display — skip verbose sections
+      slimResponse = {
+        recognition:         parsed?.recognition         || '',
+        verse_identified:    parsed?.verse_identified    || '',
+        verse_text:          parsed?.verse_text          || '',
+        qt_summary:          parsed?.qt_summary          || '',
+        entanglement:        parsed?.entanglement        || '',
+        coherence_alignment: parsed?.coherence_alignment || '',
+        noise_decoherence:   parsed?.noise_decoherence   || '',
+        telos_insight:       parsed?.telos_insight       || '',
+        olam_haba:           parsed?.olam_haba           || '',
+        key_terms:           parsed?.key_terms           || [],
+        kingdom_implication: parsed?.kingdom_implication || '',
+      };
     } catch {
       title = query.substring(0, 60);
-      parsedResponse = {};
+      slimResponse = { raw: response?.substring(0, 500) || '' };
     }
 
-    // Use RPC to bypass direct REST insert issues in streaming context
-    const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_thread`, {
-      method: 'POST',
-      headers: {
-        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json'
-      },
-      body: JSON.stringify({
-        p_user_id:          userId,
-        p_title:            title.trim(),
-        p_query:            query,
-        p_response:         parsedResponse,
-        p_query_type:       queryType || 'free_text',
-        p_tier:             tier,
-        p_retention_days:   retentionDays,
-        p_expires_at:       expiresAt.toISOString(),
-        p_grace_ends_at:    graceEndsAt.toISOString()
-      })
-    });
+    console.log('[saveThread] payload size:', JSON.stringify(slimResponse).length, 'bytes');
 
-    if (!rpcRes.ok) {
-      const err = await rpcRes.text();
-      console.error('saveThread RPC failed:', err);
-      // Fallback: try direct insert
-      return await saveThreadDirect({ userId, query, queryType, parsedResponse, tier, retentionDays, expiresAt, graceEndsAt, title });
-    }
+    const threadData = {
+      user_id:          userId,
+      title:            title.trim(),
+      query:            query,
+      response:         slimResponse,
+      query_type:       queryType || 'free_text',
+      tier_at_creation: tier,
+      retention_days:   retentionDays,
+      expires_at:       expiresAt.toISOString(),
+      grace_ends_at:    graceEndsAt.toISOString(),
+    };
 
-    const threadId = await rpcRes.json();
-    return threadId || null;
-  } catch (err) {
-    console.error('saveThread error:', err.message);
-    return null;
-  }
-}
+    console.log('[saveThread] attempting insert for userId:', userId);
 
-async function saveThreadDirect({ userId, query, queryType, parsedResponse, tier, retentionDays, expiresAt, graceEndsAt, title }) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/threads`, {
+    const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/threads`, {
       method: 'POST',
       headers: {
         'apikey':        SUPABASE_SERVICE_ROLE_KEY,
@@ -279,27 +274,20 @@ async function saveThreadDirect({ userId, query, queryType, parsedResponse, tier
         'Content-Type':  'application/json',
         'Prefer':        'return=representation'
       },
-      body: JSON.stringify({
-        user_id:          userId,
-        title:            title,
-        query:            query,
-        response:         parsedResponse,
-        query_type:       queryType || 'free_text',
-        tier_at_creation: tier,
-        retention_days:   retentionDays,
-        expires_at:       expiresAt.toISOString(),
-        grace_ends_at:    graceEndsAt.toISOString(),
-      })
+      body: JSON.stringify(threadData)
     });
-    if (!res.ok) {
-      const err = await res.text();
-      console.error('saveThreadDirect failed:', err);
+
+    if (!saveRes.ok) {
+      const err = await saveRes.text();
+      console.error('[saveThread] failed:', err);
       return null;
     }
-    const saved = await res.json();
+
+    const saved = await saveRes.json();
+    console.log('[saveThread] success, threadId:', saved?.[0]?.id);
     return saved?.[0]?.id || null;
   } catch (err) {
-    console.error('saveThreadDirect error:', err.message);
+    console.error('[saveThread] error:', err.message, err.cause?.message || '');
     return null;
   }
 }
