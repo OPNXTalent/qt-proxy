@@ -2323,7 +2323,25 @@ function saveRename(id) {
   const inp = document.getElementById('rename-input-' + id);
   if (!inp) return;
   const val = inp.value.trim();
-  if (val) localStorage.setItem('qt_thread_title_' + id, val);
+  if (val) {
+    // Update in-memory and localStorage (for pending threads)
+    localStorage.setItem('qt_thread_title_' + id, val);
+    // Update allThreads in memory
+    allThreads = allThreads.map(function(t) {
+      return t.id === id ? Object.assign({}, t, { title: val }) : t;
+    });
+    // Persist to Supabase if this is a real thread (uuid, not pending-)
+    if (!id.startsWith('pending-')) {
+      var userEmail = localStorage.getItem('qt_user_email');
+      if (userEmail) {
+        fetch('https://quantumtheology.app/api/threads', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
+          body: JSON.stringify({ threadId: id, title: val })
+        }).catch(function() {});
+      }
+    }
+  }
   renameOpenId = null;
   renderThreads(allThreads);
 }
@@ -2355,48 +2373,87 @@ function initSidebar() {
   var tierLabels = { scholar: 'Scholar · 90 Day Archive', theologian: 'Theologian · 180 Day Archive', companion: 'Companion · 1 Year Archive', free: 'Free Access' };
   document.getElementById('sidebarTierLabel').textContent = tierLabels[CURRENT_TIER] || 'Scholar · 30 Day Archive';
 
-  // Load threads from localStorage, enforce tier retention expiration
-  var saved = localStorage.getItem('qt_threads');
-  var rawThreads = saved ? JSON.parse(saved) : [];
-  var retentionDays = TIER_RETENTION[CURRENT_TIER] || 1;
-  var now = Date.now();
-  // Mark threads as expired based on actual tier retention window
-  allThreads = rawThreads.map(function(t) {
-    var createdAt = t.createdAt || now;
-    var ageInDays = (now - createdAt) / (1000 * 60 * 60 * 24);
-    var daysLeft = Math.max(0, Math.floor(retentionDays - ageInDays));
-    return Object.assign({}, t, {
-      daysLeft: daysLeft,
-      expired: daysLeft === 0
-    });
-  });
-  // Save back with updated expiry state
-  localStorage.setItem('qt_threads', JSON.stringify(allThreads));
-
-  // Show sidebar immediately on login if threads exist OR if sidebar has appeared before
+  var userEmail = localStorage.getItem('qt_user_email');
   var toggle = document.getElementById('sidebarToggle');
   var sidebar = document.getElementById('sidebar');
 
-  var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
-  var hasThreads = allThreads.length > 0;
+  // Free/anonymous — no thread history
+  if (!userEmail || CURRENT_TIER === 'free') {
+    allThreads = [];
+    renderThreads(allThreads);
+    return;
+  }
 
-  if (hasAppeared || hasThreads) {
+  // Show sidebar shell immediately if it appeared before
+  var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
+  if (hasAppeared) {
     sidebar.classList.add('visible');
     toggle.classList.add('visible');
     sidebarHasAppeared = true;
-    localStorage.setItem('qt_sidebar_appeared', '1');
     var wasOpen = localStorage.getItem('qt_sidebar_open') === '1';
-    if (wasOpen || hasThreads) {
+    if (wasOpen) {
       sidebarOpen = true;
       sidebar.classList.add('open');
       document.getElementById('mainContent').classList.add('sidebar-open');
       toggle.textContent = '✕';
     }
-    renderThreads(allThreads);
   }
 
-  // Demo: show cancel banner (remove to hide)
-  // document.getElementById('cancelBanner').style.display = 'block';
+  // Fetch threads from Supabase via API endpoint
+  fetch('https://quantumtheology.app/api/threads', {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail }
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (!data.threads) return;
+    allThreads = data.threads;
+
+    // Run localStorage → Supabase migration once
+    var migrated = localStorage.getItem('qt_migration_done');
+    if (!migrated) {
+      var localRaw = localStorage.getItem('qt_threads');
+      var localThreads = localRaw ? JSON.parse(localRaw) : [];
+      if (localThreads.length > 0) {
+        fetch('https://quantumtheology.app/api/migrate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
+          body: JSON.stringify({ threads: localThreads })
+        }).catch(function() {});
+      }
+      localStorage.setItem('qt_migration_done', '1');
+    }
+
+    var hasThreads = allThreads.length > 0;
+    if (hasThreads) {
+      sidebar.classList.add('visible');
+      toggle.classList.add('visible');
+      sidebarHasAppeared = true;
+      localStorage.setItem('qt_sidebar_appeared', '1');
+      if (!sidebarOpen) {
+        sidebarOpen = true;
+        sidebar.classList.add('open');
+        document.getElementById('mainContent').classList.add('sidebar-open');
+        toggle.textContent = '✕';
+      }
+    }
+    renderThreads(allThreads);
+  })
+  .catch(function(err) {
+    console.error('initSidebar error:', err.message);
+    // Graceful fallback to localStorage if API unavailable
+    var saved = localStorage.getItem('qt_threads');
+    var rawThreads = saved ? JSON.parse(saved) : [];
+    var retentionDays = TIER_RETENTION[CURRENT_TIER] || 1;
+    var now = Date.now();
+    allThreads = rawThreads.map(function(t) {
+      var createdAt = t.createdAt || now;
+      var ageInDays = (now - createdAt) / (1000 * 60 * 60 * 24);
+      var daysLeft = Math.max(0, Math.floor(retentionDays - ageInDays));
+      return Object.assign({}, t, { daysLeft: daysLeft, expired: daysLeft === 0 });
+    });
+    renderThreads(allThreads);
+  });
 }
 
 function showSidebarAfterQuery(queryText) {
@@ -2426,10 +2483,12 @@ function showSidebarAfterQuery(queryText) {
 }
 
 function addThreadToSidebar(queryText) {
+  // Thread already saved to Supabase by interpret.js
+  // Add optimistic entry to sidebar — will get real id on next initSidebar
   var tsNow = Date.now();
   const newThread = {
-    id: 'thread-' + tsNow,
-    title: null,
+    id: 'pending-' + tsNow,
+    title: queryText.length > 60 ? queryText.slice(0, 60) + '…' : queryText,
     query: queryText,
     type: 'new',
     lastVisited: formatNow(),
@@ -2439,9 +2498,27 @@ function addThreadToSidebar(queryText) {
     archived: false
   };
   allThreads.unshift(newThread);
-  localStorage.setItem('qt_threads', JSON.stringify(allThreads));
   activeThreadId = newThread.id;
   renderThreads(allThreads);
+  // Refresh from Supabase after a short delay to get real thread id
+  var userEmail = localStorage.getItem('qt_user_email');
+  if (userEmail) {
+    setTimeout(function() {
+      fetch('https://quantumtheology.app/api/threads', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail }
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (!data.threads) return;
+        allThreads = data.threads;
+        // Set active to the most recent thread
+        if (allThreads.length > 0) activeThreadId = allThreads[0].id;
+        renderThreads(allThreads);
+      })
+      .catch(function() {});
+    }, 2000);
+  }
 }
 
 function formatNow() {
@@ -2529,7 +2606,16 @@ function deleteThread(id) {
 }
 
 function confirmDelete(id) {
-  // Hard delete all localStorage keys for this thread
+  // Hard delete from Supabase
+  var userEmail = localStorage.getItem('qt_user_email');
+  if (userEmail) {
+    fetch('https://quantumtheology.app/api/threads', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
+      body: JSON.stringify({ threadId: id })
+    }).catch(function() {});
+  }
+  // Clear localStorage residue
   localStorage.removeItem('qt_response_' + id);
   localStorage.removeItem('qt_input_' + id);
   localStorage.removeItem('qt_followups_' + id);
