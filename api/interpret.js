@@ -161,7 +161,7 @@ async function getCodeRedemption(email) {
 
 async function getQueryLog(ip) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/query_log?select=id,cost,created_at&user_id=is.null&channel_context=eq.solo&order=created_at.desc&limit=100`,
+    `${SUPABASE_URL}/rest/v1/query_log?select=id,query_type,cost,created_at&user_id=is.null&order=created_at.desc&limit=200`,
     {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -274,8 +274,8 @@ async function saveThread({ userId, query, queryType, response, tier }) {
 
 async function updateQueryCount({ userId, tier, threadId }) {
   try {
-    // Use RPC draw_query for atomic increment — handles monthly vs purchased credit logic
-    // draw_query also writes to query_log automatically
+    // Use draw_query RPC for atomic increment
+    // Handles monthly vs purchased credit logic and writes query_log automatically
     const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_query`, {
       method: 'POST',
       headers: {
@@ -288,14 +288,13 @@ async function updateQueryCount({ userId, tier, threadId }) {
 
     if (!rpcRes.ok) {
       const err = await rpcRes.text();
-      // INSUFFICIENT_QUERIES is expected when allocation is exhausted — not an error
       if (!err.includes('INSUFFICIENT_QUERIES')) {
         console.error('draw_query failed:', err);
       }
       return;
     }
 
-    // If we have a threadId, update the query_log row with the thread reference
+    // Link the most recent query_log entry to this thread
     if (threadId) {
       await fetch(
         `${SUPABASE_URL}/rest/v1/query_log?user_id=eq.${userId}&thread_id=is.null&order=created_at.desc&limit=1`,
