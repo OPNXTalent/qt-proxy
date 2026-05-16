@@ -1117,7 +1117,7 @@ async function runInterpretation() {
   conversationHistory.push({ role: 'user', content: prompt });
 
   try {
-    const apiRawText = await callProxy(conversationHistory);
+    const apiRawText = await callProxy(conversationHistory, input);
   
   // Store a condensed version in history to prevent payload bloat on follow-ups
   const condensed = apiRawText.length > 1000 
@@ -1283,7 +1283,8 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
   try {
     const responseText = await callProxyStream(
       [{ role: 'user', content: followUpPrompt }],
-      followUpTextEl
+      followUpTextEl,
+      input
     );
 
     document.getElementById('followUpInput').value = '';
@@ -1319,7 +1320,7 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
   }
 }
 
-async function callProxyStream(messages, targetEl) {
+async function callProxyStream(messages, targetEl, rawQuery) {
   // Streams plain text response directly into targetEl
   const userEmail = localStorage.getItem('qt_user_email') || null;
   let response;
@@ -1328,7 +1329,7 @@ async function callProxyStream(messages, targetEl) {
     response = await fetch('https://quantumtheology.app/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, email: userEmail })
+      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '' })
     });
   } catch (networkErr) {
     const err = new Error('NETWORK_ERROR');
@@ -1395,7 +1396,7 @@ async function callProxyStream(messages, targetEl) {
   return fullText;
 }
 
-async function callProxy(messages) {
+async function callProxy(messages, rawQuery) {
   const userEmail = localStorage.getItem('qt_user_email') || null;
   let response;
 
@@ -1403,7 +1404,7 @@ async function callProxy(messages) {
     response = await fetch('https://quantumtheology.app/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, email: userEmail })
+      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '' })
     });
   } catch (networkErr) {
     const err = new Error('NETWORK_ERROR');
