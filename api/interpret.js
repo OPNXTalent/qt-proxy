@@ -405,7 +405,6 @@ export default async function handler(req, res) {
   }
   const tier = subscriber?.tier || 'trial';
   const userId = subscriber?.id || null;
-  console.log('[DEBUG] Subscriber found — email:', userEmail, 'tier:', tier, 'userId:', userId);
 
   // Determine query type from the last user message
   const queryType = (() => {
@@ -448,6 +447,7 @@ export default async function handler(req, res) {
   const decoder = new TextDecoder();
   let buffer = '';
   let fullResponse = ''; // accumulate complete response for thread persistence
+  let streamDone = false;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -465,31 +465,8 @@ export default async function handler(req, res) {
             fullResponse += parsed.delta.text;
             res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
           } else if (parsed.type === 'message_stop') {
-            // Send done event to client first
             res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
-            // Debug logging
-            console.log('[DEBUG] message_stop fired. userId:', userId, 'tier:', tier, 'fullResponse length:', fullResponse.length, 'lastUserText length:', lastUserText?.length);
-            // Save thread to Supabase before function terminates
-            const isFollowUp = messages && messages.length > 1;
-            console.log('[DEBUG] isFollowUp:', isFollowUp, 'messages length:', messages?.length);
-            if (!isFollowUp && userId) {
-              console.log('[DEBUG] Calling saveThread...');
-              const threadId = await saveThread({
-                userId,
-                query:     lastUserText,
-                queryType,
-                response:  fullResponse,
-                tier
-              });
-              console.log('[DEBUG] saveThread returned threadId:', threadId);
-              await updateQueryCount({ userId, tier, threadId });
-              console.log('[DEBUG] updateQueryCount complete');
-            } else if (isFollowUp && userId) {
-              console.log('[DEBUG] Follow-up — skipping saveThread, calling updateQueryCount only');
-              await updateQueryCount({ userId, tier, threadId: null });
-            } else {
-              console.log('[DEBUG] saveThread NOT called — userId:', userId, 'isFollowUp:', isFollowUp);
-            }
+            streamDone = true;
           }
         } catch {}
       }
@@ -508,11 +485,30 @@ export default async function handler(req, res) {
             res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
           } else if (parsed.type === 'message_stop') {
             res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
+            streamDone = true;
           }
         } catch {}
       }
     }
   }
+
+  // Stream fully complete — save to Supabase after SSE connection closes
+  if (streamDone && userId) {
+    const isFollowUp = messages && messages.length > 1;
+    if (!isFollowUp) {
+      const threadId = await saveThread({
+        userId,
+        query:     lastUserText,
+        queryType,
+        response:  fullResponse,
+        tier
+      });
+      await updateQueryCount({ userId, tier, threadId });
+    } else {
+      await updateQueryCount({ userId, tier, threadId: null });
+    }
+  }
+
   return res.end();
 }
     }
