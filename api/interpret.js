@@ -222,7 +222,6 @@ async function saveThread({ userId, query, queryType, response, tier }) {
     const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
     const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // Parse and slim response to keep payload within Vercel outbound limits
     let title = '';
     let slimResponse = {};
     try {
@@ -391,20 +390,33 @@ export default async function handler(req, res) {
 
   // ── CRISIS DETECTION — runs before any auth or rate-limit check ──────────────
   // Extract the last user-role message text for analysis
-  // Guard against system prompt contamination in message content
+  // Skip messages that look like system prompt contamination
   const lastUserText = (() => {
+    const isContaminated = (text) =>
+      !text ||
+      text.toUpperCase().startsWith('RESPOND WITH') ||
+      text.toUpperCase().startsWith('YOU ARE THE QT') ||
+      text.length > 3000;
+
     if (messages && messages.length > 0) {
+      // Try last user message first
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === 'user') {
           const c = messages[i].content;
           const raw = typeof c === 'string' ? c : (Array.isArray(c) ? c.map(b => b.text || '').join(' ') : '');
-          // Strip if it looks like a system prompt leaked in
-          if (raw.toUpperCase().startsWith('RESPOND WITH') || raw.length > 2000) {
-            continue;
-          }
-          return raw;
+          if (!isContaminated(raw)) return raw;
         }
       }
+      // Fallback: find shortest user message (most likely the real query)
+      const userMsgs = messages
+        .filter(m => m.role === 'user')
+        .map(m => {
+          const c = m.content;
+          return typeof c === 'string' ? c : (Array.isArray(c) ? c.map(b => b.text || '').join(' ') : '');
+        })
+        .filter(t => !isContaminated(t))
+        .sort((a, b) => a.length - b.length);
+      if (userMsgs.length > 0) return userMsgs[0];
     }
     return prompt || '';
   })();
