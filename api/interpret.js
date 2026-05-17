@@ -90,11 +90,11 @@ const WINDOW_HOURS = 24;
 // observer = free (IP-limited separately)
 // refraction / full_spectrum = paid tiers
 const TIER_LIMITS = {
-  refraction:    150,
+  refraction:    100,
   full_spectrum: null, // unlimited
   trial:         250,  // book code redeemers
   // legacy names kept for backward compat
-  scholar:       150,
+  scholar:       100,
   theologian:    null,
 };
 
