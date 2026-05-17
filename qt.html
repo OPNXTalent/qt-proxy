@@ -2640,7 +2640,7 @@ function showSidebarAfterQuery(queryText) {
   if (!sidebarOpen) {
     sidebarOpen = true; sidebar.classList.add('open');
     var mc = document.getElementById('mainContent'); if (mc) mc.classList.add('sidebar-open');
-    if (toggle) toggle.textContent = '\u2715'; localStorage.setItem('qt_sidebar_open', '1');
+    if (toggle) toggle.textContent = '‹'; localStorage.setItem('qt_sidebar_open', '1');
   }
   addThreadToSidebar(queryText);
 }
@@ -2653,7 +2653,7 @@ function toggleSidebar() {
   var toggle  = document.getElementById('sidebarToggle');
   if (sidebar) sidebar.classList.toggle('open', sidebarOpen);
   if (main)    main.classList.toggle('sidebar-open', sidebarOpen);
-  if (toggle)  toggle.textContent = sidebarOpen ? '\u2715' : '\u2630';
+  if (toggle)  toggle.textContent = sidebarOpen ? '‹' : '☰';
   localStorage.setItem('qt_sidebar_open', sidebarOpen ? '1' : '0');
 }
 
@@ -2736,7 +2736,7 @@ function initSidebar() {
     if (wasOpen) {
       sidebarOpen = true; sidebar.classList.add('open');
       var mc = document.getElementById('mainContent'); if (mc) mc.classList.add('sidebar-open');
-      if (toggle) toggle.textContent = '\u2715';
+      if (toggle) toggle.textContent = '‹';
     }
   }
 
@@ -2763,7 +2763,7 @@ function initSidebar() {
       if (!sidebarOpen) {
         sidebarOpen = true; sidebar.classList.add('open');
         var mc2 = document.getElementById('mainContent'); if (mc2) mc2.classList.add('sidebar-open');
-        if (toggle) toggle.textContent = '\u2715';
+        if (toggle) toggle.textContent = '‹';
       }
     }
     renderThreads(allThreads);
