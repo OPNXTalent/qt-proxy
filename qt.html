@@ -2963,9 +2963,86 @@ async function runPreflightCheck() {
   } catch(e) {}
 }
 
+// ── SIGNAL SESSIONS POST-PURCHASE HANDLER ────────────────────────────────────
+// Fires when Stripe redirects back with ?credits_added=1 after a Signal Sessions
+// purchase. Re-fetches the subscriber record, confirms credits landed, then
+// dismisses the quota wall and restores the submit button.
+
+async function handleCreditsAdded() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('credits_added') !== '1') return;
+
+  // Clean the param from the URL without triggering a reload
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState({}, '', cleanUrl);
+
+  const email = localStorage.getItem('qt_user_email');
+  if (!email) return;
+
+  // Show a brief status message while we verify
+  const statusEl = document.createElement('div');
+  statusEl.id = 'creditsStatus';
+  statusEl.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999;';
+  statusEl.textContent = 'Confirming your Signal Sessions…';
+  document.body.appendChild(statusEl);
+
+  // Poll Supabase up to 8 times (every 1.5s) waiting for webhook to land
+  const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+  const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+
+  let credits = 0;
+  for (let i = 0; i < 8; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const res = await fetch(
+        `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=purchased_credits&limit=1`,
+        {
+          headers: {
+            'apikey': sbAnon,
+            'Authorization': `Bearer ${sbAnon}`
+          }
+        }
+      );
+      const data = await res.json();
+      credits = data?.[0]?.purchased_credits || 0;
+      if (credits > 0) break;
+    } catch {}
+  }
+
+  // Dismiss status
+  statusEl.remove();
+
+  if (credits > 0) {
+    // Dismiss quota wall, restore submit button
+    const quotaPrompt = document.getElementById('quotaPrompt');
+    if (quotaPrompt) quotaPrompt.style.display = 'none';
+    const limitPrompt = document.getElementById('limitPrompt');
+    if (limitPrompt) limitPrompt.style.display = 'none';
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) { submitBtn.style.display = ''; submitBtn.disabled = false; }
+    const newSubjectBtn = document.getElementById('newSubjectTopBtn');
+    if (newSubjectBtn) newSubjectBtn.style.display = '';
+
+    // Show confirmation toast
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999; transition:opacity 0.5s;';
+    toast.textContent = `Signal Sessions confirmed — ${credits} quer${credits === 1 ? 'y' : 'ies'} available`;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 4000);
+  } else {
+    // Credits didn't land yet — webhook may still be in flight
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--border-lit); padding:14px 28px; font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); z-index:999; transition:opacity 0.5s;';
+    toast.textContent = 'Credits are being processed — refresh in a moment';
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 5000);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   initSidebar();
   runPreflightCheck();
+  handleCreditsAdded();
   var modal = document.getElementById('shareModal');
   if (modal) {
     modal.addEventListener('click', function(e) {
