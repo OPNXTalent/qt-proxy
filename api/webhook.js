@@ -7,10 +7,37 @@ export const config = {
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
+// ── Tier configuration ──────────────────────────────────────────────
+// Maps Stripe price amounts (in cents) to internal tier keys
+// and their monthly query limits
+const TIER_CONFIG = {
+  // Refraction Monthly  $9.99
+  999:  { tier: 'scholar',    limit: 100 },
+  // Refraction Annual   $99/yr → billed as $9900 cents
+  9900: { tier: 'scholar',    limit: 100 },
+  // Full Spectrum Monthly $24.99
+  2499: { tier: 'theologian', limit: 250 },
+  // Full Spectrum Annual $249/yr → billed as $24900 cents
+  24900:{ tier: 'theologian', limit: 250 },
+};
+
+// Signal Sessions — one-time purchase query credits
+const SIGNAL_CREDITS = {
+  299:  10,
+  699:  25,
+  1299: 50,
+  1999: 100,
+};
+
+// ── Stripe payment link product IDs → Signal Sessions ──────────────
+// Used to distinguish one-time Signal purchases from subscriptions
+// in payment_intent.succeeded events
+const SIGNAL_AMOUNTS = new Set([299, 699, 1299, 1999]);
 
 async function buffer(readable) {
   const chunks = [];
@@ -50,14 +77,24 @@ async function getCustomerEmail(customerId) {
   }
 }
 
-async function upsertSubscriber(email, customerId, subscriptionId, tier, status) {
+function supabaseHeaders() {
+  return {
+    'apikey': SUPABASE_SERVICE_ROLE_KEY,
+    'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+// Upsert subscriber on new subscription — sets tier, limit, reset date
+async function upsertSubscriber(email, customerId, subscriptionId, tier, limit, status) {
   if (!email) return;
+  const resetAt = new Date();
+  resetAt.setMonth(resetAt.getMonth() + 1);
+
   const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers`, {
     method: 'POST',
     headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
+      ...supabaseHeaders(),
       'Prefer': 'resolution=merge-duplicates'
     },
     body: JSON.stringify({
@@ -66,10 +103,89 @@ async function upsertSubscriber(email, customerId, subscriptionId, tier, status)
       stripe_subscription_id: subscriptionId,
       tier,
       status,
+      query_count: 0,
+      query_reset_at: resetAt.toISOString(),
       updated_at: new Date().toISOString()
     })
   });
   if (!res.ok) console.error('Supabase upsert error:', await res.text());
+}
+
+// Update tier/status on subscription change
+async function updateSubscription(subscriptionId, tier, limit, status) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/subscribers?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}`,
+    {
+      method: 'PATCH',
+      headers: { ...supabaseHeaders(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ tier, status, updated_at: new Date().toISOString() })
+    }
+  );
+  if (!res.ok) console.error('Supabase update error:', await res.text());
+}
+
+// Reset monthly query count on successful invoice payment
+async function resetMonthlyQueries(subscriptionId) {
+  const resetAt = new Date();
+  resetAt.setMonth(resetAt.getMonth() + 1);
+
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/subscribers?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}`,
+    {
+      method: 'PATCH',
+      headers: { ...supabaseHeaders(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        query_count: 0,
+        query_reset_at: resetAt.toISOString(),
+        status: 'active',
+        updated_at: new Date().toISOString()
+      })
+    }
+  );
+  if (!res.ok) console.error('Supabase reset error:', await res.text());
+}
+
+// Credit Signal Sessions purchased_credits by email
+async function creditSignalSessions(email, credits) {
+  if (!email || !credits) return;
+
+  // First get current purchased_credits
+  const getRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=purchased_credits`,
+    { headers: supabaseHeaders() }
+  );
+  const rows = await getRes.json();
+
+  if (!rows || rows.length === 0) {
+    // No subscriber record yet — create one with credits
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers`, {
+      method: 'POST',
+      headers: { ...supabaseHeaders(), 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({
+        email,
+        tier: 'free',
+        status: 'active',
+        purchased_credits: credits,
+        updated_at: new Date().toISOString()
+      })
+    });
+    if (!res.ok) console.error('Signal Sessions create error:', await res.text());
+    return;
+  }
+
+  const current = rows[0].purchased_credits || 0;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}`,
+    {
+      method: 'PATCH',
+      headers: { ...supabaseHeaders(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        purchased_credits: current + credits,
+        updated_at: new Date().toISOString()
+      })
+    }
+  );
+  if (!res.ok) console.error('Signal Sessions credit error:', await res.text());
 }
 
 async function updateSubscriberStatus(subscriptionId, status) {
@@ -77,22 +193,11 @@ async function updateSubscriberStatus(subscriptionId, status) {
     `${SUPABASE_URL}/rest/v1/subscribers?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}`,
     {
       method: 'PATCH',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
+      headers: { ...supabaseHeaders(), 'Prefer': 'return=minimal' },
       body: JSON.stringify({ status, updated_at: new Date().toISOString() })
     }
   );
-  if (!res.ok) console.error('Supabase update error:', await res.text());
-}
-
-function getTierFromAmount(amount) {
-  if (amount >= 19900) return 'companion';
-  if (amount >= 2499) return 'theologian';
-  return 'scholar';
+  if (!res.ok) console.error('Supabase status update error:', await res.text());
 }
 
 async function sendEmail(to, subject, html) {
@@ -115,7 +220,7 @@ function emailWrapper(content) {
   return `
     <div style="background:#06060a; color:#d8d4e8; font-family:Georgia,serif; max-width:600px; margin:0 auto; padding:48px 40px;">
       <div style="text-align:center; margin-bottom:32px;">
-        <div style="font-family:serif; font-size:28px; color:#e8d5a0; letter-spacing:0.08em;">Quantum Theology</div>
+        <div style="font-family:serif; font-size:28px; color:#e8d5a0; letter-spacing:0.08em;">The Prism</div>
         <div style="font-size:14px; color:#7a6230; letter-spacing:0.2em; text-transform:uppercase; margin-top:4px;">Echad b'Emet</div>
       </div>
       <div style="border-top:1px solid #2a2a40; margin-bottom:32px;"></div>
@@ -126,6 +231,16 @@ function emailWrapper(content) {
     </div>
   `;
 }
+
+const TIER_DISPLAY = {
+  scholar:    'Refraction',
+  theologian: 'Full Spectrum',
+};
+
+const TIER_DESC = {
+  scholar:    '100 queries per month to The Prism.',
+  theologian: '250 queries per month to The Prism.',
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -145,6 +260,7 @@ export default async function handler(req, res) {
   try {
     switch (event.type) {
 
+      // ── New or updated subscription ──────────────────────────────
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = event.data.object;
@@ -152,39 +268,40 @@ export default async function handler(req, res) {
         const subscriptionId = sub.id;
         const status = sub.status === 'active' ? 'active' : 'inactive';
         const amount = sub.items?.data?.[0]?.price?.unit_amount || 0;
-        const tier = getTierFromAmount(amount);
+        const config = TIER_CONFIG[amount] || { tier: 'scholar', limit: 100 };
         const email = await getCustomerEmail(customerId);
-        await upsertSubscriber(email, customerId, subscriptionId, tier, status);
 
-        if (email && status === 'active' && event.type === 'customer.subscription.created') {
-          const tierNames = { scholar: 'Scholar', theologian: 'Theologian', companion: 'Companion' };
-          const tierName = tierNames[tier] || 'Scholar';
-          const tierDesc = {
-            scholar: '150 queries per month to the Quantum Theology Prism.',
-            theologian: '350 queries per month to the Quantum Theology Prism.',
-            companion: '500 queries per month to the Quantum Theology Prism.'
-          }[tier] || '';
+        if (event.type === 'customer.subscription.created') {
+          await upsertSubscriber(email, customerId, subscriptionId, config.tier, config.limit, status);
 
-          try {
-            await sendEmail(
-              email,
-              `Welcome to the QT Prism — ${tierName}`,
-              emailWrapper(`
-                <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your <strong style="color:#e8d5a0;">${tierName}</strong> subscription is active.</p>
-                <p style="font-size:16px; line-height:1.8; color:#7a7890;">${tierDesc} The framework applies relational ontology, Hebrew linguistic architecture, and the conceptual language of quantum mechanics to Scripture.</p>
-                <div style="text-align:center; margin:40px 0;">
-                  <a href="https://quantumtheology.app/qt.html" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Enter the Prism</a>
-                </div>
-                <p style="font-size:13px; color:#3a384a; text-align:center;">Manage your subscription at <a href="https://billing.stripe.com" style="color:#7a6230;">billing.stripe.com</a></p>
-              `)
-            );
-          } catch (emailErr) {
-            console.error('Welcome email failed:', emailErr.message);
+          if (email && status === 'active') {
+            const tierName = TIER_DISPLAY[config.tier] || 'Refraction';
+            const tierDesc = TIER_DESC[config.tier] || '';
+            try {
+              await sendEmail(
+                email,
+                `Welcome to The Prism — ${tierName}`,
+                emailWrapper(`
+                  <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your <strong style="color:#e8d5a0;">${tierName}</strong> subscription is active.</p>
+                  <p style="font-size:16px; line-height:1.8; color:#7a7890;">${tierDesc} The Prism surfaces the relational architecture already present in the text.</p>
+                  <div style="text-align:center; margin:40px 0;">
+                    <a href="https://quantumtheology.app/qt-gateway.html" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Enter the Prism</a>
+                  </div>
+                  <p style="font-size:13px; color:#3a384a; text-align:center;">Manage your subscription at <a href="https://billing.stripe.com" style="color:#7a6230;">billing.stripe.com</a></p>
+                `)
+              );
+            } catch (emailErr) {
+              console.error('Welcome email failed:', emailErr.message);
+            }
           }
+        } else {
+          // Updated — sync tier and status
+          await updateSubscription(subscriptionId, config.tier, config.limit, status);
         }
         break;
       }
 
+      // ── Subscription cancelled ───────────────────────────────────
       case 'customer.subscription.deleted': {
         const sub = event.data.object;
         await updateSubscriberStatus(sub.id, 'inactive');
@@ -193,12 +310,12 @@ export default async function handler(req, res) {
           try {
             await sendEmail(
               email,
-              'Your QT Prism Subscription Has Been Cancelled',
+              'Your Prism Subscription Has Been Cancelled',
               emailWrapper(`
                 <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your subscription has been cancelled.</p>
-                <p style="font-size:16px; line-height:1.8; color:#7a7890;">We hope the Prism served you well. You still have access to 3 free queries every 24 hours. If you ever want to return, your subscription is one step away.</p>
+                <p style="font-size:16px; line-height:1.8; color:#7a7890;">We hope The Prism served you well. You still have access to 3 free queries every 24 hours. If you ever want to return, your subscription is one step away.</p>
                 <div style="text-align:center; margin:40px 0;">
-                  <a href="https://quantumtheology.app/index.html#access" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Resubscribe</a>
+                  <a href="https://quantumtheology.app/#interpreter" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Resubscribe</a>
                 </div>
               `)
             );
@@ -209,6 +326,16 @@ export default async function handler(req, res) {
         break;
       }
 
+      // ── Successful invoice — reset monthly query count ───────────
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object;
+        if (invoice.subscription) {
+          await resetMonthlyQueries(invoice.subscription);
+        }
+        break;
+      }
+
+      // ── Failed invoice ───────────────────────────────────────────
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
         const email = await getCustomerEmail(invoice.customer);
@@ -216,7 +343,7 @@ export default async function handler(req, res) {
           try {
             await sendEmail(
               email,
-              'Action Required — Payment Issue with Your QT Prism Subscription',
+              'Action Required — Payment Issue with Your Prism Subscription',
               emailWrapper(`
                 <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">There was an issue processing your subscription payment.</p>
                 <p style="font-size:16px; line-height:1.8; color:#7a7890;">Stripe will retry the charge automatically. To avoid any interruption to your Prism access, please update your payment method at your earliest convenience.</p>
@@ -232,10 +359,33 @@ export default async function handler(req, res) {
         break;
       }
 
-      case 'invoice.payment_succeeded': {
-        const invoice = event.data.object;
-        if (invoice.subscription) {
-          await updateSubscriberStatus(invoice.subscription, 'active');
+      // ── Signal Sessions — one-time credit purchase ───────────────
+      case 'payment_intent.succeeded': {
+        const pi = event.data.object;
+        const amount = pi.amount;
+
+        if (SIGNAL_AMOUNTS.has(amount)) {
+          const credits = SIGNAL_CREDITS[amount];
+          const email = pi.receipt_email || (pi.customer ? await getCustomerEmail(pi.customer) : null);
+
+          if (email && credits) {
+            await creditSignalSessions(email, credits);
+            try {
+              await sendEmail(
+                email,
+                `Your Signal Sessions — ${credits} Queries Added`,
+                emailWrapper(`
+                  <p style="font-size:18px; line-height:1.8; color:#d8d4e8;"><strong style="color:#e8d5a0;">${credits} queries</strong> have been added to your Prism account.</p>
+                  <p style="font-size:16px; line-height:1.8; color:#7a7890;">Your Signal Sessions never expire and stack with any existing credits. Use them at your own pace.</p>
+                  <div style="text-align:center; margin:40px 0;">
+                    <a href="https://quantumtheology.app/qt-gateway.html" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Enter the Prism</a>
+                  </div>
+                `)
+              );
+            } catch (emailErr) {
+              console.error('Signal Sessions email failed:', emailErr.message);
+            }
+          }
         }
         break;
       }
@@ -287,14 +437,7 @@ export default async function handler(req, res) {
       }
 
       case 'payment_intent.canceled': {
-        const pi = event.data.object;
-        console.log('PaymentIntent canceled:', pi.id);
-        break;
-      }
-
-      case 'payment_intent.succeeded': {
-        const pi = event.data.object;
-        console.log('PaymentIntent succeeded:', pi.id);
+        console.log('PaymentIntent canceled:', event.data.object.id);
         break;
       }
 
