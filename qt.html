@@ -690,6 +690,35 @@
   <div class="sidebar-header">
     <div class="sidebar-logo">The Prism</div>
     <div class="sidebar-tier" id="sidebarTierLabel">Refraction &nbsp;·&nbsp; 90 Day Archive</div>
+    <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
+      <span id="sidebarQueryCount">— queries remaining</span>
+      <span style="color:var(--border-lit);">·</span>
+      <button id="sidebarAddSessionsBtn" onclick="toggleSessionsPanel()" style="background:transparent; border:none; padding:0; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); cursor:pointer; text-transform:uppercase; transition:color 0.2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gold-dim)'">+ Sessions</button>
+    </div>
+
+    <!-- Signal Sessions inline panel -->
+    <div id="sessionsPanel" style="display:none; margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
+      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Add Signal Sessions</div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">10 queries</span>
+          <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$2.99 →</span>
+        </a>
+        <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">25 queries</span>
+          <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$6.99 →</span>
+        </a>
+        <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">50 queries</span>
+          <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$12.99 →</span>
+        </a>
+        <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">100 queries</span>
+          <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$19.99 →</span>
+        </a>
+      </div>
+      <div style="font-family:var(--crimson); font-style:italic; font-size:12px; color:var(--text-muted); margin-top:10px; line-height:1.5;">Credits never expire and stack with your subscription.</div>
+    </div>
   </div>
 
   <!-- Cancellation warning banner (shown based on post-cancel state) -->
@@ -794,9 +823,9 @@
         <!-- Buy queries -->
         <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface);">
           <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">One-Time</div>
-          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$1.99</div>
+          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$2.99</div>
           <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">10 queries.<br>No subscription required.</div>
-          <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Buy 10 Queries →</a>
+          <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Buy 10 Queries →</a>
         </div>
 
         <!-- Subscribe -->
@@ -834,7 +863,7 @@
       <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
         <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Continue Now</div>
         <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Signal Sessions</div>
-        <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$1.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
+        <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$2.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
         <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">One-time top-up.<br>No plan change required.</div>
         <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Sessions →</a>
       </div>
@@ -2629,11 +2658,70 @@ function toggleSidebar() {
 }
 
 // INIT SIDEBAR
+function toggleSessionsPanel() {
+  var panel = document.getElementById('sessionsPanel');
+  if (!panel) return;
+  var isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  var btn = document.getElementById('sidebarAddSessionsBtn');
+  if (btn) btn.textContent = isOpen ? '+ Sessions' : '↑ Sessions';
+}
+
+async function loadSidebarCredits() {
+  const email = localStorage.getItem('qt_user_email');
+  if (!email || CURRENT_TIER === 'free') return;
+
+  const tierLimits = { refraction: 100, scholar: 100, theologian: null, full_spectrum: null, companion: null, trial: 250 };
+  const limit = tierLimits[CURRENT_TIER];
+
+  // Unlimited tiers — hide the counter entirely
+  if (limit === null) return;
+
+  try {
+    const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    const res = await fetch(
+      `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=query_count,purchased_credits&limit=1`,
+      { headers: { 'apikey': sbAnon, 'Authorization': `Bearer ${sbAnon}` } }
+    );
+    const data = await res.json();
+    if (!data?.[0]) return;
+
+    const used    = data[0].query_count || 0;
+    const credits = data[0].purchased_credits || 0;
+    const monthly = Math.max(0, limit - used);
+    const total   = monthly + credits;
+
+    const countEl = document.getElementById('sidebarQueryCount');
+    const wrapEl  = document.getElementById('sidebarCredits');
+    if (!countEl || !wrapEl) return;
+
+    countEl.textContent = total === 1 ? '1 query remaining' : `${total} queries remaining`;
+    if (credits > 0) {
+      countEl.title = `${monthly} monthly + ${credits} Signal Sessions`;
+    }
+    wrapEl.style.display = 'flex';
+  } catch {}
+}
+
+function updateSidebarCredits(newCredits) {
+  // Called after handleCreditsAdded confirms — refreshes count without re-fetch
+  const countEl = document.getElementById('sidebarQueryCount');
+  const wrapEl  = document.getElementById('sidebarCredits');
+  if (!countEl || !wrapEl) return;
+  const current = parseInt(countEl.textContent) || 0;
+  const updated = current + newCredits;
+  countEl.textContent = updated === 1 ? '1 query remaining' : `${updated} queries remaining`;
+  wrapEl.style.display = 'flex';
+}
+
 function initSidebar() {
   var tierLabels = { scholar: 'Refraction \u00b7 90 Day Archive', theologian: 'Full Spectrum \u00b7 180 Day Archive',
     companion: 'Full Spectrum \u00b7 1 Year Archive', free: 'Free Access' };
   var labelEl = document.getElementById('sidebarTierLabel');
   if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || 'Refraction \u00b7 90 Day Archive';
+
+  loadSidebarCredits();
 
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
