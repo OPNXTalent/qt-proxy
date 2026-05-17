@@ -823,6 +823,35 @@
       </div>
   </div><!-- /#limitPrompt -->
 
+  <!-- PAID QUOTA WALL — shown when subscriber exhausts monthly limit -->
+  <div id="quotaPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
+    <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Monthly Limit Reached</div>
+    <div id="quotaMessage" style="font-family:var(--crimson); font-size:19px; color:var(--text); line-height:1.8; margin-bottom:32px;">You've used all your queries for this period.</div>
+
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
+
+      <!-- Add Signal Sessions -->
+      <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
+        <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Continue Now</div>
+        <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Signal Sessions</div>
+        <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$1.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
+        <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">One-time top-up.<br>No plan change required.</div>
+        <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Sessions →</a>
+      </div>
+
+      <!-- Wait for reset -->
+      <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface); display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Your Plan</div>
+          <div id="quotaResetLabel" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Resets Next Month</div>
+          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); line-height:1.6; margin-bottom:12px;">Your query count resets at the start of your next billing cycle.</div>
+        </div>
+        <a href="/" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--border-lit)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
+      </div>
+
+    </div>
+  </div><!-- /#quotaPrompt -->
+
   <!-- LOADING -->
   <div class="loading" id="loadingBlock">
     <div class="loading-symbol">✦</div>
@@ -1139,6 +1168,23 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
     }
     prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+function applyQuotaLock(message) {
+    document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('newSubjectTopBtn').style.display = 'none';
+    const prompt = document.getElementById('quotaPrompt');
+    if (message) {
+      const msgEl = document.getElementById('quotaMessage');
+      if (msgEl) msgEl.textContent = message;
+    }
+    prompt.style.display = 'block';
+    const followUp = document.getElementById('followUpSection');
+    if (followUp) {
+      followUp.style.display = 'none';
+      followUp.parentNode.insertBefore(prompt, followUp);
+    }
+    prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
 async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
@@ -1255,6 +1301,7 @@ async function runInterpretation() {
     if (err.message === 'RATE_LIMITED') return;
     if (err.message === 'CRISIS_DETECTED') return;
     if (err.message === 'SURVEY_DETECTED') return;
+    if (err.message === 'QUOTA_EXCEEDED') return;
     document.getElementById('resultContent').innerHTML = getErrorMessage(err);
     showResult();
   } finally {
@@ -1371,7 +1418,7 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
 
   } catch (err) {
     if (err.message === 'RATE_LIMITED') return;
-    const errEl = document.createElement('div');
+    if (err.message === 'QUOTA_EXCEEDED') return;
     errEl.style.marginTop = '20px';
     errEl.innerHTML = getErrorMessage(err);
     document.getElementById('resultContent').appendChild(errEl);
@@ -1520,6 +1567,10 @@ async function callProxy(messages, rawQuery) {
     if (bodyData.survey) {
       showSurveyPanel(bodyData.redirect);
       throw new Error('SURVEY_DETECTED');
+    }
+    if (bodyData.quota_exceeded) {
+      applyQuotaLock(bodyData.message || "You've used all your queries for this period.");
+      throw new Error('QUOTA_EXCEEDED');
     }
     // Any other unexpected JSON — surface as server error
     const err = new Error('Unexpected JSON response from server.');
