@@ -720,7 +720,7 @@
 
   <!-- Sidebar footer — nav + logout -->
   <div style="padding:16px 20px; border-top:1px solid var(--border); flex-shrink:0; position:relative; display:flex; justify-content:space-between; align-items:center;">
-    <a href="https://quantumtheology.app/index.html" style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">← Home</a>
+    <a href="/index.html" style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">← Home</a>
     <button onclick="handleLogout()" style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">Sign Out →</button>
   </div>
 
@@ -1326,7 +1326,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
   let response;
 
   try {
-    response = await fetch('https://quantumtheology.app/api/interpret', {
+    response = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '', isFollowUp: isFollowUp || false })
@@ -1338,6 +1338,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
   }
 
   if (response.status === 429) {
+
     let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
     let hoursRemaining = null;
     let secondsRemaining = null;
@@ -1401,7 +1402,7 @@ async function callProxy(messages, rawQuery) {
   let response;
 
   try {
-    response = await fetch('https://quantumtheology.app/api/interpret', {
+    response = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '' })
@@ -2158,7 +2159,7 @@ let allThreads    = [];
 let sidebarOpen   = false;
 let sidebarHasAppeared = false;
 
-const API_BASE = 'https://quantumtheology.app';
+const API_BASE = '';
 
 function userEmail() {
   return localStorage.getItem('qt_user_email') || null;
@@ -2614,7 +2615,7 @@ async function handleLogout() {
   sessionStorage.clear();
 
   // Redirect to gateway
-  window.location.href = 'https://quantumtheology.app/qt-gateway.html';
+  window.location.href = '/qt-gateway.html';
 }
 
 /* ── SHARE MODAL ── */
@@ -2665,11 +2666,11 @@ async function submitShare() {
   statusEl.style.color = 'var(--text-muted)';
   statusEl.style.display = 'block';
 
-  var senderEmail = localStorage.getItem('qt_user_email') || 'anonymous@quantumtheology.app';
+  var senderEmail = localStorage.getItem('qt_user_email') || 'anonymous@theprism.io';
   var snapshot = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
 
   try {
-    var res = await fetch('https://quantumtheology.app/api/share', {
+    var res = await fetch('/api/share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ senderEmail: senderEmail, recipientEmail: recipientEmail, snapshot: snapshot })
@@ -2836,7 +2837,7 @@ async function runPreflightCheck() {
   var _paidTier = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
   if (userEmail && !_anonMode && _paidTier) return;
   try {
-    var res = await fetch('https://quantumtheology.app/api/interpret', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+    var res = await fetch('/api/interpret', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
     if (!res.ok) return;
     var data = await res.json();
     if (data.locked) {
