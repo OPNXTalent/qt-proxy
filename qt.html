@@ -689,7 +689,7 @@
 
   <div class="sidebar-header">
     <div class="sidebar-logo">The Prism</div>
-    <div class="sidebar-tier" id="sidebarTierLabel">Scholar &nbsp;·&nbsp; 30 Day Archive</div>
+    <div class="sidebar-tier" id="sidebarTierLabel">Refraction &nbsp;·&nbsp; 90 Day Archive</div>
   </div>
 
   <!-- Cancellation warning banner (shown based on post-cancel state) -->
@@ -710,7 +710,7 @@
   <!-- Free user upgrade prompt (shown for free tier) -->
   <div class="sidebar-upgrade-prompt" id="freeUpgradePrompt" style="display:none;">
     Your interpretations are saved and organized when you subscribe. Start your archive.
-    <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank">Subscribe → Scholar</a>
+    <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank">Subscribe → Refraction</a>
   </div>
 
   <!-- New Subject button in sidebar -->
@@ -802,7 +802,7 @@
         <!-- Subscribe -->
         <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
           <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Recommended</div>
-          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Scholar</div>
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Refraction</div>
           <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$9.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
           <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">Unlimited queries.<br>Full framework access.</div>
           <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Subscribe →</a>
@@ -1604,7 +1604,7 @@ async function callProxy(messages, rawQuery) {
   if (tierFromStream && tierFromStream !== 'trial' && tierFromStream !== 'free') {
     localStorage.setItem('qt_user_tier', tierFromStream);
     CURRENT_TIER = tierFromStream;
-    var tierLabelsMap = { scholar: 'Scholar · 90 Day Archive', theologian: 'Theologian · 180 Day Archive', companion: 'Companion · 1 Year Archive', free: 'Free Access' };
+    var tierLabelsMap = { scholar: 'Refraction · 90 Day Archive', theologian: 'Full Spectrum · 180 Day Archive', companion: 'Full Spectrum · 1 Year Archive', free: 'Observer · Free Access' };
     var labelEl = document.getElementById('sidebarTierLabel');
     if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
@@ -2579,10 +2579,10 @@ function toggleSidebar() {
 
 // INIT SIDEBAR
 function initSidebar() {
-  var tierLabels = { scholar: 'Scholar \u00b7 90 Day Archive', theologian: 'Theologian \u00b7 180 Day Archive',
+  var tierLabels = { scholar: 'Refraction \u00b7 90 Day Archive', theologian: 'Full Spectrum \u00b7 180 Day Archive',
     companion: 'Companion \u00b7 1 Year Archive', free: 'Free Access' };
   var labelEl = document.getElementById('sidebarTierLabel');
-  if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || 'Scholar \u00b7 90 Day Archive';
+  if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || 'Refraction \u00b7 90 Day Archive';
 
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
