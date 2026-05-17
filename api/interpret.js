@@ -87,18 +87,26 @@ const QUERY_LIMIT = 3;
 const WINDOW_HOURS = 24;
 
 // Tier query limits per month
+// observer = free (IP-limited separately)
+// refraction / full_spectrum = paid tiers
 const TIER_LIMITS = {
-  scholar:    100,
-  theologian: 250,
-  trial:      250, // book code redeemers
+  refraction:    150,
+  full_spectrum: null, // unlimited
+  trial:         250,  // book code redeemers
+  // legacy names kept for backward compat
+  scholar:       150,
+  theologian:    null,
 };
 
 // Retention days by tier
 const RETENTION_DAYS = {
-  scholar:    90,
-  theologian: 180,
-  trial:      30,
-  free:       1,
+  refraction:    90,
+  full_spectrum: 180,
+  trial:         30,
+  free:          1,
+  // legacy names
+  scholar:       90,
+  theologian:    180,
 };
 
 // ── CRISIS DETECTION ──────────────────────────────────────────────────────────
@@ -208,6 +216,78 @@ async function incrementQueryLog(ip) {
 
 async function resetQueryLog(ip) {
   // No-op — rows are immutable, window is time-based
+}
+
+// ── PRE-FLIGHT SUBSCRIBER QUOTA CHECK ────────────────────────────────────────
+// Called BEFORE the Anthropic API call for paid subscribers.
+// Returns { allowed: true } or { allowed: false, reason, creditsUsed }
+// Logic:
+//   1. full_spectrum / theologian → unlimited, always allowed
+//   2. refraction / scholar → check query_count against monthly limit
+//      a. Under limit → allowed
+//      b. Over limit + purchased_credits > 0 → draw one credit, allowed
+//      c. Over limit + no credits → blocked
+
+async function checkSubscriberQuota(subscriber) {
+  const tier = (subscriber.tier || 'observer').toLowerCase();
+  const limit = TIER_LIMITS[tier];
+
+  // Unlimited tier
+  if (limit === null || limit === undefined) return { allowed: true };
+
+  const used = subscriber.query_count || 0;
+
+  // Under monthly limit
+  if (used < limit) return { allowed: true };
+
+  // Over limit — check purchased_credits
+  const credits = subscriber.purchased_credits || 0;
+  if (credits > 0) {
+    // Draw one Signal Session credit
+    const drawn = await drawSignalSessionCredit(subscriber.id);
+    if (drawn) return { allowed: true, creditsUsed: true };
+  }
+
+  // Blocked
+  return {
+    allowed: false,
+    reason: 'quota_exceeded',
+    queriesUsed: used,
+    limit,
+    credits
+  };
+}
+
+// ── SIGNAL SESSION CREDIT DRAWDOWN ───────────────────────────────────────────
+// Atomically decrements purchased_credits by 1 using a conditional update.
+// Returns true if successful, false if credits were 0 or update failed.
+
+async function drawSignalSessionCredit(userId) {
+  try {
+    // Use RPC for atomic decrement with floor at 0
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_signal_credit`, {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json'
+      },
+      body: JSON.stringify({ p_user_id: userId })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('draw_signal_credit failed:', err);
+      return false;
+    }
+
+    const data = await res.json();
+    // RPC returns true if credit was drawn, false if none available
+    return data === true;
+  } catch (err) {
+    console.error('drawSignalSessionCredit error:', err.message);
+    return false;
+  }
 }
 
 // ── THREAD PERSISTENCE ────────────────────────────────────────────────────────
@@ -447,13 +527,32 @@ export default async function handler(req, res) {
       const subscriber = await getSubscriber(userEmail);
       const redemption = await getCodeRedemption(userEmail);
       if ((subscriber && subscriber.status === 'active') || redemption) {
-  // Active subscriber or valid code — skip rate limit, go straight to API
+  // Active subscriber or valid code — check quota before API call
   const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
   if (!apiMessages || apiMessages.length === 0) {
     return res.status(400).json({ error: 'No messages provided' });
   }
   const tier = subscriber?.tier || 'trial';
   const userId = subscriber?.id || null;
+
+  // ── QUOTA GATE — runs before Anthropic call ──────────────────────────────
+  // Skip quota check for follow-ups (they don't cost a new query draw)
+  const isFollowUpCheck = isFollowUp || (messages && messages.length > 1);
+  if (!isFollowUpCheck && subscriber) {
+    const quota = await checkSubscriberQuota(subscriber);
+    if (!quota.allowed) {
+      return res.status(200).json({
+        quota_exceeded: true,
+        tier,
+        queriesUsed: quota.queriesUsed,
+        limit: quota.limit,
+        credits: quota.credits,
+        message: quota.credits === 0
+          ? `You've used all ${quota.limit} queries for this period. Add Signal Sessions to continue, or wait for your next reset.`
+          : `You've reached your query limit and have no Signal Sessions remaining.`
+      });
+    }
+  }
 
   // Determine query type from the last user message
   const queryType = (() => {
