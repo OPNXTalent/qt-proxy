@@ -1518,11 +1518,20 @@ footer {
       </p>
     </div>
 
+    <!-- Billing toggle -->
+    <div class="reveal reveal-delay-1" style="display:flex; justify-content:center; align-items:center; gap:14px; margin-bottom:36px;">
+      <span id="toggle-monthly-label" style="font-family:var(--sans); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold);">Monthly</span>
+      <div id="billing-toggle" onclick="toggleBilling()" style="width:44px; height:24px; background:var(--surface-2); border:1px solid var(--border-lit); border-radius:12px; cursor:pointer; position:relative; transition:background 0.3s;">
+        <div id="toggle-knob" style="width:18px; height:18px; background:var(--gold); border-radius:50%; position:absolute; top:2px; left:3px; transition:left 0.3s;"></div>
+      </div>
+      <span id="toggle-annual-label" style="font-family:var(--sans); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted);">Annual <span style="color:var(--gold-dim); font-size:9px; letter-spacing:0.18em;">SAVE 17%</span></span>
+    </div>
+
     <!-- Tier cards -->
     <div class="tiers reveal reveal-delay-1">
 
       <div class="tier-card">
-        <span class="tier-name">Explorer</span>
+        <span class="tier-name">Observer</span>
         <div class="tier-price">Free</div>
         <span class="tier-cadence">3 queries / 24 hrs</span>
         <ul class="tier-features">
@@ -1534,74 +1543,74 @@ footer {
       </div>
 
       <div class="tier-card featured">
-        <span class="tier-name">Scholar</span>
-        <div class="tier-price"><sup>$</sup>9<span style="font-size:20px;">.99</span></div>
-        <span class="tier-cadence">per month · 100 queries</span>
+        <span class="tier-name">Refraction</span>
+        <div class="tier-price"><sup>$</sup><span id="refraction-price">9<span style="font-size:20px;">.99</span></span></div>
+        <span id="refraction-cadence" class="tier-cadence">per month · 100 queries</span>
         <ul class="tier-features">
           <li>100 queries / month</li>
           <li>Session history — 90 days</li>
           <li>Follow-up thread support</li>
           <li>Full five-lens output</li>
         </ul>
-        <a href="/qt.html?tier=scholar" class="tier-btn">Subscribe →</a>
+        <a id="refraction-btn" href="https://buy.stripe.com/dRm3cv2UKcHeg8N1Ut18c0d" class="tier-btn">Subscribe →</a>
       </div>
 
       <div class="tier-card">
-        <span class="tier-name">Theologian</span>
-        <div class="tier-price"><sup>$</sup>24<span style="font-size:20px;">.99</span></div>
-        <span class="tier-cadence">per month · 250 queries</span>
+        <span class="tier-name">Full Spectrum</span>
+        <div class="tier-price"><sup>$</sup><span id="fullspectrum-price">24<span style="font-size:20px;">.99</span></span></div>
+        <span id="fullspectrum-cadence" class="tier-cadence">per month · 250 queries</span>
         <ul class="tier-features">
           <li>250 queries / month</li>
           <li>Session history — 180 days</li>
           <li>Follow-up thread support</li>
           <li>Priority response</li>
         </ul>
-        <a href="/qt.html?tier=theologian" class="tier-btn">Subscribe →</a>
+        <a id="fullspectrum-btn" href="https://buy.stripe.com/28EaEX66WdLie0Fcz718c0c" class="tier-btn">Subscribe →</a>
       </div>
 
       <div class="tier-card" style="grid-column: span 1; padding: 0; border: none; background: transparent;">
         <div style="border: 0.5px solid var(--border-lit); padding: 16px 20px 12px; margin-bottom: 0; background: rgba(212,175,95,0.03);">
-          <span class="tier-name" style="color: var(--gold);">À La Carte</span>
-          <div style="font-family:var(--cinzel); font-size:12px; font-style:italic; color:var(--text-muted); margin-bottom:14px; line-height:1.5;">No subscription. Buy exactly what you need.</div>
+          <span class="tier-name" style="color: var(--gold);">Signal Sessions</span>
+          <div style="font-family:var(--cinzel); font-size:12px; font-style:italic; color:var(--text-muted); margin-bottom:14px; line-height:1.5;">No subscription. Buy exactly what you need. Queries never expire.</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:0.5px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(212,175,95,0.05)'" onmouseout="this.style.background='transparent'">
               <div>
-                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Starter</div>
+                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Signal 10</div>
                 <div style="font-family:var(--cinzel); font-size:13px; color:var(--text);">10 queries</div>
               </div>
               <div style="text-align:right;">
                 <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale);">$2.99</div>
-                <a href="#" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
+                <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
               </div>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:0.5px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(212,175,95,0.05)'" onmouseout="this.style.background='transparent'">
               <div>
-                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Explorer</div>
+                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Signal 25</div>
                 <div style="font-family:var(--cinzel); font-size:13px; color:var(--text);">25 queries</div>
               </div>
               <div style="text-align:right;">
                 <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale);">$6.99</div>
-                <a href="#" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
+                <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
               </div>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:0.5px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(212,175,95,0.05)'" onmouseout="this.style.background='transparent'">
               <div>
-                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Seeker</div>
+                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Signal 50</div>
                 <div style="font-family:var(--cinzel); font-size:13px; color:var(--text);">50 queries</div>
               </div>
               <div style="text-align:right;">
                 <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale);">$12.99</div>
-                <a href="#" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
+                <a href="https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
               </div>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.04); transition:background 0.2s;" onmouseover="this.style.background='rgba(212,175,95,0.08)'" onmouseout="this.style.background='rgba(212,175,95,0.04)'">
               <div>
-                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:3px;">Scholar</div>
+                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:3px;">Signal 100</div>
                 <div style="font-family:var(--cinzel); font-size:13px; color:var(--text);">100 queries</div>
               </div>
               <div style="text-align:right;">
                 <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale);">$19.99</div>
-                <a href="#" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
+                <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
               </div>
             </div>
           </div>
@@ -1613,7 +1622,7 @@ footer {
 
     <!-- One-time option note -->
     <p style="text-align:center; font-family:var(--cinzel); font-size:14px; font-style:italic; color:var(--text-muted); margin-top:28px;" class="reveal reveal-delay-2">
-      À La Carte queries never expire and bundles stack — use them at your own pace.
+      Signal Sessions queries never expire and bundles stack — use them at your own pace.
     </p>
 
   </div>
@@ -2171,6 +2180,44 @@ function toggleRct(el) {
     el.style.background = 'rgba(212,175,95,0.025)';
   }
 }
+
+/* ── BILLING TOGGLE ── */
+var _billingAnnual = false;
+function toggleBilling() {
+  _billingAnnual = !_billingAnnual;
+  var knob = document.getElementById('toggle-knob');
+  var mLabel = document.getElementById('toggle-monthly-label');
+  var aLabel = document.getElementById('toggle-annual-label');
+  var rPrice = document.getElementById('refraction-price');
+  var rCad = document.getElementById('refraction-cadence');
+  var rBtn = document.getElementById('refraction-btn');
+  var fsPrice = document.getElementById('fullspectrum-price');
+  var fsCad = document.getElementById('fullspectrum-cadence');
+  var fsBtn = document.getElementById('fullspectrum-btn');
+
+  if (_billingAnnual) {
+    knob.style.left = '23px';
+    mLabel.style.color = 'var(--text-muted)';
+    aLabel.style.color = 'var(--gold)';
+    rPrice.innerHTML = '99<span style="font-size:20px;">/yr</span>';
+    rCad.textContent = 'per year · 100 queries / month';
+    rBtn.href = 'https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b';
+    fsPrice.innerHTML = '249<span style="font-size:20px;">/yr</span>';
+    fsCad.textContent = 'per year · 250 queries / month';
+    fsBtn.href = 'https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09';
+  } else {
+    knob.style.left = '3px';
+    mLabel.style.color = 'var(--gold)';
+    aLabel.style.color = 'var(--text-muted)';
+    rPrice.innerHTML = '9<span style="font-size:20px;">.99</span>';
+    rCad.textContent = 'per month · 100 queries';
+    rBtn.href = 'https://buy.stripe.com/dRm3cv2UKcHeg8N1Ut18c0d';
+    fsPrice.innerHTML = '24<span style="font-size:20px;">.99</span>';
+    fsCad.textContent = 'per month · 250 queries';
+    fsBtn.href = 'https://buy.stripe.com/28EaEX66WdLie0Fcz718c0c';
+  }
+}
+
 </script>
 
 </body>
