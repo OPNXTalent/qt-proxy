@@ -1301,6 +1301,7 @@ async function runInterpretation() {
     document.getElementById('downloadRow').style.display = 'block';
 
     sessionQueryCount++;
+    decrementSidebarCounter();
     // Only lock the UI for free/anonymous users — paid subscribers are gated server-side
     const _isAnonPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
     const _isPaidPost = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
@@ -1434,6 +1435,7 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
 
     // Increment counter and apply lock for non-subscribers after successful follow-up
     sessionQueryCount++;
+    decrementSidebarCounter();
     const _isAnonFUPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
     const _isPaidFUPost = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
     if ((_isAnonFUPost || !_isPaidFUPost) && sessionQueryCount >= QUERY_LIMIT) {
@@ -2658,6 +2660,17 @@ function toggleSidebar() {
 }
 
 // INIT SIDEBAR
+function decrementSidebarCounter() {
+  const countEl = document.getElementById('sidebarQueryCount');
+  const wrapEl  = document.getElementById('sidebarCredits');
+  if (!countEl || wrapEl.style.display === 'none') return;
+  const match = countEl.textContent.match(/(\d+)/);
+  if (!match) return;
+  const current = parseInt(match[1]);
+  const updated = Math.max(0, current - 1);
+  countEl.textContent = updated === 1 ? '1 query remaining' : `${updated} queries remaining`;
+}
+
 function toggleSessionsPanel() {
   var panel = document.getElementById('sessionsPanel');
   if (!panel) return;
