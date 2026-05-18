@@ -2717,14 +2717,10 @@ async function loadSidebarCredits() {
     const tooltipEl = document.getElementById('sidebarQueryTooltip');
     if (tooltipEl) countEl.appendChild(tooltipEl);
 
-    if (credits > 0) {
-      if (tooltipEl) {
-        tooltipEl.textContent = `${monthly} monthly  ·  ${credits} Signal Sessions`;
-        countEl.addEventListener('mouseenter', () => tooltipEl.style.display = 'block');
-        countEl.addEventListener('mouseleave', () => tooltipEl.style.display = 'none');
-      }
-    } else {
-      if (tooltipEl) tooltipEl.style.display = 'none';
+    if (tooltipEl) {
+      tooltipEl.textContent = `${monthly} monthly  ·  ${credits} Signal Sessions`;
+      countEl.addEventListener('mouseenter', () => tooltipEl.style.display = 'block');
+      countEl.addEventListener('mouseleave', () => tooltipEl.style.display = 'none');
     }
     wrapEl.style.display = 'flex';
   } catch {}
