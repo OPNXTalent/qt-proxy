@@ -1,123 +1,3742 @@
-// api/highlights.js
-// Save, retrieve, update, and delete thread highlights with notes
-
-const SUPABASE_URL             = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  const userEmail = req.headers['x-user-email'] || null;
-  if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
-
-  // Look up subscriber
-  const subRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id&limit=1`,
-    { headers: { 'apikey': SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
-  );
-  const subs = await subRes.json();
-  if (!subs?.length) return res.status(404).json({ error: 'Subscriber not found' });
-  const userId = subs[0].id;
-
-  // ── GET — fetch highlights for a thread ──────────────────────────────────
-  if (req.method === 'GET') {
-    const threadId = req.query?.threadId || null;
-    if (!threadId) return res.status(400).json({ error: 'threadId required' });
-
-    const hlRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/thread_highlights?thread_id=eq.${threadId}&user_id=eq.${userId}&order=created_at.asc`,
-      { headers: { 'apikey': SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
-    );
-    const highlights = await hlRes.json();
-    return res.status(200).json({ highlights: highlights || [] });
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Prism — Framework Interpreter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --void: #06060a;
+    --deep: #0d0d14;
+    --surface: #13131e;
+    --surface-2: #1a1a28;
+    --border: #2a2a40;
+    --border-lit: #4a4a70;
+    --gold: #c9a84c;
+    --gold-dim: #7a6230;
+    --gold-pale: #e8d5a0;
+    --blue-deep: #1e2a4a;
+    --blue-mid: #2a3f70;
+    --blue-lit: #4a6aaa;
+    --text: #d8d4e8;
+    --text-dim: #7a7890;
+    --text-muted: #3a384a;
+    --hebrew: #b8a8d0;
+    --cinzel: 'Cinzel', serif;
+    --crimson: 'Crimson Pro', Georgia, serif;
+    --mono: 'JetBrains Mono', monospace;
   }
 
-  // ── POST — save a new highlight ───────────────────────────────────────────
-  if (req.method === 'POST') {
-    const { threadId, selectedText, note, sectionKey, startOffset, endOffset, color } = req.body || {};
-    if (!threadId || !selectedText || !sectionKey) {
-      return res.status(400).json({ error: 'threadId, selectedText, and sectionKey required' });
-    }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    // Verify thread ownership
-    const threadRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${userId}&select=id&limit=1`,
-      { headers: { 'apikey': SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
-    );
-    const threads = await threadRes.json();
-    if (!threads?.length) return res.status(403).json({ error: 'Thread not found or not owned by user' });
-
-    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/thread_highlights`, {
-      method: 'POST',
-      headers: {
-        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({
-        thread_id:     threadId,
-        user_id:       userId,
-        selected_text: selectedText,
-        note:          note || null,
-        section_key:   sectionKey,
-        start_offset:  startOffset || 0,
-        end_offset:    endOffset || selectedText.length,
-        color:         color || 'yellow'
-      })
-    });
-
-    if (!insertRes.ok) {
-      const err = await insertRes.text();
-      console.error('highlight insert failed:', err);
-      return res.status(500).json({ error: 'Failed to save highlight' });
-    }
-
-    const saved = await insertRes.json();
-    return res.status(200).json({ success: true, highlight: saved?.[0] });
+  .site-footer {
+    padding: 32px 60px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-mark {
+    font-family: var(--cinzel);
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .footer-mark:hover { color: var(--gold); }
+  .footer-copy {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .footer-copy a { color: var(--text-muted); text-decoration: none; }
+  .footer-copy a:hover { color: var(--gold); }
+  .sep { margin: 0 0.6rem; }
+  @media (max-width: 768px) {
+    .site-footer { flex-direction: column; gap: 16px; text-align: center; padding: 28px; }
   }
 
-  // ── PATCH — update highlight note ─────────────────────────────────────────
-  if (req.method === 'PATCH') {
-    const { highlightId, note } = req.body || {};
-    if (!highlightId) return res.status(400).json({ error: 'highlightId required' });
+  body {
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--crimson);
+    font-size: 20px;
+    line-height: 1.7;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
 
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/thread_highlights?id=eq.${highlightId}&user_id=eq.${userId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          'Content-Type':  'application/json',
-          'Prefer':        'return=minimal'
-        },
-        body: JSON.stringify({ note: note || null })
+  /* Starfield background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(200,180,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 10%, rgba(200,180,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 60%, rgba(200,180,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 15% 75%, rgba(200,180,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 50%, rgba(200,180,255,0.25) 0%, transparent 100%),
+      radial-gradient(1px 1px at 35% 15%, rgba(200,180,255,0.35) 0%, transparent 100%),
+      radial-gradient(1px 1px at 65% 85%, rgba(200,180,255,0.2) 0%, transparent 100%),
+      radial-gradient(2px 2px at 75% 35%, rgba(201,168,76,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 45% 45%, rgba(200,180,255,0.4) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── SIDEBAR LAYOUT ── */
+  .page-wrap { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 280px; min-width: 280px;
+    background: var(--deep);
+    border-right: 1px solid var(--border);
+    display: none; flex-direction: column;
+    position: fixed; top: 0; left: 0; bottom: 0;
+    z-index: 200;
+    transform: translateX(-280px);
+    transition: transform 0.3s ease;
+    overflow: hidden;
+  }
+  .sidebar.visible { display: flex; }
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-toggle {
+    position: fixed; top: 20px; left: 20px; z-index: 300;
+    width: 36px; height: 36px;
+    background: rgba(6,6,10,0.9); border: 1px solid var(--border);
+    color: var(--gold-dim); cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    font-size: 14px; transition: all 0.2s; backdrop-filter: blur(8px);
+  }
+  .sidebar-toggle.visible { display: flex; }
+  .sidebar-toggle:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  .sidebar-header { padding: 68px 20px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .sidebar-logo { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.18em; color: var(--gold-pale); text-transform: uppercase; margin-bottom: 4px; }
+  .sidebar-tier { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--gold-dim); text-transform: uppercase; }
+
+  .sidebar-search { padding: 12px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .sidebar-search input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; padding: 8px 12px; outline: none; transition: border-color 0.2s; }
+  .sidebar-search input:focus { border-color: var(--gold-dim); }
+  .sidebar-search input::placeholder { color: var(--text-muted); font-style: italic; }
+
+  .sidebar-section-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--text-muted); padding: 14px 20px 8px; flex-shrink: 0; }
+
+  .sidebar-threads { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+  .sidebar-threads::-webkit-scrollbar { width: 3px; }
+  .sidebar-threads::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .thread-item { padding: 12px 20px; border-bottom: 1px solid rgba(42,42,64,0.5); cursor: pointer; transition: background 0.15s; position: relative; }
+  .thread-item:hover { background: rgba(255,255,255,0.02); }
+  .thread-item.active { background: rgba(201,168,76,0.05); border-left: 2px solid var(--gold-dim); padding-left: 18px; }
+  .thread-item.locked { cursor: default; }
+  .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text); line-height: 1.4; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 52px; }
+  .thread-item.locked .thread-title { color: var(--text-muted); }
+  .thread-subtitle { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .thread-date { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--text-muted); }
+  .thread-badge { font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 2px 6px; border: 1px solid; white-space: nowrap; }
+  .badge-ok     { color: var(--gold-dim); border-color: var(--gold-dim); background: rgba(201,168,76,0.05); }
+  .badge-warn   { color: #c08040; border-color: #8a5a28; background: rgba(192,128,64,0.08); }
+  .badge-urgent { color: #b85c5c; border-color: #8a3a3a; background: rgba(184,92,92,0.08); }
+  .badge-expired{ color: var(--text-muted); border-color: var(--border); }
+  .badge-locked { color: var(--text-muted); border-color: var(--border); font-size: 10px; }
+
+  .thread-rename-wrap { display: none; padding: 8px 20px 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .thread-rename-wrap.visible { display: block; }
+  .thread-rename-input { width: 100%; background: var(--deep); border: 1px solid var(--gold-dim); color: var(--text); font-family: var(--crimson); font-size: 13px; padding: 6px 10px; outline: none; margin-bottom: 4px; }
+  .thread-rename-count { font-family: var(--mono); font-size: 9px; color: var(--text-muted); text-align: right; }
+
+  .thread-upgrade { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--gold-dim); padding: 5px 20px 10px; line-height: 1.5; border-bottom: 1px solid rgba(42,42,64,0.4); }
+  .thread-upgrade a { color: var(--gold); text-decoration: none; }
+  .thread-action-btns { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+  .thread-item:hover .thread-action-btns { opacity: 1; }
+  .thread-delete-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 3px 5px; line-height: 1; transition: color 0.15s; border-radius: 2px; }
+  .thread-delete-btn:hover { color: #b85c5c; background: rgba(184,92,92,0.1); }
+  .thread-reset-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 3px 5px; line-height: 1; transition: color 0.15s; border-radius: 2px; }
+  .thread-reset-btn:hover { color: #4a9eda; background: rgba(74,158,218,0.1); }
+  .sidebar-undo-toast { position: absolute; bottom: 60px; left: 12px; right: 12px; background: var(--surface-2); border: 1px solid var(--border-lit); padding: 10px 14px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text); display: flex; align-items: center; justify-content: space-between; z-index: 10; animation: toastIn 0.2s ease; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .sidebar-undo-btn { color: var(--gold); background: transparent; border: none; cursor: pointer; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; padding: 0; }
+  .thread-expired-note { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); padding: 5px 20px 8px; border-bottom: 1px solid rgba(42,42,64,0.4); }
+  .thread-expired-note a { color: var(--gold-dim); text-decoration: none; }
+
+  .sidebar-upgrade-prompt { margin: 12px 16px; padding: 14px 16px; border: 1px solid var(--border); background: rgba(201,168,76,0.03); font-family: var(--crimson); font-style: italic; font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+  .sidebar-upgrade-prompt a { color: var(--gold); text-decoration: none; font-style: normal; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; display: block; margin-top: 10px; text-transform: uppercase; }
+
+  .cancel-banner { padding: 10px 20px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; line-height: 1.6; border-bottom: 1px solid; flex-shrink: 0; }
+  .cancel-banner.stage-1 { background: rgba(201,168,76,0.05); color: var(--gold-dim); border-color: rgba(201,168,76,0.3); }
+  .cancel-banner.stage-2 { background: rgba(192,128,64,0.07); color: #c08040; border-color: #8a5a28; }
+  .cancel-banner.stage-3 { background: rgba(184,92,92,0.08); color: #b85c5c; border-color: #8a3a3a; }
+
+  .main-content { flex: 1; margin-left: 0; transition: margin-left 0.3s ease; min-width: 0; }
+  .main-content.sidebar-open { margin-left: 280px; }
+  @media (max-width: 900px) { .main-content.sidebar-open { margin-left: 0; } }
+
+
+  .shell {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 60px 40px 100px;
+    box-sizing: border-box;
+    left: 0;
+    right: 0;
+  }
+
+  /* HEADER */
+  .header {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+
+  .header-eyebrow {
+    font-family: var(--mono);
+    font-size: 17px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 20px;
+  }
+
+  .header h1 {
+    font-family: var(--cinzel);
+    font-size: 44px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--gold-pale);
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+
+  .header-sub {
+    font-family: var(--cinzel);
+    font-size: 17px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    margin-bottom: 28px;
+  }
+
+  .header-rule {
+    width: 120px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .header-premise {
+    font-size: 17px;
+    color: var(--text-dim);
+    font-style: italic;
+    max-width: 560px;
+    margin: 0 auto;
+    line-height: 1.75;
+  }
+
+  /* INPUT TYPE SELECTOR */
+  .input-selector {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+
+  .type-btn {
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 12px 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.25s;
+    text-align: center;
+  }
+
+  .type-btn:hover {
+    border-color: var(--border-lit);
+    color: var(--text);
+  }
+
+  .type-btn.active {
+    border-color: var(--gold-dim);
+    background: rgba(201,168,76,0.06);
+    color: var(--gold-pale);
+  }
+
+  /* INPUT AREA */
+  .input-wrap {
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .input-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .input-field {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--crimson);
+    font-size: 16px;
+    padding: 18px 20px;
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.6;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  .input-field:focus {
+    border-color: var(--gold-dim);
+  }
+
+  .input-field::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  /* SUBMIT */
+  .submit-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 52px;
+  }
+
+  .submit-btn {
+    font-family: var(--cinzel);
+    font-size: 17px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 16px 36px;
+    border: 1px solid var(--gold-dim);
+    background: transparent;
+    color: var(--gold-pale);
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .submit-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(201,168,76,0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .submit-btn:hover::before { opacity: 1; }
+  .submit-btn:hover { border-color: var(--gold); }
+
+  .submit-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  /* LOADING */
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 60px 0;
+  }
+
+  .loading.visible { display: block; }
+
+  .loading-symbol {
+    font-family: var(--cinzel);
+    font-size: 32px;
+    color: var(--gold-dim);
+    margin-bottom: 20px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .loading-text {
+    font-family: var(--mono);
+    font-size: 17px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* RESULT */
+  .result {
+    display: none;
+    animation: revealResult 0.6s ease;
+  }
+
+  .result.visible { display: block; }
+
+  @keyframes revealResult {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Verse banner */
+  .verse-banner {
+    border-left: 2px solid var(--gold-dim);
+    padding: 20px 28px;
+    background: linear-gradient(135deg, rgba(201,168,76,0.04), transparent);
+    margin-bottom: 40px;
+  }
+
+  .verse-ref {
+    font-family: var(--cinzel);
+    font-size: 17px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 10px;
+  }
+
+  .verse-text {
+    font-size: 23px;
+    color: var(--gold-pale);
+    font-style: italic;
+    line-height: 1.6;
+  }
+
+  /* Recognition threshold */
+  .qt-recognition {
+    padding: 28px 0 28px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .qt-recognition p {
+    font-family: var(--crimson);
+    font-size: 18.5px;
+    font-style: italic;
+    color: var(--text);
+    line-height: 1.8;
+    margin: 0;
+  }
+
+  /* Section block */
+  .qt-section {
+    margin-bottom: 32px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .qt-section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 16px 24px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .qt-section-num {
+    font-family: var(--mono);
+    font-size: 17px;
+    color: var(--gold-dim);
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+  }
+
+  .qt-section-title {
+    font-family: var(--cinzel);
+    font-size: 17px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .qt-section-hebrew {
+    font-size: 18px;
+    color: var(--hebrew);
+    letter-spacing: 0.05em;
+    font-family: var(--crimson);
+    flex-shrink: 0;
+  }
+
+  .qt-section-body {
+    padding: 22px 24px;
+    font-size: 19px;
+    color: var(--text);
+    line-height: 1.75;
+  }
+
+  .qt-section-body p { margin-bottom: 12px; }
+  .qt-section-body p:last-child { margin-bottom: 0; }
+
+  /* Table inside sections */
+  .qt-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    font-size: 17px;
+  }
+
+  .qt-table th {
+    font-family: var(--mono);
+    font-size: 17px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: rgba(201,168,76,0.04);
+  }
+
+  .qt-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    vertical-align: top;
+  }
+
+  .qt-table td:first-child {
+    color: var(--text);
+    font-weight: 600;
+    width: 36%;
+  }
+
+  .qt-table tr:last-child td { border-bottom: none; }
+
+  /* Kingdom punchline */
+  .kingdom-block {
+    border: 1px solid var(--gold-dim);
+    background: linear-gradient(135deg, rgba(201,168,76,0.06), rgba(30,42,74,0.3));
+    padding: 28px 32px;
+    margin-top: 12px;
+    position: relative;
+  }
+
+  .kingdom-block::before {
+    content: '✦';
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--void);
+    padding: 0 10px;
+    color: var(--gold-dim);
+    font-size: 17px;
+  }
+
+  .kingdom-label {
+    font-family: var(--cinzel);
+    font-size: 17px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 14px;
+    text-align: center;
+  }
+
+  .kingdom-text {
+    font-size: 21px;
+    color: var(--gold-pale);
+    font-style: italic;
+    text-align: center;
+    line-height: 1.7;
+  }
+
+  /* Error */
+  .error-block {
+    border: 1px solid #5a2a2a;
+    background: #1a0a0a;
+    padding: 28px 32px;
+    color: #c08080;
+    font-size: 17px;
+    line-height: 1.65;
+  }
+
+  .error-icon {
+    font-size: 26px;
+    color: #7a3a3a;
+    margin-bottom: 12px;
+  }
+
+  .error-title {
+    font-family: var(--cinzel);
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    color: #d09090;
+    margin-bottom: 10px;
+  }
+
+  .error-body {
+    font-family: var(--crimson);
+    font-size: 17px;
+    color: #a07070;
+    line-height: 1.7;
+    font-style: italic;
+    margin-bottom: 8px;
+  }
+
+  .error-hint {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: #6a4a4a;
+    text-transform: uppercase;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #3a1a1a;
+  }
+
+  .error-timeout { border-color: #5a4a1a; background: #131008; }
+  .error-timeout .error-icon { color: #7a6a2a; }
+  .error-timeout .error-title { color: #c0a860; }
+  .error-timeout .error-body { color: #907850; }
+  .error-timeout .error-hint { color: #5a4a20; border-top-color: #2a200a; }
+
+  .error-network { border-color: #2a3a5a; background: #080d14; }
+  .error-network .error-icon { color: #2a4a7a; }
+  .error-network .error-title { color: #6080b0; }
+  .error-network .error-body { color: #405070; }
+
+  /* New query */
+  .new-query-row {
+    text-align: center;
+    margin-top: 52px;
+    padding-top: 36px;
+    border-top: 1px solid var(--border);
+  }
+
+  .new-query-btn {
+    font-family: var(--mono);
+    font-size: 17px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .new-query-btn:hover {
+    border-color: var(--border-lit);
+    color: var(--text-dim);
+  }
+
+  /* Mic button active state */
+  #micBtn.listening {
+    border-color: rgba(220,60,60,0.8);
+    background: rgba(180,30,30,0.2);
+    color: rgba(255,100,80,0.9);
+    box-shadow: 0 0 8px rgba(220,60,60,0.4);
+    animation: micPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes micPulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(220,60,60,0.3); }
+    50% { box-shadow: 0 0 14px rgba(220,60,60,0.6); }
+  }
+
+  /* Disclaimer */
+  .disclaimer {
+    margin-top: 64px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.75;
+    text-align: center;
+    max-width: 580px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .shell { padding: 40px 20px 80px; }
+    .header h1 { font-size: 26px; }
+    .input-selector { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── HIGHLIGHT SYSTEM ── */
+  .hl-yellow  { background: rgba(201,168,76,0.28);  border-bottom: 1px solid rgba(201,168,76,0.5); }
+  .hl-blue    { background: rgba(74,106,170,0.28);  border-bottom: 1px solid rgba(74,106,170,0.5); }
+  .hl-purple  { background: rgba(140,100,200,0.28); border-bottom: 1px solid rgba(140,100,200,0.5); }
+  .hl-green   { background: rgba(70,160,100,0.28);  border-bottom: 1px solid rgba(70,160,100,0.5); }
+  mark.qt-hl  { cursor: pointer; border-radius: 1px; padding: 0 1px; transition: filter 0.15s; }
+  mark.qt-hl:hover { filter: brightness(1.3); }
+
+  /* Selection toolbar */
+  #hlToolbar {
+    position: fixed; z-index: 500;
+    background: var(--deep); border: 1px solid var(--border-lit);
+    padding: 8px 12px; display: none; align-items: center; gap: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+    pointer-events: auto;
+  }
+  #hlToolbar.visible { display: flex; }
+  .hl-swatch {
+    width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+    border: 1px solid transparent; transition: transform 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .hl-swatch:hover { transform: scale(1.25); border-color: var(--border-lit); }
+  .hl-swatch.selected { border-color: var(--gold); transform: scale(1.2); }
+  .hl-save-btn {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--gold-dim); background: transparent; border: 1px solid var(--border-lit);
+    padding: 4px 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .hl-save-btn:hover { color: var(--gold); border-color: var(--gold-dim); }
+  .hl-divider { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
+
+  /* Highlights panel */
+  #hlPanel {
+    margin-top: 32px; border: 1px solid var(--border);
+    background: var(--surface); overflow: hidden;
+  }
+  #hlPanelHead {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; background: var(--surface-2);
+    border-bottom: 1px solid var(--border); cursor: pointer;
+    user-select: none;
+  }
+  #hlPanelHead:hover { background: rgba(255,255,255,0.02); }
+  .hl-panel-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--gold-dim);
+  }
+  .hl-panel-count {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em;
+    color: var(--text-muted); margin-left: 8px;
+  }
+  .hl-panel-toggle { color: var(--text-muted); font-size: 11px; }
+  #hlList { padding: 0; }
+  .hl-entry {
+    padding: 14px 20px; border-bottom: 1px solid rgba(42,42,64,0.5);
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .hl-entry:last-child { border-bottom: none; }
+  .hl-entry-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+  }
+  .hl-entry-body { flex: 1; min-width: 0; }
+  .hl-entry-text {
+    font-family: var(--crimson); font-size: 15px; font-style: italic;
+    color: var(--text-dim); line-height: 1.5; margin-bottom: 6px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hl-entry-section {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+  }
+  .hl-entry-note {
+    font-family: var(--crimson); font-size: 14px; color: var(--text-dim);
+    line-height: 1.5; margin-top: 4px;
+  }
+  .hl-note-input {
+    width: 100%; background: var(--deep); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--crimson); font-size: 14px;
+    padding: 6px 10px; outline: none; margin-top: 6px; resize: none;
+    transition: border-color 0.2s; min-height: 48px;
+  }
+  .hl-note-input:focus { border-color: var(--gold-dim); }
+  .hl-entry-actions {
+    display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;
+  }
+  .hl-action-btn {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text-muted); background: transparent;
+    border: none; cursor: pointer; padding: 0; transition: color 0.15s;
+  }
+  .hl-action-btn:hover { color: var(--gold-dim); }
+  .hl-action-btn.danger:hover { color: #b85c5c; }
+  .hl-empty {
+    padding: 24px 20px; font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.12em; color: var(--text-muted); text-align: center; line-height: 1.8;
+  }
+  #hlPanel.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR TOGGLE ── -->
+<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle session history">☰</button>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar" id="sidebar">
+
+  <div class="sidebar-header">
+    <div class="sidebar-logo">The Prism</div>
+    <div class="sidebar-tier" id="sidebarTierLabel">Refraction &nbsp;·&nbsp; 90 Day Archive</div>
+    <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
+      <span id="sidebarQueryCount" style="position:relative; cursor:default;">
+        <span id="sidebarQueryCountText">— queries remaining</span>
+        <span id="sidebarQueryTooltip" style="display:none; position:absolute; left:0; top:18px; background:var(--surface-2); border:1px solid var(--border-lit); padding:6px 10px; font-size:9px; letter-spacing:0.12em; color:var(--text-dim); white-space:nowrap; z-index:100; pointer-events:none;"></span>
+      </span>
+      <span style="color:var(--border-lit);">·</span>
+      <button id="sidebarAddSessionsBtn" onclick="toggleSessionsPanel()" style="background:transparent; border:none; padding:0; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); cursor:pointer; text-transform:uppercase; transition:color 0.2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gold-dim)'">+ Sessions</button>
+    </div>
+
+    <!-- Signal Bank inline panel -->
+    <div id="sessionsPanel" style="display:none; margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
+      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Add Signal Bank</div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">10 queries</span>
+          <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$2.99 →</span>
+        </a>
+        <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">25 queries</span>
+          <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$6.99 →</span>
+        </a>
+        <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">50 queries</span>
+          <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$12.99 →</span>
+        </a>
+        <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">100 queries</span>
+          <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$19.99 →</span>
+        </a>
+      </div>
+      <div style="font-family:var(--crimson); font-style:italic; font-size:12px; color:var(--text-muted); margin-top:10px; line-height:1.5;">Credits never expire and stack with your subscription.</div>
+    </div>
+  </div>
+
+  <!-- Cancellation warning banner (shown based on post-cancel state) -->
+  <div class="cancel-banner stage-1" id="cancelBanner" style="display:none;">
+    Your session history is now read-only. Conversations will be permanently deleted in <strong id="cancelDaysLeft">90</strong> days unless you resubscribe.
+  </div>
+
+  <div class="sidebar-search">
+    <input type="text" id="sidebarSearch" placeholder="Search sessions…" oninput="filterThreads(this.value)" />
+  </div>
+
+  <div class="sidebar-section-label">Recent Sessions</div>
+
+  <div class="sidebar-threads" id="sidebarThreads">
+    <!-- Threads injected by JS -->
+  </div>
+
+  <!-- Free user upgrade prompt (shown for free tier) -->
+  <div class="sidebar-upgrade-prompt" id="freeUpgradePrompt" style="display:none;">
+    Your interpretations are saved and organized when you subscribe. Start your archive.
+    <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank">Subscribe → Refraction</a>
+  </div>
+
+  <!-- New Subject button in sidebar -->
+  <div style="padding:12px 16px; flex-shrink:0;">
+    <button onclick="resetForm()" style="width:100%; font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); background:transparent; border:1px solid var(--border); padding:10px 16px; cursor:pointer; transition:all 0.2s; text-align:center;" onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--gold-dim)'">+ New Subject</button>
+  </div>
+
+  <!-- Sidebar footer — nav + logout -->
+  <div style="padding:16px 20px; border-top:1px solid var(--border); flex-shrink:0; position:relative; display:flex; justify-content:space-between; align-items:center;">
+    <a href="/index.html" style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">← Home</a>
+    <button onclick="handleLogout()" style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">Sign Out →</button>
+  </div>
+
+  <!-- Undo toast -->
+  <div id="undoToast" class="sidebar-undo-toast" style="display:none;">
+    <span>Thread deleted</span>
+    <button class="sidebar-undo-btn" onclick="undoDelete()">Undo</button>
+  </div>
+
+</aside>
+
+<div class="page-wrap">
+
+<!-- ── MAIN CONTENT ── -->
+<div class="main-content" id="mainContent">
+<div class="shell">
+
+
+
+  <header class="header">
+    <img src="ThePrism.png" alt="The Prism" style="height:80px; margin-bottom:12px;">
+    <h1>The Prism</h1>
+    <div style="font-family:var(--cinzel); font-size:20px; letter-spacing:0.18em; color:var(--gold); margin-bottom:4px;">Echad b'Emet</div>
+    <div style="font-family:var(--crimson); font-size:24px; color:var(--hebrew); letter-spacing:0.08em; margin-bottom:16px; direction:rtl;">אֶחָד בֶּאֱמֶת</div>
+    <div class="header-sub">Framework Interpreter</div>
+    <div class="header-rule"></div>
+    <p class="header-premise">Submit a verse, phrase, theme, or concept. The Prism surfaces the relational architecture already present in the text.</p>
+  </header>
+
+  <!-- Anonymous back link — shown only to non-subscribers -->
+  <div id="anonBackLink" style="display:none; margin-bottom:20px; display:flex; flex-direction:row; justify-content:space-between; align-items:center; width:100%;">
+    <a href="/index.html" style="font-family:var(--mono); font-size:13.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">← Learn more</a>
+    <a href="/purchase.html" style="font-family:var(--mono); font-size:13.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gold-dim)'">Expand Your Access →</a>
+  </div>
+
+  <!-- INPUT FORM -->
+  <div id="inputSection">
+        <div class="input-selector">
+      <button class="type-btn active" data-type="verse" onclick="setType('verse', this)">Verse Reference</button>
+      <button class="type-btn" data-type="phrase" onclick="setType('phrase', this)">Phrase</button>
+      <button class="type-btn" data-type="theme" onclick="setType('theme', this)">Theme</button>
+      <button class="type-btn" data-type="freetext" onclick="setType('freetext', this)">Free Text</button>
+    </div>
+
+    <div class="input-wrap">
+      <label class="input-label" id="inputLabel">Enter a verse reference (e.g. John 3:16, Romans 8:28)</label>
+      <div style="position:relative;">
+        <textarea class="input-field" id="userInput" placeholder="John 15:5…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+        <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:15px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+      </div>
+      <div id="micStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
+      <div id="charCount" style="font-family:var(--mono); font-size: 17px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 600</div>
+    </div>
+
+  </div><!-- /#inputSection closes here -->
+
+  <!-- SUBMIT ROW — lives outside inputSection so opacity fade never affects it -->
+  <div class="submit-row" id="submitRow">
+    <button id="newSubjectTopBtn" onclick="resetForm()" onmouseover="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'" style="display:none;font-family:var(--mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);background:transparent;border:1px solid var(--border);padding:16px 28px;cursor:pointer;transition:all 0.2s;">↺ New Subject</button>
+    <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
+  </div>
+
+    <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
+      <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Free Query Limit Reached</div>
+      <div class="limit-message" style="font-family:var(--crimson); font-size:19px; color:var(--text); line-height:1.8; margin-bottom:32px;">You've used your 3 free interpretations.</div>
+
+      <!-- Disclaimer -->
+      <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-muted); line-height:1.8; text-align:left; border-top:1px solid var(--border); padding-top:24px; margin-bottom:28px;">
+        The Prism is a lens, not an authority. It surfaces relational architecture already present within the text and the questions surrounding it — it does not think for you, conclude for you, or require agreement in order to engage.<br><br>
+        Its purpose is not to replace judgment, tradition, skepticism, faith, or personal inquiry, but to provide a structured way of examining difficult ideas without reducing them to slogans, tribal reflexes, or inherited assumptions.<br><br>
+        QT is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
+      </div>
+
+      <!-- Three-option wall -->
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px; text-align:left;">
+
+        <!-- Buy queries -->
+        <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface);">
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">One-Time</div>
+          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$2.99</div>
+          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">10 queries.<br>No subscription required.</div>
+          <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Buy 10 Queries →</a>
+        </div>
+
+        <!-- Subscribe -->
+        <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
+          <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Recommended</div>
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Subscribe</div>
+          <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">from $9.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
+          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">Full framework access.<br>Choose the plan that fits.</div>
+          <a href="/purchase.html" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">See Plans →</a>
+        </div>
+
+        <!-- Return tomorrow -->
+        <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface); display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Free</div>
+            <div style="font-family:var(--cinzel); font-size:22px; color:var(--text-dim); margin-bottom:4px;">$0</div>
+            <div id="returnTomorrowLabel" style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Return Tomorrow</div>
+            <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); line-height:1.6; margin-bottom:12px;">3 queries reset every 24 hours.</div>
+            <div id="resetTicker" style="font-family:var(--mono); font-size:20px; letter-spacing:0.18em; color:var(--gold-dim); margin-bottom:20px; display:none;">--:--:--</div>
+          </div>
+          <a href="/" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--border-lit)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
+        </div>
+
+      </div>
+  </div><!-- /#limitPrompt -->
+
+  <!-- PAID QUOTA WALL — shown when subscriber exhausts monthly limit -->
+  <div id="quotaPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
+    <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Monthly Limit Reached</div>
+    <div id="quotaMessage" style="font-family:var(--crimson); font-size:19px; color:var(--text); line-height:1.8; margin-bottom:32px;">You've used all your queries for this period.</div>
+
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
+
+      <!-- Add Signal Bank -->
+      <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
+        <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Continue Now</div>
+        <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Signal Bank</div>
+        <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$2.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
+        <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">One-time top-up.<br>No plan change required.</div>
+        <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Bank →</a>
+      </div>
+
+      <!-- Wait for reset -->
+      <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface); display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Your Plan</div>
+          <div id="quotaResetLabel" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Resets Next Month</div>
+          <div style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); line-height:1.6; margin-bottom:12px;">Your query count resets at the start of your next billing cycle.</div>
+        </div>
+        <a href="/" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--border-lit)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
+      </div>
+
+    </div>
+  </div><!-- /#quotaPrompt -->
+
+  <!-- LOADING -->
+  <div class="loading" id="loadingBlock">
+    <div class="loading-symbol">✦</div>
+    <div class="loading-text">Reading the relational field…</div>
+  </div>
+
+  <!-- RESULT ---->
+  <div class="result" id="resultBlock">
+    <div id="subjectBanner" style="display:none; margin-bottom:28px;">
+      <div style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Current Subject</div>
+      <div id="subjectText" style="font-size:17px; color:var(--text-dim); font-style:italic;"></div>
+    </div>
+    <div id="resultContent"></div>
+
+    <!-- DOWNLOAD -->
+    <div id="downloadRow" style="display:none; text-align:center; margin-top:36px; padding:24px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+      <div style="font-family:var(--mono); font-size: 17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:14px;">Save This Interpretation</div>
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+        <button onclick="downloadPDF('dark')" style="font-family:var(--cinzel); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">↓ Dark Version</button>
+        <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Print Version</button>
+        <button onclick="openShareModal()" style="font-family:var(--cinzel); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">⟳ Share</button>
+      </div>
+    </div>
+
+    <!-- HIGHLIGHTS PANEL -->
+    <div id="hlPanel" class="hidden">
+      <div id="hlPanelHead" onclick="toggleHlPanel()">
+        <div>
+          <span class="hl-panel-label">Highlights</span>
+          <span class="hl-panel-count" id="hlPanelCount"></span>
+        </div>
+        <span class="hl-panel-toggle" id="hlPanelToggleIcon">▾</span>
+      </div>
+      <div id="hlList"></div>
+    </div>
+
+    <!-- FOLLOW-UP -->
+    <div id="followUpSection" style="display:none; margin-top:40px; border-top:1px solid var(--border); padding-top:32px;">
+      <div style="font-family:var(--mono); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:12px;">Continue the Exploration</div>
+      <div style="position:relative; margin-bottom:16px;">
+        <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question — go deeper on any section, connect it to another passage, or explore a related theme…" rows="3" style="padding-right:52px;"></textarea>
+        <button id="followUpMicBtn" onclick="toggleFollowUpMic()" title="Speak your follow-up" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:15px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+      </div>
+      <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--gold-dim); margin-bottom:10px; text-transform:uppercase;"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="new-query-btn" onclick="resetForm()">↺ New Subject</button>
+        <button class="submit-btn" id="followUpBtn" onclick="runFollowUp()">Ask →</button>
+      </div>
+      <div id="followUpLoading" style="display:none; text-align:center; padding:32px 0;">
+        <div style="font-family:var(--cinzel); font-size:24px; color:var(--gold-dim); animation: pulse 2s ease-in-out infinite;">✦</div>
+        <div style="font-family:var(--mono); font-size: 17px; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); margin-top:12px;">Reading the relational field…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    The Prism is a lens, not an authority. It surfaces relational architecture already present within the text and the questions surrounding it — it does not think for you, conclude for you, or require agreement in order to engage.<br><br>
+    Its purpose is not to replace judgment, tradition, skepticism, faith, or personal inquiry, but to provide a structured way of examining difficult ideas without reducing them to slogans, tribal reflexes, or inherited assumptions.<br><br>
+    QT is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
+  </div>
+
+</div><!-- /.shell -->
+</div><!-- /.main-content -->
+</div><!-- /.page-wrap -->
+
+<script>
+const inputTypes = {
+  verse: {
+    label: 'Enter a verse reference (e.g. John 3:16, Romans 8:28)',
+    placeholder: 'John 15:5…'
+  },
+  phrase: {
+    label: 'Enter a phrase or half-remembered line',
+    placeholder: '"I can do all things…" or "be still and know…"'
+  },
+  theme: {
+    label: 'Enter a biblical theme or concept',
+    placeholder: 'Forgiveness, covenant, redemption, the prodigal son…'
+  },
+  freetext: {
+    label: 'Enter a question, struggle, or passage (keep it concise for best results)',
+    placeholder: 'What does Scripture say about suffering? Or paste a short passage…'
+  }
+};
+
+let currentType = 'verse';
+let conversationHistory = [];  // stores {role, content} pairs
+let currentSubject = '';       // the original subject for context
+
+function setType(type, el) {
+  currentType = type;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('inputLabel').textContent = inputTypes[type].label;
+  document.getElementById('userInput').placeholder = inputTypes[type].placeholder;
+  // Show character counter only for free text
+  document.getElementById('charCount').style.display = type === 'freetext' ? 'block' : 'none';
+  document.getElementById('charNum').textContent = document.getElementById('userInput').value.length;
+}
+
+function updateCharCount() {
+  const len = document.getElementById('userInput').value.length;
+  document.getElementById('charNum').textContent = len;
+  const el = document.getElementById('charNum');
+  el.style.color = len > 500 ? 'var(--warn)' : 'var(--text-muted)';
+}
+
+function buildPrompt(type, input) {
+  const typeDescriptions = {
+    verse: 'a specific Scripture verse reference',
+    phrase: 'a phrase or half-remembered line from Scripture',
+    theme: 'a biblical theme or concept',
+    freetext: 'a free-text question, passage, or reflection'
+  };
+
+  // Shorter prompt for free-text to reduce timeout risk
+  if (type === 'freetext') {
+    return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. START WITH { END WITH }.
+
+RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER
+These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.
+
+First Movement: Recognition Before Terminology
+Every response begins by locating the human tension inside the question. Name what the visitor is actually carrying before introducing any framework category. If they feel seen first, the architecture lands as revelation rather than lecture.
+
+Second Movement: Ordinary Language Before Framework Language
+Articulate the underlying tension in plain language before introducing QT terminology. The category earns its name by explaining something the visitor already felt but couldn't articulate. Terminology introduced before recognition feels imposed. Terminology introduced after recognition feels inevitable.
+
+Third Movement: One Door At A Time
+Resist the impulse toward categorical completeness in a single response. Open one door fully rather than gesturing at six doors simultaneously. The visitor should leave each response with one thing newly visible — and a question forming naturally in their mind.
+
+Pacing Principle: Spiral Staircase, Not Elevator Shaft
+The descent into QT architecture should feel gradual and earned. Recognition → Curiosity → Resonance → Interpretation → Architecture → Ontology. Never begin at ontology.
+
+Compression Over Explanation
+When a formulation captures the insight completely, stop. Do not explain what the compression already accomplished. Trust the language.
+
+End Open, Not Closed
+Every response should leave one thread slightly unresolved — not as manipulation, but as honest invitation. Reality is not fully legible yet. The response should reflect that.
+
+The Governing Principle
+The goal is not to make the visitor feel informed. The goal is to make reality feel newly legible to them. Every response is measured against that standard — not against categorical completeness.
+
+
+
+HUMAN CARE PROTOCOL — SILENT MODE
+This instruction operates beneath all framework activity. It never announces itself.
+
+As you read each message, remain attentive to signals that suggest the person may be in genuine personal distress — not theological distress, but human distress. Lament psalms, Job, Ecclesiastes, and suffering theology are not signals. Personal statements of hopelessness, worthlessness, desire to disappear, or references to self-harm or ending one's life are signals.
+
+When you detect a potential signal:
+- Do not deliver a framework interpretation.
+- Shift seamlessly into warm, plainspoken presence. No QT terminology. No lenses.
+- Begin with acknowledgment. Let them know they have been heard.
+- Ask one gentle qualifying question at a time to understand what they are carrying. Do not interrogate. Do not rush.
+- Weave in naturally, without preaching: they matter, they are seen, they are loved by the One who knows them completely.
+
+As the exchange clarifies:
+- If it resolves as theological or academic engagement — return to normal interpretation without comment.
+- If genuine distress is confirmed but not imminent — offer warmly: "You don't have to carry this alone. Please reach out to the 988 Suicide and Crisis Lifeline (call or text 988) or the Crisis Text Line (text HOME to 741741). Someone is ready to listen right now."
+- If there is any indication of imminent risk or active attempt — respond with urgency and care: "Please call 911 now. You matter, and help can reach you. After you call, 988 and the Crisis Text Line (text HOME to 741741) are also there for you."
+
+The thread memorializes this exchange. Hold it with care.
+
+You are a Quantum Theology (QT) interpreter. Apply the QT framework to: "${input}"
+
+QT Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
+
+Return this exact JSON:
+{"recognition":"2-4 lines of plain-language recognition of the human tension inside this question — before any QT category. Name what the person is actually carrying.","verse_identified":"Most relevant Scripture","verse_text":"Verse quoted accurately","qt_summary":"Two sharp sentences","entanglement":"God's initiation here","coherence_alignment":"How this calls toward alignment","noise_decoherence":"What distortions this exposes","telos_insight":"Christ-form being called toward","olam_haba":"Time-transcendent view","kingdom_implication":"One crisp Kingdom punchline","key_terms":[{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"}]}`;
+  }
+
+  return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. NO BACKTICKS. START YOUR RESPONSE WITH { AND END WITH }. NOTHING ELSE.
+
+RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER
+These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.
+
+First Movement: Recognition Before Terminology
+Every response begins by locating the human tension inside the question. Name what the visitor is actually carrying before introducing any framework category. If they feel seen first, the architecture lands as revelation rather than lecture.
+
+Second Movement: Ordinary Language Before Framework Language
+Articulate the underlying tension in plain language before introducing QT terminology. The category earns its name by explaining something the visitor already felt but couldn't articulate. Terminology introduced before recognition feels imposed. Terminology introduced after recognition feels inevitable.
+
+Third Movement: One Door At A Time
+Resist the impulse toward categorical completeness in a single response. Open one door fully rather than gesturing at six doors simultaneously. The visitor should leave each response with one thing newly visible — and a question forming naturally in their mind.
+
+Pacing Principle: Spiral Staircase, Not Elevator Shaft
+The descent into QT architecture should feel gradual and earned. Recognition → Curiosity → Resonance → Interpretation → Architecture → Ontology. Never begin at ontology.
+
+Compression Over Explanation
+When a formulation captures the insight completely, stop. Do not explain what the compression already accomplished. Trust the language.
+
+End Open, Not Closed
+Every response should leave one thread slightly unresolved — not as manipulation, but as honest invitation. Reality is not fully legible yet. The response should reflect that.
+
+The Governing Principle
+The goal is not to make the visitor feel informed. The goal is to make reality feel newly legible to them. Every response is measured against that standard — not against categorical completeness.
+
+
+
+HUMAN CARE PROTOCOL — SILENT MODE
+This instruction operates beneath all framework activity. It never announces itself.
+
+As you read each message, remain attentive to signals that suggest the person may be in genuine personal distress — not theological distress, but human distress. Lament psalms, Job, Ecclesiastes, and suffering theology are not signals. Personal statements of hopelessness, worthlessness, desire to disappear, or references to self-harm or ending one's life are signals.
+
+When you detect a potential signal:
+- Do not deliver a framework interpretation.
+- Shift seamlessly into warm, plainspoken presence. No QT terminology. No lenses.
+- Begin with acknowledgment. Let them know they have been heard.
+- Ask one gentle qualifying question at a time to understand what they are carrying. Do not interrogate. Do not rush.
+- Weave in naturally, without preaching: they matter, they are seen, they are loved by the One who knows them completely.
+
+As the exchange clarifies:
+- If it resolves as theological or academic engagement — return to normal interpretation without comment.
+- If genuine distress is confirmed but not imminent — offer warmly: "You don't have to carry this alone. Please reach out to the 988 Suicide and Crisis Lifeline (call or text 988) or the Crisis Text Line (text HOME to 741741). Someone is ready to listen right now."
+- If there is any indication of imminent risk or active attempt — respond with urgency and care: "Please call 911 now. You matter, and help can reach you. After you call, 988 and the Crisis Text Line (text HOME to 741741) are also there for you."
+
+The thread memorializes this exchange. Hold it with care.
+
+You are a Quantum Theology (QT) framework interpreter. The user has submitted ${typeDescriptions[type]}: "${input}"
+
+Apply the complete 8-part QT framework. Even if the input is vague, abstract, or a theme rather than a specific verse — identify the most relevant Scripture, apply all eight framework components, and return the JSON.
+
+The QT Framework you must apply:
+
+0. Echad b'Emet — Unified in Truth: Reality is built on God's relational truth. Unity > fragmentation. Coherence > chaos. Salvation = restoration into Echad b'Emet. Sin = decoherence. Jesus = full manifestation of Echad b'Emet.
+
+1. Relational Ontology: Reality is relational (Hebraic worldview), not categorical (Greek abstraction).
+
+2. Quantum Structure: Entanglement = God's initiating contact. Coherence = alignment/obedience/abiding. Decoherence = ego/fear/pride/trauma. Signal vs Noise = clarity vs distortion.
+
+3. Telos: God predestines the form (Christ-shaped version of the person), not the roster.
+
+4. Universal Entanglement / Optional Alignment: God entangles everyone. Alignment is relational and volitional — never forced.
+
+5. Children as Low-Noise Systems: Minimal ego = resonance template.
+
+6. Competing Entanglements: The world-system = ego, pride, image-crafting, tribalism. Being in but not of = placement vs resonance.
+
+7. Jesus' Voice as Resonance Pattern: Signal recognition, not favoritism.
+
+8. Hebrew Two-World Cosmology: Olam HaZeh (this world: noise/fragmentation) vs Olam HaBa (world to come: coherence/telos). The overlap = Already/Not Yet. Malkhut Elohim = coherent ordering of reality under God's truth.
+
+Return this exact JSON object (start with { immediately):
+{
+  "recognition": "2-4 sentences of plain-language recognition before any QT category",
+  "verse_identified": "Most relevant Scripture",
+  "verse_text": "Verse quoted accurately",
+  "qt_summary": "Two sharp sentences",
+  "entanglement": "God's initiation here",
+  "coherence_alignment": "How this calls toward alignment",
+  "noise_decoherence": "What distortions this exposes",
+  "telos_insight": "Christ-form being called toward",
+  "olam_haba": "Time-transcendent view",
+  "kingdom_implication": "One crisp Kingdom punchline",
+  "key_terms": [
+    {"term": "Term", "hebrew": "Hebrew if applicable", "qt_meaning": "QT meaning"},
+    {"term": "Term", "hebrew": "Hebrew if applicable", "qt_meaning": "QT meaning"},
+    {"term": "Term", "hebrew": "Hebrew if applicable", "qt_meaning": "QT meaning"}
+  ]
+}`;
+}
+
+// --- Query limit state ---
+let sessionQueryCount = 0;
+const QUERY_LIMIT = 3;
+
+// Live ticker state
+let _tickerInterval = null;
+let _tickerSeconds = 0;
+
+function formatTicker(totalSeconds) {
+  if (totalSeconds <= 0) return '00:00:00';
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function startTicker(secondsRemaining) {
+  if (_tickerInterval) clearInterval(_tickerInterval);
+  _tickerSeconds = secondsRemaining;
+  const tickerEl = document.getElementById('resetTicker');
+  if (!tickerEl) return;
+  tickerEl.style.display = 'block';
+  tickerEl.textContent = formatTicker(_tickerSeconds);
+  _tickerInterval = setInterval(function() {
+    _tickerSeconds = Math.max(0, _tickerSeconds - 1);
+    if (tickerEl) tickerEl.textContent = formatTicker(_tickerSeconds);
+    if (_tickerSeconds === 0) {
+      clearInterval(_tickerInterval);
+      // Quietly re-enable the form when the window expires
+      if (tickerEl) tickerEl.textContent = 'Ready — refresh to continue';
+      document.getElementById('submitBtn').style.display = '';
+      document.getElementById('limitPrompt').style.display = 'none';
+      sessionQueryCount = 0;
+    }
+  }, 1000);
+}
+
+function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
+    document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('newSubjectTopBtn').style.display = 'none';
+    const prompt = document.getElementById('limitPrompt');
+    if (customMessage) {
+      const msgEl = prompt.querySelector('.limit-message');
+      if (msgEl) msgEl.textContent = customMessage;
+    }
+    // Update the "Return Tomorrow" panel with precise reset info
+    if (hoursRemaining != null) {
+      const returnLabel = document.getElementById('returnTomorrowLabel');
+      const returnBody = document.getElementById('returnTomorrowBody');
+      if (returnLabel) returnLabel.textContent = hoursRemaining <= 1 ? 'Resets Soon' : 'Return in ' + hoursRemaining + ' Hour' + (hoursRemaining !== 1 ? 's' : '');
+      if (returnBody) returnBody.textContent = 'Your 3 free queries reset in ' + hoursRemaining + ' hour' + (hoursRemaining !== 1 ? 's' : '') + '.';
+    }
+    // Start live countdown ticker
+    if (secondsRemaining != null) {
+      startTicker(secondsRemaining);
+    }
+    prompt.style.display = 'block';
+    // Hide follow-up section and show limit prompt in its place
+    const followUp = document.getElementById('followUpSection');
+    if (followUp) {
+      followUp.style.display = 'none';
+      followUp.parentNode.insertBefore(prompt, followUp);
+    }
+    prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+function applyQuotaLock(message) {
+    document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('newSubjectTopBtn').style.display = 'none';
+    const prompt = document.getElementById('quotaPrompt');
+    if (message) {
+      const msgEl = document.getElementById('quotaMessage');
+      if (msgEl) msgEl.textContent = message;
+    }
+    prompt.style.display = 'block';
+    const followUp = document.getElementById('followUpSection');
+    if (followUp) {
+      followUp.style.display = 'none';
+      followUp.parentNode.insertBefore(prompt, followUp);
+    }
+    prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+async function runInterpretation() {
+  const input = document.getElementById('userInput').value.trim();
+  if (!input) return;
+
+  // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
+  const _isAnon = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+  const _isPaidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
+  if ((_isAnon || !_isPaidTier) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+
+  // Reset conversation for new subject
+  conversationHistory = [];
+  currentSubject = input;
+
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('inputSection').style.opacity = '0.4';
+  document.getElementById('inputSection').style.pointerEvents = 'none';
+  document.getElementById('loadingBlock').classList.add('visible');
+  document.getElementById('resultBlock').classList.remove('visible');
+
+  const prompt = buildPrompt(currentType, input);
+  conversationHistory.push({ role: 'user', content: prompt });
+
+  try {
+    const apiRawText = await callProxy(conversationHistory, input);
+  
+  // Store a condensed version in history to prevent payload bloat on follow-ups
+  const condensed = apiRawText.length > 1000 
+    ? apiRawText.slice(0, 1000) + '...[full interpretation provided]' 
+    : apiRawText;
+  conversationHistory.push({ role: 'assistant', content: condensed });
+
+    let parsed;
+    try {
+      let cleaned = apiRawText.trim();
+      cleaned = cleaned.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+      // Sanitize: fix unescaped newlines/tabs inside JSON string values
+      cleaned = cleaned.replace(/"((?:[^"\\]|\\.)*)"/g, (m, inner) =>
+        '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"'
+      );
+      parsed = JSON.parse(cleaned);
+    } catch {
+      try {
+        // Second attempt: extract and repair common JSON issues
+        let raw = apiRawText;
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('no json');
+        let candidate = match[0];
+        // Replace smart quotes with standard quotes
+        candidate = candidate.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+        // Sanitize: fix unescaped newlines/tabs inside string values
+        candidate = candidate.replace(/"((?:[^"\\]|\\.)*)"/g, (m, inner) =>
+          '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"'
+        );
+        // Truncated JSON: try to close any open string then close the object
+        try {
+          parsed = JSON.parse(candidate);
+        } catch {
+          // Strip trailing incomplete key-value pair and close the object
+          candidate = candidate.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/, '').replace(/,\s*"[^"]*"\s*:\s*$/, '');
+          if (!candidate.endsWith('}')) candidate = candidate.replace(/,?\s*$/, '') + '}';
+          parsed = JSON.parse(candidate);
+        }
+      } catch {
+        document.getElementById('resultContent').innerHTML = `
+          <div class="error-block">
+            <p style="margin-bottom:12px;">Could not parse response. Raw output:</p>
+            <p style="font-family:var(--mono); font-size: 17px; white-space:pre-wrap; color:var(--text-dim);">${escHtml(apiRawText.slice(0, 800))}</p>
+          </div>`;
+        showResult();
+        return;
       }
+    }
+
+    renderResult(parsed);
+    window._lastParsedResult = parsed;
+    showResult();
+
+    // Show subject banner, follow-up, and download button
+    document.getElementById('subjectText').textContent = input;
+    document.getElementById('subjectBanner').style.display = 'block';
+    document.getElementById('followUpSection').style.display = 'block';
+    document.getElementById('downloadRow').style.display = 'block';
+
+    sessionQueryCount++;
+    decrementSidebarCounter();
+    // Only lock the UI for free/anonymous users — paid subscribers are gated server-side
+    const _isAnonPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+    const _isPaidPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
+    if ((_isAnonPost || !_isPaidPost) && sessionQueryCount >= QUERY_LIMIT) {
+      applyQueryLock();
+    }
+
+    // Show sidebar after first successful query
+    const queryText = document.getElementById('userInput').value.trim();
+    showSidebarAfterQuery(queryText);
+
+    // Save full response to localStorage keyed by thread id
+    // activeThreadId is set by showSidebarAfterQuery/addThreadToSidebar
+    if (activeThreadId && parsed) {
+      try {
+        localStorage.setItem('qt_response_' + activeThreadId, JSON.stringify(parsed));
+        localStorage.setItem('qt_input_' + activeThreadId, queryText);
+        console.log('Saved response for thread:', activeThreadId);
+      } catch(saveErr) {
+        console.error('Save failed:', saveErr.message);
+      }
+    } else {
+      console.warn('Save skipped — activeThreadId:', activeThreadId, 'parsed:', !!parsed);
+    }
+
+  } catch (err) {
+    if (err.message === 'RATE_LIMITED') return;
+    if (err.message === 'CRISIS_DETECTED') return;
+    if (err.message === 'SURVEY_DETECTED') return;
+    if (err.message === 'QUOTA_EXCEEDED') return;
+    document.getElementById('resultContent').innerHTML = getErrorMessage(err);
+    showResult();
+  } finally {
+    // loadingBlock already hidden by streaming handler
+    document.getElementById('loadingBlock').classList.remove('visible');
+    document.getElementById('inputSection').style.opacity = '';
+    document.getElementById('inputSection').style.pointerEvents = '';
+    document.getElementById('submitBtn').disabled = false;
+    // Remove stream indicator if still present
+    var si = document.getElementById('streamIndicator');
+    if (si) si.remove();
+  }
+}
+
+async function runFollowUp() {
+  const input = document.getElementById('followUpInput').value.trim();
+  if (!input) return;
+
+  // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
+  const _isAnonFU = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+  const _isPaidTierFU = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
+  if ((_isAnonFU || !_isPaidTierFU) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+
+  document.getElementById('followUpBtn').disabled = true;
+  document.getElementById('followUpInput').style.opacity = '0.4';
+  document.getElementById('followUpInput').style.pointerEvents = 'none';
+  document.getElementById('followUpLoading').style.display = 'block';
+  document.getElementById('followUpLoading').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // Build follow-up prompt that stays within QT framework
+  const followUpPrompt = `RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER
+These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.
+
+First Movement: Recognition Before Terminology
+Every response begins by locating the human tension inside the question. Name what the visitor is actually carrying before introducing any framework category. If they feel seen first, the architecture lands as revelation rather than lecture.
+
+Second Movement: Ordinary Language Before Framework Language
+Articulate the underlying tension in plain language before introducing QT terminology. The category earns its name by explaining something the visitor already felt but couldn't articulate. Terminology introduced before recognition feels imposed. Terminology introduced after recognition feels inevitable.
+
+Third Movement: One Door At A Time
+Resist the impulse toward categorical completeness in a single response. Open one door fully rather than gesturing at six doors simultaneously. The visitor should leave each response with one thing newly visible — and a question forming naturally in their mind.
+
+Pacing Principle: Spiral Staircase, Not Elevator Shaft
+The descent into QT architecture should feel gradual and earned. Recognition → Curiosity → Resonance → Interpretation → Architecture → Ontology. Never begin at ontology.
+
+Compression Over Explanation
+When a formulation captures the insight completely, stop. Do not explain what the compression already accomplished. Trust the language.
+
+End Open, Not Closed
+Every response should leave one thread slightly unresolved — not as manipulation, but as honest invitation. Reality is not fully legible yet. The response should reflect that.
+
+The Governing Principle
+The goal is not to make the visitor feel informed. The goal is to make reality feel newly legible to them. Every response is measured against that standard — not against categorical completeness.
+
+
+
+HUMAN CARE PROTOCOL — SILENT MODE
+This instruction operates beneath all framework activity. It never announces itself.
+
+As you read each message, remain attentive to signals that suggest the person may be in genuine personal distress — not theological distress, but human distress. Lament psalms, Job, Ecclesiastes, and suffering theology are not signals. Personal statements of hopelessness, worthlessness, desire to disappear, or references to self-harm or ending one's life are signals.
+
+When you detect a potential signal:
+- Do not deliver a framework interpretation.
+- Shift seamlessly into warm, plainspoken presence. No QT terminology. No lenses.
+- Begin with acknowledgment. Let them know they have been heard.
+- Ask one gentle qualifying question at a time to understand what they are carrying. Do not interrogate. Do not rush.
+- Weave in naturally, without preaching: they matter, they are seen, they are loved by the One who knows them completely.
+
+As the exchange clarifies:
+- If it resolves as theological or academic engagement — return to normal interpretation without comment.
+- If genuine distress is confirmed but not imminent — offer warmly: "You don't have to carry this alone. Please reach out to the 988 Suicide and Crisis Lifeline (call or text 988) or the Crisis Text Line (text HOME to 741741). Someone is ready to listen right now."
+- If there is any indication of imminent risk or active attempt — respond with urgency and care: "Please call 911 now. You matter, and help can reach you. After you call, 988 and the Crisis Text Line (text HOME to 741741) are also there for you."
+
+The thread memorializes this exchange. Hold it with care.
+
+You are a Quantum Theology (QT) framework interpreter. The user previously received a full QT interpretation of: "${currentSubject}"
+
+Their follow-up question is: "${input}"
+
+Respond within the QT framework — grounded in Echad b'Emet, relational ontology, entanglement/coherence/decoherence, telos, and Hebrew two-world cosmology where relevant. Be direct and precise. Plain prose, no JSON, no markdown headers.`;
+
+  // Create follow-up element immediately so we can stream into it
+  const followUpEl = document.createElement('div');
+  followUpEl.style.cssText = 'margin-top:32px; border-top:1px solid var(--border); padding-top:28px;';
+  const followUpTextEl = document.createElement('div');
+  followUpTextEl.style.cssText = 'font-size:16.5px; color:var(--text); line-height:1.75;';
+  followUpEl.innerHTML = `<div style="font-family:var(--mono); font-size:17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Follow-up — ${escHtml(input)}</div>`;
+  followUpEl.appendChild(followUpTextEl);
+  document.getElementById('resultContent').appendChild(followUpEl);
+  followUpEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const responseText = await callProxyStream(
+      [{ role: 'user', content: followUpPrompt }],
+      followUpTextEl,
+      input,
+      true  // isFollowUp — prevents saving as new thread
     );
-    return res.status(200).json({ success: true });
+
+    document.getElementById('followUpInput').value = '';
+
+    // Increment counter and apply lock for non-subscribers after successful follow-up
+    sessionQueryCount++;
+    decrementSidebarCounter();
+    const _isAnonFUPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+    const _isPaidFUPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
+    if ((_isAnonFUPost || !_isPaidFUPost) && sessionQueryCount >= QUERY_LIMIT) {
+      applyQueryLock();
+    }
+
+    // Save follow-up via unified saveFollowUp
+    if (activeThreadId) {
+      saveFollowUp(activeThreadId, input, responseText);
+    }
+
+  } catch (err) {
+    if (err.message === 'RATE_LIMITED') return;
+    if (err.message === 'QUOTA_EXCEEDED') return;
+    errEl.style.marginTop = '20px';
+    errEl.innerHTML = getErrorMessage(err);
+    document.getElementById('resultContent').appendChild(errEl);
+  } finally {
+    document.getElementById('followUpLoading').style.display = 'none';
+    document.getElementById('followUpInput').style.opacity = '';
+    document.getElementById('followUpInput').style.pointerEvents = '';
+    document.getElementById('followUpBtn').disabled = false;
+  }
+}
+
+async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
+  // Streams plain text response directly into targetEl
+  const userEmail = localStorage.getItem('qt_user_email') || null;
+  let response;
+
+  try {
+    response = await fetch('/api/interpret', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '', isFollowUp: isFollowUp || false })
+    });
+  } catch (networkErr) {
+    const err = new Error('NETWORK_ERROR');
+    err.type = 'network';
+    throw err;
   }
 
-  // ── DELETE — remove a highlight ───────────────────────────────────────────
-  if (req.method === 'DELETE') {
-    const { highlightId } = req.body || {};
-    if (!highlightId) return res.status(400).json({ error: 'highlightId required' });
+  if (response.status === 429) {
 
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/thread_highlights?id=eq.${highlightId}&user_id=eq.${userId}`,
-      {
-        method: 'DELETE',
-        headers: {
-          'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+    let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
+    let hoursRemaining = null;
+    let secondsRemaining = null;
+    try {
+      const limitData = await response.json();
+      if (limitData.message) rateLimitMsg = limitData.message;
+      if (limitData.hoursRemaining != null) {
+        hoursRemaining = limitData.hoursRemaining;
+        secondsRemaining = limitData.secondsRemaining != null ? limitData.secondsRemaining : hoursRemaining * 3600;
+      }
+    } catch {}
+    applyQueryLock(rateLimitMsg, hoursRemaining, secondsRemaining);
+    throw new Error('RATE_LIMITED');
+  }
+
+  if (response.status === 504 || response.status === 524) {
+    const err = new Error('TIMEOUT'); err.type = 'timeout'; throw err;
+  }
+  if (!response.ok) {
+    const err = new Error(`SERVER_ERROR_${response.status}`); err.type = 'server'; throw err;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+
+  // Show streaming cursor in target element
+  if (targetEl) targetEl.innerHTML = '<span style="opacity:0.4; font-family:var(--mono); font-size:11px; letter-spacing:0.12em;">interpreting…</span>';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'delta' && parsed.text) {
+            fullText += parsed.text;
+            // Render accumulated text as formatted prose
+            if (targetEl) {
+              targetEl.innerHTML = escHtml(fullText)
+                .replace(/\n\n/g, '</p><p style="margin-top:12px;">')
+                .replace(/\n/g, '<br>');
+            }
+          }
+        } catch {}
+      }
+    }
+  }
+
+  return fullText;
+}
+
+async function callProxy(messages, rawQuery) {
+  const userEmail = localStorage.getItem('qt_user_email') || null;
+  let response;
+
+  try {
+    response = await fetch('/api/interpret', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '' })
+    });
+  } catch (networkErr) {
+    const err = new Error('NETWORK_ERROR');
+    err.type = 'network';
+    throw err;
+  }
+
+  // Handle rate limit before streaming
+  if (response.status === 429) {
+    let rateLimitMsg = "You've reached the query limit. Please subscribe for continued access.";
+    let hoursRemaining = null;
+    let secondsRemaining = null;
+    try {
+      const limitData = await response.json();
+      if (limitData.message) rateLimitMsg = limitData.message;
+      if (limitData.hoursRemaining != null) {
+        hoursRemaining = limitData.hoursRemaining;
+        secondsRemaining = limitData.secondsRemaining != null ? limitData.secondsRemaining : hoursRemaining * 3600;
+      }
+    } catch {}
+    applyQueryLock(rateLimitMsg, hoursRemaining, secondsRemaining);
+    throw new Error('RATE_LIMITED');
+  }
+
+  if (response.status === 504 || response.status === 524) {
+    const err = new Error('TIMEOUT');
+    err.type = 'timeout';
+    throw err;
+  }
+
+  if (!response.ok) {
+    const err = new Error(`SERVER_ERROR_${response.status}`);
+    err.type = 'server';
+    err.status = response.status;
+    throw err;
+  }
+
+  // ── CRISIS + SURVEY RESPONSE CHECK ──────────────────────────────────────────
+  // Server returns { crisis: true } or { survey: true, redirect: "..." } as plain JSON
+  // (not SSE) when input triggers detection. Peek at Content-Type before streaming.
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    let bodyData = {};
+    try { bodyData = await response.json(); } catch {}
+    if (bodyData.crisis) {
+      showCrisisPanel();
+      throw new Error('CRISIS_DETECTED');
+    }
+    if (bodyData.survey) {
+      showSurveyPanel(bodyData.redirect);
+      throw new Error('SURVEY_DETECTED');
+    }
+    if (bodyData.quota_exceeded) {
+      applyQuotaLock(bodyData.message || "You've used all your queries for this period.");
+      throw new Error('QUOTA_EXCEEDED');
+    }
+    // Any other unexpected JSON — surface as server error
+    const err = new Error('Unexpected JSON response from server.');
+    err.type = 'server';
+    throw err;
+  }
+
+  // Read the SSE stream and accumulate full text
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+  let tierFromStream = null;
+
+  // Show streaming indicator
+  document.getElementById('loadingBlock').classList.remove('visible');
+  document.getElementById('resultBlock').classList.add('visible');
+  document.getElementById('resultContent').innerHTML =
+    '<div id="streamIndicator" style="font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); padding:20px 0; text-align:center;">Interpreting<span id="streamDots">...</span></div>';
+
+  // Animate the dots
+  var dotCount = 0;
+  var dotInterval = setInterval(function() {
+    dotCount = (dotCount + 1) % 4;
+    var dotsEl = document.getElementById('streamDots');
+    if (dotsEl) dotsEl.textContent = '.'.repeat(dotCount + 1);
+  }, 400);
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'delta' && parsed.text) {
+              fullText += parsed.text;
+            } else if (parsed.type === 'done') {
+              tierFromStream = parsed.tier;
+            } else if (parsed.type === 'error') {
+              throw new Error('Stream error: ' + parsed.error);
+            }
+          } catch(e) {
+            if (e.message && e.message.startsWith('Stream error')) throw e;
+          }
         }
       }
-    );
-    return res.status(200).json({ success: true });
+    }
+    // Flush any remaining buffered data after stream ends
+    if (buffer.trim()) {
+      const lines = buffer.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'delta' && parsed.text) {
+              fullText += parsed.text;
+            } else if (parsed.type === 'done') {
+              tierFromStream = parsed.tier;
+            }
+          } catch(e) { /* ignore malformed final chunk */ }
+        }
+      }
+    }
+  } finally {
+    clearInterval(dotInterval);
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  if (!fullText) {
+    const err = new Error('Empty stream response.');
+    err.type = 'empty';
+    throw err;
+  }
+
+  // Store tier from stream headers/events
+  if (tierFromStream && tierFromStream !== 'trial' && tierFromStream !== 'free') {
+    localStorage.setItem('qt_user_tier', tierFromStream);
+    CURRENT_TIER = tierFromStream;
+    var tierLabelsMap = { scholar: 'Refraction · 90 Day Archive', refraction: 'Refraction · 90 Day Archive', theologian: 'Full Spectrum · 180 Day Archive', full_spectrum: 'Full Spectrum · 180 Day Archive', companion: 'Full Spectrum · 1 Year Archive', trial: 'Trial · 30 Day Archive', free: 'Observer · Free Access' };
+    var labelEl = document.getElementById('sidebarTierLabel');
+    if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
+  }
+
+  return fullText;
 }
+
+function getErrorMessage(err) {
+  if (err.type === 'timeout') {
+    return `<div class="error-block error-timeout">
+      <div class="error-icon">⧖</div>
+      <div class="error-title">This interpretation is taking longer than expected.</div>
+      <div class="error-body">Complex theological questions sometimes require additional processing time. Please try again in a moment — your question has been received and the framework is intact.</div>
+      <div class="error-hint">If this continues, try shortening your input or switching to the Verse Reference mode.</div>
+    </div>`;
+  }
+  if (err.type === 'network') {
+    return `<div class="error-block error-network">
+      <div class="error-icon">⦿</div>
+      <div class="error-title">Connection interrupted.</div>
+      <div class="error-body">The Prism could not reach the interpretation server. Please check your connection and try again.</div>
+    </div>`;
+  }
+  if (err.type === 'server') {
+    return `<div class="error-block error-server">
+      <div class="error-icon">⚠</div>
+      <div class="error-title">The server encountered an issue.</div>
+      <div class="error-body">Something went wrong on our end. This is temporary — please try again in a moment. If the problem persists, contact <a href="mailto:support@quantumtheology.app" style="color:var(--gold-dim);">support@quantumtheology.app</a>.</div>
+    </div>`;
+  }
+  // Generic fallback
+  return `<div class="error-block">
+    <div class="error-icon">⦿</div>
+    <div class="error-title">Something went wrong.</div>
+    <div class="error-body">Please try again. If the problem continues, contact <a href="mailto:support@quantumtheology.app" style="color:var(--gold-dim);">support@quantumtheology.app</a>.</div>
+  </div>`;
+}
+
+function showResult() {
+  document.getElementById('loadingBlock').classList.remove('visible');
+  document.getElementById('resultBlock').classList.add('visible');
+  document.getElementById('newSubjectTopBtn').style.display = 'block';
+  // Apply any loaded highlights to the freshly-rendered DOM
+  applyAllHighlights();
+  renderHlPanel();
+}
+
+function renderResult(d) {
+  const sections = [
+    { num: '00', title: 'Echad b\'Emet', hebrew: 'אֶחָד בֶּאֱמֶת', content: d.qt_summary },
+    { num: '01', title: 'Entanglement', hebrew: 'קֶשֶׁר', content: d.entanglement },
+    { num: '02', title: 'Coherence & Alignment', hebrew: 'יִחוּד', content: d.coherence_alignment },
+    { num: '03', title: 'Noise & Decoherence', hebrew: 'פֵּרוּד', content: d.noise_decoherence },
+    { num: '04', title: 'Telos', hebrew: 'תַּכְלִית', content: d.telos_insight },
+    { num: '05', title: 'Olam HaBa — Non-Local View', hebrew: 'עוֹלָם הַבָּא', content: d.olam_haba },
+  ];
+
+  let html = '';
+
+  // Verse banner
+  if (d.verse_text) {
+    html += `
+      <div class="verse-banner">
+        <div class="verse-ref">${escHtml(d.verse_identified || '')}</div>
+        <div class="verse-text">${escHtml(d.verse_text)}</div>
+      </div>
+    `;
+  }
+
+  // Recognition threshold — unlabeled opening
+  if (d.recognition) {
+    html += `
+      <div class="qt-recognition">
+        <p>${escHtml(d.recognition)}</p>
+      </div>
+    `;
+  }
+
+  // QT sections
+  sections.forEach(s => {
+    html += `
+      <div class="qt-section">
+        <div class="qt-section-head">
+          <span class="qt-section-num">${s.num}</span>
+          <span class="qt-section-title">${s.title}</span>
+          <span class="qt-section-hebrew">${s.hebrew}</span>
+        </div>
+        <div class="qt-section-body">
+          <p>${escHtml(s.content || '')}</p>
+        </div>
+      </div>
+    `;
+  });
+
+  // Key terms table
+  if (d.key_terms && d.key_terms.length > 0) {
+    html += `
+      <div class="qt-section">
+        <div class="qt-section-head">
+          <span class="qt-section-num">06</span>
+          <span class="qt-section-title">Key Terms</span>
+          <span class="qt-section-hebrew">מִלִּים</span>
+        </div>
+        <div class="qt-section-body" style="padding:0;">
+          <table class="qt-table">
+            <thead>
+              <tr>
+                <th>Term</th>
+                <th>QT Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${d.key_terms.map(t => `
+                <tr>
+                  <td>${escHtml(t.term)}${t.hebrew ? ` <span style="color:var(--hebrew); font-size: 17px;">${escHtml(t.hebrew)}</span>` : ''}</td>
+                  <td>${escHtml(t.qt_meaning)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // Kingdom punchline
+  html += `
+    <div class="kingdom-block">
+      <div class="kingdom-label">Kingdom Implication</div>
+      <div class="kingdom-text">${escHtml(d.kingdom_implication || '')}</div>
+    </div>
+  `;
+
+  document.getElementById('resultContent').innerHTML = html;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function stripHebrew(text) {
+  // Remove Hebrew Unicode block characters (U+0590–U+05FF) and any trailing whitespace
+  return (text || '').replace(/[\u0590-\u05FF]+/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function downloadPDF(mode) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const isDark = mode !== 'light';
+  const pageW = 210;
+  const pageH = 297;
+  const margin = 18;
+  const contentW = pageW - margin * 2;
+  let y = margin;
+
+  // Color schemes
+  const bg       = isDark ? [6, 6, 10]       : [255, 255, 255];
+  const bgSection= isDark ? [20, 20, 40]      : [240, 240, 248];
+  const gold     = isDark ? [201, 168, 76]    : [120, 90, 20];
+  const goldDim  = isDark ? [122, 98, 46]     : [150, 120, 50];
+  const bodyText = isDark ? [212, 212, 216]   : [30, 30, 40];
+  const dimText  = isDark ? [120, 120, 144]   : [90, 90, 110];
+  const footerBg = isDark ? [6, 6, 10]        : [245, 245, 250];
+
+  doc.setFillColor(...bg);
+  doc.rect(0, 0, pageW, pageH, 'F');
+
+  function checkPage(needed) {
+    if (y + needed > pageH - 18) {
+      doc.addPage();
+      doc.setFillColor(...bg);
+      doc.rect(0, 0, pageW, pageH, 'F');
+      y = margin;
+    }
+  }
+
+  function drawRule() {
+    doc.setDrawColor(...goldDim);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageW - margin, y);
+    y += 5;
+  }
+
+  function addBody(text, color, size) {
+    const cleaned = stripHebrew(text);
+    if (!cleaned) return;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(size || 10);
+    doc.setTextColor(...(color || bodyText));
+    const lines = doc.splitTextToSize(cleaned, contentW - 8);
+    checkPage(lines.length * 5 + 4);
+    doc.text(lines, margin + 4, y);
+    y += lines.length * 5 + 4;
+  }
+
+  // Logo
+  const logoImg = document.querySelector('header img');
+  if (logoImg) {
+    try {
+      const logoData = logoImg.src; // already base64
+      const logoSize = 28;
+      doc.addImage(logoData, 'PNG', (pageW - logoSize) / 2, y, logoSize, logoSize);
+      y += logoSize + 6;
+    } catch(e) {
+      y += 4;
+    }
+  }
+
+  // HEADER
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.setTextColor(...gold);
+  doc.text('QUANTUM THEOLOGY', pageW / 2, y + 8, { align: 'center' });
+  y += 14;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...goldDim);
+  doc.text('FRAMEWORK INTERPRETATION', pageW / 2, y, { align: 'center' });
+  y += 6;
+  doc.setFontSize(7);
+  doc.text('OPNX LLC  ·  © 2026 All Rights Reserved', pageW / 2, y, { align: 'center' });
+  y += 8;
+  drawRule();
+
+  // Subject
+  const subject = stripHebrew(document.getElementById('subjectText').textContent);
+  if (subject) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(11);
+    doc.setTextColor(...dimText);
+    const sl = doc.splitTextToSize(`Subject: ${subject}`, contentW);
+    doc.text(sl, margin, y);
+    y += sl.length * 6 + 5;
+  }
+
+  // Verse banner
+  const verseRef = document.querySelector('.verse-ref');
+  const verseText = document.querySelector('.verse-text');
+  if (verseRef && verseText) {
+    checkPage(24);
+    doc.setFillColor(...bgSection);
+    const vLines = doc.splitTextToSize(stripHebrew(verseText.innerText), contentW - 12);
+    const vHeight = vLines.length * 6 + 18;
+    doc.rect(margin, y - 2, contentW, vHeight, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...goldDim);
+    doc.text(stripHebrew(verseRef.innerText).toUpperCase(), margin + 4, y + 4);
+    y += 9;
+    doc.setFont('helvetica', 'bolditalic');
+    doc.setFontSize(10);
+    doc.setTextColor(...gold);
+    doc.text(vLines, margin + 4, y);
+    y += vLines.length * 6 + 8;
+  }
+
+  // Recognition threshold
+  const recognitionEl = document.querySelector('.qt-recognition p');
+  if (recognitionEl) {
+    checkPage(20);
+    y += 4;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(10);
+    doc.setTextColor(...dimText);
+    const rLines = doc.splitTextToSize(recognitionEl.innerText.trim(), contentW);
+    checkPage(rLines.length * 5 + 14);
+    doc.text(rLines, margin, y);
+    y += rLines.length * 5 + 10;
+    drawRule();
+  }
+
+  // Framework sections
+  const sectionLabels = [
+    "00  ECHAD B'EMET — Unified in Truth",
+    '01  ENTANGLEMENT',
+    '02  COHERENCE & ALIGNMENT',
+    '03  NOISE & DECOHERENCE',
+    '04  TELOS',
+    '05  OLAM HABA — Non-Local View',
+  ];
+
+  const sectionEls = document.querySelectorAll('.qt-section');
+  sectionEls.forEach((el, i) => {
+    if (i >= sectionLabels.length) return;
+    checkPage(22);
+    y += 2;
+    doc.setFillColor(...bgSection);
+    doc.rect(margin, y - 3, contentW, 9, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...gold);
+    doc.text(sectionLabels[i], margin + 2, y + 3);
+    y += 11;
+    const bodyEl = el.querySelector('.qt-section-body');
+    if (bodyEl) addBody(bodyEl.innerText.trim());
+  });
+
+  // Key terms
+  const tableEl = document.querySelector('.qt-table');
+  if (tableEl) {
+    checkPage(22);
+    y += 2;
+    doc.setFillColor(...bgSection);
+    doc.rect(margin, y - 3, contentW, 9, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...gold);
+    doc.text('06  KEY TERMS', margin + 2, y + 3);
+    y += 11;
+
+    tableEl.querySelectorAll('tbody tr').forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length >= 2) {
+        checkPage(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...gold);
+        doc.text(stripHebrew(cells[0].innerText), margin, y);
+        y += 5;
+        addBody(stripHebrew(cells[1].innerText), dimText);
+      }
+    });
+  }
+
+  // Kingdom implication
+  const kingdomEl = document.querySelector('.kingdom-text');
+  if (kingdomEl) {
+    checkPage(32);
+    y += 4;
+    drawRule();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...goldDim);
+    doc.text('KINGDOM IMPLICATION', pageW / 2, y, { align: 'center' });
+    y += 7;
+    doc.setFont('helvetica', 'bolditalic');
+    doc.setFontSize(11);
+    doc.setTextColor(...gold);
+    const kl = doc.splitTextToSize(stripHebrew(kingdomEl.innerText), contentW);
+    doc.text(kl, pageW / 2, y, { align: 'center' });
+    y += kl.length * 6 + 6;
+  }
+
+  // Follow-up exchanges
+  const followUps = document.querySelectorAll('#resultContent > div[style*="border-top"]');
+  if (followUps.length > 0) {
+    checkPage(20);
+    drawRule();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...goldDim);
+    doc.text('CONTINUED EXPLORATION', margin, y);
+    y += 8;
+    followUps.forEach(el => {
+      const divs = el.querySelectorAll('div');
+      if (divs[0]) {
+        checkPage(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...gold);
+        doc.text(stripHebrew(divs[0].innerText), margin, y);
+        y += 6;
+      }
+      if (divs[1]) addBody(stripHebrew(divs[1].innerText), dimText);
+      y += 3;
+    });
+  }
+
+  // Footer on every page
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFillColor(...footerBg);
+    doc.rect(0, pageH - 14, pageW, 14, 'F');
+    doc.setDrawColor(...goldDim);
+    doc.setLineWidth(0.3);
+    doc.line(margin, pageH - 14, pageW - margin, pageH - 14);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...goldDim);
+    doc.text('OPNX LLC  ·  © 2026 All Rights Reserved  ·  The Prism Framework', pageW / 2, pageH - 7, { align: 'center' });
+    doc.text(`${p} / ${totalPages}`, pageW - margin, pageH - 7, { align: 'right' });
+  }
+
+  const filename = `QT_${subject.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)}_${new Date().toISOString().slice(0,10)}_${isDark ? 'dark' : 'print'}.pdf`;
+  doc.save(filename);
+}
+
+function resetForm() {
+  conversationHistory = [];
+  currentSubject = '';
+  _hlData = [];
+  var hlPanel = document.getElementById('hlPanel');
+  if (hlPanel) hlPanel.classList.add('hidden');
+  document.getElementById('resultBlock').classList.remove('visible');
+  document.getElementById('downloadRow').style.display = 'none';
+  document.getElementById('followUpSection').style.display = 'none';
+  document.getElementById('subjectBanner').style.display = 'none';
+  document.getElementById('resultContent').innerHTML = '';
+  document.getElementById('userInput').value = '';
+  if (document.getElementById('followUpInput')) document.getElementById('followUpInput').value = '';
+  document.getElementById('newSubjectTopBtn').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Enter key submits
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.ctrlKey) runInterpretation();
+});
+
+// ── VOICE / MIC ──────────────────────────────────────────────────────────────
+(function initMic() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return; // not supported — mic button stays hidden
+
+  const micBtn = document.getElementById('micBtn');
+  const micStatus = document.getElementById('micStatus');
+  const textarea = document.getElementById('userInput');
+
+  micBtn.style.display = 'block'; // reveal only when supported
+
+  const recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  let listening = false;
+
+  recognition.onstart = () => {
+    listening = true;
+    micBtn.classList.add('listening');
+    micBtn.title = 'Tap to stop and interpret';
+    micStatus.style.display = 'block';
+    micStatus.textContent = '● Listening — speak freely, tap 🎙 when done';
+  };
+
+  recognition.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    if (final) {
+      const current = textarea.value;
+      textarea.value = (current ? current.trimEnd() + ' ' : '') + final.trim();
+      updateCharCount();
+    }
+    if (interim) {
+      micStatus.textContent = '● ' + interim;
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech') return; // ignore no-speech in continuous mode
+    micStatus.textContent = e.error === 'not-allowed'
+      ? 'Microphone access denied — enable it in browser settings'
+      : 'Could not hear input — please try again';
+    micStatus.style.color = 'rgba(200,80,70,0.8)';
+    listening = false;
+    micBtn.classList.remove('listening');
+  };
+
+  recognition.onend = () => {
+    // In continuous mode, onend only fires when we explicitly call stop()
+    listening = false;
+    micBtn.classList.remove('listening');
+    micBtn.title = 'Speak your input';
+    if (textarea.value.trim()) {
+      micStatus.textContent = '✓ Captured — interpreting…';
+      setTimeout(() => {
+        micStatus.style.display = 'none';
+        micStatus.style.color = 'var(--gold-dim)';
+        runInterpretation();
+      }, 600);
+    } else {
+      micStatus.style.display = 'none';
+    }
+  };
+
+  window.toggleMic = function() {
+    if (listening) {
+      recognition.stop(); // user taps to stop — triggers onend → auto-submit
+    } else {
+      micStatus.style.color = 'var(--gold-dim)';
+      textarea.value = '';
+      updateCharCount();
+      try {
+        recognition.start();
+      } catch(e) {
+        micStatus.style.display = 'block';
+        micStatus.textContent = 'Could not start microphone — try again';
+      }
+    }
+  };
+
+  // ── FOLLOW-UP MIC ─────────────────────────────────────────────────────────
+  const followUpMicBtn = document.getElementById('followUpMicBtn');
+  const followUpMicStatus = document.getElementById('followUpMicStatus');
+  const followUpTextarea = document.getElementById('followUpInput');
+
+  followUpMicBtn.style.display = 'block';
+
+  const followUpRecognition = new SpeechRecognition();
+  followUpRecognition.continuous = true;
+  followUpRecognition.interimResults = true;
+  followUpRecognition.lang = 'en-US';
+
+  let followUpListening = false;
+
+  followUpRecognition.onstart = () => {
+    followUpListening = true;
+    followUpMicBtn.classList.add('listening');
+    followUpMicBtn.title = 'Tap to stop and submit';
+    followUpMicStatus.style.display = 'block';
+    followUpMicStatus.textContent = '● Listening — speak freely, tap 🎙 when done';
+  };
+
+  followUpRecognition.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    if (final) {
+      const current = followUpTextarea.value;
+      followUpTextarea.value = (current ? current.trimEnd() + ' ' : '') + final.trim();
+    }
+    if (interim) followUpMicStatus.textContent = '● ' + interim;
+  };
+
+  followUpRecognition.onerror = (e) => {
+    if (e.error === 'no-speech') return;
+    followUpMicStatus.textContent = e.error === 'not-allowed'
+      ? 'Microphone access denied — enable it in browser settings'
+      : 'Could not hear input — please try again';
+    followUpMicStatus.style.color = 'rgba(200,80,70,0.8)';
+    followUpListening = false;
+    followUpMicBtn.classList.remove('listening');
+  };
+
+  followUpRecognition.onend = () => {
+    followUpListening = false;
+    followUpMicBtn.classList.remove('listening');
+    followUpMicBtn.title = 'Speak your follow-up';
+    if (followUpTextarea.value.trim()) {
+      followUpMicStatus.textContent = '✓ Captured — submitting…';
+      setTimeout(() => {
+        followUpMicStatus.style.display = 'none';
+        followUpMicStatus.style.color = 'var(--gold-dim)';
+        runFollowUp();
+      }, 600);
+    } else {
+      followUpMicStatus.style.display = 'none';
+    }
+  };
+
+  window.toggleFollowUpMic = function() {
+    if (followUpListening) {
+      followUpRecognition.stop(); // user taps to stop — triggers onend → auto-submit
+    } else {
+      followUpMicStatus.style.color = 'var(--gold-dim)';
+      followUpTextarea.value = '';
+      try {
+        followUpRecognition.start();
+      } catch(e) {
+        followUpMicStatus.style.display = 'block';
+        followUpMicStatus.textContent = 'Could not start microphone — try again';
+      }
+    }
+  };
+})();
+
+// ── SIDEBAR SYSTEM ──
+
+// Tier retention windows in days
+var TIER_RETENTION = { scholar: 90, refraction: 90, theologian: 180, full_spectrum: 180, companion: 365, trial: 30, free: 1 };
+
+// Read actual tier — requires a logged-in email to honor a paid tier
+function getActualTier() {
+  var urlParams = new URLSearchParams(window.location.search);
+  var userEmail = localStorage.getItem('qt_user_email');
+
+  // If URL has a paid tier and email is present — clear anon flag, honor paid tier
+  var tierParam = urlParams.get('tier');
+  if (tierParam && tierParam !== 'free' && TIER_RETENTION[tierParam] && userEmail) {
+    sessionStorage.removeItem('qt_anon_mode');
+    sessionStorage.removeItem('qt_anon');
+    localStorage.setItem('qt_user_tier', tierParam);
+    return tierParam;
+  }
+
+  // Anonymous mode flag set by gateway — always free
+  if (sessionStorage.getItem('qt_anon_mode') === '1') return 'free';
+  if (urlParams.get('mode') === 'anon') return 'free';
+
+  // No email = anonymous session — always free
+  if (!userEmail) return 'free';
+
+  var stored = localStorage.getItem('qt_user_tier');
+  if (stored && stored !== 'free' && TIER_RETENTION[stored]) return stored;
+  if (tierParam && TIER_RETENTION[tierParam]) return tierParam;
+  if (stored && TIER_RETENTION[stored]) return stored;
+  return 'free';
+}
+
+var CURRENT_TIER = getActualTier();
+// Persist tier to localStorage so it survives navigation
+if (CURRENT_TIER !== 'free') localStorage.setItem('qt_user_tier', CURRENT_TIER);
+
+let activeThreadId = null;
+
+// SIDEBAR STATE
+let renameOpenId  = null;
+let allThreads    = [];
+let sidebarOpen   = false;
+let sidebarHasAppeared = false;
+
+const API_BASE = '';
+
+function userEmail() {
+  return localStorage.getItem('qt_user_email') || null;
+}
+
+function getThreadTitle(thread) {
+  var local = localStorage.getItem('qt_thread_title_' + thread.id);
+  if (local) return local;
+  if (thread.title) return thread.title;
+  return thread.query ? (thread.query.length > 60 ? thread.query.slice(0, 60) + '\u2026' : thread.query) : 'Untitled';
+}
+
+// RENDER THREADS - CSP-safe, no innerHTML, no eval
+function renderThreads(threads) {
+  var list = document.getElementById('sidebarThreads');
+  if (!list) return;
+  while (list.firstChild) list.removeChild(list.firstChild);
+
+  if (!threads || threads.length === 0) {
+    var empty = document.createElement('div');
+    empty.style.cssText = 'padding:24px 20px;font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:var(--text-muted);text-align:center;line-height:1.8;';
+    empty.textContent = 'Your interpretations will appear here after your first query.';
+    list.appendChild(empty);
+    return;
+  }
+
+  threads.forEach(function(thread) {
+    var title    = getThreadTitle(thread);
+    var preview  = thread.query ? (thread.query.length > 60 ? thread.query.slice(0, 60) + '\u2026' : thread.query) : '';
+    var isActive = thread.id === activeThreadId;
+    var isLocked = thread.isLocked || false;
+    var expired  = thread.expired || false;
+    var daysLeft = thread.daysLeft != null ? thread.daysLeft : 90;
+
+    var item = document.createElement('div');
+    item.className = 'thread-item' + (isActive ? ' active' : '') + (isLocked ? ' locked' : '');
+    item.id = 'ti-' + thread.id;
+    item.title = 'Double-click to rename';
+    item.addEventListener('click', (function(id) { return function() { selectThread(id); }; })(thread.id));
+    item.addEventListener('dblclick', (function(id) { return function(e) { e.stopPropagation(); startRename(id); }; })(thread.id));
+
+    if (isLocked) {
+      var lock = document.createElement('span');
+      lock.style.cssText = 'float:right;color:var(--gold-dim);font-size:11px;';
+      lock.textContent = '[locked]';
+      item.appendChild(lock);
+    }
+
+    var titleEl = document.createElement('div');
+    titleEl.className = 'thread-title';
+    if (renameOpenId === thread.id) {
+      var inp = document.createElement('input');
+      inp.id = 'rename-input-' + thread.id;
+      inp.className = 'thread-rename-input';
+      inp.value = title;
+      inp.style.cssText = 'width:100%;background:transparent;border:none;border-bottom:1px solid var(--gold-dim);color:var(--text);font-size:14px;font-family:var(--crimson);outline:none;padding:0 0 2px 0;';
+      inp.addEventListener('blur',    (function(id) { return function()  { saveRename(id); }; })(thread.id));
+      inp.addEventListener('keydown', (function(id) { return function(e) { handleRenameKey(e, id); }; })(thread.id));
+      inp.addEventListener('click',   function(e) { e.stopPropagation(); });
+      titleEl.appendChild(inp);
+    } else {
+      titleEl.textContent = title;
+    }
+    item.appendChild(titleEl);
+
+    // Only show subtitle if different from title
+    if (preview && preview !== title) {
+      var previewEl = document.createElement('div');
+      previewEl.className = 'thread-subtitle';
+      previewEl.textContent = preview;
+      item.appendChild(previewEl);
+    }
+
+    var metaEl = document.createElement('div');
+    metaEl.className = 'thread-meta';
+    var dateEl = document.createElement('span');
+    dateEl.className = 'thread-date';
+    dateEl.textContent = thread.lastVisited || '';
+    metaEl.appendChild(dateEl);
+    var badgeClass = 'thread-badge ';
+    if (expired || isLocked) badgeClass += 'badge-expired';
+    else if (daysLeft <= 5)  badgeClass += 'badge-urgent';
+    else if (daysLeft <= 10) badgeClass += 'badge-warn';
+    else                     badgeClass += 'badge-ok';
+    var badge = document.createElement('span');
+    badge.className = badgeClass;
+    badge.textContent = expired ? 'Expired' : (isLocked ? 'Locked' : daysLeft + ' Days Left');
+    metaEl.appendChild(badge);
+    item.appendChild(metaEl);
+
+    // Action buttons container — appears on hover, top right
+    if (!isLocked) {
+      var actionBtns = document.createElement('div');
+      actionBtns.className = 'thread-action-btns';
+
+      var resetBtn = document.createElement('button');
+      resetBtn.className = 'thread-reset-btn';
+      resetBtn.title = 'Reset expiry clock (costs 1 query)';
+      resetBtn.textContent = '↺';
+      resetBtn.addEventListener('click', (function(id) {
+        return function(e) { e.stopPropagation(); resetThreadExpiry(id); };
+      })(thread.id));
+      actionBtns.appendChild(resetBtn);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'thread-delete-btn';
+      delBtn.title = 'Delete thread';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', (function(id) {
+        return function(e) { e.stopPropagation(); deleteThread(id); };
+      })(thread.id));
+      actionBtns.appendChild(delBtn);
+
+      item.appendChild(actionBtns);
+    }
+
+    list.appendChild(item);
+  });
+
+  if (renameOpenId) {
+    var ri = document.getElementById('rename-input-' + renameOpenId);
+    if (ri) { ri.focus(); ri.select(); }
+  }
+}
+
+// SELECT THREAD
+function selectThread(id) {
+  var thread = allThreads.find(function(t) { return t.id === id; });
+  if (!thread) return;
+  activeThreadId = id;
+  renderThreads(allThreads);
+
+  var savedInput = localStorage.getItem('qt_input_' + id) || thread.query || '';
+  var inputEl = document.getElementById('userInput');
+  if (inputEl) inputEl.value = savedInput;
+
+  var localRaw = localStorage.getItem('qt_response_' + id);
+  var localParsed = null;
+  if (localRaw) { try { localParsed = JSON.parse(localRaw); } catch(e) {} }
+  var supaResp = (thread.response && typeof thread.response === 'object' && Object.keys(thread.response).length > 0) ? thread.response : null;
+  var responseData = localParsed || supaResp;
+
+  if (responseData) {
+    renderResult(responseData);
+    showResult();
+    var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
+    var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
+    var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
+    var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
+    restoreFollowUps(id);
+    // Load highlights for this thread
+    loadHighlights(id).then(function() { applyAllHighlights(); renderHlPanel(); });
+  } else {
+    var rb = document.getElementById('resultBlock');      if (rb)  rb.classList.remove('visible');
+    var sb = document.getElementById('subjectBanner');    if (sb)  sb.style.display = 'none';
+    var fs = document.getElementById('followUpSection'); if (fs)  fs.style.display = 'none';
+    var dr = document.getElementById('downloadRow');      if (dr)  dr.style.display = 'none';
+  }
+  var mc = document.getElementById('mainContent');
+  if (mc) mc.scrollTop = 0;
+}
+
+// RESTORE FOLLOW-UPS
+function restoreFollowUps(id) {
+  function renderFU(list) {
+    list.forEach(function(fu) {
+      var el = document.createElement('div');
+      el.style.cssText = 'margin-top:32px;border-top:1px solid var(--border);padding-top:28px;';
+      var question = fu.question || fu.query || '';
+      var resp = (fu.response && typeof fu.response === 'object') ? (fu.response.text || '') : (fu.response || '');
+      var label = document.createElement('div');
+      label.style.cssText = 'font-family:var(--mono);font-size:17px;letter-spacing:0.16em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:10px;';
+      label.textContent = 'Follow-up \u2014 ' + question;
+      var body = document.createElement('div');
+      body.style.cssText = 'font-size:16.5px;color:var(--text);line-height:1.75;';
+      body.textContent = resp;
+      el.appendChild(label);
+      el.appendChild(body);
+      var rc = document.getElementById('resultContent');
+      if (rc) rc.appendChild(el);
+    });
+  }
+  var local = [];
+  try { local = JSON.parse(localStorage.getItem('qt_followups_' + id) || '[]'); } catch(e) {}
+  if (local.length > 0) { renderFU(local); return; }
+  if (!id.startsWith('pending-') && userEmail()) {
+    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-user-email': userEmail() } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFU(data.followUps); })
+    .catch(function() {});
+  }
+}
+
+// SAVE FOLLOW-UP
+function saveFollowUp(threadId, question, response) {
+  if (!threadId) return;
+  var key = 'qt_followups_' + threadId;
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+  list.push({ question: question, response: response });
+  localStorage.setItem(key, JSON.stringify(list));
+  if (!threadId.startsWith('pending-') && userEmail()) {
+    fetch(API_BASE + '/api/followups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
+      body: JSON.stringify({ threadId: threadId, question: question, response: response })
+    }).catch(function() {});
+  }
+}
+
+// RENAME
+function startRename(id) { renameOpenId = id; renderThreads(allThreads); }
+function handleRenameKey(e, id) {
+  if (e.key === 'Enter') saveRename(id);
+  if (e.key === 'Escape') { renameOpenId = null; renderThreads(allThreads); }
+}
+function saveRename(id) {
+  var inp = document.getElementById('rename-input-' + id);
+  if (!inp) return;
+  var val = inp.value.trim();
+  if (val) {
+    localStorage.setItem('qt_thread_title_' + id, val);
+    allThreads = allThreads.map(function(t) { return t.id === id ? Object.assign({}, t, { title: val }) : t; });
+    if (!id.startsWith('pending-') && userEmail()) {
+      fetch(API_BASE + '/api/threads', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
+        body: JSON.stringify({ threadId: id, title: val })
+      }).catch(function() {});
+    }
+  }
+  renameOpenId = null;
+  renderThreads(allThreads);
+}
+
+// SEARCH
+function filterThreads(query) {
+  if (!query.trim()) { renderThreads(allThreads); return; }
+  var q = query.toLowerCase();
+  renderThreads(allThreads.filter(function(t) {
+    return getThreadTitle(t).toLowerCase().includes(q) || (t.query || '').toLowerCase().includes(q);
+  }));
+}
+
+// RESET THREAD EXPIRY
+function resetThreadExpiry(id) {
+  var thread = allThreads.find(function(t) { return t.id === id; });
+  if (!thread) return;
+  var email = userEmail();
+  if (!email) return;
+
+  // Optimistic update — reset daysLeft in UI immediately
+  var retentionDays = TIER_RETENTION[CURRENT_TIER] || 90;
+  allThreads = allThreads.map(function(t) {
+    return t.id === id ? Object.assign({}, t, { daysLeft: retentionDays, expired: false }) : t;
+  });
+  renderThreads(allThreads);
+
+  // Call server to reset expiry and draw 1 query
+  fetch(API_BASE + '/api/threads', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+    body: JSON.stringify({ threadId: id, action: 'reset_expiry' })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      console.error('Reset failed:', data.error);
+      // Revert optimistic update on failure
+      initSidebar();
+    } else {
+      decrementSidebarCounter();
+    }
+  })
+  .catch(function() { initSidebar(); });
+}
+
+// DELETE
+var _deletedThread = null;
+function deleteThread(id) {
+  var thread = allThreads.find(function(t) { return t.id === id; });
+  if (!thread) return;
+  _deletedThread = { thread: thread, title: localStorage.getItem('qt_thread_title_' + id),
+    response: localStorage.getItem('qt_response_' + id), input: localStorage.getItem('qt_input_' + id),
+    followups: localStorage.getItem('qt_followups_' + id) };
+  allThreads = allThreads.filter(function(t) { return t.id !== id; });
+  renderThreads(allThreads);
+  if (activeThreadId === id) {
+    activeThreadId = null;
+    var rb = document.getElementById('resultBlock'); if (rb) rb.classList.remove('visible');
+  }
+  var toast = document.getElementById('undoToast'); if (toast) toast.style.display = 'flex';
+  setTimeout(function() { confirmDelete(id); }, 5000);
+}
+function confirmDelete(id) {
+  if (!_deletedThread || _deletedThread.thread.id !== id) return;
+  if (!id.startsWith('pending-') && userEmail()) {
+    fetch(API_BASE + '/api/threads', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
+      body: JSON.stringify({ threadId: id })
+    }).catch(function() {});
+  }
+  ['qt_response_', 'qt_input_', 'qt_followups_', 'qt_thread_title_'].forEach(function(k) {
+    localStorage.removeItem(k + id);
+  });
+  _deletedThread = null;
+  var toast = document.getElementById('undoToast'); if (toast) toast.style.display = 'none';
+}
+
+// ADD THREAD TO SIDEBAR
+function addThreadToSidebar(queryText) {
+  var tsNow = Date.now(), tempId = 'pending-' + tsNow;
+  allThreads.unshift({ id: tempId, title: queryText.length > 60 ? queryText.slice(0, 60) + '\u2026' : queryText,
+    query: queryText, lastVisited: formatNow(), createdAt: tsNow,
+    daysLeft: TIER_RETENTION[CURRENT_TIER] || 90, expired: false, response: null });
+  activeThreadId = tempId;
+  renderThreads(allThreads);
+  if (userEmail()) {
+    setTimeout(function() {
+      fetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.threads) return;
+        allThreads = data.threads;
+        if (allThreads.length > 0) activeThreadId = allThreads[0].id;
+        renderThreads(allThreads);
+      }).catch(function() {});
+    }, 2500);
+  }
+}
+
+// SHOW SIDEBAR AFTER QUERY
+function showSidebarAfterQuery(queryText) {
+  var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+  if (!sidebarHasAppeared) {
+    sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
+    sidebarHasAppeared = true; localStorage.setItem('qt_sidebar_appeared', '1');
+  }
+  if (!sidebarOpen) {
+    sidebarOpen = true; sidebar.classList.add('open');
+    var mc = document.getElementById('mainContent'); if (mc) mc.classList.add('sidebar-open');
+    if (toggle) toggle.textContent = '‹'; localStorage.setItem('qt_sidebar_open', '1');
+  }
+  addThreadToSidebar(queryText);
+}
+
+// TOGGLE SIDEBAR
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  var sidebar = document.getElementById('sidebar');
+  var main    = document.getElementById('mainContent');
+  var toggle  = document.getElementById('sidebarToggle');
+  if (sidebar) sidebar.classList.toggle('open', sidebarOpen);
+  if (main)    main.classList.toggle('sidebar-open', sidebarOpen);
+  if (toggle)  toggle.textContent = sidebarOpen ? '‹' : '☰';
+  localStorage.setItem('qt_sidebar_open', sidebarOpen ? '1' : '0');
+}
+
+// INIT SIDEBAR
+function decrementSidebarCounter() {
+  const countEl = document.getElementById('sidebarQueryCountText');
+  const wrapEl  = document.getElementById('sidebarCredits');
+  if (!countEl || wrapEl.style.display === 'none') return;
+  const match = countEl.textContent.match(/(\d+)/);
+  if (!match) return;
+  const current = parseInt(match[1]);
+  const updated = Math.max(0, current - 1);
+  countEl.textContent = updated === 1 ? '1 query remaining' : `${updated} queries remaining`;
+}
+
+function toggleSessionsPanel() {
+  var panel = document.getElementById('sessionsPanel');
+  if (!panel) return;
+  var isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  var btn = document.getElementById('sidebarAddSessionsBtn');
+  if (btn) btn.textContent = isOpen ? '+ Sessions' : '↑ Sessions';
+}
+
+async function loadSidebarCredits() {
+  const email = localStorage.getItem('qt_user_email');
+  if (!email || CURRENT_TIER === 'free') return;
+
+  const tierLimits = { refraction: 100, scholar: 100, theologian: null, full_spectrum: null, companion: null, trial: 250 };
+  const limit = tierLimits[CURRENT_TIER];
+
+  // Unlimited tiers — hide the counter entirely
+  if (limit === null) return;
+
+  try {
+    const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    const res = await fetch(
+      `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=query_count,purchased_credits&limit=1`,
+      { headers: { 'apikey': sbAnon, 'Authorization': `Bearer ${sbAnon}` } }
+    );
+    const data = await res.json();
+    if (!data?.[0]) return;
+
+    const used    = data[0].query_count || 0;
+    const credits = data[0].purchased_credits || 0;
+    const monthly = Math.max(0, limit - used);
+    const total   = monthly + credits;
+
+    const countEl   = document.getElementById('sidebarQueryCountText');
+    const wrapEl    = document.getElementById('sidebarCredits');
+    const tooltipEl = document.getElementById('sidebarQueryTooltip');
+    const hoverEl   = document.getElementById('sidebarQueryCount');
+    if (!countEl || !wrapEl) return;
+
+    countEl.textContent = total === 1 ? '1 query remaining' : `${total} queries remaining`;
+
+    if (tooltipEl) {
+      tooltipEl.textContent = `${monthly} monthly  ·  ${credits} Signal Bank`;
+    }
+    if (hoverEl && tooltipEl) {
+      hoverEl.addEventListener('mouseenter', () => tooltipEl.style.display = 'block');
+      hoverEl.addEventListener('mouseleave', () => tooltipEl.style.display = 'none');
+    }
+    wrapEl.style.display = 'flex';
+  } catch {}
+}
+
+function updateSidebarCredits(newCredits) {
+  const countEl = document.getElementById('sidebarQueryCountText');
+  const wrapEl  = document.getElementById('sidebarCredits');
+  if (!countEl || !wrapEl) return;
+  const match = countEl.textContent.match(/(\d+)/);
+  const current = match ? parseInt(match[1]) : 0;
+  const updated = current + newCredits;
+  countEl.textContent = updated === 1 ? '1 query remaining' : `${updated} queries remaining`;
+  wrapEl.style.display = 'flex';
+}
+
+function initSidebar() {
+  var tierLabels = { scholar: 'Refraction \u00b7 90 Day Archive', theologian: 'Full Spectrum \u00b7 180 Day Archive',
+    companion: 'Full Spectrum \u00b7 1 Year Archive', free: 'Free Access' };
+  var labelEl = document.getElementById('sidebarTierLabel');
+  if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || 'Refraction \u00b7 90 Day Archive';
+
+  loadSidebarCredits();
+
+  var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
+  var email  = userEmail();
+
+  if (!email || CURRENT_TIER === 'free') { allThreads = []; renderThreads(allThreads); return; }
+
+  var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
+  var wasOpen     = localStorage.getItem('qt_sidebar_open') === '1';
+  if (hasAppeared && sidebar) {
+    sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
+    sidebarHasAppeared = true;
+    if (wasOpen) {
+      sidebarOpen = true; sidebar.classList.add('open');
+      var mc = document.getElementById('mainContent'); if (mc) mc.classList.add('sidebar-open');
+      if (toggle) toggle.textContent = '‹';
+    }
+  }
+
+  fetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': email } })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.threads) return;
+    allThreads = data.threads;
+    if (!localStorage.getItem('qt_migration_done')) {
+      var raw = localStorage.getItem('qt_threads');
+      var local = [];
+      try { if (raw) local = JSON.parse(raw); } catch(e) {}
+      if (local.length > 0) {
+        fetch(API_BASE + '/api/migrate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+          body: JSON.stringify({ threads: local })
+        }).catch(function() {});
+      }
+      localStorage.setItem('qt_migration_done', '1');
+    }
+    if (allThreads.length > 0 && sidebar) {
+      sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
+      sidebarHasAppeared = true; localStorage.setItem('qt_sidebar_appeared', '1');
+      if (!sidebarOpen) {
+        sidebarOpen = true; sidebar.classList.add('open');
+        var mc2 = document.getElementById('mainContent'); if (mc2) mc2.classList.add('sidebar-open');
+        if (toggle) toggle.textContent = '‹';
+      }
+    }
+    renderThreads(allThreads);
+  })
+  .catch(function(err) {
+    console.error('initSidebar error:', err.message);
+    var raw = localStorage.getItem('qt_threads');
+    allThreads = [];
+    try { if (raw) allThreads = JSON.parse(raw); } catch(e) {}
+    renderThreads(allThreads);
+  });
+}
+
+function undoDelete() {
+  if (!_deletedThread) return;
+  if (_deleteTimer) clearTimeout(_deleteTimer);
+
+  // Restore thread
+  allThreads.unshift(_deletedThread.thread);
+  localStorage.setItem('qt_threads', JSON.stringify(allThreads));
+
+  // Restore associated data
+  if (_deletedThread.response) localStorage.setItem('qt_response_' + _deletedThread.thread.id, _deletedThread.response);
+  if (_deletedThread.input)    localStorage.setItem('qt_input_' + _deletedThread.thread.id, _deletedThread.input);
+  if (_deletedThread.followups) localStorage.setItem('qt_followups_' + _deletedThread.thread.id, _deletedThread.followups);
+  if (_deletedThread.title)    localStorage.setItem('qt_thread_title_' + _deletedThread.thread.id, _deletedThread.title);
+
+  _deletedThread = null;
+  renderThreads(allThreads);
+
+  var toast = document.getElementById('undoToast');
+  if (toast) toast.style.display = 'none';
+}
+
+async function handleLogout() {
+  // Sign out of Supabase Auth
+  try {
+    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    await fetch(sbUrl + '/auth/v1/logout', {
+      method: 'POST',
+      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon }
+    });
+  } catch(e) { /* silent — proceed with local clear regardless */ }
+
+  // Clear session identity only — preserve thread history for when user logs back in
+  var keysToRemove = ['qt_user_email', 'qt_user_tier', 'qt_sidebar_appeared', 'qt_sidebar_open'];
+  keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+
+  // Clear session storage
+  sessionStorage.clear();
+
+  // Redirect to gateway
+  window.location.href = '/qt-gateway.html';
+}
+
+/* ── SHARE MODAL ── */
+
+function openShareModal() {
+  document.getElementById('shareModal').style.display = 'flex';
+  document.getElementById('shareRecipientEmail').value = '';
+  document.getElementById('shareModalStatus').textContent = '';
+  document.getElementById('shareModalStatus').style.display = 'none';
+  document.getElementById('shareModalBtn').disabled = false;
+  document.getElementById('shareRecipientEmail').focus();
+}
+
+function closeShareModal() {
+  document.getElementById('shareModal').style.display = 'none';
+}
+
+async function submitShare() {
+  var recipientEmail = document.getElementById('shareRecipientEmail').value.trim();
+  var statusEl = document.getElementById('shareModalStatus');
+  var btn = document.getElementById('shareModalBtn');
+
+  if (!recipientEmail) {
+    statusEl.textContent = 'Please enter an email address.';
+    statusEl.style.color = '#b85c5c';
+    statusEl.style.display = 'block';
+    return;
+  }
+
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(recipientEmail)) {
+    statusEl.textContent = 'Please enter a valid email address.';
+    statusEl.style.color = '#b85c5c';
+    statusEl.style.display = 'block';
+    return;
+  }
+
+  // Get current parsed result from resultContent — stored globally at render time
+  if (!window._lastParsedResult) {
+    statusEl.textContent = 'No interpretation to share. Run a query first.';
+    statusEl.style.color = '#b85c5c';
+    statusEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.textContent = 'Sending…';
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.style.display = 'block';
+
+  var senderEmail = localStorage.getItem('qt_user_email') || 'anonymous@theprism.io';
+  var snapshot = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
+
+  try {
+    var res = await fetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ senderEmail: senderEmail, recipientEmail: recipientEmail, snapshot: snapshot })
+    });
+
+    var data = await res.json();
+
+    if (!res.ok || !data.success) {
+      statusEl.textContent = 'Could not send. Please try again.';
+      statusEl.style.color = '#b85c5c';
+      btn.disabled = false;
+      return;
+    }
+
+    statusEl.textContent = 'Sent. They will receive an email with the interpretation.';
+    statusEl.style.color = 'var(--gold)';
+    btn.disabled = true;
+
+    // Auto-close after 3 seconds
+    setTimeout(closeShareModal, 3000);
+
+  } catch (err) {
+    statusEl.textContent = 'Connection error. Please try again.';
+    statusEl.style.color = '#b85c5c';
+    btn.disabled = false;
+  }
+}
+
+// ── CRISIS PANEL ─────────────────────────────────────────────────────────────
+function showCrisisPanel() {
+  // Hide loading, show result area
+  document.getElementById('loadingBlock').classList.remove('visible');
+  document.getElementById('resultBlock').classList.add('visible');
+
+  // Re-enable form
+  document.getElementById('inputSection').style.opacity = '';
+  document.getElementById('inputSection').style.pointerEvents = '';
+  document.getElementById('submitBtn').disabled = false;
+
+  document.getElementById('resultContent').innerHTML = `
+    <div id="crisisPanel" style="
+      border: 1px solid #4a3030;
+      background: linear-gradient(135deg, rgba(90,40,40,0.18), rgba(13,13,20,0.6));
+      padding: 40px 44px;
+      margin-bottom: 32px;
+    ">
+      <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; text-transform:uppercase; color:#c08080; margin-bottom:20px;">
+        Before We Continue
+      </div>
+      <div style="font-family:var(--crimson); font-size:20px; color:var(--text); line-height:1.85; margin-bottom:28px;">
+        Something in what you wrote suggests you may be carrying more than a theological question right now.
+        The framework will be here — but if you're in a place of real pain, you don't have to navigate it alone.
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:28px;">
+        <div style="border:1px solid #4a3030; padding:22px 20px; background:rgba(13,13,20,0.5);">
+          <div style="font-family:var(--cinzel); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:#c08080; margin-bottom:8px;">Crisis Line</div>
+          <div style="font-family:var(--crimson); font-size:17px; color:var(--text); line-height:1.6; margin-bottom:14px;">988 Suicide & Crisis Lifeline — call or text <strong style="color:var(--gold-pale);">988</strong> (US)</div>
+          <a href="tel:988" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:inline-block; transition:all 0.25s;">Call 988 →</a>
+        </div>
+        <div style="border:1px solid #4a3030; padding:22px 20px; background:rgba(13,13,20,0.5);">
+          <div style="font-family:var(--cinzel); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:#c08080; margin-bottom:8px;">Crisis Text Line</div>
+          <div style="font-family:var(--crimson); font-size:17px; color:var(--text); line-height:1.6; margin-bottom:14px;">Text <strong style="color:var(--gold-pale);">HOME</strong> to <strong style="color:var(--gold-pale);">741741</strong> — free, confidential, 24/7</div>
+          <a href="sms:741741?body=HOME" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:inline-block; transition:all 0.25s;">Text Now →</a>
+        </div>
+        <div style="border:1px solid #4a3030; padding:22px 20px; background:rgba(13,13,20,0.5);">
+          <div style="font-family:var(--cinzel); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:#c08080; margin-bottom:8px;">International</div>
+          <div style="font-family:var(--crimson); font-size:17px; color:var(--text); line-height:1.6; margin-bottom:14px;">A directory of crisis lines in over 50 countries</div>
+          <a href="https://www.iasp.info/resources/Crisis_Centres/" target="_blank" rel="noopener" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:inline-block; transition:all 0.25s;">Find Support →</a>
+        </div>
+      </div>
+      <div style="border-top:1px solid #4a3030; padding-top:24px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+        <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.7; flex:1; min-width:200px;">
+          If you'd still like to explore the framework, you can continue below. The Prism isn't going anywhere.
+        </div>
+        <button onclick="dismissCrisisPanel()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:11px 22px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; white-space:nowrap; transition:all 0.2s;">Continue to Framework →</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('resultContent').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function dismissCrisisPanel() {
+  var panel = document.getElementById('crisisPanel');
+  if (panel) {
+    panel.style.transition = 'opacity 0.4s ease';
+    panel.style.opacity = '0';
+    setTimeout(function() {
+      if (panel.parentNode) panel.parentNode.removeChild(panel);
+      document.getElementById('resultBlock').classList.remove('visible');
+      document.getElementById('userInput').focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 400);
+  }
+}
+
+// ── SURVEY PANEL ──────────────────────────────────────────────────────────────
+function showSurveyPanel(redirectMessage) {
+  document.getElementById('loadingBlock').classList.remove('visible');
+  document.getElementById('resultBlock').classList.add('visible');
+
+  // Re-enable form
+  document.getElementById('inputSection').style.opacity = '';
+  document.getElementById('inputSection').style.pointerEvents = '';
+  document.getElementById('submitBtn').disabled = false;
+
+  var message = redirectMessage || "The question you're carrying is real — but the Prism works from a specific point of entry, not from altitude. Bring a verse that sits at the center of this tension and ask what it's actually holding.";
+
+  document.getElementById('resultContent').innerHTML = `
+    <div id="surveyPanel" style="
+      border: 1px solid var(--border-lit);
+      background: linear-gradient(135deg, rgba(74,106,170,0.08), rgba(13,13,20,0.6));
+      padding: 40px 44px;
+      margin-bottom: 32px;
+    ">
+      <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:20px;">
+        A Different Entry Point
+      </div>
+      <div style="font-family:var(--crimson); font-size:20px; color:var(--text); line-height:1.85; margin-bottom:32px;">
+        ${escHtml(message)}
+      </div>
+      <div style="border-top:1px solid var(--border); padding-top:24px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+        <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.7; flex:1; min-width:200px;">
+          The Prism opens from a specific passage. Bring the verse — and the tension inside it will surface.
+        </div>
+        <button onclick="dismissSurveyPanel()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:11px 22px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; white-space:nowrap; transition:all 0.2s;">Try a Verse →</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('resultContent').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function dismissSurveyPanel() {
+  var panel = document.getElementById('surveyPanel');
+  if (panel) {
+    panel.style.transition = 'opacity 0.4s ease';
+    panel.style.opacity = '0';
+    setTimeout(function() {
+      if (panel.parentNode) panel.parentNode.removeChild(panel);
+      document.getElementById('resultBlock').classList.remove('visible');
+      document.getElementById('userInput').value = '';
+      document.getElementById('userInput').focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 400);
+  }
+}
+
+// Close modal on backdrop click
+function formatNow() {
+  var now   = new Date();
+  var month = now.toLocaleString('en-US', { month: 'short' });
+  var day   = now.getDate();
+  var hours = now.getHours();
+  var mins  = String(now.getMinutes()).padStart(2, '0');
+  var ampm  = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12 || 12;
+  return month + ' ' + day + ' \u00b7 ' + hours + ':' + mins + ' ' + ampm;
+}
+
+async function runPreflightCheck() {
+  var userEmail = localStorage.getItem('qt_user_email');
+  var _anonMode = sessionStorage.getItem('qt_anon_mode') === '1';
+  var _paidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
+
+  // Show back link for anonymous/free users
+  if (!userEmail || _anonMode || !_paidTier) {
+    var backLink = document.getElementById('anonBackLink');
+    if (backLink) backLink.style.display = 'flex';
+  }
+
+  if (userEmail && !_anonMode && _paidTier) return;
+  try {
+    var res = await fetch('/api/interpret', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+    if (!res.ok) return;
+    var data = await res.json();
+    if (data.locked) {
+      var hrs  = data.hoursRemaining || 0;
+      var secs = data.secondsRemaining || hrs * 3600;
+      var msg  = "You've used your " + (data.queriesUsed || 3) + " free queries. Access resets in " + hrs + " hour" + (hrs !== 1 ? "s" : "") + ".";
+      applyQueryLock(msg, hrs, secs);
+    }
+  } catch(e) {}
+}
+
+// ── SIGNAL SESSIONS POST-PURCHASE HANDLER ────────────────────────────────────
+// Fires when Stripe redirects back with ?credits_added=1 after a Signal Bank
+// purchase. Re-fetches the subscriber record, confirms credits landed, then
+// dismisses the quota wall and restores the submit button.
+
+async function handleCreditsAdded() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('credits_added') !== '1') return;
+
+  // Clean the param from the URL without triggering a reload
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState({}, '', cleanUrl);
+
+  const email = localStorage.getItem('qt_user_email');
+  if (!email) return;
+
+  // Show a brief status message while we verify
+  const statusEl = document.createElement('div');
+  statusEl.id = 'creditsStatus';
+  statusEl.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999;';
+  statusEl.textContent = 'Confirming your Signal Bank…';
+  document.body.appendChild(statusEl);
+
+  // Poll Supabase up to 8 times (every 1.5s) waiting for webhook to land
+  const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+  const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+
+  let credits = 0;
+  for (let i = 0; i < 8; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const res = await fetch(
+        `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=purchased_credits&limit=1`,
+        {
+          headers: {
+            'apikey': sbAnon,
+            'Authorization': `Bearer ${sbAnon}`
+          }
+        }
+      );
+      const data = await res.json();
+      credits = data?.[0]?.purchased_credits || 0;
+      if (credits > 0) break;
+    } catch {}
+  }
+
+  // Dismiss status
+  statusEl.remove();
+
+  if (credits > 0) {
+    // Dismiss quota wall, restore submit button
+    const quotaPrompt = document.getElementById('quotaPrompt');
+    if (quotaPrompt) quotaPrompt.style.display = 'none';
+    const limitPrompt = document.getElementById('limitPrompt');
+    if (limitPrompt) limitPrompt.style.display = 'none';
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) { submitBtn.style.display = ''; submitBtn.disabled = false; }
+    const newSubjectBtn = document.getElementById('newSubjectTopBtn');
+    if (newSubjectBtn) newSubjectBtn.style.display = '';
+
+    // Show confirmation toast
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999; transition:opacity 0.5s;';
+    toast.textContent = `Signal Bank confirmed — ${credits} quer${credits === 1 ? 'y' : 'ies'} available`;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 4000);
+  } else {
+    // Credits didn't land yet — webhook may still be in flight
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--border-lit); padding:14px 28px; font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); z-index:999; transition:opacity 0.5s;';
+    toast.textContent = 'Credits are being processed — refresh in a moment';
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 5000);
+  }
+}
+
+// ── HIGHLIGHT SYSTEM ─────────────────────────────────────────────────────────
+
+var _hlColor       = 'yellow';   // currently selected color in toolbar
+var _hlData        = [];         // [{id, selectedText, note, sectionKey, color}, …]
+var _hlPanelOpen   = true;
+var _pendingRange  = null;       // saved Selection range before toolbar click clears it
+var _hlApiBase     = '/api/highlights';
+
+// Color → CSS class map
+var HL_COLOR_CLASS = { yellow: 'hl-yellow', blue: 'hl-blue', purple: 'hl-purple', green: 'hl-green' };
+// Color → dot fill for panel
+var HL_COLOR_DOT   = { yellow: 'rgba(201,168,76,0.7)', blue: 'rgba(74,106,170,0.7)', purple: 'rgba(140,100,200,0.7)', green: 'rgba(70,160,100,0.7)' };
+
+// Section key labels for the panel
+var SECTION_KEY_LABELS = {
+  recognition: 'Recognition Threshold',
+  '00': 'Echad b\'Emet', '01': 'Entanglement', '02': 'Coherence & Alignment',
+  '03': 'Noise & Decoherence', '04': 'Telos', '05': 'Olam HaBa',
+  '06': 'Key Terms', kingdom: 'Kingdom Implication', verse: 'Verse', followup: 'Follow-up'
+};
+
+function selectHlColor(color, el) {
+  _hlColor = color;
+  document.querySelectorAll('.hl-swatch').forEach(function(s) { s.classList.remove('selected'); });
+  if (el) el.classList.add('selected');
+}
+
+// Detect which section a node lives in inside resultContent
+function getSectionKey(node) {
+  var rc = document.getElementById('resultContent');
+  if (!rc) return 'general';
+  var el = node;
+  while (el && el !== rc) {
+    if (el.classList) {
+      if (el.classList.contains('qt-recognition')) return 'recognition';
+      if (el.classList.contains('kingdom-block'))  return 'kingdom';
+      if (el.classList.contains('verse-banner'))   return 'verse';
+      if (el.classList.contains('qt-section')) {
+        var numEl = el.querySelector('.qt-section-num');
+        return numEl ? numEl.textContent.trim() : 'general';
+      }
+      // Follow-up blocks
+      if (el.style && el.style.borderTop && el.parentElement && el.parentElement.id === 'resultContent') {
+        return 'followup';
+      }
+    }
+    el = el.parentElement;
+  }
+  return 'general';
+}
+
+// Show/hide the floating toolbar
+function showHlToolbar(x, y) {
+  var tb = document.getElementById('hlToolbar');
+  if (!tb) return;
+  tb.classList.add('visible');
+  // Position above the selection
+  var tbH = 44;
+  var left = Math.max(8, Math.min(x - 60, window.innerWidth - 260));
+  var top  = Math.max(8, y - tbH - 10);
+  tb.style.left = left + 'px';
+  tb.style.top  = top  + 'px';
+}
+
+function hideHlToolbar() {
+  var tb = document.getElementById('hlToolbar');
+  if (tb) tb.classList.remove('visible');
+  _pendingRange = null;
+}
+
+// Listen for text selection inside resultContent
+document.addEventListener('mouseup', function(e) {
+  var rc = document.getElementById('resultContent');
+  if (!rc) return;
+
+  // If click is inside the toolbar itself, don't dismiss
+  var tb = document.getElementById('hlToolbar');
+  if (tb && tb.contains(e.target)) return;
+
+  var sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) { hideHlToolbar(); return; }
+
+  var range = sel.getRangeAt(0);
+  var text  = sel.toString().trim();
+  if (!text || text.length < 3) { hideHlToolbar(); return; }
+
+  // Ensure selection is inside resultContent
+  if (!rc.contains(range.commonAncestorContainer)) { hideHlToolbar(); return; }
+
+  // Only available for paid/logged-in users
+  var email = localStorage.getItem('qt_user_email');
+  if (!email || !activeThreadId) { hideHlToolbar(); return; }
+
+  // Save range before mouseup bubbles and clears selection on some browsers
+  _pendingRange = range.cloneRange();
+
+  var rect = range.getBoundingClientRect();
+  showHlToolbar(rect.left + window.scrollX + rect.width / 2, rect.top + window.scrollY);
+});
+
+// Dismiss toolbar on click outside
+document.addEventListener('mousedown', function(e) {
+  var tb = document.getElementById('hlToolbar');
+  if (tb && !tb.contains(e.target)) hideHlToolbar();
+});
+
+async function saveSelectionAsHighlight() {
+  var range = _pendingRange;
+  if (!range) {
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount) range = sel.getRangeAt(0);
+  }
+  if (!range) return;
+
+  var selectedText = range.toString().trim();
+  if (!selectedText) return;
+
+  var sectionKey = getSectionKey(range.commonAncestorContainer);
+  var email = localStorage.getItem('qt_user_email');
+  if (!email || !activeThreadId) return;
+
+  hideHlToolbar();
+  if (window.getSelection) window.getSelection().removeAllRanges();
+
+  try {
+    var res = await fetch(_hlApiBase, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify({
+        threadId: activeThreadId, selectedText: selectedText,
+        sectionKey: sectionKey, color: _hlColor, note: null
+      })
+    });
+    var data = await res.json();
+    if (data.highlight) {
+      _hlData.push(data.highlight);
+      applyHighlightMark(data.highlight);
+      renderHlPanel();
+      showHlToast('Highlight saved');
+    }
+  } catch(e) {
+    console.error('Highlight save failed:', e);
+  }
+}
+
+// Apply a single highlight mark to the DOM using text search
+function applyHighlightMark(hl) {
+  var rc = document.getElementById('resultContent');
+  if (!rc || !hl.selected_text) return;
+
+  var colorClass = HL_COLOR_CLASS[hl.color] || 'hl-yellow';
+
+  // Walk text nodes looking for the selected text
+  var walker = document.createTreeWalker(rc, NodeFilter.SHOW_TEXT, null, false);
+  var node;
+  while ((node = walker.nextNode())) {
+    var idx = node.nodeValue.indexOf(hl.selected_text);
+    if (idx === -1) continue;
+
+    var before = node.nodeValue.slice(0, idx);
+    var after  = node.nodeValue.slice(idx + hl.selected_text.length);
+
+    var mark = document.createElement('mark');
+    mark.className = 'qt-hl ' + colorClass;
+    mark.dataset.hlId = hl.id;
+    mark.title = hl.note ? hl.note : 'Click to add note';
+    mark.textContent = hl.selected_text;
+    mark.addEventListener('click', function() { scrollToHlEntry(this.dataset.hlId); });
+
+    var parent = node.parentNode;
+    var beforeNode = document.createTextNode(before);
+    var afterNode  = document.createTextNode(after);
+    parent.insertBefore(beforeNode, node);
+    parent.insertBefore(mark, node);
+    parent.insertBefore(afterNode, node);
+    parent.removeChild(node);
+    break; // only mark first occurrence
+  }
+}
+
+// Apply all highlights after render
+function applyAllHighlights() {
+  _hlData.forEach(function(hl) { applyHighlightMark(hl); });
+}
+
+// Load highlights for the current thread
+async function loadHighlights(threadId) {
+  _hlData = [];
+  if (!threadId || threadId.startsWith('pending-')) return;
+  var email = localStorage.getItem('qt_user_email');
+  if (!email) return;
+  try {
+    var res  = await fetch(_hlApiBase + '?threadId=' + encodeURIComponent(threadId), {
+      headers: { 'x-user-email': email }
+    });
+    var data = await res.json();
+    _hlData  = data.highlights || [];
+  } catch(e) { _hlData = []; }
+}
+
+// Delete a highlight
+async function deleteHighlight(hlId) {
+  var email = localStorage.getItem('qt_user_email');
+  if (!email) return;
+  _hlData = _hlData.filter(function(h) { return h.id !== hlId; });
+  renderHlPanel();
+  // Remove mark from DOM
+  var mark = document.querySelector('mark[data-hl-id="' + hlId + '"]');
+  if (mark) {
+    var parent = mark.parentNode;
+    parent.replaceChild(document.createTextNode(mark.textContent), mark);
+    parent.normalize();
+  }
+  try {
+    await fetch(_hlApiBase, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify({ highlightId: hlId })
+    });
+  } catch(e) {}
+}
+
+// Update note for a highlight
+async function updateHighlightNote(hlId, note) {
+  var email = localStorage.getItem('qt_user_email');
+  if (!email) return;
+  _hlData = _hlData.map(function(h) {
+    return h.id === hlId ? Object.assign({}, h, { note: note }) : h;
+  });
+  // Update tooltip on mark
+  var mark = document.querySelector('mark[data-hl-id="' + hlId + '"]');
+  if (mark) mark.title = note || 'Click to add note';
+  try {
+    await fetch(_hlApiBase, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify({ highlightId: hlId, note: note })
+    });
+  } catch(e) {}
+}
+
+// Scroll to highlight entry in panel
+function scrollToHlEntry(hlId) {
+  var entry = document.getElementById('hl-entry-' + hlId);
+  if (!entry) return;
+  // Open panel if closed
+  if (!_hlPanelOpen) toggleHlPanel();
+  entry.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  entry.style.background = 'rgba(201,168,76,0.06)';
+  setTimeout(function() { entry.style.background = ''; }, 1200);
+}
+
+// Toggle highlights panel
+function toggleHlPanel() {
+  _hlPanelOpen = !_hlPanelOpen;
+  var list    = document.getElementById('hlList');
+  var icon    = document.getElementById('hlPanelToggleIcon');
+  if (list)   list.style.display   = _hlPanelOpen ? '' : 'none';
+  if (icon)   icon.textContent     = _hlPanelOpen ? '▾' : '▸';
+}
+
+// Render the highlights panel
+function renderHlPanel() {
+  var panel   = document.getElementById('hlPanel');
+  var list    = document.getElementById('hlList');
+  var countEl = document.getElementById('hlPanelCount');
+  if (!panel || !list) return;
+
+  var n = _hlData.length;
+  if (countEl) countEl.textContent = n ? '(' + n + ')' : '';
+
+  // Show/hide panel
+  if (n === 0) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+
+  // Clear and rebuild
+  list.innerHTML = '';
+
+  if (!_hlPanelOpen) { list.style.display = 'none'; return; }
+
+  _hlData.forEach(function(hl) {
+    var entry = document.createElement('div');
+    entry.className = 'hl-entry';
+    entry.id = 'hl-entry-' + hl.id;
+    entry.style.transition = 'background 0.4s';
+
+    var dot = document.createElement('div');
+    dot.className = 'hl-entry-dot';
+    dot.style.background = HL_COLOR_DOT[hl.color] || HL_COLOR_DOT.yellow;
+
+    var body = document.createElement('div');
+    body.className = 'hl-entry-body';
+
+    var section = document.createElement('div');
+    section.className = 'hl-entry-section';
+    section.textContent = SECTION_KEY_LABELS[hl.section_key] || hl.section_key || '';
+
+    var text = document.createElement('div');
+    text.className = 'hl-entry-text';
+    text.textContent = '"' + (hl.selected_text || '') + '"';
+
+    body.appendChild(section);
+    body.appendChild(text);
+
+    if (hl.note) {
+      var noteEl = document.createElement('div');
+      noteEl.className = 'hl-entry-note';
+      noteEl.textContent = hl.note;
+      body.appendChild(noteEl);
+    }
+
+    // Actions row
+    var actions = document.createElement('div');
+    actions.className = 'hl-entry-actions';
+
+    var noteBtn = document.createElement('button');
+    noteBtn.className = 'hl-action-btn';
+    noteBtn.textContent = hl.note ? 'Edit Note' : '+ Note';
+    noteBtn.addEventListener('click', (function(h) {
+      return function() { openNoteEditor(h.id, h.note || ''); };
+    })(hl));
+    actions.appendChild(noteBtn);
+
+    var jumpBtn = document.createElement('button');
+    jumpBtn.className = 'hl-action-btn';
+    jumpBtn.textContent = 'Jump ↑';
+    jumpBtn.addEventListener('click', (function(hlId) {
+      return function() {
+        var mark = document.querySelector('mark[data-hl-id="' + hlId + '"]');
+        if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      };
+    })(hl.id));
+    actions.appendChild(jumpBtn);
+
+    var delBtn = document.createElement('button');
+    delBtn.className = 'hl-action-btn danger';
+    delBtn.textContent = 'Remove';
+    delBtn.addEventListener('click', (function(hlId) {
+      return function() { deleteHighlight(hlId); };
+    })(hl.id));
+    actions.appendChild(delBtn);
+
+    body.appendChild(actions);
+    entry.appendChild(dot);
+    entry.appendChild(body);
+    list.appendChild(entry);
+  });
+}
+
+function openNoteEditor(hlId, currentNote) {
+  var entry = document.getElementById('hl-entry-' + hlId);
+  if (!entry) return;
+  // Remove any existing editor
+  var existing = entry.querySelector('.hl-note-input');
+  if (existing) { existing.remove(); return; }
+
+  var textarea = document.createElement('textarea');
+  textarea.className = 'hl-note-input';
+  textarea.placeholder = 'Add a note…';
+  textarea.value = currentNote;
+  textarea.rows = 2;
+
+  textarea.addEventListener('blur', function() {
+    var newNote = textarea.value.trim();
+    updateHighlightNote(hlId, newNote);
+    renderHlPanel();
+  });
+  textarea.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      textarea.blur();
+    }
+    if (e.key === 'Escape') {
+      textarea.remove();
+    }
+  });
+
+  var actionsEl = entry.querySelector('.hl-entry-actions');
+  if (actionsEl) entry.querySelector('.hl-entry-body').insertBefore(textarea, actionsEl);
+  else entry.querySelector('.hl-entry-body').appendChild(textarea);
+  textarea.focus();
+}
+
+function showHlToast(msg) {
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--gold-dim);padding:10px 24px;font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);z-index:999;transition:opacity 0.4s;';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 400); }, 2000);
+}
+
+// ── END HIGHLIGHT SYSTEM ──────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', function() {
+  initSidebar();
+  runPreflightCheck();
+  handleCreditsAdded();
+  var modal = document.getElementById('shareModal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) closeShareModal();
+    });
+  }
+});
+
+
+</script>
+
+<!-- ── HIGHLIGHT TOOLBAR ── -->
+<div id="hlToolbar" role="toolbar" aria-label="Highlight options">
+  <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">Highlight</span>
+  <div class="hl-divider"></div>
+  <div class="hl-swatch selected" data-color="yellow" title="Gold" style="background:rgba(201,168,76,0.6);" onclick="selectHlColor('yellow',this)"></div>
+  <div class="hl-swatch" data-color="blue"   title="Blue"   style="background:rgba(74,106,170,0.6);"  onclick="selectHlColor('blue',this)"></div>
+  <div class="hl-swatch" data-color="purple" title="Purple" style="background:rgba(140,100,200,0.6);" onclick="selectHlColor('purple',this)"></div>
+  <div class="hl-swatch" data-color="green"  title="Green"  style="background:rgba(70,160,100,0.6);"  onclick="selectHlColor('green',this)"></div>
+  <div class="hl-divider"></div>
+  <button class="hl-save-btn" onclick="saveSelectionAsHighlight()">+ Save</button>
+</div>
+
+<!-- ── SHARE MODAL ── -->
+<div id="shareModal" style="display:none; position:fixed; inset:0; background:rgba(6,6,10,0.85); z-index:1000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+  <div style="background:var(--deep); border:1px solid var(--border); padding:40px; max-width:440px; width:90%; position:relative;">
+    <button onclick="closeShareModal()" style="position:absolute; top:16px; right:16px; background:transparent; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; line-height:1;">✕</button>
+    <div style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:8px;">Share This Interpretation</div>
+    <div style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--text-muted); text-transform:uppercase; margin-bottom:24px;">They will receive an email with a read-only link.</div>
+    <div style="margin-bottom:16px;">
+      <label style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:8px;">Recipient Email</label>
+      <input id="shareRecipientEmail" type="email" placeholder="their@email.com" autocomplete="off"
+        style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:16px; padding:12px 16px; outline:none; transition:border-color 0.2s;"
+        onfocus="this.style.borderColor='var(--gold-dim)'"
+        onblur="this.style.borderColor='var(--border)'"
+        onkeydown="if(event.key==='Enter') submitShare()" />
+    </div>
+    <div id="shareModalStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; margin-bottom:16px; line-height:1.6;"></div>
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <button onclick="closeShareModal()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer;">Cancel</button>
+      <button id="shareModalBtn" onclick="submitShare()" style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">Send →</button>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <a href="/" class="footer-mark">The Prism</a>
+  <div class="footer-copy">
+    OPNX LLC &nbsp;·&nbsp; © 2026 All Rights Reserved
+    <span class="sep">·</span>
+    <a href="/terms">Terms</a>
+    <span class="sep">·</span>
+    <a href="/privacy">Privacy</a>
+  </div>
+</footer>
+  
+</body>
+</html>
