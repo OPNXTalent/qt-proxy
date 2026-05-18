@@ -228,6 +228,7 @@
     color: var(--text-muted);
     display: block;
     margin-bottom: 24px;
+    white-space: nowrap;
   }
 
   .tier-features {
@@ -575,7 +576,7 @@ function toggleBilling() {
     mLabel.style.color = 'var(--text-muted)';
     aLabel.style.color = 'var(--gold)';
     rPrice.innerHTML  = '99<span style="font-size:20px;">/yr</span>';
-    rCad.textContent  = 'per year · 100 queries / month';
+    rCad.textContent  = 'per year · 100 queries / mo';
     rBtn.href         = 'https://buy.stripe.com/dRm3cv2UKcHeg8N1Ut18c0d';
     fsPrice.innerHTML = '249<span style="font-size:20px;">/yr</span>';
     fsCad.textContent = 'per year · unlimited queries';
