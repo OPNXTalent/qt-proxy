@@ -2575,6 +2575,8 @@ function resetThreadExpiry(id) {
       console.error('Reset failed:', data.error);
       // Revert optimistic update on failure
       initSidebar();
+    } else {
+      decrementSidebarCounter();
     }
   })
   .catch(function() { initSidebar(); });
