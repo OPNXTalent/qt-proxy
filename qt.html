@@ -782,6 +782,11 @@
     <p class="header-premise">Submit a verse, phrase, theme, or concept. The Prism surfaces the relational architecture already present in the text.</p>
   </header>
 
+  <!-- Anonymous back link — shown only to non-subscribers -->
+  <div id="anonBackLink" style="display:none; text-align:center; margin-bottom:20px;">
+    <a href="/index.html" style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">← Learn more about The Prism</a>
+  </div>
+
   <!-- INPUT FORM -->
   <div id="inputSection">
         <div class="input-selector">
@@ -3062,6 +3067,13 @@ async function runPreflightCheck() {
   var userEmail = localStorage.getItem('qt_user_email');
   var _anonMode = sessionStorage.getItem('qt_anon_mode') === '1';
   var _paidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
+
+  // Show back link for anonymous/free users
+  if (!userEmail || _anonMode || !_paidTier) {
+    var backLink = document.getElementById('anonBackLink');
+    if (backLink) backLink.style.display = 'block';
+  }
+
   if (userEmail && !_anonMode && _paidTier) return;
   try {
     var res = await fetch('/api/interpret', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
