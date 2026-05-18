@@ -699,9 +699,9 @@
       <button id="sidebarAddSessionsBtn" onclick="toggleSessionsPanel()" style="background:transparent; border:none; padding:0; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); cursor:pointer; text-transform:uppercase; transition:color 0.2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gold-dim)'">+ Sessions</button>
     </div>
 
-    <!-- Signal Sessions inline panel -->
+    <!-- Signal Bank inline panel -->
     <div id="sessionsPanel" style="display:none; margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
-      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Add Signal Sessions</div>
+      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Add Signal Bank</div>
       <div style="display:flex; flex-direction:column; gap:6px;">
         <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">10 queries</span>
@@ -862,13 +862,13 @@
 
     <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
 
-      <!-- Add Signal Sessions -->
+      <!-- Add Signal Bank -->
       <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
         <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Continue Now</div>
-        <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Signal Sessions</div>
+        <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Signal Bank</div>
         <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$2.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
         <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">One-time top-up.<br>No plan change required.</div>
-        <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Sessions →</a>
+        <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Bank →</a>
       </div>
 
       <!-- Wait for reset -->
@@ -2717,7 +2717,7 @@ async function loadSidebarCredits() {
     countEl.textContent = total === 1 ? '1 query remaining' : `${total} queries remaining`;
 
     if (tooltipEl) {
-      tooltipEl.textContent = `${monthly} monthly  ·  ${credits} Signal Sessions`;
+      tooltipEl.textContent = `${monthly} monthly  ·  ${credits} Signal Bank`;
     }
     if (hoverEl && tooltipEl) {
       hoverEl.addEventListener('mouseenter', () => tooltipEl.style.display = 'block');
@@ -3075,7 +3075,7 @@ async function runPreflightCheck() {
 }
 
 // ── SIGNAL SESSIONS POST-PURCHASE HANDLER ────────────────────────────────────
-// Fires when Stripe redirects back with ?credits_added=1 after a Signal Sessions
+// Fires when Stripe redirects back with ?credits_added=1 after a Signal Bank
 // purchase. Re-fetches the subscriber record, confirms credits landed, then
 // dismisses the quota wall and restores the submit button.
 
@@ -3094,7 +3094,7 @@ async function handleCreditsAdded() {
   const statusEl = document.createElement('div');
   statusEl.id = 'creditsStatus';
   statusEl.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999;';
-  statusEl.textContent = 'Confirming your Signal Sessions…';
+  statusEl.textContent = 'Confirming your Signal Bank…';
   document.body.appendChild(statusEl);
 
   // Poll Supabase up to 8 times (every 1.5s) waiting for webhook to land
@@ -3137,7 +3137,7 @@ async function handleCreditsAdded() {
     // Show confirmation toast
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999; transition:opacity 0.5s;';
-    toast.textContent = `Signal Sessions confirmed — ${credits} quer${credits === 1 ? 'y' : 'ies'} available`;
+    toast.textContent = `Signal Bank confirmed — ${credits} quer${credits === 1 ? 'y' : 'ies'} available`;
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 4000);
   } else {
