@@ -171,6 +171,8 @@
     padding: 36px 28px 32px;
     position: relative;
     transition: background 0.2s;
+    display: flex;
+    flex-direction: column;
   }
 
   .tier:hover { background: var(--surface-2); }
@@ -234,7 +236,7 @@
   .tier-features {
     list-style: none;
     margin-bottom: 32px;
-    min-height: 100px;
+    flex: 1;
   }
 
   .tier-features li {
