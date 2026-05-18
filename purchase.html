@@ -163,6 +163,7 @@
     background: var(--border);
     border: 1px solid var(--border);
     margin-bottom: 48px;
+    overflow: visible;
   }
 
   .tier {
@@ -176,12 +177,13 @@
 
   .tier.featured {
     background: linear-gradient(160deg, rgba(201,168,76,0.06), var(--surface));
+    padding-top: 52px;
   }
 
   .tier.featured::before {
     content: 'Most Popular';
     position: absolute;
-    top: -1px;
+    top: -13px;
     left: 50%;
     transform: translateX(-50%);
     background: var(--gold-dim);
@@ -191,6 +193,7 @@
     text-transform: uppercase;
     color: var(--void);
     padding: 4px 14px;
+    white-space: nowrap;
   }
 
   .tier-name {
