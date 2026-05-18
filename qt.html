@@ -1223,7 +1223,7 @@ async function runInterpretation() {
 
   // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
   const _isAnon = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
-  const _isPaidTier = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+  const _isPaidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
   if ((_isAnon || !_isPaidTier) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   // Reset conversation for new subject
@@ -1307,7 +1307,7 @@ async function runInterpretation() {
     decrementSidebarCounter();
     // Only lock the UI for free/anonymous users — paid subscribers are gated server-side
     const _isAnonPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
-    const _isPaidPost = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+    const _isPaidPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
     if ((_isAnonPost || !_isPaidPost) && sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
     }
@@ -1355,7 +1355,7 @@ async function runFollowUp() {
 
   // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
   const _isAnonFU = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
-  const _isPaidTierFU = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+  const _isPaidTierFU = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
   if ((_isAnonFU || !_isPaidTierFU) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
 
   document.getElementById('followUpBtn').disabled = true;
@@ -1440,7 +1440,7 @@ Respond within the QT framework — grounded in Echad b'Emet, relational ontolog
     sessionQueryCount++;
     decrementSidebarCounter();
     const _isAnonFUPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
-    const _isPaidFUPost = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+    const _isPaidFUPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
     if ((_isAnonFUPost || !_isPaidFUPost) && sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
     }
@@ -1689,7 +1689,7 @@ async function callProxy(messages, rawQuery) {
   if (tierFromStream && tierFromStream !== 'trial' && tierFromStream !== 'free') {
     localStorage.setItem('qt_user_tier', tierFromStream);
     CURRENT_TIER = tierFromStream;
-    var tierLabelsMap = { scholar: 'Refraction · 90 Day Archive', theologian: 'Full Spectrum · 180 Day Archive', companion: 'Full Spectrum · 1 Year Archive', free: 'Observer · Free Access' };
+    var tierLabelsMap = { scholar: 'Refraction · 90 Day Archive', refraction: 'Refraction · 90 Day Archive', theologian: 'Full Spectrum · 180 Day Archive', full_spectrum: 'Full Spectrum · 180 Day Archive', companion: 'Full Spectrum · 1 Year Archive', trial: 'Trial · 30 Day Archive', free: 'Observer · Free Access' };
     var labelEl = document.getElementById('sidebarTierLabel');
     if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
@@ -2265,7 +2265,7 @@ document.addEventListener('keydown', e => {
 // ── SIDEBAR SYSTEM ──
 
 // Tier retention windows in days
-var TIER_RETENTION = { scholar: 90, theologian: 180, companion: 365, free: 1 };
+var TIER_RETENTION = { scholar: 90, refraction: 90, theologian: 180, full_spectrum: 180, companion: 365, trial: 30, free: 1 };
 
 // Read actual tier — requires a logged-in email to honor a paid tier
 function getActualTier() {
@@ -3061,7 +3061,7 @@ function formatNow() {
 async function runPreflightCheck() {
   var userEmail = localStorage.getItem('qt_user_email');
   var _anonMode = sessionStorage.getItem('qt_anon_mode') === '1';
-  var _paidTier = ['scholar','theologian','companion'].includes(localStorage.getItem('qt_user_tier'));
+  var _paidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
   if (userEmail && !_anonMode && _paidTier) return;
   try {
     var res = await fetch('/api/interpret', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
