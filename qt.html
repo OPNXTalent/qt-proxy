@@ -691,7 +691,8 @@
     <div class="sidebar-logo">The Prism</div>
     <div class="sidebar-tier" id="sidebarTierLabel">Refraction &nbsp;·&nbsp; 90 Day Archive</div>
     <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
-      <span id="sidebarQueryCount" style="position:relative; cursor:default;">— queries remaining
+      <span id="sidebarQueryCount" style="position:relative; cursor:default;">
+        <span id="sidebarQueryCountText">— queries remaining</span>
         <span id="sidebarQueryTooltip" style="display:none; position:absolute; left:0; top:18px; background:var(--surface-2); border:1px solid var(--border-lit); padding:6px 10px; font-size:9px; letter-spacing:0.12em; color:var(--text-dim); white-space:nowrap; z-index:100; pointer-events:none;"></span>
       </span>
       <span style="color:var(--border-lit);">·</span>
@@ -2663,7 +2664,7 @@ function toggleSidebar() {
 
 // INIT SIDEBAR
 function decrementSidebarCounter() {
-  const countEl = document.getElementById('sidebarQueryCount');
+  const countEl = document.getElementById('sidebarQueryCountText');
   const wrapEl  = document.getElementById('sidebarCredits');
   if (!countEl || wrapEl.style.display === 'none') return;
   const match = countEl.textContent.match(/(\d+)/);
@@ -2707,31 +2708,31 @@ async function loadSidebarCredits() {
     const monthly = Math.max(0, limit - used);
     const total   = monthly + credits;
 
-    const countEl = document.getElementById('sidebarQueryCount');
-    const wrapEl  = document.getElementById('sidebarCredits');
+    const countEl   = document.getElementById('sidebarQueryCountText');
+    const wrapEl    = document.getElementById('sidebarCredits');
+    const tooltipEl = document.getElementById('sidebarQueryTooltip');
+    const hoverEl   = document.getElementById('sidebarQueryCount');
     if (!countEl || !wrapEl) return;
 
     countEl.textContent = total === 1 ? '1 query remaining' : `${total} queries remaining`;
 
-    // Re-append tooltip span (textContent wipes it)
-    const tooltipEl = document.getElementById('sidebarQueryTooltip');
-    if (tooltipEl) countEl.appendChild(tooltipEl);
-
     if (tooltipEl) {
       tooltipEl.textContent = `${monthly} monthly  ·  ${credits} Signal Sessions`;
-      countEl.addEventListener('mouseenter', () => tooltipEl.style.display = 'block');
-      countEl.addEventListener('mouseleave', () => tooltipEl.style.display = 'none');
+    }
+    if (hoverEl && tooltipEl) {
+      hoverEl.addEventListener('mouseenter', () => tooltipEl.style.display = 'block');
+      hoverEl.addEventListener('mouseleave', () => tooltipEl.style.display = 'none');
     }
     wrapEl.style.display = 'flex';
   } catch {}
 }
 
 function updateSidebarCredits(newCredits) {
-  // Called after handleCreditsAdded confirms — refreshes count without re-fetch
-  const countEl = document.getElementById('sidebarQueryCount');
+  const countEl = document.getElementById('sidebarQueryCountText');
   const wrapEl  = document.getElementById('sidebarCredits');
   if (!countEl || !wrapEl) return;
-  const current = parseInt(countEl.textContent) || 0;
+  const match = countEl.textContent.match(/(\d+)/);
+  const current = match ? parseInt(match[1]) : 0;
   const updated = current + newCredits;
   countEl.textContent = updated === 1 ? '1 query remaining' : `${updated} queries remaining`;
   wrapEl.style.display = 'flex';
