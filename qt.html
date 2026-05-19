@@ -1042,12 +1042,12 @@ As the exchange clarifies:
 
 The thread memorializes this exchange. Hold it with care.
 
-You are a Quantum Theology (QT) interpreter. Apply the QT framework to: "${input}"
+You are The Prism framework interpreter. Apply the Prism framework to: "${input}"
 
-QT Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
+Prism Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
 
 Return this exact JSON:
-{"recognition":"2-4 lines of plain-language recognition of the human tension inside this question — before any QT category. Name what the person is actually carrying.","verse_identified":"Most relevant Scripture","verse_text":"Verse quoted accurately","qt_summary":"Two sharp sentences","entanglement":"God's initiation here","coherence_alignment":"How this calls toward alignment","noise_decoherence":"What distortions this exposes","telos_insight":"Christ-form being called toward","olam_haba":"Time-transcendent view","kingdom_implication":"One crisp Kingdom punchline","key_terms":[{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","qt_meaning":"QT meaning"}]}`;
+{"recognition":"2-4 lines of plain-language recognition of the human tension inside this question — before any framework category. Name what the person is actually carrying.","verse_identified":"Most relevant Scripture","verse_text":"Verse quoted accurately","prism_summary":"Two sharp sentences","entanglement":"God's initiation here","coherence_alignment":"How this calls toward alignment","noise_decoherence":"What distortions this exposes","telos_insight":"Christ-form being called toward","olam_haba":"Time-transcendent view","kingdom_implication":"One crisp Kingdom punchline","key_terms":[{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"Prism meaning"},{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"Prism meaning"},{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"Prism meaning"}]}`;
   }
 
   return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. NO BACKTICKS. START YOUR RESPONSE WITH { AND END WITH }. NOTHING ELSE.
@@ -1097,11 +1097,11 @@ As the exchange clarifies:
 
 The thread memorializes this exchange. Hold it with care.
 
-You are a Quantum Theology (QT) framework interpreter. The user has submitted ${typeDescriptions[type]}: "${input}"
+You are The Prism framework interpreter. The user has submitted ${typeDescriptions[type]}: "${input}"
 
-Apply the complete 8-part QT framework. Even if the input is vague, abstract, or a theme rather than a specific verse — identify the most relevant Scripture, apply all eight framework components, and return the JSON.
+Apply the complete 8-part Prism framework. Even if the input is vague, abstract, or a theme rather than a specific verse — identify the most relevant Scripture, apply all eight framework components, and return the JSON.
 
-The QT Framework you must apply:
+The Prism Framework you must apply:
 
 0. Echad b'Emet — Unified in Truth: Reality is built on God's relational truth. Unity > fragmentation. Coherence > chaos. Salvation = restoration into Echad b'Emet. Sin = decoherence. Jesus = full manifestation of Echad b'Emet.
 
@@ -1123,10 +1123,10 @@ The QT Framework you must apply:
 
 Return this exact JSON object (start with { immediately):
 {
-  "recognition": "2-4 sentences of plain-language recognition before any QT category",
+  "recognition": "2-4 sentences of plain-language recognition before any framework category",
   "verse_identified": "Most relevant Scripture",
   "verse_text": "Verse quoted accurately",
-  "qt_summary": "Two sharp sentences",
+  "prism_summary": "Two sharp sentences",
   "entanglement": "God's initiation here",
   "coherence_alignment": "How this calls toward alignment",
   "noise_decoherence": "What distortions this exposes",
@@ -1134,9 +1134,9 @@ Return this exact JSON object (start with { immediately):
   "olam_haba": "Time-transcendent view",
   "kingdom_implication": "One crisp Kingdom punchline",
   "key_terms": [
-    {"term": "Term", "hebrew": "Hebrew if applicable", "qt_meaning": "QT meaning"},
-    {"term": "Term", "hebrew": "Hebrew if applicable", "qt_meaning": "QT meaning"},
-    {"term": "Term", "hebrew": "Hebrew if applicable", "qt_meaning": "QT meaning"}
+    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"},
+    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"},
+    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"}
   ]
 }`;
 }
@@ -1370,7 +1370,7 @@ async function runFollowUp() {
   document.getElementById('followUpLoading').style.display = 'block';
   document.getElementById('followUpLoading').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-  // Build follow-up prompt that stays within QT framework
+  // Build follow-up prompt that stays within Prism framework
   const followUpPrompt = `RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER
 These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.
 
@@ -1416,11 +1416,11 @@ As the exchange clarifies:
 
 The thread memorializes this exchange. Hold it with care.
 
-You are a Quantum Theology (QT) framework interpreter. The user previously received a full QT interpretation of: "${currentSubject}"
+You are The Prism framework interpreter. The user previously received a full Prism interpretation of: "${currentSubject}"
 
 Their follow-up question is: "${input}"
 
-Respond within the QT framework — grounded in Echad b'Emet, relational ontology, entanglement/coherence/decoherence, telos, and Hebrew two-world cosmology where relevant. Be direct and precise. Plain prose, no JSON, no markdown headers.`;
+Respond within the Prism framework — grounded in Echad b'Emet, relational ontology, entanglement/coherence/decoherence, telos, and Hebrew two-world cosmology where relevant. Be direct and precise. Plain prose, no JSON, no markdown headers.`;
 
   // Create follow-up element immediately so we can stream into it
   const followUpEl = document.createElement('div');
@@ -1742,7 +1742,7 @@ function showResult() {
 
 function renderResult(d) {
   const sections = [
-    { num: '00', title: 'Echad b\'Emet', hebrew: 'אֶחָד בֶּאֱמֶת', content: d.qt_summary },
+    { num: '00', title: 'Echad b\'Emet', hebrew: 'אֶחָד בֶּאֱמֶת', content: d.prism_summary },
     { num: '01', title: 'Entanglement', hebrew: 'קֶשֶׁר', content: d.entanglement },
     { num: '02', title: 'Coherence & Alignment', hebrew: 'יִחוּד', content: d.coherence_alignment },
     { num: '03', title: 'Noise & Decoherence', hebrew: 'פֵּרוּד', content: d.noise_decoherence },
@@ -1801,14 +1801,14 @@ function renderResult(d) {
             <thead>
               <tr>
                 <th>Term</th>
-                <th>QT Meaning</th>
+                <th>Prism Meaning</th>
               </tr>
             </thead>
             <tbody>
               ${d.key_terms.map(t => `
                 <tr>
                   <td>${escHtml(t.term)}${t.hebrew ? ` <span style="color:var(--hebrew); font-size: 17px;">${escHtml(t.hebrew)}</span>` : ''}</td>
-                  <td>${escHtml(t.qt_meaning)}</td>
+                  <td>${escHtml(t.prism_meaning)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1907,7 +1907,7 @@ function downloadPDF(mode) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.setTextColor(...gold);
-  doc.text('QUANTUM THEOLOGY', pageW / 2, y + 8, { align: 'center' });
+  doc.text('THE PRISM', pageW / 2, y + 8, { align: 'center' });
   y += 14;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
@@ -2079,7 +2079,7 @@ function downloadPDF(mode) {
     doc.text(`${p} / ${totalPages}`, pageW - margin, pageH - 7, { align: 'right' });
   }
 
-  const filename = `QT_${subject.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)}_${new Date().toISOString().slice(0,10)}_${isDark ? 'dark' : 'print'}.pdf`;
+  const filename = `Prism_${subject.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)}_${new Date().toISOString().slice(0,10)}_${isDark ? 'dark' : 'print'}.pdf`;
   doc.save(filename);
 }
 
