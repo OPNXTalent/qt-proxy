@@ -931,6 +931,20 @@ await fetch('/api/register', {
       err.classList.add('visible');
       return;
     }
+    // Check if this email has already redeemed this code
+const { data: existingRedemption } = await sb
+  .from('code_redemptions')
+  .select('id')
+  .eq('code_id', codeRow.id)
+  .eq('email', email)
+  .single();
+if (existingRedemption) {
+  setBtnLoading(btn, false);
+  document.getElementById('bc-code').classList.add('is-error');
+  err.textContent = 'This code has already been redeemed with this email.';
+  err.classList.add('visible');
+  return;
+}
     await sb.from('subscribers').upsert(
       { email: email, tier: 'free', status: 'active' },
       { onConflict: 'email' }
