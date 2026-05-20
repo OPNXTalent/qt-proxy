@@ -429,7 +429,22 @@
     .signal-grid { grid-template-columns: repeat(2, 1fr); }
     .heading-title { font-size: 24px; }
   }
-</style>
+
+  /* Pre-purchase email modal */
+  #prePurchaseModal { display:none; position:fixed; inset:0; background:rgba(6,6,10,0.85); z-index:9999; align-items:center; justify-content:center; }
+  #prePurchaseModal.active { display:flex; }
+  .pre-purchase-card { background:#0d0d14; border:1px solid #4a4a70; padding:2rem 2.25rem; max-width:400px; width:90%; position:relative; }
+  .pre-purchase-card::before { content:''; position:absolute; top:0; left:10%; right:10%; height:1px; background:linear-gradient(90deg,transparent,#7a6230,transparent); }
+  .pre-purchase-title { font-family:'Cinzel',serif; font-size:13px; letter-spacing:0.2em; color:#e8d5a0; text-transform:uppercase; margin-bottom:0.75rem; }
+  .pre-purchase-copy { font-family:'Crimson Pro',Georgia,serif; font-style:italic; font-size:16px; color:#7a7890; line-height:1.65; margin-bottom:1.25rem; }
+  .pre-purchase-input { width:100%; background:#13131e; border:1px solid #2a2a40; color:#d8d4e8; font-family:'Crimson Pro',Georgia,serif; font-size:16px; padding:10px 12px; outline:none; transition:border-color 0.2s; margin-bottom:0.75rem; box-sizing:border-box; }
+  .pre-purchase-input:focus { border-color:#7a6230; }
+  .pre-purchase-input::placeholder { color:#3a384a; font-style:italic; }
+  .pre-purchase-btn { width:100%; background:transparent; border:1px solid #7a6230; color:#c9a84c; font-family:'Cinzel',serif; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; padding:12px; cursor:pointer; transition:all 0.2s; margin-bottom:0.5rem; }
+  .pre-purchase-btn:hover { background:#7a6230; color:#06060a; }
+  .pre-purchase-skip { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:#3a384a; background:none; border:none; cursor:pointer; padding:0; transition:color 0.2s; display:block; margin:0 auto; }
+  .pre-purchase-skip:hover { color:#7a7890; }
+
 </head>
 <body>
 
@@ -516,28 +531,28 @@
 
   <div class="signal-grid">
 
-    <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" class="signal-card">
+    <a href="#" onclick="interceptPurchase('https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b'); return false;" class="signal-card">
       <span class="signal-qty">Signal 10</span>
       <span class="signal-count">10</span>
       <span class="signal-price">$2.99</span>
       <span class="signal-buy">Buy →</span>
     </a>
 
-    <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" class="signal-card">
+    <a href="#" onclick="interceptPurchase('https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09'); return false;" class="signal-card">
       <span class="signal-qty">Signal 25</span>
       <span class="signal-count">25</span>
       <span class="signal-price">$6.99</span>
       <span class="signal-buy">Buy →</span>
     </a>
 
-    <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" class="signal-card featured-signal">
+    <a href="#" onclick="interceptPurchase('https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08'); return false;" class="signal-card featured-signal">
       <span class="signal-qty">Signal 50</span>
       <span class="signal-count">50</span>
       <span class="signal-price">$12.99</span>
       <span class="signal-buy">Buy →</span>
     </a>
 
-    <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" class="signal-card">
+    <a href="#" onclick="interceptPurchase('https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07'); return false;" class="signal-card">
       <span class="signal-qty">Signal 100</span>
       <span class="signal-count">100</span>
       <span class="signal-price">$19.99</span>
@@ -555,8 +570,60 @@
 
 </div>
 
+<!-- Pre-purchase email capture modal -->
+<div id="prePurchaseModal">
+  <div class="pre-purchase-card">
+    <div class="pre-purchase-title">One More Step</div>
+    <div class="pre-purchase-copy">Drop your email so we can credit your account the moment payment clears. Your queries will be waiting when you return.</div>
+    <input class="pre-purchase-input" type="email" id="prePurchaseEmail" placeholder="your@email.com" />
+    <button class="pre-purchase-btn" onclick="handlePrePurchaseContinue()">Continue to Checkout →</button>
+    <button class="pre-purchase-skip" onclick="handlePrePurchaseSkip()">Skip — continue without saving email</button>
+  </div>
+</div>
+
 <script>
 var _billingAnnual = false;
+var _pendingStripeUrl = null;
+
+function interceptPurchase(stripeUrl) {
+  var email = localStorage.getItem('qt_user_email');
+  if (email) { window.location.href = stripeUrl; return; }
+  _pendingStripeUrl = stripeUrl;
+  var modal = document.getElementById('prePurchaseModal');
+  if (modal) modal.classList.add('active');
+  setTimeout(function() {
+    var input = document.getElementById('prePurchaseEmail');
+    if (input) input.focus();
+  }, 100);
+}
+
+async function handlePrePurchaseContinue() {
+  var email = document.getElementById('prePurchaseEmail').value.trim();
+  if (email) {
+    localStorage.setItem('qt_user_email', email);
+    try {
+      var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+      var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+      await fetch(sbUrl + '/rest/v1/subscribers', {
+        method: 'POST',
+        headers: {
+          'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon,
+          'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates'
+        },
+        body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+      });
+    } catch(e) {}
+  }
+  var modal = document.getElementById('prePurchaseModal');
+  if (modal) modal.classList.remove('active');
+  if (_pendingStripeUrl) window.location.href = _pendingStripeUrl;
+}
+
+function handlePrePurchaseSkip() {
+  var modal = document.getElementById('prePurchaseModal');
+  if (modal) modal.classList.remove('active');
+  if (_pendingStripeUrl) window.location.href = _pendingStripeUrl;
+}
 
 function toggleBilling() {
   _billingAnnual = !_billingAnnual;
