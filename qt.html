@@ -2757,7 +2757,13 @@ function initSidebar() {
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
 
-  if (!email || CURRENT_TIER === 'free') { allThreads = []; renderThreads(allThreads); return; }
+  if (!email || CURRENT_TIER === 'free') { allThreads = []; renderThreads(allThreads); }
+
+// Always show sidebar toggle and panel on load
+if (sidebar) { sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible'); }
+sidebarHasAppeared = true; localStorage.setItem('qt_sidebar_appeared', '1');
+
+if (!email || CURRENT_TIER === 'free') return;
 
   var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
   var wasOpen     = localStorage.getItem('qt_sidebar_open') === '1';
