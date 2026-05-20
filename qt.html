@@ -2674,7 +2674,7 @@ function toggleSidebar() {
 function decrementSidebarCounter() {
   const countEl = document.getElementById('sidebarQueryCountText');
   const wrapEl  = document.getElementById('sidebarCredits');
-  if (!countEl || wrapEl.style.display === 'none') return;
+  if (!countEl || !wrapEl || wrapEl.style.display === 'none') return;
   const match = countEl.textContent.match(/(\d+)/);
   if (!match) return;
   const current = parseInt(match[1]);
