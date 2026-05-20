@@ -2719,9 +2719,9 @@ function toggleSessionsPanel() {
 
 async function loadSidebarCredits() {
   const email = localStorage.getItem('qt_user_email');
-  if (!email || CURRENT_TIER === 'free') return;
+  if (!email) return;
 
-  const tierLimits = { refraction: 100, scholar: 100, theologian: null, full_spectrum: null, companion: null, trial: 250 };
+  const tierLimits = { refraction: 100, scholar: 100, theologian: null, full_spectrum: null, companion: null, trial: 250, free: 0 };
   const limit = tierLimits[CURRENT_TIER];
 
   // Unlimited tiers — hide the counter entirely
