@@ -571,7 +571,7 @@
 </div>
 
 <!-- Pre-purchase email capture modal -->
-<div id="prePurchaseModal">
+<div id="prePurchaseModal" style="display:none;">
   <div class="pre-purchase-card">
     <div class="pre-purchase-title">One More Step</div>
     <div class="pre-purchase-copy">Drop your email so we can credit your account the moment payment clears. Your queries will be waiting when you return.</div>
@@ -590,7 +590,7 @@ function interceptPurchase(stripeUrl) {
   if (email) { window.location.href = stripeUrl; return; }
   _pendingStripeUrl = stripeUrl;
   var modal = document.getElementById('prePurchaseModal');
-  if (modal) modal.classList.add('active');
+  if (modal) modal.style.display = 'flex';
   setTimeout(function() {
     var input = document.getElementById('prePurchaseEmail');
     if (input) input.focus();
@@ -615,13 +615,13 @@ async function handlePrePurchaseContinue() {
     } catch(e) {}
   }
   var modal = document.getElementById('prePurchaseModal');
-  if (modal) modal.classList.remove('active');
+  if (modal) modal.style.display = 'none';
   if (_pendingStripeUrl) window.location.href = _pendingStripeUrl;
 }
 
 function handlePrePurchaseSkip() {
   var modal = document.getElementById('prePurchaseModal');
-  if (modal) modal.classList.remove('active');
+  if (modal) modal.style.display = 'none';
   if (_pendingStripeUrl) window.location.href = _pendingStripeUrl;
 }
 
