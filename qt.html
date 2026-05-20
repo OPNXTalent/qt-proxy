@@ -169,6 +169,14 @@
 
   .sidebar-upgrade-prompt { margin: 12px 16px; padding: 14px 16px; border: 1px solid var(--border); background: rgba(201,168,76,0.03); font-family: var(--crimson); font-style: italic; font-size: 13px; color: var(--text-dim); line-height: 1.6; }
   .sidebar-upgrade-prompt a { color: var(--gold); text-decoration: none; font-style: normal; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; display: block; margin-top: 10px; text-transform: uppercase; }
+  .sidebar-save-place { margin: 8px 16px 4px; padding: 14px 16px; border: 1px solid var(--border); background: rgba(201,168,76,0.02); }
+  .sidebar-save-place p { font-family: var(--crimson); font-style: italic; font-size: 13px; color: var(--text-dim); line-height: 1.6; margin-bottom: 10px; }
+  .sidebar-save-place input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--crimson); font-size: 14px; padding: 8px 10px; outline: none; transition: border-color 0.2s; margin-bottom: 8px; box-sizing: border-box; }
+  .sidebar-save-place input:focus { border-color: var(--gold-dim); }
+  .sidebar-save-place input::placeholder { color: var(--text-muted); font-style: italic; }
+  .sidebar-save-place button { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold-dim); background: transparent; border: 1px solid var(--border); padding: 7px 12px; cursor: pointer; transition: all 0.2s; width: 100%; }
+  .sidebar-save-place button:hover { border-color: var(--gold-dim); color: var(--gold); }
+  .sidebar-save-place-confirm { font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; color: var(--gold-dim); margin-top: 6px; display: none; text-align: center; }
   .sidebar-expand-tip { 
   display: none; 
   position: absolute; 
@@ -762,6 +770,16 @@
   <div class="sidebar-upgrade-prompt" id="freeUpgradePrompt" style="display:none;">
     Your interpretations are saved and organized when you subscribe. Start your archive.
     <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank">Subscribe → Refraction</a>
+  </div>
+
+  <!-- Save my place prompt — shown for anonymous/free users without email -->
+  <div id="savePlacePrompt" style="display:none;">
+    <div class="sidebar-save-place">
+      <p>Want to pick up where you left off? Share your email and we'll hold your place.</p>
+      <input type="email" id="savePlaceEmail" placeholder="your@email.com" />
+      <button onclick="handleSavePlace()">Save My Place →</button>
+      <div class="sidebar-save-place-confirm" id="savePlaceConfirm">✓ Your place is saved.</div>
+    </div>
   </div>
 
   <!-- New Subject button in sidebar -->
@@ -2682,6 +2700,46 @@ function showSidebarAfterQuery(queryText) {
     if (toggle) toggle.textContent = '‹'; localStorage.setItem('qt_sidebar_open', '1');
   }
   addThreadToSidebar(queryText);
+
+  // Show save-place prompt for anonymous or free users without a stored email
+  if (!userEmail() || CURRENT_TIER === 'free') {
+    var savePlaceEl = document.getElementById('savePlacePrompt');
+    if (savePlaceEl && !localStorage.getItem('qt_save_place_done')) {
+      savePlaceEl.style.display = 'block';
+    }
+  }
+}
+
+// SAVE MY PLACE
+async function handleSavePlace() {
+  var email = document.getElementById('savePlaceEmail').value.trim();
+  if (!email) return;
+  var btn = document.querySelector('#savePlacePrompt button');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+
+  localStorage.setItem('qt_user_email', email);
+  localStorage.setItem('qt_save_place_done', '1');
+
+  try {
+    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    await fetch(sbUrl + '/rest/v1/subscribers', {
+      method: 'POST',
+      headers: {
+        'apikey': sbAnon,
+        'Authorization': 'Bearer ' + sbAnon,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=ignore-duplicates'
+      },
+      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+    });
+  } catch(e) {}
+
+  var input   = document.getElementById('savePlaceEmail');
+  var confirm = document.getElementById('savePlaceConfirm');
+  if (input)   input.style.display   = 'none';
+  if (btn)     btn.style.display     = 'none';
+  if (confirm) confirm.style.display = 'block';
 }
 
 // TOGGLE SIDEBAR
