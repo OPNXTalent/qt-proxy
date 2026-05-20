@@ -907,7 +907,7 @@ await fetch('/api/register', {
     setBtnLoading(btn, true);
     var { data: codeRow, error: codeErr } = await sb
       .from('access_codes')
-      .select('id, max_redemptions, redemption_count, expires_at')
+      .select('id, max_redemptions, redemption_count, expires_at, credits')
       .eq('code', code)
       .single();
     if (codeErr || !codeRow) {
@@ -920,7 +920,7 @@ await fetch('/api/register', {
     if (codeRow.redemption_count >= codeRow.max_redemptions) {
       setBtnLoading(btn, false);
       document.getElementById('bc-code').classList.add('is-error');
-      err.textContent = 'This code has reached its maximum redemptions.';
+      err.textContent = 'This code has already been redeemed.';
       err.classList.add('visible');
       return;
     }
@@ -932,9 +932,23 @@ await fetch('/api/register', {
       return;
     }
     await sb.from('subscribers').upsert(
-      { email: email, tier: 'scholar', status: 'active' },
+      { email: email, tier: 'free', status: 'active' },
       { onConflict: 'email' }
     );
+
+    // Credit the Signal Bank
+    const { data: subRow } = await sb
+      .from('subscribers')
+      .select('purchased_credits')
+      .eq('email', email)
+      .single();
+    const currentCredits = (subRow && subRow.purchased_credits) ? subRow.purchased_credits : 0;
+    const newCredits = currentCredits + (codeRow.credits || 0);
+    await sb
+      .from('subscribers')
+      .update({ purchased_credits: newCredits })
+      .eq('email', email);
+
     await sb.from('code_redemptions').insert({ code_id: codeRow.id, email: email });
     await sb.from('access_codes')
       .update({ redemption_count: codeRow.redemption_count + 1 })
