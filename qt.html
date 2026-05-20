@@ -177,6 +177,20 @@
   .sidebar-save-place button { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold-dim); background: transparent; border: 1px solid var(--border); padding: 7px 12px; cursor: pointer; transition: all 0.2s; width: 100%; }
   .sidebar-save-place button:hover { border-color: var(--gold-dim); color: var(--gold); }
   .sidebar-save-place-confirm { font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; color: var(--gold-dim); margin-top: 6px; display: none; text-align: center; }
+  /* Pre-purchase email modal */
+  #prePurchaseModal { display:none; position:fixed; inset:0; background:rgba(6,6,10,0.85); z-index:9999; align-items:center; justify-content:center; }
+  #prePurchaseModal.active { display:flex; }
+  .pre-purchase-card { background:var(--deep); border:1px solid var(--border-lit); padding:2rem 2.25rem; max-width:400px; width:90%; position:relative; }
+  .pre-purchase-card::before { content:''; position:absolute; top:0; left:10%; right:10%; height:1px; background:linear-gradient(90deg,transparent,var(--gold-dim),transparent); }
+  .pre-purchase-title { font-family:var(--cinzel); font-size:13px; letter-spacing:0.2em; color:var(--gold-pale); text-transform:uppercase; margin-bottom:0.75rem; }
+  .pre-purchase-copy { font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.65; margin-bottom:1.25rem; }
+  .pre-purchase-input { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:16px; padding:10px 12px; outline:none; transition:border-color 0.2s; margin-bottom:0.75rem; box-sizing:border-box; }
+  .pre-purchase-input:focus { border-color:var(--gold-dim); }
+  .pre-purchase-input::placeholder { color:var(--text-muted); font-style:italic; }
+  .pre-purchase-btn { width:100%; background:transparent; border:1px solid var(--gold-dim); color:var(--gold); font-family:var(--cinzel); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; padding:12px; cursor:pointer; transition:all 0.2s; margin-bottom:0.5rem; }
+  .pre-purchase-btn:hover { background:var(--gold-dim); color:var(--void); }
+  .pre-purchase-skip { font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); background:none; border:none; cursor:pointer; padding:0; transition:color 0.2s; display:block; margin:0 auto; }
+  .pre-purchase-skip:hover { color:var(--text-dim); }
   .sidebar-expand-tip { 
   display: none; 
   position: absolute; 
@@ -729,19 +743,19 @@
     <div id="sessionsPanel" style="display:none; margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
       <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Add Signal Bank</div>
       <div style="display:flex; flex-direction:column; gap:6px;">
-        <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b'); return false;" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">10 queries</span>
           <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$2.99 →</span>
         </a>
-        <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09'); return false;" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">25 queries</span>
           <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$6.99 →</span>
         </a>
-        <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08'); return false;" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">50 queries</span>
           <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$12.99 →</span>
         </a>
-        <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07'); return false;" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">100 queries</span>
           <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$19.99 →</span>
         </a>
@@ -878,7 +892,7 @@
           <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">One-Time</div>
           <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$2.99</div>
           <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">10 queries.<br>No subscription required.</div>
-          <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Buy 10 Queries →</a>
+          <a href="#" onclick="interceptPurchase('https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b'); return false;" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Buy 10 Queries →</a>
         </div>
 
         <!-- Subscribe -->
@@ -918,7 +932,7 @@
         <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Signal Bank</div>
         <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$2.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
         <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">One-time top-up.<br>No plan change required.</div>
-        <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Bank →</a>
+        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07'); return false;" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Bank →</a>
       </div>
 
       <!-- Wait for reset -->
@@ -2710,6 +2724,55 @@ function showSidebarAfterQuery(queryText) {
   }
 }
 
+// PRE-PURCHASE EMAIL INTERCEPT
+var _pendingStripeUrl = null;
+
+function interceptPurchase(stripeUrl) {
+  // If email already known, go straight to Stripe
+  var email = userEmail() || localStorage.getItem('qt_user_email');
+  if (email) {
+    window.location.href = stripeUrl;
+    return;
+  }
+  // Otherwise show the modal
+  _pendingStripeUrl = stripeUrl;
+  var modal = document.getElementById('prePurchaseModal');
+  if (modal) modal.classList.add('active');
+  setTimeout(function() {
+    var input = document.getElementById('prePurchaseEmail');
+    if (input) input.focus();
+  }, 100);
+}
+
+async function handlePrePurchaseContinue() {
+  var email = document.getElementById('prePurchaseEmail').value.trim();
+  if (email) {
+    localStorage.setItem('qt_user_email', email);
+    // Create free subscriber record
+    try {
+      var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+      var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+      await fetch(sbUrl + '/rest/v1/subscribers', {
+        method: 'POST',
+        headers: {
+          'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon,
+          'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates'
+        },
+        body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+      });
+    } catch(e) {}
+  }
+  var modal = document.getElementById('prePurchaseModal');
+  if (modal) modal.classList.remove('active');
+  if (_pendingStripeUrl) window.location.href = _pendingStripeUrl;
+}
+
+function handlePrePurchaseSkip() {
+  var modal = document.getElementById('prePurchaseModal');
+  if (modal) modal.classList.remove('active');
+  if (_pendingStripeUrl) window.location.href = _pendingStripeUrl;
+}
+
 // SAVE MY PLACE
 async function handleSavePlace() {
   var email = document.getElementById('savePlaceEmail').value.trim();
@@ -3303,5 +3366,16 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </footer>
   
+<!-- Pre-purchase email capture modal -->
+<div id="prePurchaseModal">
+  <div class="pre-purchase-card">
+    <div class="pre-purchase-title">One More Step</div>
+    <div class="pre-purchase-copy">Drop your email so we can credit your account the moment payment clears. Your queries will be waiting when you return.</div>
+    <input class="pre-purchase-input" type="email" id="prePurchaseEmail" placeholder="your@email.com" />
+    <button class="pre-purchase-btn" onclick="handlePrePurchaseContinue()">Continue to Checkout →</button>
+    <button class="pre-purchase-skip" onclick="handlePrePurchaseSkip()">Skip — continue without saving email</button>
+  </div>
+</div>
+
 </body>
 </html>
