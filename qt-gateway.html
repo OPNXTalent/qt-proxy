@@ -659,7 +659,37 @@
             Your code is single-use and tied to your email. Keep your book — the code is printed inside the cover.
           </div>
         </div>
-
+      
+<!-- ── SET PASSWORD (post-purchase) ── -->
+<div class="flow" id="flow-setpassword">
+  <div class="soft-prompt" style="text-align:left; margin-bottom:1.35rem;">
+    Your Signal Bank credits have been deposited. Create a password to enter the Prism.
+  </div>
+  <form autocomplete="on" onsubmit="return false;">
+  <div class="field-group">
+    <div class="field-wrap">
+      <label class="field-label" for="sp-email">Email</label>
+      <input class="field-input" id="sp-email" type="email" placeholder="your@email.com" autocomplete="email" />
+    </div>
+    <div class="field-wrap">
+      <label class="field-label" for="sp-password">Create Password</label>
+      <div class="pw-wrap">
+        <input class="field-input" id="sp-password" type="password" placeholder="8 characters minimum" autocomplete="new-password" />
+        <button type="button" class="pw-toggle" onclick="togglePw('sp-password', this)">👁</button>
+      </div>
+    </div>
+    <div class="field-wrap">
+      <label class="field-label" for="sp-confirm">Confirm Password</label>
+      <div class="pw-wrap">
+        <input class="field-input" id="sp-confirm" type="password" placeholder="Repeat your password" autocomplete="new-password" />
+        <button type="button" class="pw-toggle" onclick="togglePw('sp-confirm', this)">👁</button>
+      </div>
+      <div class="field-error" id="sp-mismatch">Passwords do not match.</div>
+    </div>
+  </div>
+  <button class="btn-primary" onclick="handleSetPassword(this)">Enter the Prism →</button>
+  </form>
+</div>
     </div><!-- /.gate-card -->
   </div><!-- /.gateway-wrap -->
 
@@ -677,7 +707,7 @@
   }
 
   /* ── Flow state ── */
-  var flowOrder = ['select', 'new-user', 'returning', 'legacy', 'errors', 'routing', 'bookcode'];
+  var flowOrder = ['select', 'new-user', 'returning', 'legacy', 'errors', 'routing', 'bookcode', 'setpassword'];
 
   var flowTitles = {
     'select':    'Enter the Prism',
@@ -687,6 +717,7 @@
     'errors':    'Enter the Prism',
     'routing':   'Access Confirmed',
     'bookcode':  'Redeem Your Code'
+    'setpassword': 'Set Your Password'
   };
 
   var flowCopies = {
@@ -697,6 +728,7 @@
     'errors':    'Every reader brings their own interpretations to the text — layered sediment of tradition, disappointment, or need. This conversation begins where those interpretations end. The door is open. What you carry through it is your own.',
     'routing':   'Authentication verified. Your session is being prepared.',
     'bookcode':  'Enter the access code printed in your copy of The Prism. Your code unlocks extended access to the Prism.'
+    'setpassword': 'Your queries are ready. Set a password to access them — your credits are waiting inside.'
   };
 
   function showFlow(id) {
@@ -987,6 +1019,8 @@ if (existingRedemption) {
       if (newUserField)   newUserField.value   = decoded;
       if (legacyField)    legacyField.value    = decoded;
       if (returningField) returningField.value = decoded;
+      var setPasswordField = document.getElementById('sp-email');
+    if (setPasswordField) setPasswordField.value = decoded;
     }
 
     // Capture referral token
@@ -994,6 +1028,9 @@ if (existingRedemption) {
     if (refParam) {
       _refToken = refParam;
     }
+    // Route to flow from URL param
+      var flowParam = params.get('flow');
+      if (flowParam) showFlow(flowParam);
   })();
 
   /* ── Fire referral credit after successful registration ── */
@@ -1053,6 +1090,25 @@ if (existingRedemption) {
       console.error('Referral credit error:', err.message);
     }
   }
+  async function handleSetPassword(btn) {
+  var email    = document.getElementById('sp-email').value.trim();
+  var password = document.getElementById('sp-password').value;
+  var confirm  = document.getElementById('sp-confirm').value;
+  clearErrors([['sp-confirm', 'sp-mismatch']]);
+  if (!email || !password) return;
+  if (password !== confirm) { setError('sp-confirm', 'sp-mismatch', true); return; }
+  setBtnLoading(btn, true);
+  var { data, error } = await sb.auth.signUp({ email, password });
+  if (error && !error.message.toLowerCase().includes('already registered')) {
+    setBtnLoading(btn, false);
+    var el = document.getElementById('sp-mismatch');
+    el.textContent = error.message;
+    el.style.display = 'block';
+    return;
+  }
+  setBtnLoading(btn, false);
+  routeAfterAuth(email);
+}
 </script>
 
 </body>
