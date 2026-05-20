@@ -378,7 +378,7 @@ export default async function handler(req, res) {
                   <p style="font-size:18px; line-height:1.8; color:#d8d4e8;"><strong style="color:#e8d5a0;">${credits} queries</strong> have been added to your Prism account.</p>
                   <p style="font-size:16px; line-height:1.8; color:#7a7890;">Your Signal Sessions never expire and stack with any existing credits. Use them at your own pace.</p>
                   <div style="text-align:center; margin:40px 0;">
-                    <a href="https://quantumtheology.app/qt-gateway.html" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Enter the Prism</a>
+                    <a href="https://quantumtheology.app/qt-gateway.html?flow=setpassword&email=${encodeURIComponent(email)}" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Enter the Prism</a>
                   </div>
                 `)
               );
