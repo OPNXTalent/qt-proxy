@@ -646,6 +646,47 @@
     line-height: 1.7;
   }
 
+  /* Follow-up exchanges */
+  .fu-block {
+    margin-top: 40px;
+    border-top: 1px solid var(--border);
+    padding-top: 32px;
+  }
+  .fu-question {
+    font-family: var(--crimson);
+    font-size: 15px;
+    font-style: italic;
+    color: var(--gold-dim);
+    letter-spacing: 0.01em;
+    margin-bottom: 20px;
+    padding-left: 14px;
+    border-left: 2px solid var(--border);
+    line-height: 1.55;
+  }
+  .fu-question::before {
+    content: 'Follow-up — ';
+    font-family: var(--mono);
+    font-size: 10px;
+    font-style: normal;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .fu-body {
+    font-family: var(--crimson);
+    font-size: 18px;
+    color: var(--text);
+    line-height: 1.8;
+  }
+  .fu-body p {
+    margin: 0 0 16px 0;
+  }
+  .fu-body p:last-child {
+    margin-bottom: 0;
+  }
+
   /* Error */
   .error-block {
     border: 1px solid #5a2a2a;
@@ -1402,10 +1443,10 @@ Respond within the Prism framework — grounded in Echad b'Emet, relational onto
 
   // Create follow-up element immediately so we can stream into it
   const followUpEl = document.createElement('div');
-  followUpEl.style.cssText = 'margin-top:32px; border-top:1px solid var(--border); padding-top:28px;';
+  followUpEl.className = 'fu-block';
+  followUpEl.innerHTML = `<div class="fu-question">${escHtml(input)}</div>`;
   const followUpTextEl = document.createElement('div');
-  followUpTextEl.style.cssText = 'font-size:16.5px; color:var(--text); line-height:1.75;';
-  followUpEl.innerHTML = `<div style="font-family:var(--mono); font-size:17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Follow-up — ${escHtml(input)}</div>`;
+  followUpTextEl.className = 'fu-body';
   followUpEl.appendChild(followUpTextEl);
   document.getElementById('resultContent').appendChild(followUpEl);
   followUpEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1512,9 +1553,12 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
             fullText += parsed.text;
             // Render accumulated text as formatted prose
             if (targetEl) {
-              targetEl.innerHTML = escHtml(fullText)
-                .replace(/\n\n/g, '</p><p style="margin-top:12px;">')
-                .replace(/\n/g, '<br>');
+              const paras = fullText.split(/\n\n/);
+              targetEl.innerHTML = paras.map((p, i) =>
+                i < paras.length - 1
+                  ? '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>'
+                  : '<p>' + escHtml(p.replace(/\n/g, ' ')) + (fullText.endsWith('\n\n') ? '</p>' : '')
+              ).join('');
             }
           }
         } catch {}
@@ -2011,8 +2055,9 @@ function downloadPDF(mode) {
     drawRule();
   }
 
+
   // Follow-up exchanges — wrapped, with section header per exchange
-  const followUps = document.querySelectorAll('#resultContent > div[style*="border-top"]');
+  const followUps = document.querySelectorAll('#resultContent .fu-block');
   if (followUps.length > 0) {
     checkPage(20);
     drawRule();
@@ -2022,28 +2067,25 @@ function downloadPDF(mode) {
     doc.text('CONTINUED EXPLORATION', margin, y);
     y += 8;
     followUps.forEach(el => {
-      const divs = el.querySelectorAll('div');
-      // Compute question label height upfront, then check once for label + opening body lines together
-      if (divs[0]) {
+      const questionEl = el.querySelector('.fu-question');
+      const bodyEl = el.querySelector('.fu-body');
+      if (questionEl) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        const qLines = doc.splitTextToSize(stripHebrew(divs[0].innerText), contentW);
+        const qLines = doc.splitTextToSize(stripHebrew(questionEl.innerText), contentW);
         const qHeight = qLines.length * 5 + 4;
-        // Reserve space for label + at least 2 lines of body so they land on the same page
-        checkPage(qHeight + 12);
+        checkPage(qHeight + 14);
         doc.setTextColor(...gold);
         doc.text(qLines, margin, y);
         y += qHeight;
       }
-      if (divs[1]) {
-        // Recover paragraph breaks from HTML before stripping to plain text
-        const rawHtml = divs[1].innerHTML;
-        const withBreaks = rawHtml
-          .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
-          .replace(/<br\s*\/?>/gi, '\n');
-        const tmp = document.createElement('div');
-        tmp.innerHTML = withBreaks;
-        addBodyParagraphs(stripHebrew(tmp.innerText), dimText);
+      if (bodyEl) {
+        const paras = Array.from(bodyEl.querySelectorAll('p')).map(p => p.innerText.trim()).filter(t => t);
+        if (paras.length > 0) {
+          addBodyParagraphs(paras.join('\n\n'), dimText);
+        } else {
+          addBodyParagraphs(stripHebrew(bodyEl.innerText), dimText);
+        }
       }
       y += 6;
     });
@@ -2465,17 +2507,17 @@ function restoreFollowUps(id) {
   function renderFU(list) {
     list.forEach(function(fu) {
       var el = document.createElement('div');
-      el.style.cssText = 'margin-top:32px;border-top:1px solid var(--border);padding-top:28px;';
+      el.className = 'fu-block';
       var question = fu.question || fu.query || '';
       var resp = (fu.response && typeof fu.response === 'object') ? (fu.response.text || '') : (fu.response || '');
       var label = document.createElement('div');
-      label.style.cssText = 'font-family:var(--mono);font-size:17px;letter-spacing:0.16em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:10px;';
-      label.textContent = 'Follow-up \u2014 ' + question;
+      label.className = 'fu-question';
+      label.textContent = question;
       var body = document.createElement('div');
-      body.style.cssText = 'font-size:16.5px;color:var(--text);line-height:1.75;';
-      body.innerHTML = escHtml(resp)
-        .replace(/\n\n/g, '</p><p style="margin-top:12px;">')
-        .replace(/\n/g, '<br>');
+      body.className = 'fu-body';
+      body.innerHTML = resp.split(/\n\n/).map(function(p) {
+        return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
+      }).join('');
       el.appendChild(label);
       el.appendChild(body);
       var rc = document.getElementById('resultContent');
