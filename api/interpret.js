@@ -53,7 +53,7 @@ INCOHERENCE — the system substitutes institutional preservation, emotional sta
 PSEUDO-COHERENCE DETECTION: The Prism must identify when doctrines or systems maintain stability through emotional reinforcement, institutional repetition, semantic complexity, philosophical imports, or historical inertia — while exhibiting tension with direct textual coherence.
 
 Specific failure modes The Prism must never reproduce:
-- Deploying lexical complexity (e.g. "adelphos could mean cousin in the wider Semitic tradition") as cover for a conclusion the text does not support, when the plain meaning of the text is clear and the alternate reading requires importing assumptions the text itself does not carry.
+- Deploying lexical complexity as cover for a conclusion the text does not support, when the plain meaning of the text is clear and the alternate reading requires importing assumptions the text itself does not carry.
 - Granting institutional theological frameworks (Catholic, Orthodox, Reformed, or otherwise) interpretive authority that overrides Tier 1 direct scriptural witness.
 - Treating a doctrine as textually legitimate because it is ancient, widespread, or held by sincere believers.
 - Offering "both positions require importing assumptions" as a conclusion when the text has already answered the question plainly. That is not intellectual humility. It is evasion dressed as nuance.
@@ -216,7 +216,7 @@ When Scripture presents human sin, covenant violation, or sustained rebellion as
 
 ALL HAVE SINNED: Romans 3:23 is not a proof-text — it is a structural statement about the condition of every human creature within Olam HaZeh. No human being is exempt. No doctrine of sinlessness by nature or sinlessness by grace as a living status is established by Scripture for any person other than Christ. When a doctrinal tradition claims otherwise, The Prism names the claim as a Tier 5 institutional development that conflicts with Tier 1 direct scriptural witness. This includes Marian sinlessness, immaculate conception, and any framework that positions a human being outside the universal condition Scripture establishes.
 
-ONE MEDIATOR: 1 Timothy 2:5 is structural, not incidental. There is one God and one mediator between God and mankind — the man Christ Jesus. Every intercessory layer inserted between the creature and God does not enrich the connection. It attenuates it. Praying to Mary, to dead ancestors, or to any created being — however beloved, however honored — places a created intermediary in the mediating position that belongs to Christ alone. The structural problem is identical regardless of ecclesiastical authorization. Authorization does not change the architecture. The Prism names this decoherence directly when it appears.
+ONE MEDIATOR: 1 Timothy 2:5 is structural, not incidental. There is one God and one mediator between God and mankind — the man Christ Jesus. One. The text does not say "one primary mediator with additional intercessors available through ecclesial authorization." Every intercessory layer inserted between the creature and God does not enrich the connection. It attenuates it. Praying to Mary, to dead ancestors, or to any created being — however beloved, however honored — places a created intermediary in the mediating position that belongs to Christ alone. The structural problem is identical regardless of ecclesiastical authorization. Authorization does not change the architecture. The Prism names this decoherence directly when it appears.
 
 FIRST DIVINE SELF-DISCLOSURE: The first thing God reveals about Himself in Scripture is creativity. Bereshit bara — In the beginning, God created. When asked about divine nature or attributes, begin here. Scripture's order is Creator first, covenant-maker second. The Name — Ehyeh asher Ehyeh — is relational and active, not static and definitional. God is known by what He does before He is defined by what He is. Power and knowledge serve covenant; they are not abstractions held independently.
 
@@ -388,6 +388,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const QUERY_LIMIT = 3;
 const WINDOW_HOURS = 24;
 
+// ── TIER CONFIGURATION ────────────────────────────────────────────────────────
 const TIER_LIMITS = {
   refraction:    100,
   full_spectrum: 250,
@@ -398,6 +399,22 @@ const RETENTION_DAYS = {
   refraction:    60,
   full_spectrum: 90,
 };
+
+// ── TIER NORMALIZATION ────────────────────────────────────────────────────────
+// Normalizes tier values from the database to match code keys.
+// Handles case variations and legacy tier names.
+function normalizeTier(tier) {
+  if (!tier) return 'free';
+  const t = tier.toLowerCase().replace(/\s+/g, '_');
+  // Legacy name mapping
+  if (t === 'scholar')    return 'refraction';
+  if (t === 'theologian') return 'full_spectrum';
+  if (t === 'trial')      return 'refraction';
+  // Current names
+  if (t === 'refraction')    return 'refraction';
+  if (t === 'full_spectrum') return 'full_spectrum';
+  return 'free';
+}
 
 // ── CRISIS DETECTION ──────────────────────────────────────────────────────────
 const CRISIS_SIGNALS = [
@@ -503,14 +520,16 @@ async function resetQueryLog(ip) {
 
 // ── PRE-FLIGHT SUBSCRIBER QUOTA CHECK ────────────────────────────────────────
 async function checkSubscriberQuota(subscriber) {
-  const tier = (subscriber.tier || 'observer').toLowerCase();
+  const tier = normalizeTier(subscriber.tier);
   const limit = TIER_LIMITS[tier];
 
+  // No limit defined for this tier (e.g. free) — allow
   if (limit === null || limit === undefined) return { allowed: true };
 
   const used = subscriber.query_count || 0;
   if (used < limit) return { allowed: true };
 
+  // Over limit — check purchased_credits
   const credits = subscriber.purchased_credits || 0;
   if (credits > 0) {
     const drawn = await drawSignalSessionCredit(subscriber.id);
@@ -556,7 +575,8 @@ async function drawSignalSessionCredit(userId) {
 // ── THREAD PERSISTENCE ────────────────────────────────────────────────────────
 async function saveThread({ userId, query, queryType, response, tier }) {
   try {
-    const retentionDays = RETENTION_DAYS[tier] || RETENTION_DAYS.free;
+    const normalizedTier = normalizeTier(tier);
+    const retentionDays = RETENTION_DAYS[normalizedTier] || RETENTION_DAYS.free;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
     const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -603,7 +623,7 @@ async function saveThread({ userId, query, queryType, response, tier }) {
         query:            query,
         response:         slimResponse,
         query_type:       queryType || 'free_text',
-        tier_at_creation: tier,
+        tier_at_creation: normalizedTier,
         retention_days:   retentionDays,
         expires_at:       expiresAt.toISOString(),
         grace_ends_at:    graceEndsAt.toISOString(),
@@ -773,7 +793,7 @@ export default async function handler(req, res) {
         if (!apiMessages || apiMessages.length === 0) {
           return res.status(400).json({ error: 'No messages provided' });
         }
-        const tier = subscriber?.tier || 'trial';
+        const tier = normalizeTier(subscriber?.tier || 'free');
         const userId = subscriber?.id || null;
 
         const isFollowUpCheck = isFollowUp || (messages && messages.length > 1);
