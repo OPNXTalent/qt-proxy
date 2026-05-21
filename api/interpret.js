@@ -811,6 +811,201 @@ async function updateQueryCount({ userId, tier, threadId }) {
   }
 }
 
+// ── SHARED SESSION HELPERS ────────────────────────────────────────────────────
+
+async function createSharedSession({ snapshot, subject, senderEmail, threadId, collaborationOpen }) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90-day independent retention
+  const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const archiveEndsAt = new Date(expiresAt.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/shared_sessions`, {
+    method: 'POST',
+    headers: {
+      'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type':  'application/json',
+      'Prefer':        'return=representation'
+    },
+    body: JSON.stringify({
+      source_thread_id:    threadId || null,
+      sender_email:        senderEmail || null,
+      subject:             subject || '',
+      response:            snapshot,
+      collaboration_open:  collaborationOpen || false,
+      status:              'active',
+      expires_at:          expiresAt.toISOString(),
+      grace_ends_at:       graceEndsAt.toISOString(),
+      archive_ends_at:     archiveEndsAt.toISOString(),
+      arrival_count:       0,
+      followup_count:      0,
+      conversion_count:    0,
+    })
+  });
+  if (!res.ok) { const err = await res.text(); throw new Error('createSharedSession failed: ' + err); }
+  const data = await res.json();
+  return data?.[0] || null;
+}
+
+async function getSharedSession(shareId) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}&select=*&limit=1`,
+    {
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+      }
+    }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.[0] || null;
+}
+
+async function updateSharedSessionCollaboration(shareId, collaborationOpen) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
+      },
+      body: JSON.stringify({ collaboration_open: collaborationOpen })
+    }
+  );
+  return res.ok;
+}
+
+async function resetSharedSessionClock(shareId) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const archiveEndsAt = new Date(expiresAt.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
+      },
+      body: JSON.stringify({
+        status:          'active',
+        expires_at:      expiresAt.toISOString(),
+        grace_ends_at:   graceEndsAt.toISOString(),
+        archive_ends_at: archiveEndsAt.toISOString()
+      })
+    }
+  );
+  return res.ok;
+}
+
+async function recordSharedSessionArrival(shareId, referrer) {
+  // Increment arrival_count
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/rpc/increment_share_arrival`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json'
+      },
+      body: JSON.stringify({ p_share_id: shareId, p_referrer: referrer || null })
+    }
+  ).catch(() => {});
+}
+
+async function saveSharedFollowUp({ shareId, question, response, userEmail }) {
+  // Save to shared_followups table and reset the clock
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/shared_followups`, {
+    method: 'POST',
+    headers: {
+      'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type':  'application/json',
+      'Prefer':        'return=minimal'
+    },
+    body: JSON.stringify({
+      shared_session_id: shareId,
+      question:          question,
+      response:          response,
+      user_email:        userEmail || null,
+      created_at:        new Date().toISOString()
+    })
+  });
+  // Reset clock on any follow-up engagement
+  await resetSharedSessionClock(shareId);
+  // Increment followup_count
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
+      },
+      body: JSON.stringify({ followup_count: null }) // use RPC increment in production
+    }
+  ).catch(() => {});
+  return res.ok;
+}
+
+async function registerEmail({ email, shareId }) {
+  // Upsert subscriber as Registered Explorer
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers`, {
+    method: 'POST',
+    headers: {
+      'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type':  'application/json',
+      'Prefer':        'resolution=merge-duplicates,return=representation'
+    },
+    body: JSON.stringify({
+      email,
+      tier:        'free',
+      status:      'active',
+      query_count: 0,
+      query_limit: 3,
+      expires_at:  expiresAt.toISOString(),
+      grace_ends_at: graceEndsAt.toISOString(),
+      referral_share_id: shareId || null
+    })
+  });
+
+  // If share session exists, reset its clock and record conversion
+  if (shareId) {
+    await resetSharedSessionClock(shareId);
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type':  'application/json',
+          'Prefer':        'return=minimal'
+        },
+        body: JSON.stringify({ conversion_count: null }) // use RPC increment in production
+      }
+    ).catch(() => {});
+  }
+
+  return res.ok;
+}
+
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -852,6 +1047,78 @@ export default async function handler(req, res) {
     } catch {}
 
     return res.status(200).json({ locked: false });
+  }
+
+  // ── ROUTE DISPATCH ────────────────────────────────────────────────────────
+  const urlPath = (req.url || '').split('?')[0].replace(/\/$/, '');
+
+  // GET /api/share?id=xxx — load shared session for recipient
+  if (req.method === 'GET' && urlPath.endsWith('/share')) {
+    const urlObj = new URL(req.url, 'https://' + req.headers.host);
+    const shareId = urlObj.searchParams.get('id');
+    if (!shareId) return res.status(400).json({ error: 'Missing share id' });
+    const session = await getSharedSession(shareId);
+    if (!session) return res.status(404).json({ error: 'Not found' });
+    // Check status
+    const now = new Date();
+    if (session.status === 'archived' || (session.archive_ends_at && new Date(session.archive_ends_at) < now)) {
+      return res.status(410).json({ error: 'This session has been archived.' });
+    }
+    return res.status(200).json({ session });
+  }
+
+  // POST /api/share/arrive — record recipient arrival
+  if (req.method === 'POST' && urlPath.endsWith('/share/arrive')) {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { shareId, referrer } = body || {};
+    if (shareId) await recordSharedSessionArrival(shareId, referrer);
+    return res.status(200).json({ ok: true });
+  }
+
+  // POST /api/share/followup — save recipient follow-up
+  if (req.method === 'POST' && urlPath.endsWith('/share/followup')) {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { shareId, question, response, userEmail: fuEmail } = body || {};
+    if (!shareId || !question) return res.status(400).json({ error: 'Missing fields' });
+    await saveSharedFollowUp({ shareId, question, response, userEmail: fuEmail });
+    return res.status(200).json({ ok: true });
+  }
+
+  // PATCH /api/share — toggle collaboration
+  if (req.method === 'PATCH' && urlPath.endsWith('/share')) {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { shareId, collaborationOpen } = body || {};
+    if (!shareId) return res.status(400).json({ error: 'Missing shareId' });
+    const ok = await updateSharedSessionCollaboration(shareId, collaborationOpen);
+    return res.status(ok ? 200 : 500).json({ ok });
+  }
+
+  // POST /api/register-email — anonymous user provides email to save session
+  if (req.method === 'POST' && urlPath.endsWith('/register-email')) {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { email, shareId: regShareId } = body || {};
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRe.test(email)) return res.status(400).json({ error: 'Invalid email' });
+    const ok = await registerEmail({ email, shareId: regShareId });
+    return res.status(ok ? 200 : 500).json({ success: ok });
+  }
+
+  // POST /api/share — create shared session
+  if (req.method === 'POST' && urlPath.endsWith('/share')) {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { snapshot, subject, senderEmail, threadId, collaborationOpen } = body || {};
+    if (!snapshot) return res.status(400).json({ error: 'Missing snapshot' });
+    try {
+      const record = await createSharedSession({ snapshot, subject, senderEmail, threadId, collaborationOpen });
+      if (!record) return res.status(500).json({ error: 'Could not create shared session' });
+      const host = req.headers.host || 'quantumtheology.app';
+      const protocol = host.includes('localhost') ? 'http' : 'https';
+      const shareUrl = protocol + '://' + host + '/share/' + record.id;
+      return res.status(200).json({ shareId: record.id, shareUrl });
+    } catch (err) {
+      console.error('Share creation error:', err.message);
+      return res.status(500).json({ error: 'Server error' });
+    }
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
