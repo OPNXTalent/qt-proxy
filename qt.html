@@ -169,46 +169,6 @@
 
   .sidebar-upgrade-prompt { margin: 12px 16px; padding: 14px 16px; border: 1px solid var(--border); background: rgba(201,168,76,0.03); font-family: var(--crimson); font-style: italic; font-size: 13px; color: var(--text-dim); line-height: 1.6; }
   .sidebar-upgrade-prompt a { color: var(--gold); text-decoration: none; font-style: normal; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; display: block; margin-top: 10px; text-transform: uppercase; }
-  .sidebar-save-place { margin: 8px 16px 4px; padding: 14px 16px; border: 1px solid var(--border); background: rgba(201,168,76,0.02); }
-  .sidebar-save-place p { font-family: var(--crimson); font-style: italic; font-size: 13px; color: var(--text-dim); line-height: 1.6; margin-bottom: 10px; }
-  .sidebar-save-place input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--crimson); font-size: 14px; padding: 8px 10px; outline: none; transition: border-color 0.2s; margin-bottom: 8px; box-sizing: border-box; }
-  .sidebar-save-place input:focus { border-color: var(--gold-dim); }
-  .sidebar-save-place input::placeholder { color: var(--text-muted); font-style: italic; }
-  .sidebar-save-place button { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold-dim); background: transparent; border: 1px solid var(--border); padding: 7px 12px; cursor: pointer; transition: all 0.2s; width: 100%; }
-  .sidebar-save-place button:hover { border-color: var(--gold-dim); color: var(--gold); }
-  .sidebar-save-place-confirm { font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; color: var(--gold-dim); margin-top: 6px; display: none; text-align: center; }
-  /* Pre-purchase email modal */
-  #prePurchaseModal { display:none; position:fixed; inset:0; background:rgba(6,6,10,0.85); z-index:9999; align-items:center; justify-content:center; }
-  #prePurchaseModal.active { display:flex; }
-  .pre-purchase-card { background:var(--deep); border:1px solid var(--border-lit); padding:2rem 2.25rem; max-width:400px; width:90%; position:relative; }
-  .pre-purchase-card::before { content:''; position:absolute; top:0; left:10%; right:10%; height:1px; background:linear-gradient(90deg,transparent,var(--gold-dim),transparent); }
-  .pre-purchase-title { font-family:var(--cinzel); font-size:13px; letter-spacing:0.2em; color:var(--gold-pale); text-transform:uppercase; margin-bottom:0.75rem; }
-  .pre-purchase-copy { font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.65; margin-bottom:1.25rem; }
-  .pre-purchase-input { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:16px; padding:10px 12px; outline:none; transition:border-color 0.2s; margin-bottom:0.75rem; box-sizing:border-box; }
-  .pre-purchase-input:focus { border-color:var(--gold-dim); }
-  .pre-purchase-input::placeholder { color:var(--text-muted); font-style:italic; }
-  .pre-purchase-btn { width:100%; background:transparent; border:1px solid var(--gold-dim); color:var(--gold); font-family:var(--cinzel); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; padding:12px; cursor:pointer; transition:all 0.2s; margin-bottom:0.5rem; }
-  .pre-purchase-btn:hover { background:var(--gold-dim); color:var(--void); }
-  .pre-purchase-skip { font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); background:none; border:none; cursor:pointer; padding:0; transition:color 0.2s; display:block; margin:0 auto; }
-  .pre-purchase-skip:hover { color:var(--text-dim); }
-  .sidebar-expand-tip { 
-  display: none; 
-  position: absolute; 
-  bottom: 38px; 
-  right: 16px; 
-  background: var(--surface-2); 
-  border: 1px solid var(--border-lit); 
-  padding: 10px 14px; 
-  font-family: var(--crimson); 
-  font-style: italic; 
-  font-size: 13px; 
-  color: var(--text-dim); 
-  line-height: 1.5; 
-  width: 200px; 
-  text-align: right; 
-  pointer-events: none; 
-  z-index: 20; 
-}
 
   .cancel-banner { padding: 10px 20px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; line-height: 1.6; border-bottom: 1px solid; flex-shrink: 0; }
   .cancel-banner.stage-1 { background: rgba(201,168,76,0.05); color: var(--gold-dim); border-color: rgba(201,168,76,0.3); }
@@ -730,7 +690,7 @@
   <div class="sidebar-header">
     <div class="sidebar-logo">The Prism</div>
     <div class="sidebar-tier" id="sidebarTierLabel">Refraction &nbsp;·&nbsp; 90 Day Archive</div>
-    <div id="sidebarCredits" style="display:none; margin-top:6px; ...">
+    <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
       <span id="sidebarQueryCount" style="position:relative; cursor:default;">
         <span id="sidebarQueryCountText">— queries remaining</span>
         <span id="sidebarQueryTooltip" style="display:none; position:absolute; left:0; top:18px; background:var(--surface-2); border:1px solid var(--border-lit); padding:6px 10px; font-size:9px; letter-spacing:0.12em; color:var(--text-dim); white-space:nowrap; z-index:100; pointer-events:none;"></span>
@@ -743,19 +703,19 @@
     <div id="sessionsPanel" style="display:none; margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
       <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Add Signal Bank</div>
       <div style="display:flex; flex-direction:column; gap:6px;">
-        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b'); return false;" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+        <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">10 queries</span>
           <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$2.99 →</span>
         </a>
-        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09'); return false;" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+        <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">25 queries</span>
           <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$6.99 →</span>
         </a>
-        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08'); return false;" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+        <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">50 queries</span>
           <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$12.99 →</span>
         </a>
-        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07'); return false;" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+        <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--border); background:var(--surface); text-decoration:none; transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           <span style="font-family:var(--crimson); font-size:14px; color:var(--text-dim);">100 queries</span>
           <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$19.99 →</span>
         </a>
@@ -776,7 +736,6 @@
   <div class="sidebar-section-label">Recent Sessions</div>
 
   <div class="sidebar-threads" id="sidebarThreads">
-    
     <!-- Threads injected by JS -->
   </div>
 
@@ -784,16 +743,6 @@
   <div class="sidebar-upgrade-prompt" id="freeUpgradePrompt" style="display:none;">
     Your interpretations are saved and organized when you subscribe. Start your archive.
     <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank">Subscribe → Refraction</a>
-  </div>
-
-  <!-- Save my place prompt — shown for anonymous/free users without email -->
-  <div id="savePlacePrompt" style="display:none;">
-    <div class="sidebar-save-place">
-      <p>Want to pick up where you left off? Share your email and we'll hold your place.</p>
-      <input type="email" id="savePlaceEmail" placeholder="your@email.com" />
-      <button onclick="handleSavePlace()">Save My Place →</button>
-      <div class="sidebar-save-place-confirm" id="savePlaceConfirm">✓ Your place is saved.</div>
-    </div>
   </div>
 
   <!-- New Subject button in sidebar -->
@@ -804,16 +753,9 @@
   <!-- Sidebar footer — nav + logout -->
   <div style="padding:16px 20px; border-top:1px solid var(--border); flex-shrink:0; position:relative; display:flex; justify-content:space-between; align-items:center;">
     <a href="/index.html" style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">← Home</a>
-   <div style="position:relative;" id="signOutWrap">
-  <div class="sidebar-expand-tip" id="expandTip">Expand your access to save and follow up your query results</div>
-  <button onclick="handleLogout()" 
-    style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" 
-    onmouseover="this.style.color='var(--gold-dim)'; if(CURRENT_TIER==='free'||!userEmail()) document.getElementById('expandTip').style.display='block';" 
-    onmouseout="this.style.color='var(--text-muted)'; document.getElementById('expandTip').style.display='none';">
-    Sign Out →
-  </button>
-</div>
-  
+    <button onclick="handleLogout()" style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">Sign Out →</button>
+  </div>
+
   <!-- Undo toast -->
   <div id="undoToast" class="sidebar-undo-toast" style="display:none;">
     <span>Thread deleted</span>
@@ -881,7 +823,7 @@
       <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-muted); line-height:1.8; text-align:left; border-top:1px solid var(--border); padding-top:24px; margin-bottom:28px;">
         The Prism is a lens, not an authority. It surfaces relational architecture already present within the text and the questions surrounding it — it does not think for you, conclude for you, or require agreement in order to engage.<br><br>
         Its purpose is not to replace judgment, tradition, skepticism, faith, or personal inquiry, but to provide a structured way of examining difficult ideas without reducing them to slogans, tribal reflexes, or inherited assumptions.<br><br>
-        QT is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
+        The Prism is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
       </div>
 
       <!-- Three-option wall -->
@@ -892,7 +834,7 @@
           <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">One-Time</div>
           <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$2.99</div>
           <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">10 queries.<br>No subscription required.</div>
-          <a href="#" onclick="interceptPurchase('https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b'); return false;" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Buy 10 Queries →</a>
+          <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); text-decoration:none; border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';" onmouseout="this.style.background='transparent';">Buy 10 Queries →</a>
         </div>
 
         <!-- Subscribe -->
@@ -932,7 +874,7 @@
         <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Signal Bank</div>
         <div style="font-family:var(--cinzel); font-size:22px; color:var(--gold-pale); margin-bottom:4px;">$2.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
         <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">One-time top-up.<br>No plan change required.</div>
-        <a href="#" onclick="interceptPurchase('https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07'); return false;" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Bank →</a>
+        <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Bank →</a>
       </div>
 
       <!-- Wait for reset -->
@@ -994,7 +936,7 @@
   <div class="disclaimer">
     The Prism is a lens, not an authority. It surfaces relational architecture already present within the text and the questions surrounding it — it does not think for you, conclude for you, or require agreement in order to engage.<br><br>
     Its purpose is not to replace judgment, tradition, skepticism, faith, or personal inquiry, but to provide a structured way of examining difficult ideas without reducing them to slogans, tribal reflexes, or inherited assumptions.<br><br>
-    QT is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
+    The Prism is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
   </div>
 
 </div><!-- /.shell -->
@@ -1102,10 +1044,10 @@ The thread memorializes this exchange. Hold it with care.
 
 You are The Prism framework interpreter. Apply the Prism framework to: "${input}"
 
-Prism Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
+QT Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
 
 Return this exact JSON:
-{"recognition":"2-4 lines of plain-language recognition of the human tension inside this question — before any framework category. Name what the person is actually carrying.","verse_identified":"Most relevant Scripture","verse_text":"Verse quoted accurately","prism_summary":"Two sharp sentences","entanglement":"God's initiation here","coherence_alignment":"How this calls toward alignment","noise_decoherence":"What distortions this exposes","telos_insight":"Christ-form being called toward","olam_haba":"Time-transcendent view","kingdom_implication":"One crisp Kingdom punchline","key_terms":[{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"Prism meaning"},{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"Prism meaning"},{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"Prism meaning"}]}`;
+{"recognition":"2-4 lines of plain-language recognition of the human tension inside this question — before any QT category. Name what the person is actually carrying.","verse_identified":"Most relevant Scripture","verse_text":"Verse quoted accurately","prism_summary":"Two sharp sentences","entanglement":"God's initiation here","coherence_alignment":"How this calls toward alignment","noise_decoherence":"What distortions this exposes","telos_insight":"Christ-form being called toward","olam_haba":"Time-transcendent view","kingdom_implication":"One crisp Kingdom punchline","key_terms":[{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"QT meaning"},{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"QT meaning"}]}`;
   }
 
   return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. NO BACKTICKS. START YOUR RESPONSE WITH { AND END WITH }. NOTHING ELSE.
@@ -1159,7 +1101,7 @@ You are The Prism framework interpreter. The user has submitted ${typeDescriptio
 
 Apply the complete 8-part Prism framework. Even if the input is vague, abstract, or a theme rather than a specific verse — identify the most relevant Scripture, apply all eight framework components, and return the JSON.
 
-The Prism Framework you must apply:
+The QT Framework you must apply:
 
 0. Echad b'Emet — Unified in Truth: Reality is built on God's relational truth. Unity > fragmentation. Coherence > chaos. Salvation = restoration into Echad b'Emet. Sin = decoherence. Jesus = full manifestation of Echad b'Emet.
 
@@ -1181,7 +1123,7 @@ The Prism Framework you must apply:
 
 Return this exact JSON object (start with { immediately):
 {
-  "recognition": "2-4 sentences of plain-language recognition before any framework category",
+  "recognition": "2-4 sentences of plain-language recognition before any QT category",
   "verse_identified": "Most relevant Scripture",
   "verse_text": "Verse quoted accurately",
   "prism_summary": "Two sharp sentences",
@@ -1192,9 +1134,9 @@ Return this exact JSON object (start with { immediately):
   "olam_haba": "Time-transcendent view",
   "kingdom_implication": "One crisp Kingdom punchline",
   "key_terms": [
-    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"},
-    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"},
-    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"}
+    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "QT meaning"},
+    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "QT meaning"},
+    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "QT meaning"}
   ]
 }`;
 }
@@ -2714,95 +2656,6 @@ function showSidebarAfterQuery(queryText) {
     if (toggle) toggle.textContent = '‹'; localStorage.setItem('qt_sidebar_open', '1');
   }
   addThreadToSidebar(queryText);
-
-  // Show save-place prompt for anonymous or free users without a stored email
-  if (!userEmail() || CURRENT_TIER === 'free') {
-    var savePlaceEl = document.getElementById('savePlacePrompt');
-    if (savePlaceEl && !localStorage.getItem('qt_save_place_done')) {
-      savePlaceEl.style.display = 'block';
-    }
-  }
-}
-
-// PRE-PURCHASE EMAIL INTERCEPT
-var _pendingStripeUrl = null;
-
-function interceptPurchase(stripeUrl) {
-  // If email already known, go straight to Stripe
-  var email = userEmail() || localStorage.getItem('qt_user_email');
-  if (email) {
-    window.location.href = stripeUrl;
-    return;
-  }
-  // Otherwise show the modal
-  _pendingStripeUrl = stripeUrl;
-  var modal = document.getElementById('prePurchaseModal');
-  if (modal) modal.classList.add('active');
-  setTimeout(function() {
-    var input = document.getElementById('prePurchaseEmail');
-    if (input) input.focus();
-  }, 100);
-}
-
-async function handlePrePurchaseContinue() {
-  var email = document.getElementById('prePurchaseEmail').value.trim();
-  if (email) {
-    localStorage.setItem('qt_user_email', email);
-    // Create free subscriber record
-    try {
-      var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-      var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-      await fetch(sbUrl + '/rest/v1/subscribers', {
-        method: 'POST',
-        headers: {
-          'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon,
-          'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates'
-        },
-        body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
-      });
-    } catch(e) {}
-  }
-  var modal = document.getElementById('prePurchaseModal');
-  if (modal) modal.classList.remove('active');
-  if (_pendingStripeUrl) window.location.href = _pendingStripeUrl;
-}
-
-function handlePrePurchaseSkip() {
-  var modal = document.getElementById('prePurchaseModal');
-  if (modal) modal.classList.remove('active');
-  if (_pendingStripeUrl) window.location.href = _pendingStripeUrl;
-}
-
-// SAVE MY PLACE
-async function handleSavePlace() {
-  var email = document.getElementById('savePlaceEmail').value.trim();
-  if (!email) return;
-  var btn = document.querySelector('#savePlacePrompt button');
-  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
-
-  localStorage.setItem('qt_user_email', email);
-  localStorage.setItem('qt_save_place_done', '1');
-
-  try {
-    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-    await fetch(sbUrl + '/rest/v1/subscribers', {
-      method: 'POST',
-      headers: {
-        'apikey': sbAnon,
-        'Authorization': 'Bearer ' + sbAnon,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=ignore-duplicates'
-      },
-      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
-    });
-  } catch(e) {}
-
-  var input   = document.getElementById('savePlaceEmail');
-  var confirm = document.getElementById('savePlaceConfirm');
-  if (input)   input.style.display   = 'none';
-  if (btn)     btn.style.display     = 'none';
-  if (confirm) confirm.style.display = 'block';
 }
 
 // TOGGLE SIDEBAR
@@ -2821,7 +2674,7 @@ function toggleSidebar() {
 function decrementSidebarCounter() {
   const countEl = document.getElementById('sidebarQueryCountText');
   const wrapEl  = document.getElementById('sidebarCredits');
-  if (!countEl || !wrapEl || wrapEl.style.display === 'none') return;
+  if (!countEl || wrapEl.style.display === 'none') return;
   const match = countEl.textContent.match(/(\d+)/);
   if (!match) return;
   const current = parseInt(match[1]);
@@ -2840,9 +2693,9 @@ function toggleSessionsPanel() {
 
 async function loadSidebarCredits() {
   const email = localStorage.getItem('qt_user_email');
-  if (!email) return;
+  if (!email || CURRENT_TIER === 'free') return;
 
-  const tierLimits = { refraction: 100, scholar: 100, theologian: null, full_spectrum: null, companion: null, trial: 250, free: 0 };
+  const tierLimits = { refraction: 100, scholar: 100, theologian: null, full_spectrum: null, companion: null, trial: 250 };
   const limit = tierLimits[CURRENT_TIER];
 
   // Unlimited tiers — hide the counter entirely
@@ -2904,13 +2757,7 @@ function initSidebar() {
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
 
-  if (!email || CURRENT_TIER === 'free') { allThreads = []; renderThreads(allThreads); }
-
-// Always show sidebar toggle and panel on load
-if (sidebar) { sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible'); }
-sidebarHasAppeared = true; localStorage.setItem('qt_sidebar_appeared', '1');
-
-if (!email || CURRENT_TIER === 'free') return;
+  if (!email || CURRENT_TIER === 'free') { allThreads = []; renderThreads(allThreads); return; }
 
   var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
   var wasOpen     = localStorage.getItem('qt_sidebar_open') === '1';
@@ -3366,16 +3213,5 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </footer>
   
-<!-- Pre-purchase email capture modal -->
-<div id="prePurchaseModal">
-  <div class="pre-purchase-card">
-    <div class="pre-purchase-title">One More Step</div>
-    <div class="pre-purchase-copy">Drop your email so we can credit your account the moment payment clears. Your queries will be waiting when you return.</div>
-    <input class="pre-purchase-input" type="email" id="prePurchaseEmail" placeholder="your@email.com" />
-    <button class="pre-purchase-btn" onclick="handlePrePurchaseContinue()">Continue to Checkout →</button>
-    <button class="pre-purchase-skip" onclick="handlePrePurchaseSkip()">Skip — continue without saving email</button>
-  </div>
-</div>
-
 </body>
 </html>
