@@ -689,7 +689,7 @@
 
   <div class="sidebar-header">
     <div class="sidebar-logo">The Prism</div>
-    <div class="sidebar-tier" id="sidebarTierLabel">Refraction &nbsp;·&nbsp; 90 Day Archive</div>
+    <div class="sidebar-tier" id="sidebarTierLabel">Observer &nbsp;·&nbsp; Free Access</div>
     <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
       <span id="sidebarQueryCount" style="position:relative; cursor:default;">
         <span id="sidebarQueryCountText">— queries remaining</span>
@@ -1695,7 +1695,7 @@ async function callProxy(messages, rawQuery) {
   if (tierFromStream && tierFromStream !== 'trial' && tierFromStream !== 'free') {
     localStorage.setItem('qt_user_tier', tierFromStream);
     CURRENT_TIER = tierFromStream;
-    var tierLabelsMap = { scholar: 'Refraction · 90 Day Archive', refraction: 'Refraction · 90 Day Archive', theologian: 'Full Spectrum · 180 Day Archive', full_spectrum: 'Full Spectrum · 180 Day Archive', companion: 'Full Spectrum · 1 Year Archive', trial: 'Trial · 30 Day Archive', free: 'Observer · Free Access' };
+    var tierLabelsMap = { refraction: 'Refraction · 60 Day Archive', full_spectrum: 'Full Spectrum · 90 Day Archive', scholar: 'Refraction · 60 Day Archive', theologian: 'Full Spectrum · 90 Day Archive', free: 'Observer · Free Access' };
     var labelEl = document.getElementById('sidebarTierLabel');
     if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
@@ -2648,7 +2648,8 @@ function showSidebarAfterQuery(queryText) {
   if (!sidebar) return;
   if (!sidebarHasAppeared) {
     sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
-    sidebarHasAppeared = true; localStorage.setItem('qt_sidebar_appeared', '1');
+    sidebarHasAppeared = true;
+    if (localStorage.getItem('qt_user_email')) localStorage.setItem('qt_sidebar_appeared', '1');
   }
   if (!sidebarOpen) {
     sidebarOpen = true; sidebar.classList.add('open');
@@ -2691,15 +2692,37 @@ function toggleSessionsPanel() {
   if (btn) btn.textContent = isOpen ? '+ Sessions' : '↑ Sessions';
 }
 
+async function loadSidebarCreditsAnon() {
+  // Show IP-based query count for anonymous/free users
+  try {
+    const res = await fetch(window.API_BASE + '/api/interpret', { method: 'GET' });
+    const data = await res.json();
+    const countEl = document.getElementById('sidebarQueryCountText');
+    const wrapEl  = document.getElementById('sidebarCredits');
+    if (!countEl || !wrapEl) return;
+    if (data.locked) {
+      countEl.textContent = '0 queries remaining';
+    } else {
+      const used = data.queriesUsed || 0;
+      const remaining = Math.max(0, 3 - used);
+      countEl.textContent = remaining === 1 ? '1 query remaining' : `${remaining} queries remaining`;
+    }
+    wrapEl.style.display = 'flex';
+  } catch {}
+}
+
 async function loadSidebarCredits() {
   const email = localStorage.getItem('qt_user_email');
-  if (!email || CURRENT_TIER === 'free') return;
+  if (!email || CURRENT_TIER === 'free') {
+    loadSidebarCreditsAnon();
+    return;
+  }
 
-  const tierLimits = { refraction: 100, scholar: 100, theologian: null, full_spectrum: null, companion: null, trial: 250 };
+  const tierLimits = { refraction: 100, full_spectrum: 250 };
   const limit = tierLimits[CURRENT_TIER];
 
-  // Unlimited tiers — hide the counter entirely
-  if (limit === null) return;
+  // Tier not in limits map — hide the counter
+  if (limit === null || limit === undefined) return;
 
   try {
     const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
@@ -2747,17 +2770,29 @@ function updateSidebarCredits(newCredits) {
 }
 
 function initSidebar() {
-  var tierLabels = { scholar: 'Refraction \u00b7 90 Day Archive', theologian: 'Full Spectrum \u00b7 180 Day Archive',
-    companion: 'Full Spectrum \u00b7 1 Year Archive', free: 'Free Access' };
+  var tierLabels = { refraction: 'Refraction · 60 Day Archive', full_spectrum: 'Full Spectrum · 90 Day Archive',
+    scholar: 'Refraction · 60 Day Archive', theologian: 'Full Spectrum · 90 Day Archive',
+    free: 'Observer · Free Access' };
   var labelEl = document.getElementById('sidebarTierLabel');
-  if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || 'Refraction \u00b7 90 Day Archive';
+  if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || tierLabels['free'];
 
   loadSidebarCredits();
 
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
 
-  if (!email || CURRENT_TIER === 'free') { allThreads = []; renderThreads(allThreads); return; }
+  // Anonymous / free users still get the sidebar — show it with upgrade prompt, no thread history
+  if (!email || CURRENT_TIER === 'free') {
+    allThreads = [];
+    renderThreads(allThreads);
+    if (sidebar) sidebar.classList.add('visible');
+    if (toggle) toggle.classList.add('visible');
+    sidebarHasAppeared = true;
+    var freePrompt = document.getElementById('freeUpgradePrompt');
+    if (freePrompt) freePrompt.style.display = 'block';
+    loadSidebarCreditsAnon();
+    return;
+  }
 
   var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
   var wasOpen     = localStorage.getItem('qt_sidebar_open') === '1';
