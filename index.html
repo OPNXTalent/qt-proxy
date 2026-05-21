@@ -413,8 +413,8 @@ Respond only with a valid JSON object. No preamble, no markdown, no explanation 
 {
   "response_mode": "conversational | reflective | theological",
   "recognition": "Opening statement that meets the user where they are. No framework vocabulary until human weight is established. Depth governed by weight profile.",
-  "verse_identified": "Book Chapter:Verse for Scripture (e.g. Isaiah 45:7) or Quran Surah:Ayah for Quranic references (e.g. Quran 2:256). Empty string if not applicable.",
-  "verse_text": "The full verse or ayah text in English. For Quranic references, use an accurate English translation. Empty string if not applicable.",
+  "verse_identified": "Populate with whatever the user submitted — Scripture reference (e.g. Isaiah 45:7) OR Quranic reference (e.g. Quran 2:255). When the user submits a Quranic verse or surah, verse_identified carries that Quranic reference and verse_text carries the ayah in accurate English translation. Do NOT substitute a Scripture verse here when the user submitted a Quranic reference. Scripture enters the response through the framework sections, not the verse block. The verse block surfaces what the user brought.",
+  "verse_text": "The full text of whatever is in verse_identified — Scripture verse or Quranic ayah in accurate English translation. Empty string if not applicable.",
   "prism_summary": "Section 00 — Echad b'Emet. Core reframing. Terminology emerges only after recognition is established. Depth governed by weight profile.",
   "entanglement": "Section 01 — God's initiating relational contact. Ground in narrative or concrete moment before ontology. Depth governed by weight profile.",
   "coherence_alignment": "Section 02 — What alignment looks like in the relational field. Depth governed by weight profile.",
@@ -1066,3 +1066,4 @@ export default async function handler(req, res) {
     return res.end();
   }
 }
+          
