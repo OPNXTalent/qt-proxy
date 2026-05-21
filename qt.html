@@ -1861,6 +1861,23 @@ function downloadPDF(mode) {
     y += lines.length * 5 + 4;
   }
 
+  // Paragraph-aware body renderer — splits on \n\n, adds gap between paragraphs
+  function addBodyParagraphs(text, color, size) {
+    const cleaned = stripHebrew(text);
+    if (!cleaned) return;
+    const lineH = (size || 10) === 10 ? 5 : (size / 2);
+    const paragraphs = cleaned.split(/\n{2,}/).map(p => p.replace(/\n/g, ' ').trim()).filter(p => p.length > 0);
+    paragraphs.forEach((para, i) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(size || 10);
+      doc.setTextColor(...(color || bodyText));
+      const lines = doc.splitTextToSize(para, contentW - 8);
+      checkPage(lines.length * lineH + 4);
+      doc.text(lines, margin + 4, y);
+      y += lines.length * lineH + (i < paragraphs.length - 1 ? 6 : 4); // 6pt gap between paragraphs
+    });
+  }
+
   // Logo
   const logoImg = document.querySelector('header img');
   if (logoImg) {
@@ -2006,18 +2023,27 @@ function downloadPDF(mode) {
     y += 8;
     followUps.forEach(el => {
       const divs = el.querySelectorAll('div');
+      // Compute question label height upfront, then check once for label + opening body lines together
       if (divs[0]) {
-        checkPage(14);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.setTextColor(...gold);
         const qLines = doc.splitTextToSize(stripHebrew(divs[0].innerText), contentW);
-        checkPage(qLines.length * 5 + 6);
+        const qHeight = qLines.length * 5 + 4;
+        // Reserve space for label + at least 2 lines of body so they land on the same page
+        checkPage(qHeight + 12);
+        doc.setTextColor(...gold);
         doc.text(qLines, margin, y);
-        y += qLines.length * 5 + 4;
+        y += qHeight;
       }
       if (divs[1]) {
-        addBody(stripHebrew(divs[1].innerText), dimText);
+        // Recover paragraph breaks from HTML before stripping to plain text
+        const rawHtml = divs[1].innerHTML;
+        const withBreaks = rawHtml
+          .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+          .replace(/<br\s*\/?>/gi, '\n');
+        const tmp = document.createElement('div');
+        tmp.innerHTML = withBreaks;
+        addBodyParagraphs(stripHebrew(tmp.innerText), dimText);
       }
       y += 6;
     });
@@ -2447,7 +2473,9 @@ function restoreFollowUps(id) {
       label.textContent = 'Follow-up \u2014 ' + question;
       var body = document.createElement('div');
       body.style.cssText = 'font-size:16.5px;color:var(--text);line-height:1.75;';
-      body.textContent = resp;
+      body.innerHTML = escHtml(resp)
+        .replace(/\n\n/g, '</p><p style="margin-top:12px;">')
+        .replace(/\n/g, '<br>');
       el.appendChild(label);
       el.appendChild(body);
       var rc = document.getElementById('resultContent');
