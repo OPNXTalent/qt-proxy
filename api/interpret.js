@@ -390,19 +390,13 @@ const WINDOW_HOURS = 24;
 
 const TIER_LIMITS = {
   refraction:    100,
-  full_spectrum: null,
-  trial:         250,
-  scholar:       100,
-  theologian:    null,
+  full_spectrum: 250,
 };
 
 const RETENTION_DAYS = {
-  refraction:    90,
-  full_spectrum: 180,
-  trial:         30,
-  free:          1,
-  scholar:       90,
-  theologian:    180,
+  free:          30,   // registered Explorer with email
+  refraction:    60,
+  full_spectrum: 90,
 };
 
 // ── CRISIS DETECTION ──────────────────────────────────────────────────────────
