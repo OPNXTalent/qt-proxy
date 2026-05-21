@@ -425,7 +425,6 @@
   .qt-recognition {
     padding: 28px 0 28px;
     margin-bottom: 8px;
-    border-bottom: 1px solid var(--border);
   }
   .qt-recognition p {
     font-family: var(--crimson);
@@ -434,6 +433,91 @@
     color: var(--text);
     line-height: 1.8;
     margin: 0;
+  }
+
+  /* Core insight */
+  .qt-core-insight {
+    padding: 24px 0 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  .qt-core-insight p {
+    font-family: var(--crimson);
+    font-size: 18px;
+    color: var(--text);
+    line-height: 1.8;
+    margin: 0;
+  }
+
+  /* Suggested threads */
+  .qt-threads {
+    margin-bottom: 36px;
+  }
+  .qt-threads-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+  .qt-thread-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--crimson);
+    font-size: 16.5px;
+    font-style: italic;
+    line-height: 1.6;
+    padding: 13px 18px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+  }
+  .qt-thread-btn:last-child { margin-bottom: 0; }
+  .qt-thread-btn:hover {
+    border-color: var(--gold-dim);
+    color: var(--gold-pale);
+    background: rgba(201,168,76,0.03);
+  }
+  .qt-thread-btn::before {
+    content: '→ ';
+    color: var(--gold-dim);
+    font-style: normal;
+    font-family: var(--mono);
+    font-size: 13px;
+    margin-right: 4px;
+  }
+
+  /* Progressive disclosure toggle */
+  .qt-framework-toggle {
+    display: block;
+    width: 100%;
+    text-align: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 12px 20px;
+    cursor: pointer;
+    margin-bottom: 32px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .qt-framework-toggle:hover {
+    border-color: var(--gold-dim);
+    color: var(--gold-dim);
+  }
+  .qt-framework-body {
+    display: none;
+  }
+  .qt-framework-body.open {
+    display: block;
   }
 
   /* Section block */
@@ -779,7 +863,7 @@
     <div style="font-family:var(--crimson); font-size:24px; color:var(--hebrew); letter-spacing:0.08em; margin-bottom:16px; direction:rtl;">אֶחָד בֶּאֱמֶת</div>
     <div class="header-sub">Framework Interpreter</div>
     <div class="header-rule"></div>
-    <p class="header-premise">Submit a verse, phrase, theme, or concept. The Prism surfaces the relational architecture already present in the text.</p>
+    <p class="header-premise">A verse, a question, or whatever is on your mind. The Prism surfaces the relational architecture already present in the text.</p>
   </header>
 
   <!-- Anonymous back link — shown only to non-subscribers -->
@@ -790,17 +874,9 @@
 
   <!-- INPUT FORM -->
   <div id="inputSection">
-        <div class="input-selector">
-      <button class="type-btn active" data-type="verse" onclick="setType('verse', this)">Verse Reference</button>
-      <button class="type-btn" data-type="phrase" onclick="setType('phrase', this)">Phrase</button>
-      <button class="type-btn" data-type="theme" onclick="setType('theme', this)">Theme</button>
-      <button class="type-btn" data-type="freetext" onclick="setType('freetext', this)">Free Text</button>
-    </div>
-
     <div class="input-wrap">
-      <label class="input-label" id="inputLabel">Enter a verse reference (e.g. John 3:16, Romans 8:28)</label>
       <div style="position:relative;">
-        <textarea class="input-field" id="userInput" placeholder="John 15:5…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+        <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
         <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:15px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
       </div>
       <div id="micStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -968,14 +1044,8 @@ let conversationHistory = [];  // stores {role, content} pairs
 let currentSubject = '';       // the original subject for context
 
 function setType(type, el) {
+  // No-op: type selector removed in Phase 1. Type is now inferred by the model.
   currentType = type;
-  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('inputLabel').textContent = inputTypes[type].label;
-  document.getElementById('userInput').placeholder = inputTypes[type].placeholder;
-  // Show character counter only for free text
-  document.getElementById('charCount').style.display = type === 'freetext' ? 'block' : 'none';
-  document.getElementById('charNum').textContent = document.getElementById('userInput').value.length;
 }
 
 function updateCharCount() {
@@ -986,47 +1056,11 @@ function updateCharCount() {
 }
 
 function buildPrompt(type, input) {
-  const typeDescriptions = {
-    verse: 'a specific Scripture verse reference',
-    phrase: 'a phrase or half-remembered line from Scripture',
-    theme: 'a biblical theme or concept',
-    freetext: 'a free-text question, passage, or reflection'
-  };
-
-  // Shorter prompt for free-text to reduce timeout risk
-  if (type === 'freetext') {
-    return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. START WITH { END WITH }.
-
-RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER
-These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.
-
-First Movement: Recognition Before Terminology
-Every response begins by locating the human tension inside the question. Name what the visitor is actually carrying before introducing any framework category. If they feel seen first, the architecture lands as revelation rather than lecture.
-
-Second Movement: Ordinary Language Before Framework Language
-Articulate the underlying tension in plain language before introducing Prism terminology. The category earns its name by explaining something the visitor already felt but couldn't articulate. Terminology introduced before recognition feels imposed. Terminology introduced after recognition feels inevitable.
-
-Third Movement: One Door At A Time
-Resist the impulse toward categorical completeness in a single response. Open one door fully rather than gesturing at six doors simultaneously. The visitor should leave each response with one thing newly visible — and a question forming naturally in their mind.
-
-Pacing Principle: Spiral Staircase, Not Elevator Shaft
-The descent into Prism architecture should feel gradual and earned. Recognition → Curiosity → Resonance → Interpretation → Architecture → Ontology. Never begin at ontology.
-
-Compression Over Explanation
-When a formulation captures the insight completely, stop. Do not explain what the compression already accomplished. Trust the language.
-
-End Open, Not Closed
-Every response should leave one thread slightly unresolved — not as manipulation, but as honest invitation. Reality is not fully legible yet. The response should reflect that.
-
-The Governing Principle
-The goal is not to make the visitor feel informed. The goal is to make reality feel newly legible to them. Every response is measured against that standard — not against categorical completeness.
-
-
-
-HUMAN CARE PROTOCOL — SILENT MODE
+  // Single-field input: type is always inferred by the model
+  const humanCareProtocol = `HUMAN CARE PROTOCOL \u2014 SILENT MODE
 This instruction operates beneath all framework activity. It never announces itself.
 
-As you read each message, remain attentive to signals that suggest the person may be in genuine personal distress — not theological distress, but human distress. Lament psalms, Job, Ecclesiastes, and suffering theology are not signals. Personal statements of hopelessness, worthlessness, desire to disappear, or references to self-harm or ending one's life are signals.
+As you read each message, remain attentive to signals that suggest the person may be in genuine personal distress \u2014 not theological distress, but human distress. Lament psalms, Job, Ecclesiastes, and suffering theology are not signals. Personal statements of hopelessness, worthlessness, desire to disappear, or references to self-harm or ending one\u2019s life are signals.
 
 When you detect a potential signal:
 - Do not deliver a framework interpretation.
@@ -1036,110 +1070,54 @@ When you detect a potential signal:
 - Weave in naturally, without preaching: they matter, they are seen, they are loved by the One who knows them completely.
 
 As the exchange clarifies:
-- If it resolves as theological or academic engagement — return to normal interpretation without comment.
-- If genuine distress is confirmed but not imminent — offer warmly: "You don't have to carry this alone. Please reach out to the 988 Suicide and Crisis Lifeline (call or text 988) or the Crisis Text Line (text HOME to 741741). Someone is ready to listen right now."
-- If there is any indication of imminent risk or active attempt — respond with urgency and care: "Please call 911 now. You matter, and help can reach you. After you call, 988 and the Crisis Text Line (text HOME to 741741) are also there for you."
+- If it resolves as theological or academic engagement \u2014 return to normal interpretation without comment.
+- If genuine distress is confirmed but not imminent \u2014 offer warmly: "You don\u2019t have to carry this alone. Please reach out to the 988 Suicide and Crisis Lifeline (call or text 988) or the Crisis Text Line (text HOME to 741741). Someone is ready to listen right now."
+- If there is any indication of imminent risk or active attempt \u2014 respond with urgency and care: "Please call 911 now. You matter, and help can reach you. After you call, 988 and the Crisis Text Line (text HOME to 741741) are also there for you."
 
-The thread memorializes this exchange. Hold it with care.
+The thread memorializes this exchange. Hold it with care.`;
 
-You are The Prism framework interpreter. Apply the Prism framework to: "${input}"
+  const constitutionalLayer = `RESPONSE BEHAVIOR \u2014 CONSTITUTIONAL LAYER
+These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.
 
-Prism Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
+Recognition \u2192 Curiosity \u2192 Resonance \u2192 Interpretation \u2192 Architecture \u2192 Ontology. Never begin at ontology. Never escort the reader to the conclusion \u2014 clear the ground until the conclusion is what remains.
+
+Compression Over Explanation: When a formulation captures the insight completely, stop.
+End Open, Not Closed: Leave one thread slightly unresolved \u2014 not as manipulation, but as honest invitation.`;
+
+  return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. START WITH { END WITH }.
+
+${constitutionalLayer}
+
+${humanCareProtocol}
+
+You are The Prism framework interpreter. The user has submitted: "${input}"
+
+Infer the query type from the content \u2014 verse reference, phrase, theme, or open question. Apply the complete Prism framework regardless of input type.
+
+Prism Framework: Echad b\u2019Emet (God\u2019s unified relational truth), Entanglement (God\u2019s initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
 
 Return this exact JSON:
-{"recognition":"2-4 lines of plain-language recognition of the human tension inside this question — before any Prism category. Name what the person is actually carrying.","verse_identified":"Most relevant Scripture","verse_text":"Verse quoted accurately","prism_summary":"Two sharp sentences","entanglement":"God's initiation here","coherence_alignment":"How this calls toward alignment","noise_decoherence":"What distortions this exposes","telos_insight":"Christ-form being called toward","olam_haba":"Time-transcendent view","kingdom_implication":"One crisp Kingdom punchline","key_terms":[{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"Prism meaning"},{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"Prism meaning"},{"term":"Term","hebrew":"Hebrew if applicable","prism_meaning":"Prism meaning"}]}`;
-  }
-
-  return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. NO BACKTICKS. START YOUR RESPONSE WITH { AND END WITH }. NOTHING ELSE.
-
-RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER
-These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.
-
-First Movement: Recognition Before Terminology
-Every response begins by locating the human tension inside the question. Name what the visitor is actually carrying before introducing any framework category. If they feel seen first, the architecture lands as revelation rather than lecture.
-
-Second Movement: Ordinary Language Before Framework Language
-Articulate the underlying tension in plain language before introducing Prism terminology. The category earns its name by explaining something the visitor already felt but couldn't articulate. Terminology introduced before recognition feels imposed. Terminology introduced after recognition feels inevitable.
-
-Third Movement: One Door At A Time
-Resist the impulse toward categorical completeness in a single response. Open one door fully rather than gesturing at six doors simultaneously. The visitor should leave each response with one thing newly visible — and a question forming naturally in their mind.
-
-Pacing Principle: Spiral Staircase, Not Elevator Shaft
-The descent into Prism architecture should feel gradual and earned. Recognition → Curiosity → Resonance → Interpretation → Architecture → Ontology. Never begin at ontology.
-
-Compression Over Explanation
-When a formulation captures the insight completely, stop. Do not explain what the compression already accomplished. Trust the language.
-
-End Open, Not Closed
-Every response should leave one thread slightly unresolved — not as manipulation, but as honest invitation. Reality is not fully legible yet. The response should reflect that.
-
-The Governing Principle
-The goal is not to make the visitor feel informed. The goal is to make reality feel newly legible to them. Every response is measured against that standard — not against categorical completeness.
-
-
-
-HUMAN CARE PROTOCOL — SILENT MODE
-This instruction operates beneath all framework activity. It never announces itself.
-
-As you read each message, remain attentive to signals that suggest the person may be in genuine personal distress — not theological distress, but human distress. Lament psalms, Job, Ecclesiastes, and suffering theology are not signals. Personal statements of hopelessness, worthlessness, desire to disappear, or references to self-harm or ending one's life are signals.
-
-When you detect a potential signal:
-- Do not deliver a framework interpretation.
-- Shift seamlessly into warm, plainspoken presence. No Prism terminology. No lenses.
-- Begin with acknowledgment. Let them know they have been heard.
-- Ask one gentle qualifying question at a time to understand what they are carrying. Do not interrogate. Do not rush.
-- Weave in naturally, without preaching: they matter, they are seen, they are loved by the One who knows them completely.
-
-As the exchange clarifies:
-- If it resolves as theological or academic engagement — return to normal interpretation without comment.
-- If genuine distress is confirmed but not imminent — offer warmly: "You don't have to carry this alone. Please reach out to the 988 Suicide and Crisis Lifeline (call or text 988) or the Crisis Text Line (text HOME to 741741). Someone is ready to listen right now."
-- If there is any indication of imminent risk or active attempt — respond with urgency and care: "Please call 911 now. You matter, and help can reach you. After you call, 988 and the Crisis Text Line (text HOME to 741741) are also there for you."
-
-The thread memorializes this exchange. Hold it with care.
-
-You are The Prism framework interpreter. The user has submitted ${typeDescriptions[type]}: "${input}"
-
-Apply the complete 8-part Prism framework. Even if the input is vague, abstract, or a theme rather than a specific verse — identify the most relevant Scripture, apply all eight framework components, and return the JSON.
-
-The Prism Framework you must apply:
-
-0. Echad b'Emet — Unified in Truth: Reality is built on God's relational truth. Unity > fragmentation. Coherence > chaos. Salvation = restoration into Echad b'Emet. Sin = decoherence. Jesus = full manifestation of Echad b'Emet.
-
-1. Relational Ontology: Reality is relational (Hebraic worldview), not categorical (Greek abstraction).
-
-2. Quantum Structure: Entanglement = God's initiating contact. Coherence = alignment/obedience/abiding. Decoherence = ego/fear/pride/trauma. Signal vs Noise = clarity vs distortion.
-
-3. Telos: God predestines the form (Christ-shaped version of the person), not the roster.
-
-4. Universal Entanglement / Optional Alignment: God entangles everyone. Alignment is relational and volitional — never forced.
-
-5. Children as Low-Noise Systems: Minimal ego = resonance template.
-
-6. Competing Entanglements: The world-system = ego, pride, image-crafting, tribalism. Being in but not of = placement vs resonance.
-
-7. Jesus' Voice as Resonance Pattern: Signal recognition, not favoritism.
-
-8. Hebrew Two-World Cosmology: Olam HaZeh (this world: noise/fragmentation) vs Olam HaBa (world to come: coherence/telos). The overlap = Already/Not Yet. Malkhut Elohim = coherent ordering of reality under God's truth.
-
-Return this exact JSON object (start with { immediately):
 {
-  "recognition": "2-4 sentences of plain-language recognition before any Prism category",
+  "recognition": "2-4 sentences of plain-language recognition before any Prism category. Name what the person is actually carrying. No framework vocabulary.",
+  "core_insight": "The single most important thing the framework sees in this query. One paragraph. Framework language now permitted \u2014 only after recognition has landed. Aphoristic compression preferred. Example compression: 'The noise is not epistemic. It is volitional.'",
+  "suggested_threads": [
+    "A specific door that emerged from this encounter. Concrete, not generic. Example: 'The word translated know here is yada \u2014 that changes the entire question you came with.'",
+    "A second specific door. Example: 'Job asked the same thing from the ash heap. Want to go there?'",
+    "A third specific door \u2014 only if genuinely present. May return only 2 threads if only 2 are honest."
+  ],
   "verse_identified": "Most relevant Scripture",
   "verse_text": "Verse quoted accurately",
-  "prism_summary": "Two sharp sentences",
-  "entanglement": "God's initiation here",
+  "prism_summary": "Two sharp sentences \u2014 Section 00 Echad b\u2019Emet",
+  "entanglement": "God\u2019s initiation here",
   "coherence_alignment": "How this calls toward alignment",
   "noise_decoherence": "What distortions this exposes",
   "telos_insight": "Christ-form being called toward",
   "olam_haba": "Time-transcendent view",
-  "kingdom_implication": "One crisp Kingdom punchline",
-  "key_terms": [
-    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"},
-    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"},
-    {"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"}
-  ]
+  "kingdom_implication": "One crisp Kingdom punchline \u2014 ceremonial arrival, not summary",
+  "key_terms": [{"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"}]
 }`;
 }
+
 
 // --- Query limit state ---
 let sessionQueryCount = 0;
@@ -1242,7 +1220,7 @@ async function runInterpretation() {
   document.getElementById('loadingBlock').classList.add('visible');
   document.getElementById('resultBlock').classList.remove('visible');
 
-  const prompt = buildPrompt(currentType, input);
+  const prompt = buildPrompt('freetext', input); // type inferred by model — single field input
   conversationHistory.push({ role: 'user', content: prompt });
 
   try {
@@ -1742,8 +1720,8 @@ function showResult() {
 
 function renderResult(d) {
   const sections = [
-    { num: '00', title: 'Echad b\'Emet', hebrew: 'אֶחָד בֶּאֱמֶת', content: d.prism_summary },
-    { num: '01', title: 'Entanglement', hebrew: 'קֶשֶׁר', content: d.entanglement },
+    { num: '00', title: 'Echad b\'Emet', hebrew: 'אֶחָד בֶאֱמֶת', content: d.prism_summary },
+    { num: '01', title: 'Entanglement', hebrew: 'קֶשֶר', content: d.entanglement },
     { num: '02', title: 'Coherence & Alignment', hebrew: 'יִחוּד', content: d.coherence_alignment },
     { num: '03', title: 'Noise & Decoherence', hebrew: 'פֵּרוּד', content: d.noise_decoherence },
     { num: '04', title: 'Telos', hebrew: 'תַּכְלִית', content: d.telos_insight },
@@ -1762,7 +1740,7 @@ function renderResult(d) {
     `;
   }
 
-  // Recognition threshold — unlabeled opening
+  // 1. Recognition moment — unlabeled, pure prose, full breathing room
   if (d.recognition) {
     html += `
       <div class="qt-recognition">
@@ -1771,54 +1749,69 @@ function renderResult(d) {
     `;
   }
 
-  // Prism sections
-  sections.forEach(s => {
+  // 2. Core insight — unlabeled, one paragraph, framework language now permitted
+  if (d.core_insight) {
     html += `
-      <div class="qt-section">
-        <div class="qt-section-head">
-          <span class="qt-section-num">${s.num}</span>
-          <span class="qt-section-title">${s.title}</span>
-          <span class="qt-section-hebrew">${s.hebrew}</span>
-        </div>
-        <div class="qt-section-body">
-          <p>${escHtml(s.content || '')}</p>
-        </div>
-      </div>
-    `;
-  });
-
-  // Key terms table
-  if (d.key_terms && d.key_terms.length > 0) {
-    html += `
-      <div class="qt-section">
-        <div class="qt-section-head">
-          <span class="qt-section-num">06</span>
-          <span class="qt-section-title">Key Terms</span>
-          <span class="qt-section-hebrew">מִלִּים</span>
-        </div>
-        <div class="qt-section-body" style="padding:0;">
-          <table class="qt-table">
-            <thead>
-              <tr>
-                <th>Term</th>
-                <th>Prism Meaning</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${d.key_terms.map(t => `
-                <tr>
-                  <td>${escHtml(t.term)}${t.hebrew ? ` <span style="color:var(--hebrew); font-size: 17px;">${escHtml(t.hebrew)}</span>` : ''}</td>
-                  <td>${escHtml(t.prism_meaning)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
+      <div class="qt-core-insight">
+        <p>${escHtml(d.core_insight)}</p>
       </div>
     `;
   }
 
-  // Kingdom punchline
+  // 3. Suggested threads — specific doors from this encounter
+  const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(t => t && t.trim()) : [];
+  if (threads.length > 0) {
+    html += `<div class="qt-threads">
+      <div class="qt-threads-label">Continue the exploration</div>
+      ${threads.map(t => `<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread)" data-thread="${escHtml(t)}">${escHtml(t)}</button>`).join('')}
+    </div>`;
+  }
+
+  // 4. Progressive disclosure toggle + framework architecture (collapsed by default)
+  const hasFramework = sections.some(s => s.content) || (d.key_terms && d.key_terms.length > 0);
+  if (hasFramework) {
+    let frameworkHtml = '';
+
+    sections.forEach(s => {
+      if (!s.content) return;
+      frameworkHtml += `
+        <div class="qt-section">
+          <div class="qt-section-head">
+            <span class="qt-section-num">${s.num}</span>
+            <span class="qt-section-title">${s.title}</span>
+            <span class="qt-section-hebrew">${s.hebrew}</span>
+          </div>
+          <div class="qt-section-body">
+            <p>${escHtml(s.content || '')}</p>
+          </div>
+        </div>
+      `;
+    });
+
+    if (d.key_terms && d.key_terms.length > 0) {
+      const termRows = d.key_terms.map(function(t) {
+        const hebrewSpan = t.hebrew ? ' <span style="color:var(--hebrew); font-size: 17px;">' + escHtml(t.hebrew) + '</span>' : '';
+        return '<tr><td>' + escHtml(t.term) + hebrewSpan + '</td><td>' + escHtml(t.prism_meaning) + '</td></tr>';
+      }).join('');
+      frameworkHtml += '<div class="qt-section"><div class="qt-section-head">' +
+        '<span class="qt-section-num">06</span>' +
+        '<span class="qt-section-title">Key Terms</span>' +
+        '<span class="qt-section-hebrew">מִלִּים</span>' +
+        '</div><div class="qt-section-body" style="padding:0;">' +
+        '<table class="qt-table"><thead><tr><th>Term</th><th>Prism Meaning</th></tr></thead>' +
+        '<tbody>' + termRows + '</tbody></table></div></div>';
+    }
+    html += `
+      <button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">
+        View full framework interpretation
+      </button>
+      <div class="qt-framework-body" id="qtFrameworkBody">
+        ${frameworkHtml}
+      </div>
+    `;
+  }
+
+  // 5. Kingdom Implication — ceremonial arrival, always rendered
   html += `
     <div class="kingdom-block">
       <div class="kingdom-label">Kingdom Implication</div>
@@ -1827,6 +1820,21 @@ function renderResult(d) {
   `;
 
   document.getElementById('resultContent').innerHTML = html;
+}
+
+function toggleFramework(btn) {
+  const body = document.getElementById('qtFrameworkBody');
+  if (!body) return;
+  const isOpen = body.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen);
+  btn.textContent = isOpen ? 'Hide framework interpretation' : 'View full framework interpretation';
+}
+
+function submitSuggestedThread(text) {
+  const input = document.getElementById('userInput');
+  if (!input) return;
+  input.value = text;
+  runInterpretation();
 }
 
 function escHtml(str) {
@@ -1963,6 +1971,21 @@ function downloadPDF(mode) {
     checkPage(rLines.length * 5 + 14);
     doc.text(rLines, margin, y);
     y += rLines.length * 5 + 10;
+    drawRule();
+  }
+
+  // Core insight
+  const coreInsightEl = document.querySelector('.qt-core-insight p');
+  if (coreInsightEl) {
+    checkPage(20);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...bodyText);
+    const ciLines = doc.splitTextToSize(coreInsightEl.innerText.trim(), contentW);
+    checkPage(ciLines.length * 5 + 14);
+    doc.text(ciLines, margin, y);
+    y += ciLines.length * 5 + 10;
     drawRule();
   }
 
