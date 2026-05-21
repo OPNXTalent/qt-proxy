@@ -454,7 +454,12 @@
     margin-bottom: 36px;
   }
   .qt-threads-label {
-    display: none;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
   }
   .qt-thread-btn {
     display: block;
@@ -624,7 +629,13 @@
   }
 
   .kingdom-label {
-    display: none;
+    font-family: var(--cinzel);
+    font-size: 17px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 14px;
+    text-align: center;
   }
 
   .kingdom-text {
@@ -653,7 +664,15 @@
     line-height: 1.55;
   }
   .fu-question::before {
-    content: none;
+    content: 'Follow-up — ';
+    font-family: var(--mono);
+    font-size: 10px;
+    font-style: normal;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 6px;
   }
   .fu-body {
     font-family: var(--crimson);
@@ -2106,9 +2125,20 @@ function resetForm() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Enter key submits
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.ctrlKey) runInterpretation();
+// Enter key submits — plain Enter on main input and follow-up input
+// Shift+Enter inserts a newline (standard textarea behaviour preserved)
+document.getElementById('userInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    runInterpretation();
+  }
+});
+
+document.getElementById('followUpInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    runFollowUp();
+  }
 });
 
 // ── VOICE / MIC ──────────────────────────────────────────────────────────────
