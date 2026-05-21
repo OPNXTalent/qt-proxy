@@ -1994,80 +1994,32 @@ function downloadPDF(mode) {
     drawRule();
   }
 
-  // Framework sections (from collapsed disclosure — read directly from data)
-  const sectionLabels = [
-    "00  ECHAD B'EMET — Unified in Truth",
-    '01  ENTANGLEMENT',
-    '02  COHERENCE & ALIGNMENT',
-    '03  NOISE & DECOHERENCE',
-    '04  TELOS',
-    '05  OLAM HABA — Non-Local View',
-  ];
-
-  const sectionEls = document.querySelectorAll('.qt-section');
-  sectionEls.forEach((el, i) => {
-    if (i >= sectionLabels.length) return;
-    checkPage(22);
-    y += 2;
-    doc.setFillColor(...bgSection);
-    doc.rect(margin, y - 3, contentW, 9, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...gold);
-    doc.text(sectionLabels[i], margin + 2, y + 3);
-    y += 11;
-    const bodyEl = el.querySelector('.qt-section-body');
-    if (bodyEl) addBody(bodyEl.innerText.trim());
-  });
-
-  // Key terms
-  const tableEl = document.querySelector('.qt-table');
-  if (tableEl) {
-    checkPage(22);
-    y += 2;
-    doc.setFillColor(...bgSection);
-    doc.rect(margin, y - 3, contentW, 9, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...gold);
-    doc.text('06  KEY TERMS', margin + 2, y + 3);
-    y += 11;
-
-    tableEl.querySelectorAll('tbody tr').forEach(row => {
-      const cells = row.querySelectorAll('td');
-      if (cells.length >= 2) {
-        checkPage(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(...gold);
-        doc.text(stripHebrew(cells[0].innerText), margin, y);
-        y += 5;
-        addBody(stripHebrew(cells[1].innerText), dimText);
-      }
-    });
-  }
-  // Follow-up exchanges
+  // Follow-up exchanges — wrapped, with section header per exchange
   const followUps = document.querySelectorAll('#resultContent > div[style*="border-top"]');
   if (followUps.length > 0) {
     checkPage(20);
     drawRule();
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(...goldDim);
     doc.text('CONTINUED EXPLORATION', margin, y);
     y += 8;
     followUps.forEach(el => {
       const divs = el.querySelectorAll('div');
       if (divs[0]) {
-        checkPage(10);
+        checkPage(14);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(...gold);
-        doc.text(stripHebrew(divs[0].innerText), margin, y);
-        y += 6;
+        const qLines = doc.splitTextToSize(stripHebrew(divs[0].innerText), contentW);
+        checkPage(qLines.length * 5 + 6);
+        doc.text(qLines, margin, y);
+        y += qLines.length * 5 + 4;
       }
-      if (divs[1]) addBody(stripHebrew(divs[1].innerText), dimText);
-      y += 3;
+      if (divs[1]) {
+        addBody(stripHebrew(divs[1].innerText), dimText);
+      }
+      y += 6;
     });
   }
 
