@@ -1683,6 +1683,22 @@ async function callProxy(messages, rawQuery) {
               fullText += parsed.text;
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
+            } else if (parsed.type === 'verse_patch') {
+              // Server fetched authoritative verse text — patch the banner live
+              const patchTarget = document.getElementById('versePatchTarget');
+              if (patchTarget) {
+                patchTarget.outerHTML = escHtml(parsed.verse_text || '');
+              }
+              // Also inject into fullText so it's saved correctly when parsed
+              try {
+                const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  const obj = JSON.parse(jsonMatch[0]);
+                  obj.verse_text = parsed.verse_text || '';
+                  if (parsed.verse_text_arabic) obj.verse_text_arabic = parsed.verse_text_arabic;
+                  fullText = fullText.replace(jsonMatch[0], JSON.stringify(obj));
+                }
+              } catch(patchErr) { /* non-blocking */ }
             } else if (parsed.type === 'error') {
               throw new Error('Stream error: ' + parsed.error);
             }
@@ -1780,9 +1796,12 @@ function renderResult(d) {
 
   let html = '';
 
-  // Verse banner
-  if (d.verse_text) {
-    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified || '') + '</div><div class="verse-text">' + escHtml(d.verse_text) + '</div></div>';
+  // Verse banner — render whenever we have a reference, even if text is still loading
+  if (d.verse_identified) {
+    const verseBody = d.verse_text
+      ? escHtml(d.verse_text)
+      : '<span id="versePatchTarget" style="opacity:0.35; font-style:normal; font-family:var(--mono); font-size:12px; letter-spacing:0.12em;">retrieving text…</span>';
+    html += '<div id="verseBanner" class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + verseBody + '</div></div>';
   }
 
   // 1. Recognition moment — unlabeled, pure prose, full breathing room
