@@ -1,1128 +1,310 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Prism — Shared Interpretation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --void: #06060a;
-    --deep: #0d0d14;
-    --surface: #13131e;
-    --surface-2: #1a1a28;
-    --border: #2a2a40;
-    --border-lit: #4a4a70;
-    --gold: #c9a84c;
-    --gold-dim: #7a6230;
-    --gold-pale: #e8d5a0;
-    --blue-deep: #1e2a4a;
-    --text: #d8d4e8;
-    --text-dim: #7a7890;
-    --text-muted: #3a384a;
-    --hebrew: #b8a8d0;
-    --collab: rgba(80,180,120,0.8);
-    --collab-dim: rgba(80,180,120,0.4);
-    --cinzel: 'Cinzel', serif;
-    --crimson: 'Crimson Pro', Georgia, serif;
-    --mono: 'JetBrains Mono', monospace;
+// api/share.js
+// Handles all share operations for The Prism
+// POST   /api/share  — create a new share, returns { shareId, shareUrl }
+// PATCH  /api/share  — toggle collaboration_open or status
+// GET    /api/share?t=TOKEN — fetch share record for share.html
+
+const SUPABASE_URL          = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_ANON_KEY     = process.env.SUPABASE_ANON_KEY;
+const BASE_URL              = 'https://theprism.io';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function generateToken(length = 12) {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < length; i++) {
+    token += chars[Math.floor(Math.random() * chars.length)];
   }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--void);
-    color: var(--text);
-    font-family: var(--crimson);
-    font-size: 20px;
-    line-height: 1.7;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      radial-gradient(1px 1px at 20% 30%, rgba(200,180,255,0.4) 0%, transparent 100%),
-      radial-gradient(1px 1px at 80% 10%, rgba(200,180,255,0.3) 0%, transparent 100%),
-      radial-gradient(1px 1px at 50% 60%, rgba(200,180,255,0.2) 0%, transparent 100%),
-      radial-gradient(1px 1px at 15% 75%, rgba(200,180,255,0.3) 0%, transparent 100%),
-      radial-gradient(1px 1px at 90% 50%, rgba(200,180,255,0.25) 0%, transparent 100%),
-      radial-gradient(2px 2px at 75% 35%, rgba(201,168,76,0.3) 0%, transparent 100%),
-      radial-gradient(1px 1px at 45% 45%, rgba(200,180,255,0.4) 0%, transparent 100%);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* ── SIDEBAR ── */
-  .sidebar {
-    width: 280px; min-width: 280px;
-    background: var(--deep);
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    position: fixed; top: 0; left: 0; bottom: 0;
-    z-index: 200;
-    transform: translateX(-280px);
-    transition: transform 0.3s ease;
-  }
-  .sidebar.open { transform: translateX(0); }
-
-  .sidebar-toggle {
-    position: fixed; top: 20px; left: 20px; z-index: 300;
-    width: 36px; height: 36px;
-    background: rgba(6,6,10,0.9); border: 1px solid var(--border);
-    color: var(--gold-dim); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; transition: all 0.2s; backdrop-filter: blur(8px);
-  }
-  .sidebar-toggle:hover { border-color: var(--gold-dim); color: var(--gold); }
-
-  .sidebar-header {
-    padding: 68px 20px 16px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .sidebar-logo { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.18em; color: var(--gold-pale); text-transform: uppercase; margin-bottom: 4px; }
-  .sidebar-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--gold-dim); text-transform: uppercase; }
-
-  /* Anonymous warning bar */
-  .anon-warning {
-    margin: 12px 16px;
-    padding: 12px 14px;
-    border: 1px solid rgba(201,168,76,0.2);
-    background: rgba(201,168,76,0.03);
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    line-height: 1.7;
-    color: var(--gold-dim);
-  }
-  .anon-warning strong { color: var(--gold-pale); display: block; margin-bottom: 4px; letter-spacing: 0.16em; text-transform: uppercase; }
-
-  /* Save profile CTA */
-  .save-profile-bar {
-    margin: 8px 16px 4px;
-    padding: 0;
-  }
-  .save-profile-btn {
-    width: 100%;
-    font-family: var(--cinzel);
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    padding: 11px 16px;
-    border: 1px solid var(--gold-dim);
-    background: rgba(201,168,76,0.04);
-    color: var(--gold-pale);
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: center;
-  }
-  .save-profile-btn:hover { background: rgba(201,168,76,0.09); border-color: var(--gold); }
-
-  /* Inline email capture inside sidebar */
-  .email-capture-inline {
-    display: none;
-    margin: 8px 16px;
-    padding: 14px;
-    border: 1px solid var(--gold-dim);
-    background: rgba(201,168,76,0.03);
-  }
-  .email-capture-inline.open { display: block; }
-  .email-capture-inline input {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: var(--crimson);
-    font-size: 15px;
-    padding: 9px 12px;
-    outline: none;
-    margin-bottom: 8px;
-    transition: border-color 0.2s;
-  }
-  .email-capture-inline input:focus { border-color: var(--gold-dim); }
-  .email-capture-inline input::placeholder { color: var(--text-muted); font-style: italic; }
-  .email-capture-inline button {
-    width: 100%;
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    padding: 9px;
-    border: 1px solid var(--gold-dim);
-    background: transparent;
-    color: var(--gold-pale);
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .email-capture-inline button:hover { background: rgba(201,168,76,0.08); }
-  .email-capture-status {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    color: var(--gold-dim);
-    margin-top: 6px;
-    display: none;
-  }
-
-  .sidebar-section-label {
-    font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--text-muted);
-    padding: 14px 20px 8px; flex-shrink: 0;
-  }
-
-  .sidebar-threads { flex: 1; overflow-y: auto; padding-bottom: 16px; }
-  .sidebar-threads::-webkit-scrollbar { width: 3px; }
-  .sidebar-threads::-webkit-scrollbar-thumb { background: var(--border); }
-
-  .thread-item {
-    padding: 12px 20px;
-    border-bottom: 1px solid rgba(42,42,64,0.5);
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .thread-item:hover { background: rgba(255,255,255,0.02); }
-  .thread-item.active { background: rgba(201,168,76,0.05); border-left: 2px solid var(--gold-dim); padding-left: 18px; }
-  .thread-item.shared-origin { border-left: 2px solid var(--collab-dim); }
-  .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text); line-height: 1.4; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .thread-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
-  .thread-date { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--text-muted); }
-  .thread-badge { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 7px; color: #ffffff; background: rgba(201,168,76,0.25); }
-  .thread-badge.shared { background: rgba(80,180,120,0.25); }
-
-  .sidebar-footer {
-    padding: 16px 20px;
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .sidebar-footer a {
-    font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em;
-    text-transform: uppercase; color: var(--text-muted); text-decoration: none;
-    transition: color 0.2s;
-  }
-  .sidebar-footer a:hover { color: var(--gold-dim); }
-
-  /* ── LAYOUT ── */
-  .page-wrap { display: flex; min-height: 100vh; }
-  .main-content { flex: 1; transition: margin-left 0.3s ease; min-width: 0; }
-  .main-content.sidebar-open { margin-left: 280px; }
-  @media (max-width: 900px) { .main-content.sidebar-open { margin-left: 0; } }
-
-  .shell {
-    position: relative; z-index: 1;
-    max-width: 860px; width: 100%;
-    margin: 0 auto;
-    padding: 60px 40px 100px;
-  }
-
-  /* ── SHARED BANNER ── */
-  .share-banner {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    text-align: center;
-    margin-bottom: 48px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--border);
-  }
-  .share-banner span { color: var(--gold-dim); }
-
-  /* ── HEADER ── */
-  .header { text-align: center; margin-bottom: 64px; }
-  .header h1 { font-family: var(--cinzel); font-size: 44px; font-weight: 400; letter-spacing: 0.08em; color: var(--gold-pale); line-height: 1.2; margin-bottom: 8px; }
-  .header-sub { font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.2em; color: var(--text-muted); margin-bottom: 28px; }
-  .header-rule { width: 120px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold-dim), transparent); margin: 0 auto 24px; }
-  .header-premise { font-size: 17px; color: var(--text-dim); font-style: italic; max-width: 560px; margin: 0 auto; line-height: 1.75; }
-
-  /* ── VERSE BANNER ── */
-  .verse-banner { border-left: 2px solid var(--gold-dim); padding: 20px 28px; background: linear-gradient(135deg, rgba(201,168,76,0.04), transparent); margin-bottom: 40px; }
-  .verse-ref { font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold-dim); margin-bottom: 10px; }
-  .verse-text { font-size: 23px; color: var(--gold-pale); font-style: italic; line-height: 1.6; }
-
-  /* ── RECOGNITION ── */
-  .qt-recognition { padding: 28px 0 28px; margin-bottom: 8px; }
-  .qt-recognition p { font-family: var(--crimson); font-size: 18.5px; font-style: italic; color: var(--text); line-height: 1.8; margin: 0; }
-
-  /* ── CORE INSIGHT ── */
-  .qt-core-insight { padding: 24px 0 28px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
-  .qt-core-insight p { font-family: var(--crimson); font-size: 18px; color: var(--text); line-height: 1.8; margin: 0; }
-
-  /* ── KINGDOM BLOCK ── */
-  .kingdom-block { border: 1px solid var(--gold-dim); background: linear-gradient(135deg, rgba(201,168,76,0.06), rgba(30,42,74,0.3)); padding: 28px 32px; margin-top: 12px; position: relative; }
-  .kingdom-block::before { content: '✦'; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--void); padding: 0 10px; color: var(--gold-dim); font-size: 17px; }
-  .kingdom-label { font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold-dim); margin-bottom: 14px; text-align: center; }
-  .kingdom-text { font-size: 21px; color: var(--gold-pale); font-style: italic; text-align: center; line-height: 1.7; }
-
-  /* ── SUGGESTED THREADS ── */
-  .qt-threads { margin: 32px 0; }
-  .qt-threads-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; }
-  .qt-thread-btn { display: block; width: 100%; text-align: left; background: transparent; border: 1px solid var(--border); color: var(--text-dim); font-family: var(--crimson); font-size: 16.5px; font-style: italic; line-height: 1.6; padding: 13px 18px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
-  .qt-thread-btn:hover { border-color: var(--gold-dim); color: var(--gold-pale); background: rgba(201,168,76,0.03); }
-  .qt-thread-btn::before { content: '→ '; color: var(--gold-dim); font-style: normal; font-family: var(--mono); font-size: 13px; margin-right: 4px; }
-
-  /* ── FRAMEWORK SECTIONS ── */
-  .qt-framework-toggle { display: block; width: 100%; text-align: center; background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; padding: 12px 20px; cursor: pointer; margin-bottom: 32px; transition: border-color 0.2s, color 0.2s; }
-  .qt-framework-toggle:hover { border-color: var(--gold-dim); color: var(--gold-dim); }
-  .qt-framework-body { display: none; }
-  .qt-framework-body.open { display: block; }
-  .qt-section { margin-bottom: 32px; border: 1px solid var(--border); background: var(--surface); overflow: hidden; }
-  .qt-section-head { display: flex; align-items: baseline; gap: 14px; padding: 16px 24px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
-  .qt-section-num { font-family: var(--mono); font-size: 17px; color: var(--gold-dim); letter-spacing: 0.1em; flex-shrink: 0; }
-  .qt-section-title { font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text); flex: 1; }
-  .qt-section-hebrew { font-size: 18px; color: var(--hebrew); font-family: var(--crimson); flex-shrink: 0; }
-  .qt-section-body { padding: 22px 24px; font-size: 19px; color: var(--text); line-height: 1.75; }
-  .qt-section-body p { margin-bottom: 12px; }
-  .qt-section-body p:last-child { margin-bottom: 0; }
-  .qt-table { width: 100%; border-collapse: collapse; font-size: 17px; }
-  .qt-table th { font-family: var(--mono); font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); background: rgba(201,168,76,0.04); }
-  .qt-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-dim); vertical-align: top; }
-  .qt-table td:first-child { color: var(--text); font-weight: 600; width: 36%; }
-  .qt-table tr:last-child td { border-bottom: none; }
-
-  /* ── DIVIDER BETWEEN SHARED + OWN QUERIES ── */
-  .own-query-divider {
-    margin: 52px 0 36px;
-    text-align: center;
-    position: relative;
-  }
-  .own-query-divider::before {
-    content: '';
-    position: absolute;
-    top: 50%; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--border), transparent);
-  }
-  .own-query-divider span {
-    position: relative;
-    background: var(--void);
-    padding: 0 20px;
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-  }
-
-  /* ── INPUT AREA ── */
-  .input-field {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
-    color: var(--text); font-family: var(--crimson); font-size: 16px;
-    padding: 18px 20px; resize: vertical; min-height: 100px; line-height: 1.6;
-    transition: border-color 0.2s; outline: none;
-  }
-  .input-field:focus { border-color: var(--gold-dim); }
-  .input-field::placeholder { color: var(--text-muted); font-style: italic; }
-
-  .submit-btn {
-    font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.2em;
-    text-transform: uppercase; padding: 16px 36px;
-    border: 1px solid var(--gold-dim); background: transparent;
-    color: var(--gold-pale); cursor: pointer; transition: all 0.25s;
-  }
-  .submit-btn:hover { border-color: var(--gold); background: rgba(201,168,76,0.06); }
-  .submit-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-  /* ── FOLLOW-UP BLOCKS ── */
-  .fu-block { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 32px; }
-  .fu-question { font-family: var(--crimson); font-size: 15px; font-style: italic; color: var(--gold-dim); letter-spacing: 0.01em; margin-bottom: 20px; padding-left: 14px; border-left: 2px solid var(--border); line-height: 1.55; }
-  .fu-question::before { content: 'Your question — '; font-family: var(--mono); font-size: 10px; font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px; }
-  .fu-body { font-family: var(--crimson); font-size: 18px; color: var(--text); line-height: 1.8; }
-  .fu-body p { margin: 0 0 16px 0; }
-  .fu-body p:last-child { margin-bottom: 0; }
-
-  /* ── COLLABORATION PANEL ── */
-  .collab-panel {
-    margin-top: 48px;
-    border: 1px solid var(--collab-dim);
-    background: rgba(80,180,120,0.02);
-    overflow: hidden;
-  }
-  .collab-header {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--collab-dim);
-    background: rgba(80,180,120,0.04);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .collab-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--collab);
-    animation: collabPulse 2s ease-in-out infinite;
-  }
-  @keyframes collabPulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
-  .collab-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--collab); }
-  .collab-messages { padding: 20px; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-  .collab-messages::-webkit-scrollbar { width: 3px; }
-  .collab-messages::-webkit-scrollbar-thumb { background: var(--border); }
-  .collab-msg { padding: 12px 16px; border: 1px solid var(--border); background: var(--surface); }
-  .collab-msg.own { border-color: var(--collab-dim); background: rgba(80,180,120,0.03); }
-  .collab-msg-meta { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
-  .collab-msg.own .collab-msg-meta { color: rgba(80,180,120,0.6); }
-  .collab-msg-body { font-family: var(--crimson); font-size: 16px; color: var(--text-dim); line-height: 1.7; }
-  .collab-input-row { padding: 16px 20px; border-top: 1px solid var(--collab-dim); display: flex; gap: 10px; align-items: flex-end; }
-  .collab-input {
-    flex: 1; background: var(--surface); border: 1px solid var(--border);
-    color: var(--text); font-family: var(--crimson); font-size: 15px;
-    padding: 10px 14px; outline: none; resize: none; min-height: 48px;
-    transition: border-color 0.2s; line-height: 1.5;
-  }
-  .collab-input:focus { border-color: var(--collab-dim); }
-  .collab-input::placeholder { color: var(--text-muted); font-style: italic; }
-  .collab-send-btn {
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
-    padding: 10px 16px; border: 1px solid var(--collab-dim); background: transparent;
-    color: var(--collab); cursor: pointer; transition: all 0.2s; white-space: nowrap;
-  }
-  .collab-send-btn:hover { background: rgba(80,180,120,0.06); }
-  .collab-closed-notice { padding: 20px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text-muted); text-align: center; text-transform: uppercase; }
-
-  /* ── LOADING / ERROR ── */
-  .state-block { text-align: center; padding: 80px 0; position: relative; z-index: 1; }
-  .state-symbol { font-family: var(--cinzel); font-size: 32px; color: var(--gold-dim); margin-bottom: 20px; animation: pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
-  .state-text { font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); }
-  .state-block.error .state-symbol { animation: none; opacity: 0.5; }
-  .back-link { display: inline-block; margin-top: 24px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); text-decoration: none; border: 1px solid var(--border); padding: 10px 20px; transition: all 0.2s; }
-  .back-link:hover { border-color: var(--gold-dim); color: var(--gold-dim); }
-
-  /* ── LOADING INLINE ── */
-  .loading-inline { text-align: center; padding: 40px 0; }
-  .loading-inline .ls { font-family: var(--cinzel); font-size: 24px; color: var(--gold-dim); animation: pulse 2s ease-in-out infinite; }
-  .loading-inline .lt { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); margin-top: 12px; }
-
-  /* ── LIMIT WALL ── */
-  .limit-wall { margin-top: 32px; border: 1px solid var(--border); padding: 36px 40px; text-align: center; background: rgba(180,140,60,0.04); display: none; }
-  .limit-wall-title { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.22em; color: var(--gold); margin-bottom: 16px; text-transform: uppercase; }
-  .limit-wall-body { font-family: var(--crimson); font-size: 19px; color: var(--text); line-height: 1.8; margin-bottom: 32px; }
-  .limit-options { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; text-align: left; }
-  .limit-option { border: 1px solid var(--border); padding: 24px 20px; background: var(--surface); }
-  .limit-option.featured { border-color: var(--gold-dim); background: linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position: relative; }
-  .limit-option-tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--void); padding: 0 10px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); }
-  .limit-option-tier { font-family: var(--cinzel); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold-dim); margin-bottom: 8px; }
-  .limit-option-price { font-family: var(--cinzel); font-size: 22px; color: var(--gold-pale); margin-bottom: 4px; }
-  .limit-option-desc { font-family: var(--crimson); font-size: 15px; color: var(--text-dim); line-height: 1.6; margin-bottom: 20px; }
-  .limit-option-cta { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-pale); text-decoration: none; border: 1px solid var(--gold-dim); padding: 9px 16px; display: block; text-align: center; transition: all 0.25s; }
-  .limit-option-cta:hover { background: rgba(201,168,76,0.1); }
-  .limit-option-cta.solid { background: var(--gold-dim); color: var(--void); }
-  .limit-option-cta.solid:hover { background: var(--gold); }
-
-  /* ── FOOTER ── */
-  .site-footer { padding: 32px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1; }
-  .footer-mark { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.12em; color: var(--text-muted); text-decoration: none; }
-  .footer-mark:hover { color: var(--gold); }
-  .footer-copy { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-muted); }
-
-  @media (max-width: 768px) {
-    .shell { padding: 40px 20px 80px; }
-    .header h1 { font-size: 28px; }
-    .limit-options { grid-template-columns: 1fr; }
-    .site-footer { flex-direction: column; gap: 16px; text-align: center; padding: 28px; }
-  }
-</style>
-</head>
-<body>
-
-<!-- ── SIDEBAR TOGGLE ── -->
-<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Session history">☰</button>
-
-<!-- ── SIDEBAR ── -->
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-header">
-    <div class="sidebar-logo">The Prism</div>
-    <div class="sidebar-label">Explorer &nbsp;·&nbsp; Free Access</div>
-  </div>
-
-  <!-- Anonymous warning -->
-  <div class="anon-warning" id="anonWarning">
-    <strong>Session not saved</strong>
-    Closing this browser will erase your work. Save your email to keep it for 30 days.
-  </div>
-
-  <!-- Save profile CTA -->
-  <div class="save-profile-bar" id="saveProfileBar">
-    <button class="save-profile-btn" onclick="openEmailCapture()">Save my work →</button>
-  </div>
-
-  <!-- Inline email capture -->
-  <div class="email-capture-inline" id="emailCaptureInline">
-    <input type="email" id="sidebarEmailInput" placeholder="your@email.com" autocomplete="email"
-      onkeydown="if(event.key==='Enter') saveEmail()" />
-    <button onclick="saveEmail()">Keep this interpretation →</button>
-    <div class="email-capture-status" id="emailCaptureStatus"></div>
-  </div>
-
-  <div class="sidebar-section-label">This Session</div>
-
-  <div class="sidebar-threads" id="sidebarThreads">
-    <div id="sidebarSharedEntry" style="display:none;" class="thread-item shared-origin active">
-      <div class="thread-title" id="sidebarSharedTitle">Shared interpretation</div>
-      <div class="thread-meta">
-        <span class="thread-date" id="sidebarSharedDate"></span>
-        <span class="thread-badge shared">Shared</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="sidebar-footer">
-    <a href="https://theprism.io">← The Prism</a>
-    <a href="https://theprism.io/purchase.html">Expand Access →</a>
-  </div>
-</aside>
-
-<div class="page-wrap">
-<div class="main-content" id="mainContent">
-<div class="shell">
-
-  <!-- LOADING STATE -->
-  <div class="state-block" id="loadingState">
-    <div class="state-symbol">✦</div>
-    <div class="state-text">Loading interpretation…</div>
-  </div>
-
-  <!-- ERROR STATE -->
-  <div class="state-block error" id="errorState" style="display:none;">
-    <div class="state-symbol">⦿</div>
-    <div class="state-text" id="errorText">This interpretation could not be found.</div>
-    <a href="https://theprism.io" class="back-link">← Return to The Prism</a>
-  </div>
-
-  <!-- MAIN CONTENT -->
-  <div id="shareContent" style="display:none;">
-
-    <div class="share-banner">
-      Shared interpretation &nbsp;·&nbsp; <span>The Prism</span> &nbsp;·&nbsp; theprism.io
-    </div>
-
-    <header class="header">
-      <img src="/ThePrism.png" alt="The Prism" style="height:72px; margin-bottom:12px;">
-      <h1>The Prism</h1>
-      <div style="font-family:var(--cinzel); font-size:20px; letter-spacing:0.18em; color:var(--gold); margin-bottom:4px;">Echad b'Emet</div>
-      <div style="font-family:var(--crimson); font-size:24px; color:var(--hebrew); letter-spacing:0.08em; margin-bottom:16px; direction:rtl;">אֶחָד בֶּאֱמֶת</div>
-      <div class="header-sub">Framework Interpreter</div>
-      <div class="header-rule"></div>
-      <p class="header-premise" id="shareSubject"></p>
-    </header>
-
-    <!-- Shared interpretation renders here -->
-    <div id="shareResult"></div>
-
-    <!-- Collaboration panel (shown when collaboration_open = true) -->
-    <div class="collab-panel" id="collabPanel" style="display:none;">
-      <div class="collab-header">
-        <div class="collab-dot"></div>
-        <div class="collab-label">Live Discussion</div>
-      </div>
-      <div class="collab-messages" id="collabMessages">
-        <!-- messages injected by JS -->
-      </div>
-      <div class="collab-input-row" id="collabInputRow">
-        <textarea class="collab-input" id="collabInput" placeholder="Add to the discussion…" rows="2"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCollabMessage();}"></textarea>
-        <button class="collab-send-btn" onclick="sendCollabMessage()">Send →</button>
-      </div>
-      <div class="collab-closed-notice" id="collabClosedNotice" style="display:none;">
-        This discussion has been closed by the sender. The exchange is preserved above.
-      </div>
-    </div>
-
-    <!-- Divider -->
-    <div class="own-query-divider">
-      <span>Bring your own question</span>
-    </div>
-
-    <!-- Live input — recipient's own queries -->
-    <div id="inputSection">
-      <textarea class="input-field" id="userInput"
-        placeholder="A verse, a question, or whatever is on your mind…"
-        rows="3" maxlength="600"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();runQuery();}"></textarea>
-    </div>
-
-    <div style="display:flex; justify-content:flex-end; margin-top:16px; margin-bottom:52px;">
-      <button class="submit-btn" id="submitBtn" onclick="runQuery()">Interpret →</button>
-    </div>
-
-    <!-- Loading -->
-    <div id="loadingBlock" style="display:none;">
-      <div class="loading-inline">
-        <div class="ls">✦</div>
-        <div class="lt">Reading the relational field…</div>
-      </div>
-    </div>
-
-    <!-- Results from recipient's own queries -->
-    <div id="resultContent"></div>
-
-    <!-- Limit wall -->
-    <div class="limit-wall" id="limitWall">
-      <div class="limit-wall-title">Free Query Limit Reached</div>
-      <div class="limit-wall-body">You've used your 3 free interpretations. Continue your exploration below.</div>
-      <div class="limit-options">
-        <div class="limit-option">
-          <div class="limit-option-tier">One-Time</div>
-          <div class="limit-option-price">$2.99</div>
-          <div class="limit-option-desc">10 queries.<br>No subscription required.</div>
-          <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" class="limit-option-cta">Buy 10 Queries →</a>
-        </div>
-        <div class="limit-option featured">
-          <div class="limit-option-tag">Recommended</div>
-          <div class="limit-option-tier">Subscribe</div>
-          <div class="limit-option-price">from $9.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
-          <div class="limit-option-desc">Full framework access.<br>Session history saved.</div>
-          <a href="https://theprism.io/purchase.html" class="limit-option-cta solid">See Plans →</a>
-        </div>
-        <div class="limit-option">
-          <div class="limit-option-tier">Free</div>
-          <div class="limit-option-price">$0</div>
-          <div class="limit-option-desc">3 queries reset every 24 hours.</div>
-          <a href="https://theprism.io" class="limit-option-cta">← Return Tomorrow</a>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /#shareContent -->
-
-</div><!-- /.shell -->
-</div><!-- /.main-content -->
-</div><!-- /.page-wrap -->
-
-<footer class="site-footer">
-  <a href="https://theprism.io" class="footer-mark">The Prism</a>
-  <div class="footer-copy">OPNX LLC &nbsp;·&nbsp; © 2026 All Rights Reserved</div>
-</footer>
-
-<script>
-// ── State ────────────────────────────────────────────────────────────────────
-var shareToken      = null;
-var shareId         = null;
-var channelId       = null;
-var collabOpen      = false;
-var sessionQueries  = 0;
-var QUERY_LIMIT     = 3;
-var currentSubject  = '';
-var collabPollInterval = null;
-var lastMessageCount   = 0;
-
-var SUPABASE_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-
-// ── Utilities ─────────────────────────────────────────────────────────────────
-function escHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return token;
 }
 
-function formatNow() {
-  var now = new Date();
-  return now.toLocaleString('en-US',{month:'short',day:'numeric'}) + ' · ' +
-    now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+function sbHeaders(useServiceKey = false) {
+  const key = useServiceKey ? SUPABASE_SERVICE_KEY : SUPABASE_ANON_KEY;
+  return {
+    'apikey': key,
+    'Authorization': `Bearer ${key}`,
+    'Content-Type': 'application/json'
+  };
 }
 
-// ── Sidebar ───────────────────────────────────────────────────────────────────
-var sidebarOpen = false;
-
-function toggleSidebar() {
-  sidebarOpen = !sidebarOpen;
-  var sb = document.getElementById('sidebar');
-  var mc = document.getElementById('mainContent');
-  var tg = document.getElementById('sidebarToggle');
-  if (sb) sb.classList.toggle('open', sidebarOpen);
-  if (mc) mc.classList.toggle('sidebar-open', sidebarOpen);
-  if (tg) tg.textContent = sidebarOpen ? '‹' : '☰';
+async function sbFetch(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, options);
+  return res;
 }
 
-function openSidebar() {
-  if (!sidebarOpen) toggleSidebar();
+// ── CORS ─────────────────────────────────────────────────────────────────────
+
+function setCors(res) {
+  res.setHeader('Access-Control-Allow-Origin', 'https://theprism.io');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-user-email');
 }
 
-// ── Email capture ─────────────────────────────────────────────────────────────
-function openEmailCapture() {
-  var bar    = document.getElementById('saveProfileBar');
-  var inline = document.getElementById('emailCaptureInline');
-  if (bar)    bar.style.display    = 'none';
-  if (inline) inline.classList.add('open');
-  var inp = document.getElementById('sidebarEmailInput');
-  if (inp) setTimeout(function(){ inp.focus(); }, 100);
-  openSidebar();
-}
+// ── POST — Create share ───────────────────────────────────────────────────────
 
-async function saveEmail() {
-  var inp      = document.getElementById('sidebarEmailInput');
-  var statusEl = document.getElementById('emailCaptureStatus');
-  if (!inp) return;
-  var email = inp.value.trim();
-  var re    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!re.test(email)) {
-    statusEl.textContent = 'Please enter a valid email address.';
-    statusEl.style.color = '#b85c5c';
-    statusEl.style.display = 'block';
-    return;
-  }
-
+async function handlePost(req, res) {
+  let body;
   try {
-    var res = await fetch('/api/register-email', {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+
+  const { snapshot, subject, senderEmail, threadId, collaborationOpen } = body || {};
+
+  if (!snapshot) {
+    return res.status(400).json({ error: 'snapshot is required' });
+  }
+
+  // Generate unique token — retry once on collision
+  let token = generateToken();
+
+  const record = {
+    token,
+    sender_email:       senderEmail || null,
+    recipient_email:    'link',         // link-based sharing — no specific recipient
+    snapshot:           snapshot,
+    subject:            subject || null,
+    thread_id:          threadId || null,
+    status:             'active',
+    collaboration_open: collaborationOpen === true
+  };
+
+  // Insert share record
+  let insertRes = await sbFetch('/shares', {
+    method: 'POST',
+    headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
+    body: JSON.stringify(record)
+  });
+
+  // Handle token collision — try once more
+  if (insertRes.status === 409) {
+    token = generateToken();
+    record.token = token;
+    insertRes = await sbFetch('/shares', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, sharedToken: shareToken })
+      headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
+      body: JSON.stringify(record)
     });
-    var data = await res.json();
-    if (data.success || res.ok) {
-      localStorage.setItem('qt_user_email', email);
-      statusEl.textContent = 'Saved. Your session is held for 30 days.';
-      statusEl.style.color = 'var(--gold-dim)';
-      statusEl.style.display = 'block';
-      // Hide warning, update sidebar label
-      var warn = document.getElementById('anonWarning');
-      if (warn) warn.style.display = 'none';
-      setTimeout(function() {
-        var inline = document.getElementById('emailCaptureInline');
-        if (inline) inline.classList.remove('open');
-      }, 2500);
-    }
-  } catch (err) {
-    statusEl.textContent = 'Could not save. Please try again.';
-    statusEl.style.color = '#b85c5c';
-    statusEl.style.display = 'block';
-  }
-}
-
-// ── Render shared snapshot ────────────────────────────────────────────────────
-function renderSnapshot(snapshot, subject) {
-  currentSubject = subject || '';
-
-  // Subject in header
-  var subjectEl = document.getElementById('shareSubject');
-  if (subjectEl) subjectEl.textContent = subject || '';
-
-  // Populate sidebar entry
-  var sidebarTitle = document.getElementById('sidebarSharedTitle');
-  var sidebarDate  = document.getElementById('sidebarSharedDate');
-  var sidebarEntry = document.getElementById('sidebarSharedEntry');
-  if (sidebarTitle) sidebarTitle.textContent = subject ? (subject.length > 52 ? subject.slice(0,52)+'…' : subject) : 'Shared interpretation';
-  if (sidebarDate)  sidebarDate.textContent  = formatNow();
-  if (sidebarEntry) sidebarEntry.style.display = 'block';
-
-  var sections = [
-    { num: '00', title: "Echad b'Emet",         hebrew: 'אֶחָד בֶּאֱמֶת', content: snapshot.prism_summary },
-    { num: '01', title: 'Entanglement',          hebrew: 'קֶשֶׁר',          content: snapshot.entanglement },
-    { num: '02', title: 'Coherence & Alignment', hebrew: 'יִחוּד',          content: snapshot.coherence_alignment },
-    { num: '03', title: 'Noise & Decoherence',   hebrew: 'פֵּרוּד',          content: snapshot.noise_decoherence },
-    { num: '04', title: 'Telos',                 hebrew: 'תַּכְלִית',       content: snapshot.telos_insight },
-    { num: '05', title: 'Olam HaBa — Non-Local View', hebrew: 'עוֹלָם הַבָּא', content: snapshot.olam_haba },
-  ];
-
-  var html = '';
-
-  if (snapshot.verse_identified) {
-    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(snapshot.verse_identified) + '</div><div class="verse-text">' + escHtml(snapshot.verse_text || '') + '</div></div>';
   }
 
-  if (snapshot.recognition) {
-    html += '<div class="qt-recognition"><p>' + escHtml(snapshot.recognition) + '</p></div>';
+  if (!insertRes.ok) {
+    const text = await insertRes.text();
+    console.error('Share insert failed:', text);
+    return res.status(500).json({ error: 'Could not create share' });
   }
 
-  if (snapshot.core_insight) {
-    html += '<div class="qt-core-insight"><p>' + escHtml(snapshot.core_insight) + '</p></div>';
-  }
-
-  html += '<div class="kingdom-block"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(snapshot.kingdom_implication || '') + '</div></div>';
-
-  var threads = Array.isArray(snapshot.suggested_threads) ? snapshot.suggested_threads.filter(function(t){return t&&t.trim();}) : [];
-  if (threads.length > 0) {
-    html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
-    threads.forEach(function(t) {
-      html += '<button class="qt-thread-btn" onclick="submitThread(this.dataset.t)" data-t="' + escHtml(t) + '">' + escHtml(t) + '</button>';
-    });
-    html += '</div>';
-  }
-
-  var hasFramework = sections.some(function(s){return s.content;}) || (snapshot.key_terms && snapshot.key_terms.length > 0);
-  if (hasFramework) {
-    var fhtml = '';
-    sections.forEach(function(s) {
-      if (!s.content) return;
-      fhtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">' + s.num + '</span><span class="qt-section-title">' + s.title + '</span><span class="qt-section-hebrew">' + s.hebrew + '</span></div><div class="qt-section-body"><p>' + escHtml(s.content) + '</p></div></div>';
-    });
-    if (snapshot.key_terms && snapshot.key_terms.length > 0) {
-      var rows = snapshot.key_terms.map(function(t){
-        var h = t.hebrew ? ' <span style="color:var(--hebrew);font-size:15px;">' + escHtml(t.hebrew) + '</span>' : '';
-        return '<tr><td>' + escHtml(t.term) + h + '</td><td>' + escHtml(t.prism_meaning || t.qt_meaning || '') + '</td></tr>';
-      }).join('');
-      fhtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body" style="padding:0;"><table class="qt-table"><thead><tr><th>Term</th><th>Prism Meaning</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-    }
-    html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + fhtml + '</div>';
-  }
-
-  document.getElementById('shareResult').innerHTML = html;
-}
-
-function toggleFramework(btn) {
-  var body = document.getElementById('qtFrameworkBody');
-  if (!body) return;
-  var isOpen = body.classList.toggle('open');
-  btn.setAttribute('aria-expanded', isOpen);
-  btn.textContent = isOpen ? 'Hide framework interpretation' : 'View full framework interpretation';
-}
-
-function submitThread(text) {
-  var inp = document.getElementById('userInput');
-  if (!inp) return;
-  inp.value = text;
-  inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  runQuery();
-}
-
-// ── Recipient query flow ──────────────────────────────────────────────────────
-async function runQuery() {
-  var input = document.getElementById('userInput').value.trim();
-  if (!input) return;
-
-  if (sessionQueries >= QUERY_LIMIT) { showLimitWall(); return; }
-
-  document.getElementById('submitBtn').disabled = true;
-  document.getElementById('loadingBlock').style.display = 'block';
-  document.getElementById('loadingBlock').scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-  var prompt = buildPrompt(input);
-
+  // Get shareId — try from representation first, fall back to token lookup
+  let shareId = null;
   try {
-    var res = await fetch('/api/interpret', {
+    const rows = await insertRes.json();
+    shareId = rows?.[0]?.id || null;
+  } catch {}
+
+  if (!shareId) {
+    try {
+      const lookupRes = await sbFetch(
+        `/shares?token=eq.${encodeURIComponent(token)}&select=id&limit=1`,
+        { headers: sbHeaders(true) }
+      );
+      if (lookupRes.ok) {
+        const lookupRows = await lookupRes.json();
+        shareId = lookupRows?.[0]?.id || null;
+      }
+    } catch {}
+  }
+
+  const shareUrl = `${BASE_URL}/share.html?t=${token}`;
+
+  // If collaboration is being opened immediately, create a room channel
+  // anchored to this share so room_messages can be scoped to it
+  if (collaborationOpen && shareId && senderEmail) {
+    await openCollabChannel(shareId, senderEmail);
+  }
+
+  // Log referral if sender email present
+  if (senderEmail) {
+    await sbFetch('/referrals', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...sbHeaders(true), 'Prefer': 'return=minimal' },
       body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }],
-        email: localStorage.getItem('qt_user_email') || null,
-        rawQuery: input,
-        isFollowUp: false
+        share_token:     token,
+        sender_email:    senderEmail,
+        recipient_email: 'link'         // link-based — no specific recipient
       })
-    });
+    }).catch(() => {});                 // non-fatal
+  }
 
-    if (res.status === 429) {
-      var limitData = {};
-      try { limitData = await res.json(); } catch {}
-      showLimitWall(limitData.message);
-      return;
-    }
+  return res.status(200).json({ shareId, shareUrl, token });
+}
 
-    if (!res.ok) throw new Error('SERVER_ERROR');
+// ── PATCH — Toggle collaboration or status ───────────────────────────────────
 
-    // Stream the response
-    var fuEl = document.createElement('div');
-    fuEl.className = 'fu-block';
-    fuEl.innerHTML = '<div class="fu-question">' + escHtml(input) + '</div>';
-    var bodyEl = document.createElement('div');
-    bodyEl.className = 'fu-body';
-    fuEl.appendChild(bodyEl);
-    document.getElementById('resultContent').appendChild(fuEl);
+async function handlePatch(req, res) {
+  let body;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
 
-    var reader  = res.body.getReader();
-    var decoder = new TextDecoder();
-    var buffer  = '';
-    var fullText = '';
-    bodyEl.innerHTML = '<span style="opacity:0.4;font-family:var(--mono);font-size:11px;letter-spacing:0.12em;">interpreting…</span>';
+  const { shareId, token, collaborationOpen, status } = body || {};
 
-    while (true) {
-      var _ref = await reader.read();
-      if (_ref.done) break;
-      buffer += decoder.decode(_ref.value, { stream: true });
-      var lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i];
-        if (line.startsWith('data: ')) {
-          try {
-            var parsed = JSON.parse(line.slice(6).trim());
-            if (parsed.type === 'delta' && parsed.text) {
-              fullText += parsed.text;
-              var paras = fullText.split(/\n\n/);
-              bodyEl.innerHTML = paras.map(function(p, idx) {
-                return '<p>' + escHtml(p.replace(/\n/g,' ')) + '</p>';
-              }).join('');
-            }
-          } catch {}
-        }
+  if (!shareId && !token) {
+    return res.status(400).json({ error: 'shareId or token required' });
+  }
+
+  // Build update payload — only include fields explicitly provided
+  const updates = {};
+  if (typeof collaborationOpen === 'boolean') updates.collaboration_open = collaborationOpen;
+  if (status === 'active' || status === 'inactive') updates.status = status;
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No valid fields to update' });
+  }
+
+  const filter = shareId
+    ? `/shares?id=eq.${encodeURIComponent(shareId)}`
+    : `/shares?token=eq.${encodeURIComponent(token)}`;
+
+  const patchRes = await sbFetch(filter, {
+    method: 'PATCH',
+    headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
+    body: JSON.stringify(updates)
+  });
+
+  if (!patchRes.ok) {
+    const text = await patchRes.text();
+    console.error('Share patch failed:', text);
+    return res.status(500).json({ error: 'Could not update share' });
+  }
+
+  const rows = await patchRes.json();
+  const updated = rows?.[0];
+
+  // If collaboration just opened, ensure a room channel exists
+  if (collaborationOpen === true && updated?.id) {
+    const senderEmail = req.headers['x-user-email'] || updated.sender_email;
+    await openCollabChannel(updated.id, senderEmail);
+  }
+
+  return res.status(200).json({ success: true, share: updated });
+}
+
+// ── GET — Fetch share by token ────────────────────────────────────────────────
+
+async function handleGet(req, res) {
+  const token = req.query?.t || new URL(req.url, BASE_URL).searchParams.get('t');
+
+  if (!token) {
+    return res.status(400).json({ error: 'Token required' });
+  }
+
+  const fetchRes = await sbFetch(
+    `/shares?token=eq.${encodeURIComponent(token)}&select=id,token,snapshot,subject,status,collaboration_open,sender_email,thread_id,created_at`,
+    { headers: sbHeaders(false) }
+  );
+
+  if (!fetchRes.ok) {
+    return res.status(500).json({ error: 'Could not fetch share' });
+  }
+
+  const rows = await fetchRes.json();
+
+  if (!rows || rows.length === 0) {
+    return res.status(404).json({ error: 'Share not found or expired' });
+  }
+
+  const share = rows[0];
+
+  // Inactive shares return a clear signal so share.html can show an appropriate message
+  if (share.status === 'inactive') {
+    return res.status(410).json({ error: 'This share has been closed by the sender.' });
+  }
+
+  // If collaboration is open, fetch the channel id for this share
+  let channelId = null;
+  if (share.collaboration_open) {
+    channelId = await getCollabChannelId(share.id);
+  }
+
+  return res.status(200).json({ share, channelId });
+}
+
+// ── Collaboration channel helpers ─────────────────────────────────────────────
+
+async function openCollabChannel(shareId, senderEmail) {
+  try {
+    // Look up sender's user_id from subscribers
+    let ownerId = null;
+    if (senderEmail) {
+      const subRes = await sbFetch(
+        `/subscribers?email=eq.${encodeURIComponent(senderEmail)}&select=id&limit=1`,
+        { headers: sbHeaders(true) }
+      );
+      if (subRes.ok) {
+        const subs = await subRes.json();
+        ownerId = subs?.[0]?.id || null;
       }
     }
 
-    document.getElementById('userInput').value = '';
-    sessionQueries++;
+    // Check if a channel already exists for this share
+    const existing = await getCollabChannelId(shareId);
+    if (existing) return existing;
 
-    // Open sidebar after first query to surface the save prompt
-    if (sessionQueries === 1) {
-      openSidebar();
-    }
-
-    if (sessionQueries >= QUERY_LIMIT) {
-      showLimitWall();
-    }
-
-  } catch (err) {
-    var errEl = document.createElement('div');
-    errEl.style.cssText = 'border:1px solid #5a2a2a;background:#1a0a0a;padding:20px 24px;color:#c08080;font-size:17px;margin-top:20px;';
-    errEl.textContent = 'Something went wrong. Please try again.';
-    document.getElementById('resultContent').appendChild(errEl);
-  } finally {
-    document.getElementById('loadingBlock').style.display = 'none';
-    document.getElementById('submitBtn').disabled = false;
-  }
-}
-
-function buildPrompt(input) {
-  return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. START WITH { END WITH }.
-
-You are The Prism framework interpreter. The user has submitted: "${input}"
-
-Infer the query type from the content — verse reference, phrase, theme, or open question. Apply the complete Prism framework regardless of input type.
-
-Prism Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
-
-Return this exact JSON:
-{
-  "recognition": "2-4 sentences of plain-language recognition. No framework vocabulary.",
-  "core_insight": "The single most important thing the framework sees. One paragraph.",
-  "suggested_threads": ["specific door 1", "specific door 2"],
-  "verse_identified": "Most relevant Scripture",
-  "verse_text": "Verse quoted accurately",
-  "prism_summary": "Two sharp sentences — Section 00 Echad b'Emet",
-  "entanglement": "God's initiation here",
-  "coherence_alignment": "How this calls toward alignment",
-  "noise_decoherence": "What distortions this exposes",
-  "telos_insight": "Christ-form being called toward",
-  "olam_haba": "Time-transcendent view",
-  "kingdom_implication": "One crisp Kingdom punchline",
-  "key_terms": [{"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"}]
-}`;
-}
-
-function showLimitWall(msg) {
-  document.getElementById('submitBtn').style.display = 'none';
-  var wall = document.getElementById('limitWall');
-  if (msg) {
-    var bodyEl = wall.querySelector('.limit-wall-body');
-    if (bodyEl) bodyEl.textContent = msg;
-  }
-  wall.style.display = 'block';
-  wall.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// ── Collaboration ─────────────────────────────────────────────────────────────
-async function loadCollabMessages() {
-  if (!channelId) return;
-  try {
-    var res = await fetch(
-      SUPABASE_URL + '/rest/v1/room_messages?channel_id=eq.' + encodeURIComponent(channelId) + '&order=created_at.asc&select=id,content,message_type,created_at',
-      { headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON } }
-    );
-    var messages = await res.json();
-    if (!Array.isArray(messages)) return;
-    if (messages.length === lastMessageCount) return;
-    lastMessageCount = messages.length;
-    renderCollabMessages(messages);
-  } catch {}
-}
-
-function renderCollabMessages(messages) {
-  var container = document.getElementById('collabMessages');
-  if (!container) return;
-  container.innerHTML = '';
-  messages.forEach(function(msg) {
-    var isOwn = msg.message_type === 'recipient';
-    var el = document.createElement('div');
-    el.className = 'collab-msg' + (isOwn ? ' own' : '');
-    var time = new Date(msg.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    el.innerHTML = '<div class="collab-msg-meta">' + (isOwn ? 'You' : 'Sender') + ' · ' + time + '</div><div class="collab-msg-body">' + escHtml(msg.content) + '</div>';
-    container.appendChild(el);
-  });
-  container.scrollTop = container.scrollHeight;
-}
-
-async function sendCollabMessage() {
-  var input = document.getElementById('collabInput');
-  if (!input || !channelId) return;
-  var content = input.value.trim();
-  if (!content) return;
-
-  input.value = '';
-  input.disabled = true;
-
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/room_messages', {
+    // Create a new room_channel anchored to this share
+    // channel_type 'share' distinguishes from room/direct/small_group
+    const createRes = await sbFetch('/room_channels', {
       method: 'POST',
-      headers: {
-        'apikey': SUPABASE_ANON,
-        'Authorization': 'Bearer ' + SUPABASE_ANON,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
+      headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
       body: JSON.stringify({
-        channel_id:   channelId,
-        user_id:      '00000000-0000-0000-0000-000000000000', // anonymous recipient
-        content:      content,
-        message_type: 'recipient',
-        prism_thread_id: shareId || null
+        room_id:      shareId,        // repurposing room_id as share anchor
+        channel_type: 'share',
+        created_by:   ownerId || '00000000-0000-0000-0000-000000000000',
+        is_active:    true
       })
     });
-    await loadCollabMessages();
-  } catch {} finally {
-    input.disabled = false;
-    input.focus();
-  }
-}
 
-function startCollabPolling() {
-  if (collabPollInterval) clearInterval(collabPollInterval);
-  collabPollInterval = setInterval(loadCollabMessages, 4000);
-}
-
-// ── Load share ────────────────────────────────────────────────────────────────
-async function loadShare() {
-  var params = new URLSearchParams(window.location.search);
-  shareToken = params.get('t');
-
-  if (!shareToken) {
-    showError('No share token provided.');
-    return;
-  }
-
-  try {
-    var res = await fetch('/api/share?t=' + encodeURIComponent(shareToken));
-
-    if (res.status === 410) {
-      showError('This share has been closed by the sender.');
-      return;
-    }
-    if (res.status === 404) {
-      showError('This interpretation could not be found or has expired.');
-      return;
-    }
-    if (!res.ok) {
-      showError('Could not load this interpretation. Please try again.');
-      return;
+    if (!createRes.ok) {
+      console.error('Channel create failed:', await createRes.text());
+      return null;
     }
 
-    var data = await res.json();
-    var share = data.share;
-    channelId   = data.channelId || null;
-    shareId     = share.id;
-    collabOpen  = share.collaboration_open;
-
-    var snapshot = share.snapshot;
-    var subject  = share.subject || snapshot._subject || '';
-
-    renderSnapshot(snapshot, subject);
-
-    // Show collaboration panel if open
-    if (collabOpen && channelId) {
-      var panel = document.getElementById('collabPanel');
-      if (panel) panel.style.display = 'block';
-      await loadCollabMessages();
-      startCollabPolling();
-    } else if (collabOpen && !channelId) {
-      // Collab open but no channel yet — show panel without input
-      var panel = document.getElementById('collabPanel');
-      if (panel) panel.style.display = 'block';
-    }
-
-    // Hide loading, show content
-    document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('shareContent').style.display = 'block';
-
-    // If user already has email, hide the warning
-    if (localStorage.getItem('qt_user_email')) {
-      var warn = document.getElementById('anonWarning');
-      var bar  = document.getElementById('saveProfileBar');
-      if (warn) warn.style.display = 'none';
-      if (bar)  bar.style.display  = 'none';
-    }
+    const rows = await createRes.json();
+    return rows?.[0]?.id || null;
 
   } catch (err) {
-    showError('Could not load this interpretation. Please try again.');
+    console.error('openCollabChannel error:', err.message);
+    return null;
   }
 }
 
-function showError(msg) {
-  document.getElementById('loadingState').style.display = 'none';
-  document.getElementById('errorState').style.display = 'block';
-  document.getElementById('errorText').textContent = msg;
+async function getCollabChannelId(shareId) {
+  try {
+    const res = await sbFetch(
+      `/room_channels?room_id=eq.${encodeURIComponent(shareId)}&channel_type=eq.share&is_active=eq.true&select=id&limit=1`,
+      { headers: sbHeaders(true) }
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows?.[0]?.id || null;
+  } catch {
+    return null;
+  }
 }
 
-// ── Presence heartbeat ────────────────────────────────────────────────────────
-// Fires on first interaction (keystroke, thread tap, scroll) and then
-// every 30s while the tab is open. Signals the sender the page is live.
+// ── Main handler ──────────────────────────────────────────────────────────────
 
-var _heartbeatInterval  = null;
-var _heartbeatSent      = false;
-var _creditedCallback   = null; // set by qt.html if in embedded mode (unused here)
+export default async function handler(req, res) {
+  setCors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-function sendHeartbeat() {
-  if (!shareToken) return;
-  fetch('/api/share-presence', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: shareToken })
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    // data.credited = true means this was the first heartbeat and sender got +1
-    // Nothing to do on recipient side — the sender's qt.html handles the animation
-  })
-  .catch(function() {});
+  switch (req.method) {
+    case 'POST':  return handlePost(req, res);
+    case 'PATCH': return handlePatch(req, res);
+    case 'GET':   return handleGet(req, res);
+    default:      return res.status(405).json({ error: 'Method not allowed' });
+  }
 }
-
-function startHeartbeat() {
-  if (_heartbeatInterval) return; // already running
-  sendHeartbeat();
-  _heartbeatSent = true;
-  _heartbeatInterval = setInterval(sendHeartbeat, 30000);
-}
-
-function onRecipientInteraction() {
-  if (!_heartbeatSent) startHeartbeat();
-}
-
-// Attach interaction listeners after content loads
-function attachInteractionListeners() {
-  // Input field activity
-  var inp = document.getElementById('userInput');
-  if (inp) inp.addEventListener('keydown', onRecipientInteraction, { once: true });
-
-  // Suggested thread taps — delegated
-  document.addEventListener('click', function(e) {
-    if (e.target && e.target.classList.contains('qt-thread-btn')) {
-      onRecipientInteraction();
-    }
-  }, { once: true });
-
-  // Collab input
-  var ci = document.getElementById('collabInput');
-  if (ci) ci.addEventListener('keydown', onRecipientInteraction, { once: true });
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-  loadShare();
-  attachInteractionListeners();
-
-  // Stop heartbeat when tab hidden/closed
-  document.addEventListener('visibilitychange', function() {
-    if (document.hidden) {
-      if (_heartbeatInterval) { clearInterval(_heartbeatInterval); _heartbeatInterval = null; }
-    } else {
-      if (_heartbeatSent) startHeartbeat(); // resume on return
-    }
-  });
-});
-</script>
-
-</body>
-</html>
