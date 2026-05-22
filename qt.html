@@ -783,6 +783,35 @@
     50% { box-shadow: 0 0 14px rgba(220,60,60,0.6); }
   }
 
+  /* +1 referral credit float animation */
+  @keyframes creditFloat {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    60%  { opacity: 1; transform: translateY(-28px) scale(1.1); }
+    100% { opacity: 0; transform: translateY(-48px) scale(0.9); }
+  }
+  .credit-float {
+    position: absolute;
+    top: -8px; right: -8px;
+    font-family: var(--cinzel);
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    color: rgba(80,180,120,0.95);
+    pointer-events: none;
+    animation: creditFloat 1.4s ease-out forwards;
+    z-index: 999;
+    text-shadow: 0 0 12px rgba(80,180,120,0.4);
+  }
+
+  /* Presence dot pulse when recipient is active */
+  @keyframes presencePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(80,180,120,0.5); }
+    50%       { box-shadow: 0 0 0 5px rgba(80,180,120,0); }
+  }
+  .presence-active {
+    background: rgba(80,180,120,0.9) !important;
+    animation: presencePulse 1.8s ease-in-out infinite;
+  }
+
   /* Disclaimer */
   .disclaimer {
     margin-top: 64px;
@@ -1024,17 +1053,37 @@
     <div id="resultContent"></div>
 
     <!-- DOWNLOAD -->
-    <div id="downloadRow" style="display:none; text-align:center; margin-top:36px; padding:24px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
-      <div style="font-family:var(--mono); font-size: 17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:14px;">Save This Interpretation</div>
-      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-        <button onclick="downloadPDF('dark')" style="font-family:var(--cinzel); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">↓ Dark Version</button>
-        <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Print Version</button>
-        <button onclick="openShareModal()" style="font-family:var(--cinzel); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">⟳ Share</button>
+    <div id="downloadRow" style="display:none; margin-top:36px; padding:24px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+
+      <!-- PDF downloads + Share button row -->
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:0;">
+        <button onclick="downloadPDF('dark')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">↓ Dark Version</button>
+        <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Print Version</button>
+
+        <!-- Share button — single action, no modal pre-step -->
+        <div style="position:relative; display:inline-flex; align-items:center; gap:10px;">
+          <button id="shareBtn" onclick="handleShareBtn()" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;"
+            onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'"
+            onmouseout="if(!window._shareActive)this.style.borderColor='var(--border-lit)';if(!window._shareActive)this.style.color='var(--text-dim)'">
+            Share this reflection →
+          </button>
+          <!-- Presence dot — hidden until share exists -->
+          <div id="presenceDot" style="display:none; width:10px; height:10px; border-radius:50%; background:rgba(80,180,120,0.3); transition:background 0.5s;" title="Viewing status"></div>
+        </div>
       </div>
-      <div id="collabToggleRow" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
-        <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px;">Shared Session</div>
-        <button id="collabToggleBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:9px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;">Collaboration Closed</button>
+
+      <!-- Discussion button — appears after share created -->
+      <div id="discussionRow" style="display:none; margin-top:18px; text-align:center;">
+        <button id="collabToggleBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;"
+          onmouseover="this.style.borderColor='rgba(80,180,120,0.5)';this.style.color='rgba(80,180,120,0.8)'"
+          onmouseout="if(!_collabOpen){this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'}">
+          Open Discussion
+        </button>
       </div>
+
+      <!-- Hidden legacy collabToggleRow — kept for JS compatibility -->
+      <div id="collabToggleRow" style="display:none;"></div>
+
     </div>
 
     <!-- FOLLOW-UP -->
@@ -2987,6 +3036,173 @@ async function handleLogout() {
 
   // Redirect to gateway
   window.location.href = '/qt-gateway.html';
+}
+
+/* ── SINGLE-BUTTON SHARE HANDLER ── */
+
+window._shareActive     = false;  // true once share is created
+var _presencePollInterval = null;
+
+// Called when user taps "Share this reflection →"
+// First tap: creates share + starts delivery flow
+// Subsequent taps: opens management modal (step 3)
+async function handleShareBtn() {
+  if (window._shareActive) {
+    // Already shared — open management
+    openShareModal();
+    return;
+  }
+
+  if (!window._lastParsedResult) return;
+
+  var btn = document.getElementById('shareBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating share…'; }
+
+  var snapshot    = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
+  var senderEmail = localStorage.getItem('qt_user_email') || null;
+  var threadId    = activeThreadId || null;
+
+  try {
+    var res = await fetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': senderEmail || '' },
+      body: JSON.stringify({ snapshot, subject: currentSubject, senderEmail, threadId, collaborationOpen: false })
+    });
+    var data = await res.json();
+    if (!res.ok || !data.shareId) throw new Error('share failed');
+
+    _currentSharedSessionId = data.shareId;
+    _shareStatus            = 'on';
+    window._shareActive     = true;
+    window._currentShareUrl = data.shareUrl;
+
+    // Update share button appearance
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent   = 'Shared ✓';
+      btn.style.borderColor = 'rgba(80,180,120,0.5)';
+      btn.style.color       = 'rgba(80,180,120,0.9)';
+      btn.onmouseover = function() {};
+      btn.onmouseout  = function() {};
+    }
+
+    // Show presence dot and discussion button
+    var dot = document.getElementById('presenceDot');
+    if (dot) dot.style.display = 'block';
+    var discRow = document.getElementById('discussionRow');
+    if (discRow) discRow.style.display = 'block';
+
+    // Start polling for recipient presence
+    startPresencePolling(data.token);
+
+    // Trigger native share sheet / copy — skip modal step 1
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'The Prism — ' + (currentSubject || 'An interpretation'),
+          text: 'An interpretation from The Prism.',
+          url: data.shareUrl
+        });
+      } catch(e) { /* user cancelled native sheet — link still created */ }
+    } else {
+      // No native share — copy to clipboard silently and show brief toast
+      try { await navigator.clipboard.writeText(data.shareUrl); } catch(e) {}
+      showCopyToast(data.shareUrl);
+    }
+
+  } catch (err) {
+    console.error('Share failed:', err);
+    if (btn) {
+      btn.disabled  = false;
+      btn.textContent = 'Share this reflection →';
+    }
+  }
+}
+
+// Brief non-intrusive toast confirming link is copied
+function showCopyToast(url) {
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--gold-dim);padding:12px 24px;font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--gold);z-index:999;transition:opacity 0.5s;white-space:nowrap;';
+  toast.textContent = 'Link copied — ready to send';
+  document.body.appendChild(toast);
+  setTimeout(function() {
+    toast.style.opacity = '0';
+    setTimeout(function() { toast.remove(); }, 500);
+  }, 3000);
+}
+
+// ── PRESENCE POLLING ─────────────────────────────────────────────────────────
+// Polls /api/share-presence every 20s. Lights dot when recipient is active.
+// On first active signal, triggers +1 credit animation.
+
+var _presenceWasActive    = false;
+var _creditAnimationShown = false;
+var _presenceToken        = null;
+
+function startPresencePolling(token) {
+  _presenceToken = token;
+  if (_presencePollInterval) clearInterval(_presencePollInterval);
+  _presencePollInterval = setInterval(pollPresence, 20000);
+  // Poll immediately once
+  pollPresence();
+}
+
+async function pollPresence() {
+  if (!_presenceToken) return;
+  try {
+    var res = await fetch('/api/share-presence?token=' + encodeURIComponent(_presenceToken));
+    if (!res.ok) return;
+    var data = await res.json();
+
+    var dot = document.getElementById('presenceDot');
+    if (!dot) return;
+
+    if (data.active) {
+      dot.classList.add('presence-active');
+      dot.title = 'Recipient is viewing now';
+
+      // First time active — show +1 credit animation
+      if (!_presenceWasActive && !_creditAnimationShown) {
+        _creditAnimationShown = true;
+        showCreditAnimation();
+        // Also increment sidebar counter visually
+        incrementSidebarCounter();
+      }
+      _presenceWasActive = true;
+    } else {
+      dot.classList.remove('presence-active');
+      dot.title = 'Share link active — no one viewing right now';
+      _presenceWasActive = false;
+    }
+  } catch(e) {}
+}
+
+function showCreditAnimation() {
+  // Find share button container as anchor point
+  var btn = document.getElementById('shareBtn');
+  if (!btn) return;
+  var parent = btn.parentElement;
+  if (!parent) return;
+
+  var el = document.createElement('span');
+  el.className   = 'credit-float';
+  el.textContent = '+1';
+  parent.style.position = 'relative';
+  parent.appendChild(el);
+
+  // Remove after animation completes
+  setTimeout(function() {
+    if (el.parentNode) el.parentNode.removeChild(el);
+  }, 1500);
+}
+
+function incrementSidebarCounter() {
+  var countEl = document.getElementById('sidebarQueryCountText');
+  if (!countEl) return;
+  var match = countEl.textContent.match(/(\d+)/);
+  if (!match) return;
+  var updated = parseInt(match[1]) + 1;
+  countEl.textContent = updated === 1 ? '1 query remaining' : updated + ' queries remaining';
 }
 
 /* ── SHARE MODAL ── */
