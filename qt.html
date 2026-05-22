@@ -2993,16 +2993,33 @@ async function handleLogout() {
 
 // ── PHASE 2 SHARE SYSTEM ──────────────────────────────────────────────────────
 
-var _shareMode = 'personal'; // 'personal' | 'collab'
-var _currentSharedSessionId = null; // set after share created
-var _collabOpen = false; // current collaboration state
+// Share state
+// _shareStatus: 'off' | 'on'  — whether the share link is active at all
+// _shareMode:   'personal' | 'collab' — reflection-only vs live discussion
+// _collabOpen:  bool — current collaboration state
+var _shareStatus           = 'off';
+var _shareMode             = 'personal';
+var _currentSharedSessionId = null;
+var _collabOpen            = false;
 
 function openShareModal() {
   if (!window._lastParsedResult) return;
-  _shareMode = 'personal';
-  selectShareMode('personal');
-  document.getElementById('shareStep1').style.display = 'block';
-  document.getElementById('shareStep2').style.display = 'none';
+  // Reset to step 1 each time unless a share already exists
+  if (!_currentSharedSessionId) {
+    _shareMode = 'personal';
+    selectShareMode('personal');
+    document.getElementById('shareStep1').style.display = 'block';
+    document.getElementById('shareStep2').style.display = 'none';
+    document.getElementById('shareStep3').style.display = 'none';
+  } else {
+    // Share already created — jump to management step
+    document.getElementById('shareStep1').style.display = 'none';
+    document.getElementById('shareStep2').style.display = 'none';
+    document.getElementById('shareStep3').style.display = 'block';
+    var urlDisplay = document.getElementById('shareUrlDisplay');
+    if (urlDisplay) urlDisplay.textContent = window._currentShareUrl || '';
+    updateShareManageUI();
+  }
   document.getElementById('shareModal').style.display = 'flex';
 }
 
@@ -3034,19 +3051,22 @@ function selectShareMode(mode) {
 
 async function proceedToShareDelivery() {
   if (!window._lastParsedResult) return;
-  // Create the shared session record first, get back a share ID
   var statusEl = document.getElementById('shareModalStatus');
   var snapshot = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
   var senderEmail = localStorage.getItem('qt_user_email') || null;
-  var threadId = activeThreadId || null;
+  var threadId    = activeThreadId || null;
+
+  // Show loading state on button
+  var continueBtn = document.getElementById('shareContinueBtn');
+  if (continueBtn) { continueBtn.disabled = true; continueBtn.textContent = 'Creating…'; }
 
   try {
     var res = await fetch('/api/share', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-user-email': senderEmail || '' },
       body: JSON.stringify({
         snapshot,
-        subject: currentSubject,
+        subject:           currentSubject,
         senderEmail,
         threadId,
         collaborationOpen: _shareMode === 'collab'
@@ -3054,38 +3074,58 @@ async function proceedToShareDelivery() {
     });
     var data = await res.json();
     if (!res.ok || !data.shareId) {
-      console.error('Share creation failed');
+      if (statusEl) { statusEl.textContent = 'Could not create share. Please try again.'; statusEl.style.display = 'block'; }
+      if (continueBtn) { continueBtn.disabled = false; continueBtn.textContent = 'Continue →'; }
       return;
     }
+
     _currentSharedSessionId = data.shareId;
+    _shareStatus = 'on';
     window._currentShareUrl = data.shareUrl;
 
-    // If collab mode, update UI
     if (_shareMode === 'collab') {
       _collabOpen = true;
-      updateCollabToggleUI();
-      // Update thread item in sidebar
-      if (activeThreadId) {
-        var ti = document.getElementById('ti-' + activeThreadId);
-        if (ti) ti.classList.add('collab-open');
-      }
     }
 
-    // Show native share sheet if available, else step 2
+    // Update sidebar thread item styling
+    if (activeThreadId) {
+      var ti = document.getElementById('ti-' + activeThreadId);
+      if (ti) ti.classList.add('collab-open');
+    }
+
+    // Show native share if available
     if (navigator.share) {
       document.getElementById('shareNativeBtn').style.display = 'block';
     }
+
+    // Advance to delivery step
     document.getElementById('shareStep1').style.display = 'none';
     document.getElementById('shareStep2').style.display = 'block';
+    document.getElementById('shareStep3').style.display = 'none';
+    updateShareManageUI();
 
   } catch (err) {
     console.error('Share error:', err);
+    if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
+  } finally {
+    if (continueBtn) { continueBtn.disabled = false; continueBtn.textContent = 'Continue →'; }
   }
 }
 
 function backToShareStep1() {
   document.getElementById('shareStep1').style.display = 'block';
   document.getElementById('shareStep2').style.display = 'none';
+  document.getElementById('shareStep3').style.display = 'none';
+}
+
+function goToShareManage() {
+  document.getElementById('shareStep1').style.display = 'none';
+  document.getElementById('shareStep2').style.display = 'none';
+  document.getElementById('shareStep3').style.display = 'block';
+  // Populate URL display
+  var urlDisplay = document.getElementById('shareUrlDisplay');
+  if (urlDisplay) urlDisplay.textContent = window._currentShareUrl || '';
+  updateShareManageUI();
 }
 
 function getShareText() {
@@ -3106,17 +3146,15 @@ async function shareViaWebShare() {
 }
 
 function shareViaEmail() {
-  var subject = encodeURIComponent('An interpretation from The Prism');
+  var subject  = encodeURIComponent('An interpretation from The Prism');
   var bodyText = 'I found this interpretation and thought you might want to see it.\n\n' +
     (window._currentShareUrl || '') + '\n\nBring your own question.';
-  var body = encodeURIComponent(bodyText);
-  window.open('mailto:?subject=' + subject + '&body=' + body, '_blank');
+  window.open('mailto:?subject=' + subject + '&body=' + encodeURIComponent(bodyText), '_blank');
   showShareStatus('Email composed. Add your recipient and send.', 'var(--gold-dim)');
 }
 
 function shareViaSMS() {
-  var body = encodeURIComponent(getShareText());
-  window.open('sms:?body=' + body, '_blank');
+  window.open('sms:?body=' + encodeURIComponent(getShareText()), '_blank');
   showShareStatus('Opens your Messages app with the link ready.', 'var(--gold-dim)');
 }
 
@@ -3126,7 +3164,7 @@ async function shareViaCopy() {
     await navigator.clipboard.writeText(url);
     showShareStatus('Link copied.', 'var(--gold-dim)');
   } catch {
-    showShareStatus('Could not copy. Link: ' + url, 'var(--text-muted)');
+    showShareStatus('Could not copy — link: ' + url, 'var(--text-muted)');
   }
 }
 
@@ -3134,56 +3172,114 @@ function showShareStatus(msg, color) {
   var el = document.getElementById('shareModalStatus');
   if (!el) return;
   el.textContent = msg;
-  el.style.color = color || 'var(--text-muted)';
+  el.style.color  = color || 'var(--text-muted)';
   el.style.display = 'block';
 }
 
-// ── COLLABORATION TOGGLE ──────────────────────────────────────────────────────
+// ── SHARE MANAGEMENT (Step 3) ─────────────────────────────────────────────────
+// Three independent toggles the sender controls after a share is created:
+//   1. Share on/off   — activates or deactivates the public link
+//   2. Collaboration  — opens or closes the live discussion channel
+// The shared reflection itself is always preserved for recipients who already
+// accessed it — turning the share off only prevents new arrivals.
+
+function updateShareManageUI() {
+  // Share on/off button
+  var shareOnOffBtn = document.getElementById('shareOnOffBtn');
+  if (shareOnOffBtn) {
+    if (_shareStatus === 'on') {
+      shareOnOffBtn.textContent   = 'Share Active — Turn Off';
+      shareOnOffBtn.style.borderColor = 'var(--gold-dim)';
+      shareOnOffBtn.style.color   = 'var(--gold-pale)';
+    } else {
+      shareOnOffBtn.textContent   = 'Share Off — Turn On';
+      shareOnOffBtn.style.borderColor = 'var(--border)';
+      shareOnOffBtn.style.color   = 'var(--text-muted)';
+    }
+  }
+
+  // Collaboration toggle button
+  var collabManageBtn = document.getElementById('collabManageBtn');
+  if (collabManageBtn) {
+    if (_collabOpen) {
+      collabManageBtn.textContent   = 'Discussion Open — Close';
+      collabManageBtn.style.borderColor = 'rgba(80,180,120,0.6)';
+      collabManageBtn.style.color   = 'rgba(80,180,120,0.9)';
+    } else {
+      collabManageBtn.textContent   = 'Open Discussion';
+      collabManageBtn.style.borderColor = 'var(--border)';
+      collabManageBtn.style.color   = 'var(--text-muted)';
+    }
+  }
+
+  // Also update the downloadRow collab toggle
+  updateCollabToggleUI();
+}
+
+async function toggleShareOnOff() {
+  if (!_currentSharedSessionId) return;
+  var newStatus = _shareStatus === 'on' ? 'inactive' : 'active';
+  var prevStatus = _shareStatus;
+  _shareStatus = newStatus === 'active' ? 'on' : 'off';
+  updateShareManageUI();
+
+  try {
+    var res = await fetch('/api/share', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': localStorage.getItem('qt_user_email') || '' },
+      body: JSON.stringify({ shareId: _currentSharedSessionId, status: newStatus })
+    });
+    if (!res.ok) throw new Error('patch failed');
+  } catch (err) {
+    console.error('Share on/off toggle failed:', err);
+    _shareStatus = prevStatus; // revert
+    updateShareManageUI();
+  }
+}
 
 async function toggleCollaboration() {
   if (!_currentSharedSessionId) return;
+  var prev = _collabOpen;
   _collabOpen = !_collabOpen;
-  updateCollabToggleUI();
+  updateShareManageUI();
 
   // Update sidebar thread item
   if (activeThreadId) {
     var ti = document.getElementById('ti-' + activeThreadId);
     if (ti) {
       if (_collabOpen) ti.classList.add('collab-open');
-      else ti.classList.remove('collab-open');
+      else             ti.classList.remove('collab-open');
     }
   }
 
   try {
-    await fetch('/api/share', {
+    var res = await fetch('/api/share', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        shareId: _currentSharedSessionId,
-        collaborationOpen: _collabOpen
-      })
+      headers: { 'Content-Type': 'application/json', 'x-user-email': localStorage.getItem('qt_user_email') || '' },
+      body: JSON.stringify({ shareId: _currentSharedSessionId, collaborationOpen: _collabOpen })
     });
+    if (!res.ok) throw new Error('patch failed');
   } catch (err) {
     console.error('Collab toggle error:', err);
-    // Revert UI on failure
-    _collabOpen = !_collabOpen;
-    updateCollabToggleUI();
+    _collabOpen = prev; // revert
+    updateShareManageUI();
   }
 }
 
 function updateCollabToggleUI() {
+  // downloadRow collab toggle (visible beneath the result)
   var btn = document.getElementById('collabToggleBtn');
   var row = document.getElementById('collabToggleRow');
   if (!btn || !row) return;
   row.style.display = _currentSharedSessionId ? 'block' : 'none';
   if (_collabOpen) {
-    btn.textContent = 'Collaboration Open';
+    btn.textContent       = 'Discussion Open';
     btn.style.borderColor = 'rgba(80,180,120,0.6)';
-    btn.style.color = 'rgba(80,180,120,0.9)';
+    btn.style.color       = 'rgba(80,180,120,0.9)';
   } else {
-    btn.textContent = 'Collaboration Closed';
+    btn.textContent       = 'Open Discussion';
     btn.style.borderColor = 'var(--border)';
-    btn.style.color = 'var(--text-muted)';
+    btn.style.color       = 'var(--text-muted)';
   }
 }
 
@@ -3486,24 +3582,24 @@ document.addEventListener('DOMContentLoaded', function() {
     <button onclick="closeShareModal()" style="position:absolute; top:16px; right:16px; background:transparent; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; line-height:1;">✕</button>
     <div style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:24px;">Share This Reflection</div>
 
-    <!-- Step 1: Collaboration mode choice -->
+    <!-- Step 1: How to share -->
     <div id="shareStep1">
       <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">How would you like to share?</div>
       <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
         <button onclick="selectShareMode('personal')" id="shareModePersonal"
           style="text-align:left; padding:16px 20px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.04); cursor:pointer; transition:all 0.2s;">
           <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:4px;">Share This Reflection</div>
-          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-dim); font-style:italic;">Recipient continues their own thread. Your session is unchanged.</div>
+          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-dim); font-style:italic;">Recipient sees the interpretation and can ask their own questions. Your session is unchanged.</div>
         </button>
         <button onclick="selectShareMode('collab')" id="shareModeCollab"
           style="text-align:left; padding:16px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s;">
-          <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Invite Into This Conversation</div>
-          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-muted); font-style:italic;">Their follow-ups are visible to you. Collaboration open.</div>
+          <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Open a Discussion</div>
+          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-muted); font-style:italic;">A live discussion channel opens alongside the reflection. You can close it at any time.</div>
         </button>
       </div>
       <div style="display:flex; gap:10px; justify-content:flex-end;">
         <button onclick="closeShareModal()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer;">Cancel</button>
-        <button onclick="proceedToShareDelivery()" style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">Continue →</button>
+        <button id="shareContinueBtn" onclick="proceedToShareDelivery()" style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">Continue →</button>
       </div>
     </div>
 
@@ -3530,9 +3626,51 @@ document.addEventListener('DOMContentLoaded', function() {
       <div id="shareModalStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; margin-bottom:16px; line-height:1.6;"></div>
       <div style="display:flex; gap:10px; justify-content:space-between; align-items:center;">
         <button onclick="backToShareStep1()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 16px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer;">← Back</button>
+        <button onclick="goToShareManage()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 20px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer;">Manage Share →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Share management — on/off, collaboration toggle -->
+    <div id="shareStep3" style="display:none;">
+      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:20px;">Manage this share</div>
+
+      <!-- Shared URL display -->
+      <div style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">Share link</div>
+      <div style="display:flex; gap:8px; margin-bottom:24px;">
+        <div id="shareUrlDisplay" style="flex:1; font-family:var(--mono); font-size:11px; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+        <button onclick="shareViaCopy()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s;"
+          onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Copy</button>
+      </div>
+
+      <!-- Controls -->
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
+
+        <!-- Share on/off -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border:1px solid var(--border); background:var(--surface);">
+          <div>
+            <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text); margin-bottom:3px;">Share Link</div>
+            <div style="font-family:var(--crimson); font-size:13px; color:var(--text-muted); font-style:italic;">Recipients with the link can view this reflection</div>
+          </div>
+          <button id="shareOnOffBtn" onclick="toggleShareOnOff()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0; margin-left:12px;">Share Active — Turn Off</button>
+        </div>
+
+        <!-- Collaboration toggle -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border:1px solid var(--border); background:var(--surface);">
+          <div>
+            <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text); margin-bottom:3px;">Discussion</div>
+            <div style="font-family:var(--crimson); font-size:13px; color:var(--text-muted); font-style:italic;">Open a live channel alongside the shared reflection</div>
+          </div>
+          <button id="collabManageBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0; margin-left:12px;">Open Discussion</button>
+        </div>
+
+      </div>
+
+      <div style="display:flex; justify-content:flex-end;">
         <button onclick="closeShareModal()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer;">Done</button>
       </div>
     </div>
+
   </div>
 </div>
 
