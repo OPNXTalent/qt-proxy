@@ -1056,9 +1056,71 @@ function showError(msg) {
   document.getElementById('errorText').textContent = msg;
 }
 
+// ── Presence heartbeat ────────────────────────────────────────────────────────
+// Fires on first interaction (keystroke, thread tap, scroll) and then
+// every 30s while the tab is open. Signals the sender the page is live.
+
+var _heartbeatInterval  = null;
+var _heartbeatSent      = false;
+var _creditedCallback   = null; // set by qt.html if in embedded mode (unused here)
+
+function sendHeartbeat() {
+  if (!shareToken) return;
+  fetch('/api/share-presence', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: shareToken })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    // data.credited = true means this was the first heartbeat and sender got +1
+    // Nothing to do on recipient side — the sender's qt.html handles the animation
+  })
+  .catch(function() {});
+}
+
+function startHeartbeat() {
+  if (_heartbeatInterval) return; // already running
+  sendHeartbeat();
+  _heartbeatSent = true;
+  _heartbeatInterval = setInterval(sendHeartbeat, 30000);
+}
+
+function onRecipientInteraction() {
+  if (!_heartbeatSent) startHeartbeat();
+}
+
+// Attach interaction listeners after content loads
+function attachInteractionListeners() {
+  // Input field activity
+  var inp = document.getElementById('userInput');
+  if (inp) inp.addEventListener('keydown', onRecipientInteraction, { once: true });
+
+  // Suggested thread taps — delegated
+  document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList.contains('qt-thread-btn')) {
+      onRecipientInteraction();
+    }
+  }, { once: true });
+
+  // Collab input
+  var ci = document.getElementById('collabInput');
+  if (ci) ci.addEventListener('keydown', onRecipientInteraction, { once: true });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   loadShare();
+  attachInteractionListeners();
+
+  // Stop heartbeat when tab hidden/closed
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      if (_heartbeatInterval) { clearInterval(_heartbeatInterval); _heartbeatInterval = null; }
+    } else {
+      if (_heartbeatSent) startHeartbeat(); // resume on return
+    }
+  });
 });
 </script>
 
