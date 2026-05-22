@@ -3069,9 +3069,9 @@ async function handleShareBtn() {
       body: JSON.stringify({ snapshot, subject: currentSubject, senderEmail, threadId, collaborationOpen: false })
     });
     var data = await res.json();
-    if (!res.ok || !data.shareId) throw new Error('share failed');
+    if (!res.ok || (!data.shareId && !data.token)) throw new Error('share failed');
 
-    _currentSharedSessionId = data.shareId;
+    _currentSharedSessionId = data.shareId || null;
     _shareStatus            = 'on';
     window._shareActive     = true;
     window._currentShareUrl = data.shareUrl;
