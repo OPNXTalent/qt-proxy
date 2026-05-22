@@ -1271,7 +1271,7 @@ async function runInterpretation() {
   conversationHistory.push({ role: 'user', content: prompt });
 
   try {
-    const { fullText: apiRawText, versePatch } = await callProxy(conversationHistory, input);
+    const apiRawText = await callProxy(conversationHistory, input);
   
   // Store a condensed version in history to prevent payload bloat on follow-ups
   const condensed = apiRawText.length > 1000 
@@ -1322,12 +1322,6 @@ async function runInterpretation() {
         showResult();
         return;
       }
-    }
-
-    // If server fetched verse text for non-Bible sources, inject it before rendering
-    if (versePatch && versePatch.verse_text && parsed) {
-      parsed.verse_text = versePatch.verse_text;
-      if (versePatch.verse_text_arabic) parsed.verse_text_arabic = versePatch.verse_text_arabic;
     }
 
     renderResult(parsed);
@@ -1658,7 +1652,6 @@ async function callProxy(messages, rawQuery) {
   let buffer = '';
   let fullText = '';
   let tierFromStream = null;
-  let versePatch = null; // captures verse_patch event if server sends one
 
   // Show streaming indicator
   document.getElementById('loadingBlock').classList.remove('visible');
@@ -1690,8 +1683,6 @@ async function callProxy(messages, rawQuery) {
               fullText += parsed.text;
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
-            } else if (parsed.type === 'verse_patch') {
-              versePatch = parsed; // store for injection after renderResult
             } else if (parsed.type === 'error') {
               throw new Error('Stream error: ' + parsed.error);
             }
@@ -1737,7 +1728,7 @@ async function callProxy(messages, rawQuery) {
     if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
 
-  return { fullText, versePatch };
+  return fullText;
 }
 
 function getErrorMessage(err) {
@@ -1789,10 +1780,9 @@ function renderResult(d) {
 
   let html = '';
 
-  // Verse banner — show whenever we have a reference, whether or not verse_text is populated
+  // Verse banner — show reference always when identified; text supplied by AI for all traditions
   if (d.verse_identified) {
-    const verseBody = d.verse_text ? escHtml(d.verse_text) : '';
-    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + verseBody + '</div></div>';
+    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text || '') + '</div></div>';
   }
 
   // 1. Recognition moment — unlabeled, pure prose, full breathing room
