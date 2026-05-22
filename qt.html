@@ -456,7 +456,12 @@
     margin-bottom: 36px;
   }
   .qt-threads-label {
-    display: none;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
   }
   .qt-thread-btn {
     display: block;
@@ -626,7 +631,13 @@
   }
 
   .kingdom-label {
-    display: none;
+    font-family: var(--cinzel);
+    font-size: 17px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 14px;
+    text-align: center;
   }
 
   .kingdom-text {
@@ -655,7 +666,15 @@
     line-height: 1.55;
   }
   .fu-question::before {
-    content: none;
+    content: 'Follow-up — ';
+    font-family: var(--mono);
+    font-size: 10px;
+    font-style: normal;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 6px;
   }
   .fu-body {
     font-family: var(--crimson);
@@ -1229,95 +1248,6 @@ function applyQuotaLock(message) {
     prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-// ── SCRIPTURE VERSE FETCHER ───────────────────────────────────────────────────
-// Detects religious text references in user input across all supported traditions.
-// Routes through /api/scripture proxy — no CORS issues.
-// Returns { ref, text, tradition, source, nwtNote? } or null.
-
-const TRADITION_PATTERNS = [
-  // Quran
-  { tradition: 'quran',   regex: /(?:quran|qur'an|qoran|surah|ayah|ayat|q\s*\d)/i },
-  // 1 Enoch
-  { tradition: 'enoch',   regex: /1\s*enoch|book\s+of\s+enoch/i },
-  // Bhagavad Gita
-  { tradition: 'gita',    regex: /(?:bhagavad\s*)?gita|bhagavad/i },
-  // Book of Mormon
-  { tradition: 'mormon',  regex: /(?:book\s+of\s+)?mormon|nephi|mosiah|alma|helaman|moroni|ether/i },
-  // New World Translation / Jehovah's Witness
-  { tradition: 'nwt',     regex: /(?:new\s+world\s+translation|nwt|jehovah'?s\s+witness|watchtower)/i },
-  // Buddhist / Pali Canon
-  { tradition: 'buddhist',regex: /(?:pali|dhamma|dhammapada|sutta|nikayas?|buddha|buddhist|mn\s*\d|dn\s*\d|sn\s*\d|an\s*\d|dhp\s*\d)/i },
-  // Apocrypha / Deuterocanonical
-  { tradition: 'apocrypha', regex: /(?:tobit|judith|sirach|ecclesiasticus|wisdom\s+of\s+solomon|baruch|maccabees?|1\s*macc|2\s*macc)/i },
-  // Torah / Hebrew Bible (Sefaria) — broad match for books not in Protestant canon
-  { tradition: 'torah',   regex: /(?:talmud|mishnah|midrash|gemara|torah|tanakh|bereshit|shemot|vayikra|bamidbar|devarim)/i },
-];
-
-function detectTradition(input) {
-  if (!input) return null;
-  for (const p of TRADITION_PATTERNS) {
-    if (p.regex.test(input)) return p.tradition;
-  }
-  return null;
-}
-
-function extractRef(input, tradition) {
-  // Extract the most specific reference from the input
-  // Returns the portion of input that looks like a reference
-  const lower = input.trim();
-
-  if (tradition === 'quran') {
-    // "Quran 2:255", "Surah Al-Baqarah verse 255", "2:255"
-    const m = lower.match(/(\d+)\s*[:\s]\s*(\d+)/);
-    if (m) return `${m[1]}:${m[2]}`;
-    return lower;
-  }
-  if (tradition === 'enoch') {
-    const m = lower.match(/(?:1\s*enoch\s+)?(\d+)\s*[:\s]\s*(\d+)/i);
-    if (m) return `${m[1]}:${m[2]}`;
-    return lower.replace(/^1\s*enoch\s*/i, '').trim();
-  }
-  if (tradition === 'gita') {
-    const m = lower.match(/(\d+)\s*[:\s]\s*(\d+)/);
-    if (m) return `${m[1]}:${m[2]}`;
-    return lower;
-  }
-  if (tradition === 'mormon' || tradition === 'nwt') {
-    return input.trim();
-  }
-  if (tradition === 'buddhist') {
-    // "MN 36", "SN 56.11", "Dhp 183"
-    const m = lower.match(/(?:mn|dn|sn|an|dhp|ud|iti|snp|thag|thig)\s*[\d.]+/i);
-    if (m) return m[0].toUpperCase();
-    return input.trim();
-  }
-  // Torah / Apocrypha — pass full ref to Sefaria
-  return input.trim();
-}
-
-async function fetchScriptureVerse(input) {
-  if (!input) return null;
-
-  const tradition = detectTradition(input);
-  if (!tradition) return null;
-
-  const ref = extractRef(input, tradition);
-  if (!ref) return null;
-
-  try {
-    const res = await fetch(
-      `/api/scripture?tradition=${encodeURIComponent(tradition)}&ref=${encodeURIComponent(ref)}`
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data || !data.text) return null;
-    return data;
-  } catch {
-    return null;
-  }
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
@@ -1393,23 +1323,6 @@ async function runInterpretation() {
         return;
       }
     }
-
-    // ── SCRIPTURE VERSE OVERRIDE ─────────────────────────────────────────────
-    // Detect and fetch non-biblical religious text references.
-    // Overrides verse_identified and verse_text with the actual text,
-    // regardless of what the model returned in those fields.
-    const scriptureOverride = await fetchScriptureVerse(input);
-    if (scriptureOverride) {
-      parsed.verse_identified = scriptureOverride.ref;
-      parsed.verse_text = scriptureOverride.text;
-      // Attach NWT note to noise_decoherence if present
-      if (scriptureOverride.nwtNote && !parsed.noise_decoherence?.includes('NWT')) {
-        parsed.noise_decoherence = (parsed.noise_decoherence || '') +
-          (parsed.noise_decoherence ? ' ' : '') +
-          'NWT textual note: ' + scriptureOverride.nwtNote;
-      }
-    }
-    // ─────────────────────────────────────────────────────────────────────────
 
     renderResult(parsed);
     window._lastParsedResult = parsed;
@@ -2410,12 +2323,18 @@ function getActualTier() {
   var urlParams = new URLSearchParams(window.location.search);
   var userEmail = localStorage.getItem('qt_user_email');
 
-  // If URL has a paid tier and email is present — clear anon flag, honor paid tier
+  // If URL has a paid tier — honor it and ensure email is captured
   var tierParam = urlParams.get('tier');
-  if (tierParam && tierParam !== 'free' && TIER_RETENTION[tierParam] && userEmail) {
+  if (tierParam && tierParam !== 'free' && TIER_RETENTION[tierParam]) {
     sessionStorage.removeItem('qt_anon_mode');
     sessionStorage.removeItem('qt_anon');
     localStorage.setItem('qt_user_tier', tierParam);
+    if (userEmail) {
+      return tierParam;
+    }
+    // Paid tier present but no email stored — prompt on next tick
+    // so the app can finish initializing before the modal appears
+    setTimeout(function() { promptEmailForTier(tierParam); }, 800);
     return tierParam;
   }
 
@@ -2436,6 +2355,54 @@ function getActualTier() {
 var CURRENT_TIER = getActualTier();
 // Persist tier to localStorage so it survives navigation
 if (CURRENT_TIER !== 'free') localStorage.setItem('qt_user_tier', CURRENT_TIER);
+
+// ── EMAIL PROMPT FOR TIER ACCESS ──────────────────────────────────────────────
+function promptEmailForTier(tier) {
+  // Only show if email still missing after load
+  if (localStorage.getItem('qt_user_email')) return;
+  var modal = document.getElementById('emailForTierModal');
+  if (modal) { modal.style.display = 'flex'; return; }
+
+  // Build modal inline
+  var overlay = document.createElement('div');
+  overlay.id = 'emailForTierModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,6,10,0.92);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);';
+  var mh = '<div style="background:var(--deep);border:1px solid var(--border);padding:44px 40px;max-width:420px;width:90%;position:relative;">';
+  mh += '<div style="font-family:var(--cinzel);font-size:14px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-pale);margin-bottom:10px;">Welcome Back</div>';
+  mh += '<div style="font-family:var(--crimson);font-style:italic;font-size:17px;color:var(--text-dim);line-height:1.7;margin-bottom:24px;">Your email is how we hold your place. Without it, your session history disappears when you close the tab.</div>';
+  mh += '<input id="tierEmailInput" type="email" placeholder="your@email.com" autocomplete="email" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:16px;padding:13px 16px;outline:none;transition:border-color 0.2s;margin-bottom:12px;" />';
+  mh += '<div id="tierEmailStatus" style="display:none;font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:#b85c5c;margin-bottom:12px;"></div>';
+  mh += '<div style="display:flex;gap:10px;justify-content:flex-end;">';
+  mh += '<button onclick="document.getElementById(\'emailForTierModal\').style.display=\'none\'" style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;padding:10px 18px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">Later</button>';
+  mh += '<button onclick="submitTierEmail()" style="font-family:var(--cinzel);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;padding:10px 24px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;">Continue →</button>';
+  mh += '</div></div>';
+  overlay.innerHTML = mh;
+  setTimeout(function() {
+    var inp = document.getElementById('tierEmailInput');
+    if (inp) {
+      inp.focus();
+      inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') submitTierEmail(); });
+    }
+  }, 100);
+}
+
+function submitTierEmail() {
+  var inp = document.getElementById('tierEmailInput');
+  var statusEl = document.getElementById('tierEmailStatus');
+  if (!inp) return;
+  var email = inp.value.trim();
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(email)) {
+    if (statusEl) { statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; }
+    return;
+  }
+  localStorage.setItem('qt_user_email', email);
+  // Refresh so subscriber path fires correctly with email now in storage
+  var modal = document.getElementById('emailForTierModal');
+  if (modal) modal.style.display = 'none';
+  // Reload threads so sidebar populates under the correct identity
+  if (typeof loadUserThreads === 'function') loadUserThreads();
+}
 
 let activeThreadId = null;
 
