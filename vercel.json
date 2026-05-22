@@ -1,26 +1,13 @@
 {
   "functions": {
     "api/interpret.js": {
-<<<<<<< HEAD
       "memory": 128,
       "maxDuration": 60
     },
-=======
-  "memory": 128,
-  "maxDuration": 60
-},
->>>>>>> 8e048d5a4f9da09ddd6a33adcd97c3ed30502026
     "api/notify.js": {
       "memory": 128,
       "maxDuration": 10
     },
-<<<<<<< HEAD
-=======
-    "api/share.js": {
-      "memory": 128,
-      "maxDuration": 10
-    },
->>>>>>> 8e048d5a4f9da09ddd6a33adcd97c3ed30502026
     "api/webhook.js": {
       "memory": 128,
       "maxDuration": 10
@@ -28,13 +15,6 @@
     "api/redeem.js": {
       "memory": 128,
       "maxDuration": 10
-<<<<<<< HEAD
-=======
-    },
-    "api/threads.js": {
-      "memory": 128,
-      "maxDuration": 10
->>>>>>> 8e048d5a4f9da09ddd6a33adcd97c3ed30502026
     }
   },
   "crons": [
@@ -43,7 +23,7 @@
       "schedule": "0 9 * * *"
     }
   ],
- "rewrites": [
+  "rewrites": [
     { "source": "/", "destination": "/qt.html" },
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/privacy", "destination": "/privacy.html" }
