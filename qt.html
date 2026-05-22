@@ -2607,12 +2607,31 @@ function selectThread(id) {
   var responseData = localParsed || supaResp;
 
   if (responseData) {
+    // Set _lastParsedResult so Share button works on sidebar-loaded threads
+    window._lastParsedResult = responseData;
+    currentSubject = savedInput;
     renderResult(responseData);
     showResult();
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
     var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
+    // Reset share state for this thread
+    window._shareActive = false;
+    _currentSharedSessionId = null;
+    _shareStatus = 'off';
+    _collabOpen = false;
+    var shareBtn = document.getElementById('shareBtn');
+    if (shareBtn) {
+      shareBtn.disabled = false;
+      shareBtn.textContent = 'Share this reflection →';
+      shareBtn.style.borderColor = 'var(--border-lit)';
+      shareBtn.style.color = 'var(--text-dim)';
+    }
+    var dot = document.getElementById('presenceDot');
+    if (dot) dot.style.display = 'none';
+    var discRow = document.getElementById('discussionRow');
+    if (discRow) discRow.style.display = 'none';
     restoreFollowUps(id);
   } else {
     var rb = document.getElementById('resultBlock');      if (rb)  rb.classList.remove('visible');
@@ -3069,9 +3088,9 @@ async function handleShareBtn() {
       body: JSON.stringify({ snapshot, subject: currentSubject, senderEmail, threadId, collaborationOpen: false })
     });
     var data = await res.json();
-    if (!res.ok || (!data.shareId && !data.token)) throw new Error('share failed');
+    if (!res.ok || !data.shareId) throw new Error('share failed');
 
-    _currentSharedSessionId = data.shareId || null;
+    _currentSharedSessionId = data.shareId;
     _shareStatus            = 'on';
     window._shareActive     = true;
     window._currentShareUrl = data.shareUrl;
