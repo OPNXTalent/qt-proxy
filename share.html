@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantum Theology — Shared Interpretation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #06060a;
+    --deep: #0d0d14;
+    --surface: #13131e;
+    --surface-2: #1a1a28;
+    --border: #2a2a40;
+    --border-lit: #4a4a70;
+    --gold: #c9a84c;
+    --gold-dim: #7a6230;
+    --gold-pale: #e8d5a0;
+    --text: #d8d4e8;
+    --text-dim: #7a7890;
+    --text-muted: #3a384a;
+    --hebrew: #b8a8d0;
+    --cinzel: 'Cinzel', serif;
+    --crimson: 'Crimson Pro', Georgia, serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--crimson);
+    font-size: 20px;
+    line-height: 1.7;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(200,180,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 10%, rgba(200,180,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 60%, rgba(200,180,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 15% 75%, rgba(200,180,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 50%, rgba(200,180,255,0.25) 0%, transparent 100%),
+      radial-gradient(2px 2px at 75% 35%, rgba(201,168,76,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 45% 45%, rgba(200,180,255,0.4) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .shell {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 60px 40px 100px;
+  }
+
+  /* SHARED BANNER */
+  .share-banner {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 48px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .share-banner span {
+    color: var(--gold-dim);
+  }
+
+  /* HEADER */
+  .header { text-align: center; margin-bottom: 64px; }
+  .header-eyebrow {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 20px;
+  }
+  .header h1 {
+    font-family: var(--cinzel);
+    font-size: 36px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--gold-pale);
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  .header-sub {
+    font-family: var(--cinzel);
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    margin-bottom: 28px;
+  }
+  .header-rule {
+    width: 120px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+    margin: 0 auto 24px;
+  }
+  .subject-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .subject-text {
+    font-size: 17px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* VERSE BANNER */
+  .verse-banner {
+    border-left: 2px solid var(--gold-dim);
+    padding: 20px 28px;
+    background: linear-gradient(135deg, rgba(201,168,76,0.04), transparent);
+    margin-bottom: 40px;
+  }
+  .verse-ref {
+    font-family: var(--cinzel);
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 10px;
+  }
+  .verse-text {
+    font-size: 22px;
+    color: var(--gold-pale);
+    font-style: italic;
+    line-height: 1.6;
+  }
+
+  /* RECOGNITION */
+  .qt-recognition {
+    padding: 28px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .qt-recognition p {
+    font-size: 18.5px;
+    font-style: italic;
+    color: var(--text);
+    line-height: 1.8;
+  }
+
+  /* SECTIONS */
+  .qt-section {
+    margin-bottom: 32px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .qt-section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 16px 24px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .qt-section-num { font-family: var(--mono); font-size: 14px; color: var(--gold-dim); letter-spacing: 0.1em; flex-shrink: 0; }
+  .qt-section-title { font-family: var(--cinzel); font-size: 14px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text); flex: 1; }
+  .qt-section-hebrew { font-size: 16px; color: var(--hebrew); font-family: var(--crimson); flex-shrink: 0; }
+  .qt-section-body { padding: 22px 24px; font-size: 18px; color: var(--text); line-height: 1.75; }
+  .qt-section-body p { margin-bottom: 12px; }
+  .qt-section-body p:last-child { margin-bottom: 0; }
+
+  /* KEY TERMS TABLE */
+  .qt-table { width: 100%; border-collapse: collapse; margin-top: 0; font-size: 15px; }
+  .qt-table th { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); background: rgba(201,168,76,0.04); }
+  .qt-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-dim); vertical-align: top; }
+  .qt-table td:first-child { color: var(--text); font-weight: 600; width: 36%; }
+  .qt-table tr:last-child td { border-bottom: none; }
+
+  /* KINGDOM BLOCK */
+  .kingdom-block {
+    border: 1px solid var(--gold-dim);
+    background: linear-gradient(135deg, rgba(201,168,76,0.06), rgba(30,42,74,0.3));
+    padding: 28px 32px;
+    margin-top: 12px;
+    position: relative;
+  }
+  .kingdom-block::before {
+    content: '✦';
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    background: var(--void); padding: 0 10px;
+    color: var(--gold-dim); font-size: 14px;
+  }
+  .kingdom-label { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold-dim); margin-bottom: 14px; text-align: center; }
+  .kingdom-text { font-size: 20px; color: var(--gold-pale); font-style: italic; text-align: center; line-height: 1.7; }
+
+  /* READ-ONLY NOTICE */
+  .readonly-notice {
+    text-align: center;
+    margin: 48px 0;
+    padding: 28px 32px;
+    border: 1px solid var(--border);
+    background: rgba(201,168,76,0.02);
+  }
+  .readonly-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+  .readonly-text {
+    font-size: 17px;
+    color: var(--text-dim);
+    font-style: italic;
+    line-height: 1.75;
+    margin-bottom: 24px;
+  }
+  .cta-btn {
+    display: inline-block;
+    font-family: var(--cinzel);
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 14px 32px;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-pale);
+    text-decoration: none;
+    transition: all 0.25s;
+  }
+  .cta-btn:hover { border-color: var(--gold); background: rgba(201,168,76,0.06); }
+
+  /* LOADING / ERROR */
+  .state-block {
+    text-align: center;
+    padding: 80px 0;
+  }
+  .state-symbol { font-family: var(--cinzel); font-size: 32px; color: var(--gold-dim); margin-bottom: 20px; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+  .state-text { font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); }
+  .state-block.error .state-symbol { animation: none; opacity: 0.5; }
+
+  /* FOOTER */
+  .site-footer {
+    padding: 32px 60px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+  .footer-mark { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.12em; color: var(--text-muted); text-decoration: none; }
+  .footer-mark:hover { color: var(--gold); }
+  .footer-copy { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-muted); }
+
+  @media (max-width: 600px) {
+    .shell { padding: 40px 20px 80px; }
+    .header h1 { font-size: 24px; }
+    .site-footer { flex-direction: column; gap: 16px; text-align: center; padding: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- LOADING STATE -->
+  <div class="state-block" id="loadingState">
+    <div class="state-symbol">✦</div>
+    <div class="state-text">Loading interpretation…</div>
+  </div>
+
+  <!-- ERROR STATE -->
+  <div class="state-block error" id="errorState" style="display:none;">
+    <div class="state-symbol">⦿</div>
+    <div class="state-text" id="errorText">This interpretation could not be found.</div>
+    <div style="margin-top:24px;">
+      <a href="https://quantumtheology.app" class="cta-btn" style="font-size:11px;">← Return to Quantum Theology</a>
+    </div>
+  </div>
+
+  <!-- CONTENT (rendered after load) -->
+  <div id="shareContent" style="display:none;">
+
+    <div class="share-banner">
+      Shared interpretation &nbsp;·&nbsp; <span>Quantum Theology Prism</span> &nbsp;·&nbsp; Read-only
+    </div>
+
+    <header class="header">
+      <div class="header-eyebrow">QT Prism</div>
+      <h1>Quantum Theology</h1>
+      <div class="header-sub">Echad b'Emet</div>
+      <div class="header-rule"></div>
+      <div class="subject-label">Subject of Interpretation</div>
+      <div class="subject-text" id="shareSubject"></div>
+    </header>
+
+    <div id="shareResult"></div>
+
+    <div class="readonly-notice">
+      <div class="readonly-label">This is a read-only interpretation</div>
+      <div class="readonly-text">
+        The Prism applies Hebraic relational ontology and the conceptual language of quantum mechanics to Scripture — not as metaphor, but as structural confirmation. Enter your own query, follow the threads, and see what becomes visible.
+      </div>
+      <a href="#" id="ctaLink" class="cta-btn">Enter the Prism →</a>
+    </div>
+
+  </div>
+
+</div><!-- /.shell -->
+
+<footer class="site-footer">
+  <a href="https://quantumtheology.app" class="footer-mark">Quantum Theology</a>
+  <div class="footer-copy">OPNX LLC &nbsp;·&nbsp; © 2026 All Rights Reserved</div>
+</footer>
+
+<script>
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderSnapshot(snapshot, subject) {
+  document.getElementById('shareSubject').textContent = subject || 'Unknown subject';
+
+  const sections = [
+    { num: '00', title: "Echad b'Emet", hebrew: 'אֶחָד בֶּאֱמֶת', content: snapshot.qt_summary },
+    { num: '01', title: 'Entanglement',            hebrew: 'קֶשֶׁר',         content: snapshot.entanglement },
+    { num: '02', title: 'Coherence & Alignment',   hebrew: 'יִחוּד',         content: snapshot.coherence_alignment },
+    { num: '03', title: 'Noise & Decoherence',     hebrew: 'פֵּרוּד',         content: snapshot.noise_decoherence },
+    { num: '04', title: 'Telos',                   hebrew: 'תַּכְלִית',      content: snapshot.telos_insight },
+    { num: '05', title: 'Olam HaBa — Non-Local View', hebrew: 'עוֹלָם הַבָּא', content: snapshot.olam_haba },
+  ];
+
+  let html = '';
+
+  if (snapshot.verse_text) {
+    html += `
+      <div class="verse-banner">
+        <div class="verse-ref">${escHtml(snapshot.verse_identified || '')}</div>
+        <div class="verse-text">${escHtml(snapshot.verse_text)}</div>
+      </div>
+    `;
+  }
+
+  if (snapshot.recognition) {
+    html += `
+      <div class="qt-recognition">
+        <p>${escHtml(snapshot.recognition)}</p>
+      </div>
+    `;
+  }
+
+  sections.forEach(function(s) {
+    if (!s.content) return;
+    html += `
+      <div class="qt-section">
+        <div class="qt-section-head">
+          <span class="qt-section-num">${s.num}</span>
+          <span class="qt-section-title">${s.title}</span>
+          <span class="qt-section-hebrew">${s.hebrew}</span>
+        </div>
+        <div class="qt-section-body"><p>${escHtml(s.content)}</p></div>
+      </div>
+    `;
+  });
+
+  if (snapshot.key_terms && snapshot.key_terms.length > 0) {
+    html += `
+      <div class="qt-section">
+        <div class="qt-section-head">
+          <span class="qt-section-num">06</span>
+          <span class="qt-section-title">Key Terms</span>
+          <span class="qt-section-hebrew">מִלִּים</span>
+        </div>
+        <div class="qt-section-body" style="padding:0;">
+          <table class="qt-table">
+            <thead><tr><th>Term</th><th>QT Meaning</th></tr></thead>
+            <tbody>
+              ${snapshot.key_terms.map(function(t) {
+                return `<tr>
+                  <td>${escHtml(t.term)}${t.hebrew ? ` <span style="color:var(--hebrew); font-size:15px;">${escHtml(t.hebrew)}</span>` : ''}</td>
+                  <td>${escHtml(t.qt_meaning)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  if (snapshot.kingdom_implication) {
+    html += `
+      <div class="kingdom-block">
+        <div class="kingdom-label">Kingdom Implication</div>
+        <div class="kingdom-text">${escHtml(snapshot.kingdom_implication)}</div>
+      </div>
+    `;
+  }
+
+  document.getElementById('shareResult').innerHTML = html;
+}
+
+async function loadShare() {
+  var params = new URLSearchParams(window.location.search);
+  var token  = params.get('t');
+
+  if (!token) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorState').style.display = 'block';
+    document.getElementById('errorText').textContent = 'No share token provided.';
+    return;
+  }
+
+  // Set CTA link with ref token
+  var gatewayUrl = 'https://quantumtheology.app/qt-gateway.html?ref=' + encodeURIComponent(token);
+  document.getElementById('ctaLink').href = gatewayUrl;
+
+  try {
+    var SUPABASE_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+
+    var res = await fetch(
+      SUPABASE_URL + '/rest/v1/shares?token=eq.' + encodeURIComponent(token) + '&select=snapshot,recipient_email',
+      {
+        headers: {
+          'apikey': SUPABASE_ANON,
+          'Authorization': 'Bearer ' + SUPABASE_ANON
+        }
+      }
+    );
+
+    var rows = await res.json();
+
+    if (!rows || rows.length === 0) {
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('errorState').style.display = 'block';
+      document.getElementById('errorText').textContent = 'This interpretation could not be found or has expired.';
+      return;
+    }
+
+    var row = rows[0];
+    var snapshot = row.snapshot;
+    var subject  = snapshot._subject || '';
+
+    // Pre-populate CTA with recipient email if available
+    if (row.recipient_email) {
+      gatewayUrl += '&email=' + encodeURIComponent(row.recipient_email);
+      document.getElementById('ctaLink').href = gatewayUrl;
+    }
+
+    renderSnapshot(snapshot, subject);
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('shareContent').style.display = 'block';
+
+  } catch (err) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorState').style.display = 'block';
+    document.getElementById('errorText').textContent = 'Could not load this interpretation. Please try again.';
+  }
+}
+
+loadShare();
+</script>
+
+</body>
+</html>

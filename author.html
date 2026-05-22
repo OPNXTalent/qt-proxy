@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Author — The Prism · Echad B'Emet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Montserrat:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --void:       #0e0b18;
+  --deep:       #111020;
+  --surface:    #131025;
+  --gold:       #d4af5f;
+  --gold-dim:   #8a7040;
+  --gold-pale:  #e8d5a0;
+  --gold-glow:  rgba(212,175,95,0.10);
+  --text:       #e8e2d4;
+  --text-dim:   rgba(232,226,212,0.65);
+  --text-muted: rgba(232,226,212,0.35);
+  --border:     rgba(232,226,212,0.08);
+  --border-lit: rgba(212,175,95,0.3);
+  --cinzel: 'Cormorant Garamond', Georgia, serif;
+  --sans: 'Montserrat', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--sans);
+  font-weight: 300;
+  overflow-x: hidden;
+}
+
+/* Noise overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.35;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 52px;
+  background: linear-gradient(to bottom, rgba(14,11,24,0.97), transparent);
+}
+
+.nav-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.nav-mark img {
+  height: 36px;
+  width: 36px;
+  object-fit: contain;
+  opacity: 0.9;
+}
+
+.nav-mark-text {
+  font-family: var(--cinzel);
+  font-size: 17px;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  color: var(--gold-pale);
+}
+
+.nav-mark-text span { color: var(--gold); }
+
+.nav-links {
+  display: flex;
+  gap: 40px;
+  list-style: none;
+}
+
+.nav-links a {
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.nav-links a:hover,
+.nav-links a.active { color: var(--gold-pale); }
+
+.nav-cta {
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-decoration: none;
+  border: 0.5px solid var(--border-lit);
+  padding: 9px 20px;
+  transition: all 0.3s;
+}
+
+.nav-cta:hover {
+  background: var(--gold-glow);
+  border-color: var(--gold);
+  color: var(--gold-pale);
+}
+
+/* ── HERO ── */
+.author-hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 140px 52px 100px;
+  overflow: hidden;
+}
+
+/* Starfield */
+.starfield {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Vertical rule */
+.hero-rule {
+  position: absolute;
+  left: 52px;
+  top: 0;
+  bottom: 0;
+  width: 0.5px;
+  background: linear-gradient(to bottom, transparent, var(--border-lit) 30%, var(--border-lit) 70%, transparent);
+  z-index: 1;
+}
+
+.hero-inner {
+  position: relative;
+  z-index: 2;
+  max-width: 1060px;
+  margin: 0 auto;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 100px;
+  align-items: center;
+}
+
+/* Photo */
+.author-photo-wrap {
+  position: relative;
+  opacity: 0;
+  animation: fadeUp 1s ease forwards 0.4s;
+}
+
+.author-photo {
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  filter: grayscale(15%) contrast(1.05);
+  transition: filter 0.5s ease;
+}
+
+.author-photo:hover {
+  filter: grayscale(0%) contrast(1.02);
+}
+
+/* Gold frame accent */
+.author-photo-wrap::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  right: 12px;
+  bottom: 12px;
+  border: 0.5px solid var(--border-lit);
+  z-index: -1;
+  transition: all 0.5s ease;
+}
+
+.author-photo-wrap:hover::before {
+  top: -16px;
+  left: -16px;
+  border-color: var(--gold);
+}
+
+/* Seal watermark behind photo */
+.author-photo-wrap::after {
+  content: '';
+  position: absolute;
+  bottom: -30px;
+  right: -30px;
+  width: 160px;
+  height: 160px;
+  background: url('ThePrism.png') center/contain no-repeat;
+  opacity: 0.06;
+  z-index: -1;
+}
+
+/* Right content */
+.author-content {
+  opacity: 0;
+  animation: fadeUp 1s ease forwards 0.7s;
+}
+
+.author-eyebrow {
+  font-family: var(--sans);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.author-eyebrow::before {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 0.5px;
+  background: var(--gold-dim);
+}
+
+.author-name {
+  font-family: var(--cinzel);
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.author-name-last {
+  color: var(--gold-pale);
+}
+
+.author-title {
+  font-family: var(--cinzel);
+  font-size: 16px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--gold);
+  letter-spacing: 0.06em;
+  margin-bottom: 40px;
+  opacity: 0.85;
+}
+
+.author-rule {
+  width: 52px;
+  height: 0.5px;
+  background: var(--border-lit);
+  margin-bottom: 40px;
+}
+
+.author-opening {
+  font-family: var(--cinzel);
+  font-size: clamp(20px, 2.5vw, 26px);
+  font-weight: 300;
+  line-height: 1.75;
+  color: var(--text-dim);
+}
+
+.author-opening em {
+  font-style: italic;
+  color: var(--text);
+}
+
+/* ── STATEMENT SECTION ── */
+.statement-section {
+  padding: 120px 0;
+  background: var(--deep);
+  border-top: 0.5px solid var(--border);
+}
+
+.statement-inner {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 52px;
+}
+
+.statement-block {
+  position: relative;
+  padding-left: 40px;
+  border-left: 0.5px solid var(--border-lit);
+  margin-bottom: 56px;
+}
+
+.statement-block:last-child { margin-bottom: 0; }
+
+.statement-num {
+  font-family: var(--sans);
+  font-size: 7px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  display: block;
+  margin-bottom: 20px;
+}
+
+.statement-heading {
+  font-family: var(--cinzel);
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 300;
+  color: var(--text);
+  line-height: 1.3;
+  margin-bottom: 20px;
+}
+
+.statement-heading em {
+  font-style: italic;
+  color: var(--gold-pale);
+}
+
+.statement-body {
+  font-family: var(--cinzel);
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1.85;
+  color: var(--text-dim);
+}
+
+.statement-body + .statement-body {
+  margin-top: 18px;
+}
+
+/* ── PULL QUOTE ── */
+.pullquote-section {
+  padding: 100px 0;
+  background: var(--void);
+  border-top: 0.5px solid var(--border);
+}
+
+.pullquote-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 52px;
+  text-align: center;
+}
+
+.pullquote {
+  font-family: var(--cinzel);
+  font-size: clamp(24px, 3.5vw, 38px);
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.65;
+  color: var(--text-dim);
+  position: relative;
+  margin-bottom: 36px;
+}
+
+.pullquote::before {
+  content: '"';
+  font-size: 100px;
+  color: rgba(212,175,95,0.08);
+  font-family: var(--cinzel);
+  position: absolute;
+  top: -28px;
+  left: -20px;
+  line-height: 1;
+}
+
+.pullquote em { color: var(--text); font-style: italic; }
+
+/* ── THE WORK ── */
+.work-section {
+  padding: 120px 0;
+  background: var(--deep);
+  border-top: 0.5px solid var(--border);
+}
+
+.work-inner {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 0 52px;
+}
+
+.work-header {
+  max-width: 560px;
+  margin-bottom: 72px;
+}
+
+.section-eyebrow {
+  font-family: var(--sans);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 20px;
+}
+
+.section-heading {
+  font-family: var(--cinzel);
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 300;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.section-heading em {
+  font-style: italic;
+  color: var(--gold-pale);
+}
+
+.work-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 0.5px solid var(--border);
+}
+
+.work-item {
+  padding: 36px 32px;
+  border-right: 0.5px solid var(--border);
+  transition: background 0.3s;
+}
+
+.work-item:last-child { border-right: none; }
+.work-item:hover { background: rgba(212,175,95,0.025); }
+
+.work-item-label {
+  font-family: var(--sans);
+  font-size: 7px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  display: block;
+  margin-bottom: 16px;
+}
+
+.work-item-title {
+  font-family: var(--cinzel);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--text);
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+
+.work-item-body {
+  font-family: var(--cinzel);
+  font-size: 14px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+
+/* ── MEDIA / CONTACT ── */
+.contact-section {
+  padding: 120px 0;
+  background: var(--void);
+  border-top: 0.5px solid var(--border);
+}
+
+.contact-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 52px;
+  text-align: center;
+}
+
+.contact-seal {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  opacity: 0.22;
+  margin-bottom: 36px;
+  filter: drop-shadow(0 0 8px rgba(212,175,95,0.25));
+}
+
+.contact-heading {
+  font-family: var(--cinzel);
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 300;
+  color: var(--text);
+  margin-bottom: 20px;
+  line-height: 1.2;
+}
+
+.contact-heading em {
+  font-style: italic;
+  color: var(--gold-pale);
+}
+
+.contact-body {
+  font-family: var(--cinzel);
+  font-size: 17px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text-dim);
+  line-height: 1.85;
+  margin-bottom: 48px;
+}
+
+.contact-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold-pale);
+  text-decoration: none;
+  border: 0.5px solid var(--border-lit);
+  padding: 16px 36px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.contact-link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gold-glow);
+  transform: translateX(-100%);
+  transition: transform 0.4s ease;
+}
+
+.contact-link:hover::before { transform: translateX(0); }
+.contact-link:hover { border-color: var(--gold); }
+
+.contact-note {
+  font-family: var(--cinzel);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-top: 24px;
+  line-height: 1.6;
+}
+
+/* ── FOOTER ── */
+footer {
+  padding: 40px 52px;
+  border-top: 0.5px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--void);
+}
+
+.footer-mark {
+  font-family: var(--cinzel);
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.footer-copy {
+  font-family: var(--sans);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+}
+
+.footer-links {
+  display: flex;
+  gap: 28px;
+  list-style: none;
+}
+
+.footer-links a {
+  font-family: var(--sans);
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.footer-links a:hover { color: var(--gold-pale); }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.85s ease, transform 0.85s ease;
+}
+
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal-delay-1 { transition-delay: 0.15s; }
+.reveal-delay-2 { transition-delay: 0.3s; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  nav { padding: 20px 28px; }
+  .nav-links { display: none; }
+  .hero-inner { grid-template-columns: 1fr; gap: 52px; }
+  .author-photo { max-width: 100%; }
+  .work-grid { grid-template-columns: 1fr; }
+  .work-item { border-right: none; border-bottom: 0.5px solid var(--border); }
+  .work-item:last-child { border-bottom: none; }
+  .statement-inner,
+  .pullquote-inner,
+  .work-inner,
+  .contact-inner { padding: 0 28px; }
+  .author-hero { padding: 120px 28px 80px; }
+  footer { flex-direction: column; gap: 20px; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <a href="/index.html" class="nav-mark">
+    <img src="ThePrism.png" alt="The Prism">
+    <span class="nav-mark-text">The <span>Prism</span></span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="/index.html#what">The Framework</a></li>
+    <li><a href="/index.html#interpreter">The Interpreter</a></li>
+    <li><a href="/index.html#book">The Book</a></li>
+    <li><a href="/author.html" class="active">The Author</a></li>
+  </ul>
+  <a href="/qt.html" class="nav-cta">Open the Interpreter →</a>
+</nav>
+
+<!-- ── HERO ── -->
+<section class="author-hero">
+
+  <!-- Starfield -->
+  <svg class="starfield" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+    <rect width="1440" height="900" fill="#0e0b18"/>
+    <g fill="white">
+      <circle cx="72"  cy="88"  r="0.7" opacity="0.45"/>
+      <circle cx="310" cy="44"  r="0.4" opacity="0.35"/>
+      <circle cx="580" cy="28"  r="0.8" opacity="0.5"/>
+      <circle cx="820" cy="65"  r="0.5" opacity="0.4"/>
+      <circle cx="1060" cy="82" r="0.7" opacity="0.45"/>
+      <circle cx="1280" cy="38" r="0.4" opacity="0.35"/>
+      <circle cx="1400" cy="110" r="0.6" opacity="0.4"/>
+      <circle cx="140" cy="220" r="0.6" opacity="0.4"/>
+      <circle cx="390" cy="188" r="0.9" opacity="0.45"/>
+      <circle cx="650" cy="160" r="0.4" opacity="0.35"/>
+      <circle cx="900" cy="200" r="0.7" opacity="0.4"/>
+      <circle cx="1140" cy="175" r="0.5" opacity="0.38"/>
+      <circle cx="1360" cy="215" r="0.8" opacity="0.45"/>
+      <circle cx="55"  cy="400" r="0.5" opacity="0.35"/>
+      <circle cx="480" cy="360" r="0.7" opacity="0.4"/>
+      <circle cx="760" cy="320" r="0.4" opacity="0.35"/>
+      <circle cx="1100" cy="380" r="0.6" opacity="0.38"/>
+      <circle cx="1420" cy="350" r="0.4" opacity="0.35"/>
+      <circle cx="200" cy="580" r="0.7" opacity="0.4"/>
+      <circle cx="460" cy="540" r="0.4" opacity="0.35"/>
+      <circle cx="720" cy="600" r="0.9" opacity="0.45"/>
+      <circle cx="980" cy="560" r="0.5" opacity="0.38"/>
+      <circle cx="1260" cy="590" r="0.7" opacity="0.4"/>
+      <circle cx="100" cy="740" r="0.5" opacity="0.35"/>
+      <circle cx="380" cy="760" r="0.7" opacity="0.4"/>
+      <circle cx="640" cy="720" r="0.4" opacity="0.35"/>
+      <circle cx="900" cy="780" r="0.8" opacity="0.45"/>
+      <circle cx="1180" cy="745" r="0.5" opacity="0.38"/>
+      <circle cx="1390" cy="770" r="0.6" opacity="0.4"/>
+    </g>
+    <g fill="rgba(212,175,95,0.45)">
+      <circle cx="290" cy="130" r="1.1"/>
+      <circle cx="1160" cy="210" r="1.3"/>
+      <circle cx="700"  cy="420" r="0.9"/>
+      <circle cx="110"  cy="610" r="1.0"/>
+      <circle cx="1380" cy="500" r="1.1"/>
+    </g>
+  </svg>
+
+  <div class="hero-rule"></div>
+
+  <div class="hero-inner">
+
+    <!-- Photo -->
+    <div class="author-photo-wrap">
+      <img src="keenan2.jpeg" alt="Keenan D. Hogg" class="author-photo">
+    </div>
+
+    <!-- Content -->
+    <div class="author-content">
+      <p class="author-eyebrow">The Author</p>
+      <h1 class="author-name">Keenan D. Hogg</h1>
+      <p class="author-title">Architect · Author · Builder</p>
+      <div class="author-rule"></div>
+      <p class="author-opening">
+        I was raised Catholic. Then I encountered something the institution hadn't prepared me for —
+        the possibility of an actual <em>relationship</em> with God, rather than a system
+        for managing the distance between us.
+        That distinction never left me.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── STATEMENT ── -->
+<section class="statement-section">
+  <div class="statement-inner">
+
+    <div class="statement-block reveal">
+      <span class="statement-num">01 · On Faith</span>
+      <h2 class="statement-heading">I don't believe you have to check your brain<br>at the door <em>prior</em> to entering faith.</h2>
+      <p class="statement-body">
+        That framing — reason on one side, faith on the other — is itself the problem. It's a category error that has cost both sides enormously. The scientist who dismisses faith as pre-rational and the believer who dismisses science as spiritually irrelevant are operating from the same false architecture.
+      </p>
+      <p class="statement-body">
+        Faith is not the suspension of reason. It is reason operating beyond the boundary of what it can independently verify. Everyone does this. Every single day. The question is never whether you have faith — it's whether what you have faith in corresponds to reality.
+      </p>
+    </div>
+
+    <div class="statement-block reveal reveal-delay-1">
+      <span class="statement-num">02 · On Reality</span>
+      <h2 class="statement-heading">Everyone has faith in something.<br>But is that something <em>real?</em></h2>
+      <p class="statement-body">
+        The physicist has faith in the consistency of mathematical structure. The materialist has faith that the physical is all there is. The skeptic has faith in the reliability of their own skepticism. None of these are self-evident. All of them are commitments made in the absence of absolute proof.
+      </p>
+      <p class="statement-body">
+        How would we know if our faith corresponds to reality if we don't truly understand reality? That question is not rhetorical. It is the most important question a person can ask — and it is the question The Prism was built to help examine.
+      </p>
+    </div>
+
+    <div class="statement-block reveal reveal-delay-2">
+      <span class="statement-num">03 · On The Framework</span>
+      <h2 class="statement-heading">The Prism is not an answer.<br>It is a <em>lens.</em></h2>
+      <p class="statement-body">
+        I spent years watching people argue about conclusions while operating with incompatible frameworks for understanding reality. The conversation never moved because the lens was never examined. I built The Prism to examine the lens — to make visible the relational architecture that physics, philosophy, and the oldest textual tradition all converge on independently.
+      </p>
+      <p class="statement-body">
+        The framework does not tell you what to conclude. It reveals what the structure of reality actually requires — and invites you to reckon with that on your own terms.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── PULL QUOTE ── -->
+<section class="pullquote-section">
+  <div class="pullquote-inner reveal">
+    <p class="pullquote">
+      What if the questions you couldn't resolve weren't wrong —
+      but <em>the lens was?</em>
+    </p>
+    <span style="font-family:var(--sans); font-size:8px; letter-spacing:0.3em; text-transform:uppercase; color:var(--text-muted);">— The Prism · Echad B'Emet</span>
+  </div>
+</section>
+
+<!-- ── THE WORK ── -->
+<section class="work-section">
+  <div class="work-inner">
+    <div class="work-header reveal">
+      <p class="section-eyebrow">The Work</p>
+      <h2 class="section-heading">Three bodies of work.<br>One <em>coherent</em> architecture.</h2>
+    </div>
+    <div class="work-grid">
+      <div class="work-item reveal">
+        <span class="work-item-label">Book One · Available Now</span>
+        <div class="work-item-title">Relational Coherence Theory</div>
+        <p class="work-item-body">I needed a framework that could describe what systems actually do under pressure — without smuggling in conclusions. RCT is that framework. It maps how coherence forms, how tension accumulates, and how collapse becomes inevitable when the underlying relational architecture degrades. No prescription. No theology. Just structure. It's the diagnostic lens — and it's the foundation everything else is built on.</p>
+        <a href="/coming-soon.html" style="display:inline-block; margin-top:16px; font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit); padding-bottom:2px; transition:color 0.3s, border-color 0.3s;" onmouseover="this.style.color='var(--gold-pale)'; this.style.borderColor='var(--gold)'" onmouseout="this.style.color='var(--gold)'; this.style.borderColor='var(--border-lit)'">Order on Amazon →</a>
+      </div>
+      <div class="work-item reveal reveal-delay-1">
+        <span class="work-item-label">Book Two</span>
+        <div class="work-item-title">The Prism · Echad B'Emet</div>
+        <p class="work-item-body">RCT terminates at a boundary it cannot cross on its own warrant. The Prism picks up exactly there. This is where I recover Hebraic relational ontology from beneath centuries of Greek philosophical overlay — and make the case that what physics is describing and what the oldest textual tradition has always described are pointing at the same thing. A different category of warrant. The same architecture.</p>
+      </div>
+      <div class="work-item reveal reveal-delay-2">
+        <span class="work-item-label">The Application</span>
+        <div class="work-item-title">The Prism Interpreter</div>
+        <p class="work-item-body">I built the Interpreter because the framework needed to engage the world in real time — not just sit in a book. Submit any verse, phrase, theme, or concept and it runs it through five structured lenses. It doesn't tell you what to conclude. It shows you what the structure of the text actually contains. The instrument through which the work becomes active.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CONTACT / MEDIA ── -->
+<section class="contact-section">
+  <div class="contact-inner reveal">
+    <img src="ThePrism.png" alt="" aria-hidden="true" class="contact-seal">
+    <h2 class="contact-heading">Media &amp; <em>Speaking</em></h2>
+    <p class="contact-body">
+      Available for podcast conversations, interviews, and speaking engagements on the intersection of physics, philosophy, and faith. The framework is the subject — not the biography.
+    </p>
+    <div class="contact-options">
+      <a href="mailto:support@theprism.io?subject=Media%20Inquiry" class="contact-link">
+        Media Inquiry →
+      </a>
+      <a href="mailto:support@theprism.io?subject=Speaking%20Inquiry" class="contact-link">
+        Speaking Inquiry →
+      </a>
+    </div>
+    <p class="contact-note">
+      For general questions about The Prism or the Interpreter,<br>
+      contact <a href="mailto:support@theprism.io" style="color:var(--gold-dim); text-decoration:none;">support@theprism.io</a>
+    </p>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <a href="/index.html" class="footer-mark">The Prism</a>
+  <div class="footer-copy">OPNX LLC &nbsp;·&nbsp; © 2025 All Rights Reserved</div>
+  <ul class="footer-links">
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="mailto:support@theprism.io">Support</a></li>
+  </ul>
+</footer>
+
+<script>
+const revealEls = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1 });
+
+revealEls.forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
