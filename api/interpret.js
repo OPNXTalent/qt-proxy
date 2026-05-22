@@ -630,21 +630,56 @@ async function resetQueryLog(ip) {
 }
 
 // ── PRE-FLIGHT SUBSCRIBER QUOTA CHECK ────────────────────────────────────────
+async function getLiveQueryCount(userId) {
+  // Read live query count directly from query_log rather than the
+  // stale cached value on the subscriber record.
+  try {
+    const now = new Date();
+    const cycleStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/query_log?user_id=eq.${encodeURIComponent(userId)}&created_at=gte.${encodeURIComponent(cycleStart)}&select=id`,
+      {
+        headers: {
+          'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Prefer':        'count=exact',
+          'Range-Unit':    'items',
+          'Range':         '0-0'
+        }
+      }
+    );
+    const countHeader = res.headers.get('content-range');
+    // content-range: 0-0/N  — extract N
+    if (countHeader) {
+      const match = countHeader.match(/\/(\d+)$/);
+      if (match) return parseInt(match[1], 10);
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data.length : 0;
+  } catch {
+    // Fallback to stale value if live count fails
+    return null;
+  }
+}
+
 async function checkSubscriberQuota(subscriber) {
   const tier = normalizeTier(subscriber.tier);
   const limit = TIER_LIMITS[tier];
 
-  // No limit defined for this tier (e.g. free) — allow
+  // No limit defined for this tier — allow
   if (limit === null || limit === undefined) return { allowed: true };
 
-  const used = subscriber.query_count || 0;
-  if (used < limit) return { allowed: true };
+  // Prefer live count from query_log over stale subscriber.query_count
+  const liveCount = await getLiveQueryCount(subscriber.id);
+  const used = liveCount !== null ? liveCount : (subscriber.query_count || 0);
 
-  // Over limit — check purchased_credits
+  if (used < limit) return { allowed: true, queriesUsed: used };
+
+  // Over limit — check purchased_credits / banked queries
   const credits = subscriber.purchased_credits || 0;
   if (credits > 0) {
     const drawn = await drawSignalSessionCredit(subscriber.id);
-    if (drawn) return { allowed: true, creditsUsed: true };
+    if (drawn) return { allowed: true, creditsUsed: true, queriesUsed: used };
   }
 
   return {
@@ -773,6 +808,27 @@ async function saveThread({ userId, query, queryType, response, tier }) {
 // ── SUBSCRIBER QUERY COUNT ────────────────────────────────────────────────────
 async function updateQueryCount({ userId, tier, threadId }) {
   try {
+    // 1. Write to query_log — the authoritative usage record
+    await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
+      },
+      body: JSON.stringify({
+        user_id:        userId,
+        thread_id:      threadId || null,
+        query_type:     'subscriber',
+        credit_source:  'tier_allocation',
+        cost:           1,
+        channel_context:'solo'
+      })
+    });
+
+    // 2. Also attempt draw_query RPC to keep subscriber.query_count in sync
+    //    Non-blocking — query_log is the source of truth for quota checks
     const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_query`, {
       method: 'POST',
       headers: {
@@ -785,27 +841,12 @@ async function updateQueryCount({ userId, tier, threadId }) {
 
     if (!rpcRes.ok) {
       const err = await rpcRes.text();
+      // Log but don't fail — query_log already recorded the usage
       if (!err.includes('INSUFFICIENT_QUERIES')) {
-        console.error('draw_query failed:', err);
+        console.error('draw_query RPC failed (non-blocking):', err);
       }
-      return;
     }
 
-    if (threadId) {
-      await fetch(
-        `${SUPABASE_URL}/rest/v1/query_log?user_id=eq.${userId}&thread_id=is.null&order=created_at.desc&limit=1`,
-        {
-          method: 'PATCH',
-          headers: {
-            'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            'Content-Type':  'application/json',
-            'Prefer':        'return=minimal'
-          },
-          body: JSON.stringify({ thread_id: threadId })
-        }
-      );
-    }
   } catch (err) {
     console.error('updateQueryCount error:', err.message);
   }
