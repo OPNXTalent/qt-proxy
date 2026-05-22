@@ -479,8 +479,8 @@ Respond only with a valid JSON object. No preamble, no markdown, no explanation 
     "A second specific door. Name something that was opened but not walked through. Example: 'Job asked the same thing from the ash heap. Want to go there?'",
     "A third specific door, optional. Only include if genuinely present. May be omitted — return only 2 if only 2 threads are honest."
   ],
-  "verse_identified": "Book Chapter:Verse (e.g. Isaiah 45:7). Empty string if not applicable.",
-  "verse_text": "The full verse text. Empty string if not applicable.",
+  "verse_identified": "Book Chapter:Verse (e.g. Isaiah 45:7). For Quran references use format 'Quran 2:255'. Empty string if not applicable.",
+  "verse_text": "The full verse text for canonical Biblical passages only (Hebrew Bible / Old Testament, New Testament, Deuterocanonical/Apocrypha). For Quran references, return an EMPTY STRING — the text will be fetched from a verified source. Do not attempt to supply Quran text. Empty string if not applicable.",
   "prism_summary": "Section 00 — Echad b'Emet. Core reframing. Terminology emerges only after recognition is established. Depth governed by weight profile.",
   "entanglement": "Section 01 — God's initiating relational contact. Ground in narrative or concrete moment before ontology. Depth governed by weight profile.",
   "coherence_alignment": "Section 02 — What alignment looks like in the relational field. Depth governed by weight profile.",
@@ -1047,6 +1047,54 @@ async function registerEmail({ email, shareId }) {
 }
 
 
+// ── VERSE TEXT FETCHER ────────────────────────────────────────────────────────
+// Fetches authoritative verse text from public APIs.
+// Returns { text, source } or null if not found / not applicable.
+async function fetchVerseText(verseIdentified) {
+  if (!verseIdentified || !verseIdentified.trim()) return null;
+
+  const ref = verseIdentified.trim();
+
+  // ── Quran ─────────────────────────────────────────────────────────────────
+  // Matches: "Quran 2:255", "Surah Al-Kahf, Verse 16", "Surah 18:16"
+  const quranExplicit = ref.match(/^quran\s+(\d+):(\d+)$/i);
+  const surahVerse    = ref.match(/^surah\s+[\w\s-]+,\s*verse\s+(\d+)$/i);
+  const surahNumeric  = ref.match(/^surah\s+(\d+):(\d+)$/i);
+
+  if (quranExplicit || surahNumeric) {
+    const [, surah, ayah] = quranExplicit || surahNumeric;
+    try {
+      const r = await fetch(
+        `https://api.quran.com/api/v4/verses/by_key/${surah}:${ayah}?translations=131&fields=text_uthmani`,
+        { headers: { Accept: 'application/json' } }
+      );
+      if (r.ok) {
+        const data = await r.json();
+        const arabic  = data?.verse?.text_uthmani || '';
+        const english = data?.verse?.translations?.[0]?.text || '';
+        // Strip HTML tags from translation
+        const clean = english.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+        if (clean) return { text: clean, arabic, source: 'quran.com' };
+      }
+    } catch (e) {
+      console.error('Quran API fetch failed:', e.message);
+    }
+    return null;
+  }
+
+  // Named Surah + verse number (e.g. "Surah Al-Kahf, Verse 16")
+  // We can't reliably map names → numbers server-side without a lookup table,
+  // so return null and let the AI-supplied text stand (it's usually correct for
+  // named surahs; the problem was specific to numbered Quran references).
+
+  // ── Bible (ESV via bible-api.com — no key required) ──────────────────────
+  // Only runs if verse_text was already empty (shouldn't happen for Bible,
+  // but acts as a safety net).
+  // We skip this for now to avoid double-fetching when AI text is fine.
+
+  return null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -1327,6 +1375,35 @@ export default async function handler(req, res) {
                 }
               } catch {}
             }
+          }
+        }
+
+        // ── VERSE TEXT PATCH ────────────────────────────────────────────────
+        // If the AI left verse_text empty (e.g. Quran references), fetch it
+        // from an authoritative API and emit a patch event so the frontend
+        // can display the correct text without re-requesting.
+        if (streamDone) {
+          try {
+            const parsed = JSON.parse(fullResponse);
+            if (parsed?.verse_identified && !parsed?.verse_text) {
+              const fetched = await fetchVerseText(parsed.verse_identified);
+              if (fetched) {
+                // Patch the fullResponse so it's saved correctly to the thread
+                parsed.verse_text = fetched.text;
+                if (fetched.arabic) parsed.verse_text_arabic = fetched.arabic;
+                fullResponse = JSON.stringify(parsed);
+                // Emit a patch event to the frontend
+                res.write(`data: ${JSON.stringify({
+                  type:    'verse_patch',
+                  verse_identified: parsed.verse_identified,
+                  verse_text:       fetched.text,
+                  verse_text_arabic: fetched.arabic || '',
+                  source:           fetched.source,
+                })}\n\n`);
+              }
+            }
+          } catch {
+            // Non-blocking — if parse fails, continue without patch
           }
         }
 
