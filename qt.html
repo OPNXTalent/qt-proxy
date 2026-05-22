@@ -143,11 +143,11 @@
   .thread-subtitle { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .thread-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .thread-date { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--text-muted); }
-  .thread-badge { font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 2px 6px; border: 1px solid; white-space: nowrap; }
-  .badge-ok     { color: var(--gold-dim); border-color: var(--gold-dim); background: rgba(201,168,76,0.05); }
-  .badge-warn   { color: #c08040; border-color: #8a5a28; background: rgba(192,128,64,0.08); }
-  .badge-urgent { color: #b85c5c; border-color: #8a3a3a; background: rgba(184,92,92,0.08); }
-  .badge-expired{ color: var(--text-muted); border-color: var(--border); }
+  .thread-badge { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border: none; white-space: nowrap; font-weight: 400; color: #ffffff; }
+  .badge-ok     { background: rgba(201,168,76,0.25); }
+  .badge-warn   { background: rgba(212,137,74,0.3); }
+  .badge-urgent { background: rgba(192,60,60,0.35); }
+  .badge-expired{ background: rgba(60,58,74,0.4); }
   .badge-locked { color: var(--text-muted); border-color: var(--border); font-size: 10px; }
 
   .thread-rename-wrap { display: none; padding: 8px 20px 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
@@ -2323,12 +2323,18 @@ function getActualTier() {
   var urlParams = new URLSearchParams(window.location.search);
   var userEmail = localStorage.getItem('qt_user_email');
 
-  // If URL has a paid tier and email is present — clear anon flag, honor paid tier
+  // If URL has a paid tier — honor it and ensure email is captured
   var tierParam = urlParams.get('tier');
-  if (tierParam && tierParam !== 'free' && TIER_RETENTION[tierParam] && userEmail) {
+  if (tierParam && tierParam !== 'free' && TIER_RETENTION[tierParam]) {
     sessionStorage.removeItem('qt_anon_mode');
     sessionStorage.removeItem('qt_anon');
     localStorage.setItem('qt_user_tier', tierParam);
+    if (userEmail) {
+      return tierParam;
+    }
+    // Paid tier present but no email stored — prompt on next tick
+    // so the app can finish initializing before the modal appears
+    setTimeout(function() { promptEmailForTier(tierParam); }, 800);
     return tierParam;
   }
 
@@ -2349,6 +2355,54 @@ function getActualTier() {
 var CURRENT_TIER = getActualTier();
 // Persist tier to localStorage so it survives navigation
 if (CURRENT_TIER !== 'free') localStorage.setItem('qt_user_tier', CURRENT_TIER);
+
+// ── EMAIL PROMPT FOR TIER ACCESS ──────────────────────────────────────────────
+function promptEmailForTier(tier) {
+  // Only show if email still missing after load
+  if (localStorage.getItem('qt_user_email')) return;
+  var modal = document.getElementById('emailForTierModal');
+  if (modal) { modal.style.display = 'flex'; return; }
+
+  // Build modal inline
+  var overlay = document.createElement('div');
+  overlay.id = 'emailForTierModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,6,10,0.92);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);';
+  var mh = '<div style="background:var(--deep);border:1px solid var(--border);padding:44px 40px;max-width:420px;width:90%;position:relative;">';
+  mh += '<div style="font-family:var(--cinzel);font-size:14px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-pale);margin-bottom:10px;">Welcome Back</div>';
+  mh += '<div style="font-family:var(--crimson);font-style:italic;font-size:17px;color:var(--text-dim);line-height:1.7;margin-bottom:24px;">Your email is how we hold your place. Without it, your session history disappears when you close the tab.</div>';
+  mh += '<input id="tierEmailInput" type="email" placeholder="your@email.com" autocomplete="email" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:16px;padding:13px 16px;outline:none;transition:border-color 0.2s;margin-bottom:12px;" />';
+  mh += '<div id="tierEmailStatus" style="display:none;font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:#b85c5c;margin-bottom:12px;"></div>';
+  mh += '<div style="display:flex;gap:10px;justify-content:flex-end;">';
+  mh += '<button onclick="document.getElementById(\'emailForTierModal\').style.display=\'none\'" style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;padding:10px 18px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">Later</button>';
+  mh += '<button onclick="submitTierEmail()" style="font-family:var(--cinzel);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;padding:10px 24px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;">Continue →</button>';
+  mh += '</div></div>';
+  overlay.innerHTML = mh;
+  setTimeout(function() {
+    var inp = document.getElementById('tierEmailInput');
+    if (inp) {
+      inp.focus();
+      inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') submitTierEmail(); });
+    }
+  }, 100);
+}
+
+function submitTierEmail() {
+  var inp = document.getElementById('tierEmailInput');
+  var statusEl = document.getElementById('tierEmailStatus');
+  if (!inp) return;
+  var email = inp.value.trim();
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(email)) {
+    if (statusEl) { statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; }
+    return;
+  }
+  localStorage.setItem('qt_user_email', email);
+  // Refresh so subscriber path fires correctly with email now in storage
+  var modal = document.getElementById('emailForTierModal');
+  if (modal) modal.style.display = 'none';
+  // Reload threads so sidebar populates under the correct identity
+  if (typeof loadUserThreads === 'function') loadUserThreads();
+}
 
 let activeThreadId = null;
 
