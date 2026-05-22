@@ -135,17 +135,19 @@
   .thread-item { padding: 12px 20px; border-bottom: 1px solid rgba(42,42,64,0.5); cursor: pointer; transition: background 0.15s; position: relative; }
   .thread-item:hover { background: rgba(255,255,255,0.02); }
   .thread-item.active { background: rgba(201,168,76,0.05); border-left: 2px solid var(--gold-dim); padding-left: 18px; }
+  .thread-item.collab-open { border-left: 2px solid rgba(80,180,120,0.6); background: rgba(80,180,120,0.03); padding-left: 18px; }
+  .thread-item.collab-open.active { border-left: 2px solid rgba(80,180,120,0.8); background: rgba(80,180,120,0.06); }
   .thread-item.locked { cursor: default; }
   .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text); line-height: 1.4; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 52px; }
   .thread-item.locked .thread-title { color: var(--text-muted); }
   .thread-subtitle { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .thread-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .thread-date { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--text-muted); }
-  .thread-badge { font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 2px 6px; border: 1px solid; white-space: nowrap; }
-  .badge-ok     { color: var(--gold-dim); border-color: var(--gold-dim); background: rgba(201,168,76,0.05); }
-  .badge-warn   { color: #c08040; border-color: #8a5a28; background: rgba(192,128,64,0.08); }
-  .badge-urgent { color: #b85c5c; border-color: #8a3a3a; background: rgba(184,92,92,0.08); }
-  .badge-expired{ color: var(--text-muted); border-color: var(--border); }
+  .thread-badge { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border: none; white-space: nowrap; font-weight: 400; color: #ffffff; }
+  .badge-ok     { background: rgba(201,168,76,0.25); }
+  .badge-warn   { background: rgba(212,137,74,0.3); }
+  .badge-urgent { background: rgba(192,60,60,0.35); }
+  .badge-expired{ background: rgba(60,58,74,0.4); }
   .badge-locked { color: var(--text-muted); border-color: var(--border); font-size: 10px; }
 
   .thread-rename-wrap { display: none; padding: 8px 20px 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
@@ -1028,6 +1030,10 @@
         <button onclick="downloadPDF('dark')" style="font-family:var(--cinzel); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">↓ Dark Version</button>
         <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Print Version</button>
         <button onclick="openShareModal()" style="font-family:var(--cinzel); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">⟳ Share</button>
+      </div>
+      <div id="collabToggleRow" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+        <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px;">Shared Session</div>
+        <button id="collabToggleBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:9px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;">Collaboration Closed</button>
       </div>
     </div>
 
@@ -2125,9 +2131,20 @@ function resetForm() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Enter key submits
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.ctrlKey) runInterpretation();
+// Enter key submits — plain Enter on main input and follow-up input
+// Shift+Enter inserts a newline (standard textarea behaviour preserved)
+document.getElementById('userInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    runInterpretation();
+  }
+});
+
+document.getElementById('followUpInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    runFollowUp();
+  }
 });
 
 // ── VOICE / MIC ──────────────────────────────────────────────────────────────
@@ -2306,12 +2323,18 @@ function getActualTier() {
   var urlParams = new URLSearchParams(window.location.search);
   var userEmail = localStorage.getItem('qt_user_email');
 
-  // If URL has a paid tier and email is present — clear anon flag, honor paid tier
+  // If URL has a paid tier — honor it and ensure email is captured
   var tierParam = urlParams.get('tier');
-  if (tierParam && tierParam !== 'free' && TIER_RETENTION[tierParam] && userEmail) {
+  if (tierParam && tierParam !== 'free' && TIER_RETENTION[tierParam]) {
     sessionStorage.removeItem('qt_anon_mode');
     sessionStorage.removeItem('qt_anon');
     localStorage.setItem('qt_user_tier', tierParam);
+    if (userEmail) {
+      return tierParam;
+    }
+    // Paid tier present but no email stored — prompt on next tick
+    // so the app can finish initializing before the modal appears
+    setTimeout(function() { promptEmailForTier(tierParam); }, 800);
     return tierParam;
   }
 
@@ -2332,6 +2355,54 @@ function getActualTier() {
 var CURRENT_TIER = getActualTier();
 // Persist tier to localStorage so it survives navigation
 if (CURRENT_TIER !== 'free') localStorage.setItem('qt_user_tier', CURRENT_TIER);
+
+// ── EMAIL PROMPT FOR TIER ACCESS ──────────────────────────────────────────────
+function promptEmailForTier(tier) {
+  // Only show if email still missing after load
+  if (localStorage.getItem('qt_user_email')) return;
+  var modal = document.getElementById('emailForTierModal');
+  if (modal) { modal.style.display = 'flex'; return; }
+
+  // Build modal inline
+  var overlay = document.createElement('div');
+  overlay.id = 'emailForTierModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,6,10,0.92);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);';
+  var mh = '<div style="background:var(--deep);border:1px solid var(--border);padding:44px 40px;max-width:420px;width:90%;position:relative;">';
+  mh += '<div style="font-family:var(--cinzel);font-size:14px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-pale);margin-bottom:10px;">Welcome Back</div>';
+  mh += '<div style="font-family:var(--crimson);font-style:italic;font-size:17px;color:var(--text-dim);line-height:1.7;margin-bottom:24px;">Your email is how we hold your place. Without it, your session history disappears when you close the tab.</div>';
+  mh += '<input id="tierEmailInput" type="email" placeholder="your@email.com" autocomplete="email" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:16px;padding:13px 16px;outline:none;transition:border-color 0.2s;margin-bottom:12px;" />';
+  mh += '<div id="tierEmailStatus" style="display:none;font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:#b85c5c;margin-bottom:12px;"></div>';
+  mh += '<div style="display:flex;gap:10px;justify-content:flex-end;">';
+  mh += '<button onclick="document.getElementById(\'emailForTierModal\').style.display=\'none\'" style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;padding:10px 18px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">Later</button>';
+  mh += '<button onclick="submitTierEmail()" style="font-family:var(--cinzel);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;padding:10px 24px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;">Continue →</button>';
+  mh += '</div></div>';
+  overlay.innerHTML = mh;
+  setTimeout(function() {
+    var inp = document.getElementById('tierEmailInput');
+    if (inp) {
+      inp.focus();
+      inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') submitTierEmail(); });
+    }
+  }, 100);
+}
+
+function submitTierEmail() {
+  var inp = document.getElementById('tierEmailInput');
+  var statusEl = document.getElementById('tierEmailStatus');
+  if (!inp) return;
+  var email = inp.value.trim();
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(email)) {
+    if (statusEl) { statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; }
+    return;
+  }
+  localStorage.setItem('qt_user_email', email);
+  // Refresh so subscriber path fires correctly with email now in storage
+  var modal = document.getElementById('emailForTierModal');
+  if (modal) modal.style.display = 'none';
+  // Reload threads so sidebar populates under the correct identity
+  if (typeof loadUserThreads === 'function') loadUserThreads();
+}
 
 let activeThreadId = null;
 
@@ -2377,7 +2448,9 @@ function renderThreads(threads) {
     var daysLeft = thread.daysLeft != null ? thread.daysLeft : 90;
 
     var item = document.createElement('div');
-    item.className = 'thread-item' + (isActive ? ' active' : '') + (isLocked ? ' locked' : '');
+    var collabOpen = thread.collaboration_open || false;
+    var collabClass = collabOpen ? ' collab-open' : '';
+    item.className = 'thread-item' + (isActive ? ' active' : '') + (isLocked ? ' locked' : '') + collabClass;
     item.id = 'ti-' + thread.id;
     item.title = 'Double-click to rename';
     item.addEventListener('click', (function(id) { return function() { selectThread(id); }; })(thread.id));
@@ -2918,82 +2991,244 @@ async function handleLogout() {
 
 /* ── SHARE MODAL ── */
 
+// ── PHASE 2 SHARE SYSTEM ──────────────────────────────────────────────────────
+
+var _shareMode = 'personal'; // 'personal' | 'collab'
+var _currentSharedSessionId = null; // set after share created
+var _collabOpen = false; // current collaboration state
+
 function openShareModal() {
+  if (!window._lastParsedResult) return;
+  _shareMode = 'personal';
+  selectShareMode('personal');
+  document.getElementById('shareStep1').style.display = 'block';
+  document.getElementById('shareStep2').style.display = 'none';
   document.getElementById('shareModal').style.display = 'flex';
-  document.getElementById('shareRecipientEmail').value = '';
-  document.getElementById('shareModalStatus').textContent = '';
-  document.getElementById('shareModalStatus').style.display = 'none';
-  document.getElementById('shareModalBtn').disabled = false;
-  document.getElementById('shareRecipientEmail').focus();
 }
 
 function closeShareModal() {
   document.getElementById('shareModal').style.display = 'none';
 }
 
-async function submitShare() {
-  var recipientEmail = document.getElementById('shareRecipientEmail').value.trim();
+function selectShareMode(mode) {
+  _shareMode = mode;
+  var personal = document.getElementById('shareModePersonal');
+  var collab   = document.getElementById('shareModeCollab');
+  if (!personal || !collab) return;
+  if (mode === 'personal') {
+    personal.style.borderColor = 'var(--gold-dim)';
+    personal.style.background  = 'rgba(201,168,76,0.04)';
+    personal.querySelector('div').style.color = 'var(--gold-pale)';
+    collab.style.borderColor = 'var(--border)';
+    collab.style.background  = 'transparent';
+    collab.querySelector('div').style.color = 'var(--text-dim)';
+  } else {
+    collab.style.borderColor = 'rgba(80,180,120,0.6)';
+    collab.style.background  = 'rgba(80,180,120,0.04)';
+    collab.querySelector('div').style.color = 'rgba(80,180,120,0.9)';
+    personal.style.borderColor = 'var(--border)';
+    personal.style.background  = 'transparent';
+    personal.querySelector('div').style.color = 'var(--text-dim)';
+  }
+}
+
+async function proceedToShareDelivery() {
+  if (!window._lastParsedResult) return;
+  // Create the shared session record first, get back a share ID
   var statusEl = document.getElementById('shareModalStatus');
-  var btn = document.getElementById('shareModalBtn');
-
-  if (!recipientEmail) {
-    statusEl.textContent = 'Please enter an email address.';
-    statusEl.style.color = '#b85c5c';
-    statusEl.style.display = 'block';
-    return;
-  }
-
-  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRe.test(recipientEmail)) {
-    statusEl.textContent = 'Please enter a valid email address.';
-    statusEl.style.color = '#b85c5c';
-    statusEl.style.display = 'block';
-    return;
-  }
-
-  // Get current parsed result from resultContent — stored globally at render time
-  if (!window._lastParsedResult) {
-    statusEl.textContent = 'No interpretation to share. Run a query first.';
-    statusEl.style.color = '#b85c5c';
-    statusEl.style.display = 'block';
-    return;
-  }
-
-  btn.disabled = true;
-  statusEl.textContent = 'Sending…';
-  statusEl.style.color = 'var(--text-muted)';
-  statusEl.style.display = 'block';
-
-  var senderEmail = localStorage.getItem('qt_user_email') || 'anonymous@theprism.io';
   var snapshot = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
+  var senderEmail = localStorage.getItem('qt_user_email') || null;
+  var threadId = activeThreadId || null;
 
   try {
     var res = await fetch('/api/share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ senderEmail: senderEmail, recipientEmail: recipientEmail, snapshot: snapshot })
+      body: JSON.stringify({
+        snapshot,
+        subject: currentSubject,
+        senderEmail,
+        threadId,
+        collaborationOpen: _shareMode === 'collab'
+      })
     });
-
     var data = await res.json();
-
-    if (!res.ok || !data.success) {
-      statusEl.textContent = 'Could not send. Please try again.';
-      statusEl.style.color = '#b85c5c';
-      btn.disabled = false;
+    if (!res.ok || !data.shareId) {
+      console.error('Share creation failed');
       return;
     }
+    _currentSharedSessionId = data.shareId;
+    window._currentShareUrl = data.shareUrl;
 
-    statusEl.textContent = 'Sent. They will receive an email with the interpretation.';
-    statusEl.style.color = 'var(--gold)';
-    btn.disabled = true;
+    // If collab mode, update UI
+    if (_shareMode === 'collab') {
+      _collabOpen = true;
+      updateCollabToggleUI();
+      // Update thread item in sidebar
+      if (activeThreadId) {
+        var ti = document.getElementById('ti-' + activeThreadId);
+        if (ti) ti.classList.add('collab-open');
+      }
+    }
 
-    // Auto-close after 3 seconds
-    setTimeout(closeShareModal, 3000);
+    // Show native share sheet if available, else step 2
+    if (navigator.share) {
+      document.getElementById('shareNativeBtn').style.display = 'block';
+    }
+    document.getElementById('shareStep1').style.display = 'none';
+    document.getElementById('shareStep2').style.display = 'block';
 
   } catch (err) {
-    statusEl.textContent = 'Connection error. Please try again.';
+    console.error('Share error:', err);
+  }
+}
+
+function backToShareStep1() {
+  document.getElementById('shareStep1').style.display = 'block';
+  document.getElementById('shareStep2').style.display = 'none';
+}
+
+function getShareText() {
+  var subject = currentSubject || 'An interpretation';
+  return 'An interpretation of "' + subject + '" from The Prism — ' + (window._currentShareUrl || '');
+}
+
+async function shareViaWebShare() {
+  if (!navigator.share) return;
+  try {
+    await navigator.share({
+      title: 'The Prism — ' + (currentSubject || 'An interpretation'),
+      text: 'An interpretation from The Prism.',
+      url: window._currentShareUrl || window.location.href
+    });
+    closeShareModal();
+  } catch (e) { /* user cancelled */ }
+}
+
+function shareViaEmail() {
+  var subject = encodeURIComponent('An interpretation from The Prism');
+  var bodyText = 'I found this interpretation and thought you might want to see it.\n\n' +
+    (window._currentShareUrl || '') + '\n\nBring your own question.';
+  var body = encodeURIComponent(bodyText);
+  window.open('mailto:?subject=' + subject + '&body=' + body, '_blank');
+  showShareStatus('Email composed. Add your recipient and send.', 'var(--gold-dim)');
+}
+
+function shareViaSMS() {
+  var body = encodeURIComponent(getShareText());
+  window.open('sms:?body=' + body, '_blank');
+  showShareStatus('Opens your Messages app with the link ready.', 'var(--gold-dim)');
+}
+
+async function shareViaCopy() {
+  var url = window._currentShareUrl || window.location.href;
+  try {
+    await navigator.clipboard.writeText(url);
+    showShareStatus('Link copied.', 'var(--gold-dim)');
+  } catch {
+    showShareStatus('Could not copy. Link: ' + url, 'var(--text-muted)');
+  }
+}
+
+function showShareStatus(msg, color) {
+  var el = document.getElementById('shareModalStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = color || 'var(--text-muted)';
+  el.style.display = 'block';
+}
+
+// ── COLLABORATION TOGGLE ──────────────────────────────────────────────────────
+
+async function toggleCollaboration() {
+  if (!_currentSharedSessionId) return;
+  _collabOpen = !_collabOpen;
+  updateCollabToggleUI();
+
+  // Update sidebar thread item
+  if (activeThreadId) {
+    var ti = document.getElementById('ti-' + activeThreadId);
+    if (ti) {
+      if (_collabOpen) ti.classList.add('collab-open');
+      else ti.classList.remove('collab-open');
+    }
+  }
+
+  try {
+    await fetch('/api/share', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        shareId: _currentSharedSessionId,
+        collaborationOpen: _collabOpen
+      })
+    });
+  } catch (err) {
+    console.error('Collab toggle error:', err);
+    // Revert UI on failure
+    _collabOpen = !_collabOpen;
+    updateCollabToggleUI();
+  }
+}
+
+function updateCollabToggleUI() {
+  var btn = document.getElementById('collabToggleBtn');
+  var row = document.getElementById('collabToggleRow');
+  if (!btn || !row) return;
+  row.style.display = _currentSharedSessionId ? 'block' : 'none';
+  if (_collabOpen) {
+    btn.textContent = 'Collaboration Open';
+    btn.style.borderColor = 'rgba(80,180,120,0.6)';
+    btn.style.color = 'rgba(80,180,120,0.9)';
+  } else {
+    btn.textContent = 'Collaboration Closed';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--text-muted)';
+  }
+}
+
+// ── EMAIL CAPTURE ─────────────────────────────────────────────────────────────
+
+function openEmailCapture() {
+  // Only show if user is anonymous and has done at least one query
+  if (localStorage.getItem('qt_user_email')) return;
+  var el = document.getElementById('emailCaptureModal');
+  if (el) el.style.display = 'flex';
+}
+
+function closeEmailCapture() {
+  var el = document.getElementById('emailCaptureModal');
+  if (el) el.style.display = 'none';
+}
+
+async function submitEmailCapture() {
+  var email = document.getElementById('emailCaptureInput').value.trim();
+  var statusEl = document.getElementById('emailCaptureStatus');
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(email)) {
+    statusEl.textContent = 'Please enter a valid email address.';
     statusEl.style.color = '#b85c5c';
-    btn.disabled = false;
+    statusEl.style.display = 'block';
+    return;
+  }
+  try {
+    var res = await fetch('/api/register-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, sharedSessionId: _currentSharedSessionId || null })
+    });
+    var data = await res.json();
+    if (data.success) {
+      localStorage.setItem('qt_user_email', email);
+      statusEl.textContent = 'Saved. Your session will be held for 30 days.';
+      statusEl.style.color = 'var(--gold-dim)';
+      statusEl.style.display = 'block';
+      setTimeout(closeEmailCapture, 2500);
+    }
+  } catch (err) {
+    statusEl.textContent = 'Could not save. Please try again.';
+    statusEl.style.color = '#b85c5c';
+    statusEl.style.display = 'block';
   }
 }
 
@@ -3247,22 +3482,77 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- ── SHARE MODAL ── -->
 <div id="shareModal" style="display:none; position:fixed; inset:0; background:rgba(6,6,10,0.85); z-index:1000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-  <div style="background:var(--deep); border:1px solid var(--border); padding:40px; max-width:440px; width:90%; position:relative;">
+  <div style="background:var(--deep); border:1px solid var(--border); padding:40px; max-width:480px; width:90%; position:relative;">
     <button onclick="closeShareModal()" style="position:absolute; top:16px; right:16px; background:transparent; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; line-height:1;">✕</button>
-    <div style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:8px;">Share This Interpretation</div>
-    <div style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--text-muted); text-transform:uppercase; margin-bottom:24px;">They will receive an email with a read-only link.</div>
+    <div style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:24px;">Share This Reflection</div>
+
+    <!-- Step 1: Collaboration mode choice -->
+    <div id="shareStep1">
+      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">How would you like to share?</div>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
+        <button onclick="selectShareMode('personal')" id="shareModePersonal"
+          style="text-align:left; padding:16px 20px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.04); cursor:pointer; transition:all 0.2s;">
+          <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:4px;">Share This Reflection</div>
+          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-dim); font-style:italic;">Recipient continues their own thread. Your session is unchanged.</div>
+        </button>
+        <button onclick="selectShareMode('collab')" id="shareModeCollab"
+          style="text-align:left; padding:16px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s;">
+          <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Invite Into This Conversation</div>
+          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-muted); font-style:italic;">Their follow-ups are visible to you. Collaboration open.</div>
+        </button>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button onclick="closeShareModal()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer;">Cancel</button>
+        <button onclick="proceedToShareDelivery()" style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Delivery method -->
+    <div id="shareStep2" style="display:none;">
+      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">Send via</div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:24px;">
+        <button onclick="shareViaWebShare()" id="shareNativeBtn" style="display:none; font-family:var(--crimson); font-size:16px; font-style:italic; color:var(--text); padding:13px 20px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.04); cursor:pointer; transition:all 0.2s; text-align:left;">
+          Share… <span style="font-family:var(--mono); font-size:9px; color:var(--text-muted); letter-spacing:0.12em;">native share sheet</span>
+        </button>
+        <button onclick="shareViaEmail()" style="font-family:var(--crimson); font-size:16px; font-style:italic; color:var(--text); padding:13px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s; text-align:left;"
+          onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          Email this reflection →
+        </button>
+        <button onclick="shareViaSMS()" style="font-family:var(--crimson); font-size:16px; font-style:italic; color:var(--text); padding:13px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s; text-align:left;"
+          onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          Text this reflection →
+        </button>
+        <button onclick="shareViaCopy()" style="font-family:var(--crimson); font-size:16px; font-style:italic; color:var(--text); padding:13px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s; text-align:left;"
+          onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+          Copy link
+        </button>
+      </div>
+      <div id="shareModalStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; margin-bottom:16px; line-height:1.6;"></div>
+      <div style="display:flex; gap:10px; justify-content:space-between; align-items:center;">
+        <button onclick="backToShareStep1()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 16px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer;">← Back</button>
+        <button onclick="closeShareModal()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer;">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── EMAIL CAPTURE MODAL (shown on exit / session completion) ── -->
+<div id="emailCaptureModal" style="display:none; position:fixed; inset:0; background:rgba(6,6,10,0.85); z-index:1000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+  <div style="background:var(--deep); border:1px solid var(--border); padding:40px; max-width:440px; width:90%; position:relative;">
+    <button onclick="closeEmailCapture()" style="position:absolute; top:16px; right:16px; background:transparent; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; line-height:1;">✕</button>
+    <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:8px;">Want to save this?</div>
+    <div style="font-family:var(--crimson); font-style:italic; font-size:17px; color:var(--text-dim); line-height:1.7; margin-bottom:24px;">Leave your email and we'll hold this session for you. No charge, no commitment.</div>
     <div style="margin-bottom:16px;">
-      <label style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:8px;">Recipient Email</label>
-      <input id="shareRecipientEmail" type="email" placeholder="their@email.com" autocomplete="off"
-        style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:16px; padding:12px 16px; outline:none; transition:border-color 0.2s;"
+      <input id="emailCaptureInput" type="email" placeholder="your@email.com" autocomplete="email"
+        style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:16px; padding:12px 16px; outline:none; transition:border-color 0.2s; box-sizing:border-box;"
         onfocus="this.style.borderColor='var(--gold-dim)'"
         onblur="this.style.borderColor='var(--border)'"
-        onkeydown="if(event.key==='Enter') submitShare()" />
+        onkeydown="if(event.key==='Enter') submitEmailCapture()" />
     </div>
-    <div id="shareModalStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; margin-bottom:16px; line-height:1.6;"></div>
+    <div id="emailCaptureStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; margin-bottom:16px; line-height:1.6;"></div>
     <div style="display:flex; gap:10px; justify-content:flex-end;">
-      <button onclick="closeShareModal()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer;">Cancel</button>
-      <button id="shareModalBtn" onclick="submitShare()" style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">Send →</button>
+      <button onclick="closeEmailCapture()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer;">Not now</button>
+      <button onclick="submitEmailCapture()" style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">Save my session →</button>
     </div>
   </div>
 </div>
