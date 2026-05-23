@@ -797,7 +797,7 @@ async function runQuery() {
 
   // Build follow-up prompt — anchored to the shared subject, stays within Prism framework
   var subject = currentSubject || 'the shared interpretation';
-  var followUpPrompt = 'OVERRIDE: This is a follow-up in a shared thread. Plain prose only — no JSON, no field labels, no headers. Respond as if continuing a real conversation.\n\nLENGTH RULE: 1-3 short paragraphs. Compression over coverage. Stop when the insight lands.\n\nIF the question carries genuine depth that one response cannot fully hold: deliver the most important layer clearly, then let the final sentence trail naturally into the next layer — not as a prompt or suggestion, but as a thought the response is still carrying. It should feel like the end of something and the beginning of something else at the same time. The reader should feel pulled, not directed. Never announce that there is more. Just let the edge be visible.\n\n' +
+  var followUpPrompt = 'OVERRIDE: This is a follow-up in a shared thread. Plain prose only — no JSON, no field labels, no headers. Respond as if continuing a real conversation.\n\nLENGTH RULE: 1-3 short paragraphs. Compression over coverage.\n\nENDING RULE: Never summarize or close the thought completely. End with a sentence that opens rather than concludes — a genuine observation, a tension still live, something you noticed but did not finish. The reader should feel like the conversation is still moving. Not a question posed at them. Not a prompt. Just a thought in motion that invites the next thought. The best endings make the reader want to speak, not because they were asked to, but because something in them was activated.\n\n' +
     'RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER\n' +
     'These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.\n\n' +
     'First Movement: Recognition Before Terminology\n' +
@@ -877,9 +877,6 @@ async function runQuery() {
     var _completedInput = input;
     document.getElementById('userInput').value = '';
     sessionQueries++;
-
-    // Make any suggested follow-up question tappable
-    injectSuggestion(bodyEl, fullText);
 
     // Save as recipient follow-up on the shared thread
     saveRecipientFollowUp(_completedInput, fullText);
