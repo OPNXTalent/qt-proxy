@@ -2714,8 +2714,22 @@ function selectThread(id) {
         })
         .catch(function() {});
 
-        // Subscribe via Realtime after synchronous reset completes
-        setTimeout(function() { startFollowUpRealtime(threadId); }, 100);
+        // Subscribe via Realtime — wait for supabase client if needed
+        if (window.supabase) {
+          startFollowUpRealtime(threadId);
+        } else {
+          var _realtimeRetry = 0;
+          var _realtimeWait = setInterval(function() {
+            _realtimeRetry++;
+            if (window.supabase) {
+              clearInterval(_realtimeWait);
+              startFollowUpRealtime(threadId);
+            } else if (_realtimeRetry > 20) {
+              clearInterval(_realtimeWait);
+              startFollowUpPolling(threadId);
+            }
+          }, 250);
+        }
       })
       .catch(function() {});
     })(id);
@@ -3328,9 +3342,6 @@ async function handleShareBtn() {
     _shareStatus            = 'on';
     window._shareActive     = true;
     window._currentShareUrl = data.shareUrl;
-
-    // Start Realtime subscription for live updates
-    if (threadId) startFollowUpRealtime(threadId);
 
     // Update share button appearance
     if (btn) {
