@@ -582,7 +582,7 @@
       <button onclick="downloadPDF('dark')" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; padding:12px 24px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">↓ Dark Version</button>
       <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; padding:12px 24px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Light Version</button>
       <button onclick="handleRecipientShare()" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; padding:12px 24px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'" onmouseout="if(!window._recipientShared)this.style.borderColor='var(--border-lit)';if(!window._recipientShared)this.style.color='var(--text-dim)'">Share</button>
-      <button onclick="openNewSubject()" id="newSubjectBtn" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; padding:12px 24px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'" onmouseout="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'">+ New Subject</button>
+      <button onclick="goNewSubject()" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; padding:12px 24px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'" onmouseout="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'">+ New Subject</button>
     </div>
     <!-- Share credit notice — shown after share if no email yet -->
     <div id="recipientShareNotice" style="display:none; margin-top:14px; text-align:center; font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim);">Link copied — add your email to earn a free query when someone explores it</div>
@@ -591,25 +591,6 @@
       <input type="email" id="recipientCreditEmail" placeholder="your@email.com" style="background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:15px;padding:8px 14px;outline:none;width:220px;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'" onkeydown="if(event.key==='Enter')saveRecipientEmail()">
       <button onclick="saveRecipientEmail()" style="font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;padding:8px 16px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;">Save →</button>
     </div>
-  </div>
-
-  <!-- New Subject input — appears inline when triggered -->
-  <div id="newSubjectSection" style="display:none; margin-top:48px; padding-top:40px; border-top:1px solid var(--border);">
-    <div style="font-family:var(--mono); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted); text-align:center; margin-bottom:28px;">New Subject</div>
-    <textarea class="input-field" id="newSubjectInput"
-      placeholder="A verse, a question, or whatever is on your mind…"
-      rows="3" maxlength="600"
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();runNewSubject();}"></textarea>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; margin-bottom:52px;">
-      <button onclick="closeNewSubject()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;">Cancel</button>
-      <button id="newSubjectSubmitBtn" onclick="runNewSubject()" style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.2em; text-transform:uppercase; padding:14px 32px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">Interpret →</button>
-    </div>
-    <div id="newSubjectLoading" style="display:none; text-align:center; padding:40px 0;">
-      <div style="font-family:var(--cinzel); font-size:24px; color:var(--gold-dim); animation:pulse 2s ease-in-out infinite;">✦</div>
-      <div style="font-family:var(--mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); margin-top:12px;">Interpreting…</div>
-    </div>
-    <!-- New subject results render here -->
-    <div id="newSubjectResults"></div>
   </div>
 
   </div><!-- /#shareContent -->
@@ -1583,207 +1564,17 @@ async function triggerRecipientCredit(email) {
   } catch(e) {}
 }
 
-// ── New Subject (inline) ─────────────────────────────────────────────────────
-// Opens a fresh interpretation within share.html — no navigation away.
-// Result renders below the shared thread. Sidebar gets a new entry.
+// ── New Subject ──────────────────────────────────────────────────────────────
+// Stores the current share URL so the return bar appears on qt.html,
+// then navigates to a fresh Prism session.
 
-var _newSubjectCount = 0;
-
-function openNewSubject() {
-  var sec = document.getElementById('newSubjectSection');
-  var btn = document.getElementById('newSubjectBtn');
-  if (sec) {
-    sec.style.display = 'block';
-    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function goNewSubject() {
+  // Store share URL and title for the sidebar entry in qt.html
+  if (shareToken) {
+    sessionStorage.setItem('prism_shared_thread', '/share.html?t=' + shareToken);
+    sessionStorage.setItem('prism_shared_thread_title', currentSubject || 'Shared interpretation');
   }
-  if (btn) { btn.textContent = '↑ Close'; btn.onclick = closeNewSubject; }
-  var inp = document.getElementById('newSubjectInput');
-  if (inp) setTimeout(function(){ inp.focus(); }, 300);
-}
-
-function closeNewSubject() {
-  var sec = document.getElementById('newSubjectSection');
-  var btn = document.getElementById('newSubjectBtn');
-  if (sec) sec.style.display = 'none';
-  if (btn) { btn.textContent = '+ New Subject'; btn.onclick = openNewSubject; }
-}
-
-async function runNewSubject() {
-  var inp = document.getElementById('newSubjectInput');
-  if (!inp) return;
-  var input = inp.value.trim();
-  if (!input) return;
-
-  if (sessionQueries >= QUERY_LIMIT) { showLimitWall(); return; }
-
-  var submitBtn = document.getElementById('newSubjectSubmitBtn');
-  var loading   = document.getElementById('newSubjectLoading');
-  if (submitBtn) submitBtn.disabled = true;
-  if (loading)   loading.style.display = 'block';
-
-  // Build full interpretation prompt — same as qt.html main query
-  var prompt = 'RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. START WITH { END WITH }.\n\n' +
-    'You are The Prism framework interpreter. The user has submitted: "' + input + '"\n\n' +
-    'Infer the query type from the content — verse reference, phrase, theme, or open question. Apply the complete Prism framework regardless of input type.\n\n' +
-    'Return this exact JSON:\n{\n' +
-    '  "recognition": "2-4 sentences. Plain language. No framework vocabulary.",\n' +
-    '  "core_insight": "The single most important thing the framework sees. One paragraph.",\n' +
-    '  "suggested_threads": ["specific door 1", "specific door 2"],\n' +
-    '  "verse_identified": "Most relevant Scripture",\n' +
-    '  "verse_text": "Verse quoted accurately",\n' +
-    '  "prism_summary": "Two sharp sentences — Section 00 Echad b\'Emet",\n' +
-    '  "entanglement": "God\'s initiation here",\n' +
-    '  "coherence_alignment": "How this calls toward alignment",\n' +
-    '  "noise_decoherence": "What distortions this exposes",\n' +
-    '  "telos_insight": "Christ-form being called toward",\n' +
-    '  "olam_haba": "Time-transcendent view",\n' +
-    '  "kingdom_implication": "One crisp Kingdom punchline",\n' +
-    '  "key_terms": [{"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"}]\n}';
-
-  try {
-    var res = await fetch('/api/interpret', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }],
-        email: localStorage.getItem('qt_user_email') || null,
-        rawQuery: input,
-        isFollowUp: false
-      })
-    });
-
-    if (res.status === 429) { showLimitWall(); return; }
-    if (!res.ok) throw new Error('SERVER_ERROR');
-
-    // Collect full streamed response
-    var reader  = res.body.getReader();
-    var decoder = new TextDecoder();
-    var buffer  = '';
-    var fullText = '';
-
-    while (true) {
-      var chunk = await reader.read();
-      if (chunk.done) break;
-      buffer += decoder.decode(chunk.value, { stream: true });
-      var lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i];
-        if (line.startsWith('data: ')) {
-          try {
-            var parsed = JSON.parse(line.slice(6).trim());
-            if (parsed.type === 'delta' && parsed.text) fullText += parsed.text;
-          } catch(e) {}
-        }
-      }
-    }
-
-    // Parse the JSON response
-    var parsed = null;
-    try {
-      var clean = fullText.replace(/```json|```/g, '').trim();
-      parsed = JSON.parse(clean);
-    } catch(e) {}
-
-    if (!parsed) throw new Error('PARSE_ERROR');
-
-    // Render the new interpretation inline
-    _newSubjectCount++;
-    var container = document.getElementById('newSubjectResults');
-    if (container) {
-      var divider = document.createElement('div');
-      divider.style.cssText = 'margin:40px 0 32px;text-align:center;position:relative;';
-      divider.innerHTML = '<div style="position:absolute;top:50%;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);"></div>' +
-        '<span style="position:relative;background:var(--void);padding:0 20px;font-family:var(--mono);font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:var(--text-muted);">' + escHtml(input.length > 50 ? input.slice(0,50)+'…' : input) + '</span>';
-      container.appendChild(divider);
-
-      // Render snapshot into results
-      var resultDiv = document.createElement('div');
-      container.appendChild(resultDiv);
-      renderSnapshotInto(parsed, input, resultDiv);
-
-      // Add sidebar entry for this new subject
-      addNewSubjectToSidebar(input, divider);
-    }
-
-    inp.value = '';
-    sessionQueries++;
-    closeNewSubject();
-
-    // Scroll to new result
-    divider.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    if (sessionQueries >= QUERY_LIMIT) showLimitWall();
-
-  } catch(err) {
-    var errEl = document.createElement('div');
-    errEl.style.cssText = 'border:1px solid #5a2a2a;background:#1a0a0a;padding:20px 24px;color:#c08080;font-size:17px;margin-top:20px;';
-    errEl.textContent = 'Something went wrong. Please try again.';
-    var container = document.getElementById('newSubjectResults');
-    if (container) container.appendChild(errEl);
-  } finally {
-    if (submitBtn) submitBtn.disabled = false;
-    if (loading)   loading.style.display = 'none';
-  }
-}
-
-function addNewSubjectToSidebar(queryText, targetEl) {
-  var threads = document.getElementById('sidebarThreads');
-  if (!threads) return;
-  var item = document.createElement('div');
-  item.className = 'thread-item';
-  item.style.cursor = 'pointer';
-  var title = queryText.length > 52 ? queryText.slice(0,52)+'…' : queryText;
-  var now = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-  item.innerHTML = '<div class="thread-title">' + escHtml(title) + '</div>' +
-    '<div class="thread-meta"><span class="thread-date">Today · ' + now + '</span></div>';
-  item.addEventListener('click', function() {
-    if (targetEl) targetEl.scrollIntoView({ behavior:'smooth', block:'start' });
-  });
-  threads.appendChild(item);
-}
-
-// Renders a full interpretation into a target element — identical treatment to the shared thread
-function renderSnapshotInto(snapshot, subject, targetEl) {
-  // Reuse the main renderSnapshot machinery but point at the target element
-  // Store current shareResult, temporarily swap, render, restore
-  var realResult = document.getElementById('shareResult');
-  var realSubject = document.getElementById('shareSubject');
-  var realSidebarTitle = document.getElementById('sidebarSharedTitle');
-  var realSidebarDate  = document.getElementById('sidebarSharedDate');
-  var realSidebarEntry = document.getElementById('sidebarSharedEntry');
-
-  // Temporarily redirect renderSnapshot output to targetEl
-  var tempId = 'newSubjectRenderTarget_' + Date.now();
-  targetEl.id = tempId;
-
-  // Patch shareResult to point to our target
-  if (realResult) realResult.id = 'shareResult_saved';
-  targetEl.id = 'shareResult';
-
-  // Render — suppress sidebar and subject updates by temporarily nulling them
-  if (realSubject)     realSubject.id = 'shareSubject_saved';
-  if (realSidebarEntry) realSidebarEntry.id = 'sidebarSharedEntry_saved';
-
-  renderSnapshot(snapshot, subject);
-
-  // Restore IDs
-  targetEl.id = tempId || '';
-  if (realResult)      realResult.id = 'shareResult';
-  if (realSubject)     realSubject.id = 'shareSubject';
-  if (realSidebarEntry) realSidebarEntry.id = 'sidebarSharedEntry';
-
-  // Wire suggested thread buttons to prefill the new subject input instead
-  var threadBtns = targetEl.querySelectorAll('.qt-thread-btn');
-  threadBtns.forEach(function(btn) {
-    btn.onclick = function() { prefillNewSubject(this.dataset.t); };
-  });
-}
-
-function prefillNewSubject(text) {
-  openNewSubject();
-  var inp = document.getElementById('newSubjectInput');
-  if (inp) { inp.value = text; inp.focus(); }
+  window.location.href = 'https://theprism.io/qt.html';
 }
 
 // ── Presence heartbeat ────────────────────────────────────────────────────────
