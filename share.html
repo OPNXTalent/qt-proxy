@@ -1181,20 +1181,22 @@ function startLiveThreadPolling(threadId) {
 }
 
 function renderLiveFollowUps(followUps) {
-  var section   = document.getElementById('liveThreadSection');
-  var container = document.getElementById('liveThreadContent');
-  if (!section || !container) return;
+  // Render into resultContent so sender follow-ups appear inline
+  // in the same flow as the recipient's own queries
+  var container = document.getElementById('resultContent');
+  if (!container) return;
 
-  var hasNew = false;
   followUps.forEach(function(fu) {
     var fuId = fu.id || (fu.query + fu.created_at);
     if (_renderedFollowUpIds.has(fuId)) return;
     _renderedFollowUpIds.add(fuId);
-    hasNew = true;
 
     var isRecipient = fu.source === 'recipient';
+    // Skip recipient entries — those are rendered locally by runQuery()
+    if (isRecipient) return;
+
     var block = document.createElement('div');
-    block.className = 'fu-block ' + (isRecipient ? 'recipient' : 'sender');
+    block.className = 'fu-block sender';
 
     var response = fu.response || {};
     var bodyText = '';
@@ -1214,9 +1216,8 @@ function renderLiveFollowUps(followUps) {
       '<div class="fu-body">' + (paras || '') + '</div>';
 
     container.appendChild(block);
+    block.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
-
-  if (hasNew && section) section.style.display = 'block';
 }
 
 function startShareRealtime(threadId) {
