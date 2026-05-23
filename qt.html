@@ -914,7 +914,7 @@
 
   <!-- Free user upgrade prompt (shown for free tier) -->
   <!-- Anonymous save block — shown when no email registered -->
-  <div id="freeUpgradePrompt" style="display:none; margin:12px 16px 0;">
+  <div id="freeUpgradePrompt" style="display:none; margin:12px 16px 0;" data-anon-only="true">
     <div style="border:1px solid rgba(201,168,76,0.2); background:rgba(201,168,76,0.03); padding:16px;">
       <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:#b85c5c; margin-bottom:8px;">SESSION NOT SAVED</div>
       <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:12px;">Closing this browser will erase your work. Save your email to keep it for 30 days.</div>
@@ -3193,7 +3193,7 @@ function initSidebar() {
     if (toggle) toggle.classList.add('visible');
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt) freePrompt.style.display = 'block';
+    if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
     loadSidebarCreditsAnon();
     return;
   }
