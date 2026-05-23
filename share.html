@@ -860,6 +860,9 @@ async function runQuery() {
     document.getElementById('userInput').value = '';
     sessionQueries++;
 
+    // Save recipient contribution back to shared thread
+    saveRecipientFollowUp(_completedInput, fullText);
+
     // Add this query to the sidebar
     addQueryToSidebar(_completedInput, fuEl);
 
@@ -1027,6 +1030,11 @@ async function loadShare() {
 
     renderSnapshot(snapshot, subject);
 
+    // Start live thread polling if this share has a thread_id
+    if (share.thread_id) {
+      startLiveThreadPolling(share.thread_id);
+    }
+
     // Show collaboration panel if open
     if (collabOpen && channelId) {
       var panel = document.getElementById('collabPanel');
@@ -1088,6 +1096,96 @@ function addQueryToSidebar(queryText, targetEl) {
   });
 
   threads.appendChild(item);
+}
+
+// ── Live thread polling ──────────────────────────────────────────────────────
+// Polls /api/followups for the sender's thread every 15 seconds.
+// Renders new sender follow-ups into #liveThreadContent.
+// Also saves recipient contributions back to the thread via /api/followups.
+
+var _liveThreadPollInterval = null;
+var _renderedFollowUpIds    = new Set();
+var _threadId               = null; // populated from share.thread_id
+
+function startLiveThreadPolling(threadId) {
+  _threadId = threadId;
+  if (!threadId) return;
+  pollLiveThread(); // immediate first poll
+  _liveThreadPollInterval = setInterval(pollLiveThread, 15000);
+}
+
+async function pollLiveThread() {
+  if (!_threadId) return;
+  try {
+    var res = await fetch('/api/followups?threadId=' + encodeURIComponent(_threadId), {
+      headers: { 'x-share-id': shareId || '' }
+    });
+    if (!res.ok) return;
+    var data = await res.json();
+    var followUps = data.followUps || [];
+    if (followUps.length === 0) return;
+
+    var section  = document.getElementById('liveThreadSection');
+    var container = document.getElementById('liveThreadContent');
+    if (!section || !container) return;
+
+    var hasNew = false;
+    followUps.forEach(function(fu) {
+      var fuId = fu.id || (fu.query + fu.created_at);
+      if (_renderedFollowUpIds.has(fuId)) return;
+      _renderedFollowUpIds.add(fuId);
+      hasNew = true;
+
+      var isRecipient = fu.source === 'recipient';
+      var block = document.createElement('div');
+      block.className = 'fu-block ' + (isRecipient ? 'recipient' : 'sender');
+
+      var response = fu.response || {};
+      var bodyText = '';
+      if (typeof response === 'string') {
+        bodyText = response;
+      } else if (response.recognition) {
+        bodyText = [response.recognition, response.core_insight, response.kingdom_implication]
+          .filter(Boolean).join('
+
+');
+      }
+
+      var paras = bodyText.split(/
+
+/).filter(Boolean).map(function(p) {
+        return '<p>' + escHtml(p.replace(/
+/g, ' ')) + '</p>';
+      }).join('');
+
+      block.innerHTML =
+        '<div class="fu-question">' + escHtml(fu.query || '') + '</div>' +
+        '<div class="fu-body">' + (paras || '<p style="color:var(--text-muted);font-style:italic;">Interpretation rendered</p>') + '</div>';
+
+      container.appendChild(block);
+    });
+
+    if (hasNew) {
+      section.style.display = 'block';
+    }
+  } catch(e) {}
+}
+
+async function saveRecipientFollowUp(input, responseText) {
+  if (!_threadId || !shareId) return;
+  try {
+    await fetch('/api/followups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        threadId:  _threadId,
+        shareId:   shareId,
+        question:  input,
+        response:  responseText,
+        source:    'recipient'
+      })
+    });
+  } catch(e) {}
 }
 
 // ── Presence heartbeat ────────────────────────────────────────────────────────
