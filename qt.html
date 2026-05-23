@@ -1072,6 +1072,14 @@
         <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Light Version</button>
       </div>
 
+      <!-- Share URL — shown beneath buttons after share created -->
+      <div id="shareUrlRow" style="display:none; margin-top:16px; justify-content:center; align-items:center; gap:10px;">
+        <div id="shareLinkDisplay" style="font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:380px;"></div>
+        <button onclick="copyShareLink()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s;"
+          onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Copy</button>
+      </div>
+
       <!-- Discussion button — appears after share created -->
       <div id="discussionRow" style="display:none; margin-top:18px; text-align:center;">
         <button id="collabToggleBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;"
@@ -2630,6 +2638,10 @@ function selectThread(id) {
     }
     var dot = document.getElementById('presenceDot');
     if (dot) dot.style.display = 'none';
+    var urlRow = document.getElementById('shareUrlRow');
+    if (urlRow) urlRow.style.display = 'none';
+    var urlDisp = document.getElementById('shareLinkDisplay');
+    if (urlDisp) urlDisp.textContent = '';
     var discRow = document.getElementById('discussionRow');
     if (discRow) discRow.style.display = 'none';
     restoreFollowUps(id);
@@ -3118,6 +3130,13 @@ async function handleShareBtn() {
     try { await navigator.clipboard.writeText(data.shareUrl); } catch(e) {}
     showCopyToast(data.shareUrl);
 
+    // Show URL beneath Share button
+    var urlRow  = document.getElementById('shareUrlRow');
+    var urlDisp = document.getElementById('shareLinkDisplay');
+    if (urlRow)  urlRow.style.display = 'flex';
+    if (urlDisp) urlDisp.textContent  = data.shareUrl;
+    window._currentShareUrl = data.shareUrl;
+
   } catch (err) {
     console.error('Share failed:', err);
     if (btn) {
@@ -3355,6 +3374,13 @@ function goToShareManage() {
 function getShareText() {
   var subject = currentSubject || 'An interpretation';
   return 'An interpretation of "' + subject + '" from The Prism — ' + (window._currentShareUrl || '');
+}
+
+function copyShareLink() {
+  var url = window._currentShareUrl || '';
+  if (!url) return;
+  try { navigator.clipboard.writeText(url); } catch(e) {}
+  showCopyToast(url);
 }
 
 async function shareViaWebShare() {
