@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root {
     --void: #06060a;
@@ -2644,8 +2645,11 @@ function selectThread(id) {
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
     var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
-    // Stop any existing follow-up polling
-    if (window._qtFollowUpPoll) { clearInterval(window._qtFollowUpPoll); window._qtFollowUpPoll = null; }
+    // Stop any existing Realtime subscription
+    if (window._qtRealtimeChannel) {
+      window._qtRealtimeChannel.unsubscribe();
+      window._qtRealtimeChannel = null;
+    }
     // Reset rendered ID tracker for new thread
     _renderedFuIds = new Set();
 
@@ -2695,19 +2699,7 @@ function selectThread(id) {
           updateCollabToggleUI();
         }
 
-        // Start polling for recipient contributions
-        window._qtFollowUpPoll = setInterval(function() {
-          fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
-            headers: { 'x-user-email': userEmail() }
-          })
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
-          })
-          .catch(function() {});
-        }, 15000);
-
-        // Immediate poll to show existing recipient contributions
+        // Fetch existing recipient contributions immediately
         fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
           headers: { 'x-user-email': userEmail() }
         })
@@ -2716,6 +2708,9 @@ function selectThread(id) {
           if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
         })
         .catch(function() {});
+
+        // Subscribe via Realtime for instant updates
+        startFollowUpRealtime(threadId);
       })
       .catch(function() {});
     })(id);
@@ -2782,8 +2777,52 @@ function restoreFollowUps(id) {
 
 // RENDER FOLLOW-UPS WITH SOURCE AWARENESS
 // Shows sender's own follow-ups normally, recipient contributions with distinct styling
-// Track rendered follow-up IDs to prevent duplicates on repeated polls
-var _renderedFuIds = new Set();
+// ── Supabase Realtime ────────────────────────────────────────────────────────
+
+var _supabaseClient     = null;
+var _renderedFuIds      = new Set();
+
+function getSupabaseClient() {
+  if (_supabaseClient) return _supabaseClient;
+  var url  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+  var anon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  _supabaseClient = window.supabase.createClient(url, anon);
+  return _supabaseClient;
+}
+
+function startFollowUpRealtime(threadId) {
+  // Clean up any existing channel
+  if (window._qtRealtimeChannel) {
+    window._qtRealtimeChannel.unsubscribe();
+    window._qtRealtimeChannel = null;
+  }
+
+  try {
+    var client = getSupabaseClient();
+    window._qtRealtimeChannel = client
+      .channel('follow_ups_' + threadId)
+      .on('postgres_changes', {
+        event:  'INSERT',
+        schema: 'public',
+        table:  'follow_ups',
+        filter: 'thread_id=eq.' + threadId
+      }, function(payload) {
+        if (!payload.new) return;
+        // Only render recipient contributions — owner's own follow-ups
+        // are already rendered by the local submit flow
+        if (payload.new.source === 'recipient') {
+          renderFUWithSource([payload.new]);
+        }
+      })
+      .subscribe(function(status) {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] subscribed to follow_ups for thread:', threadId);
+        }
+      });
+  } catch(err) {
+    console.warn('[Realtime] failed to subscribe:', err.message);
+  }
+}
 
 function renderFUWithSource(list) {
   if (!list || !list.length) return;
