@@ -542,18 +542,6 @@
       <span>Bring your own question</span>
     </div>
 
-    <!-- Live input — recipient's own queries -->
-    <div id="inputSection">
-      <textarea class="input-field" id="userInput"
-        placeholder="A verse, a question, or whatever is on your mind…"
-        rows="3" maxlength="600"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();runQuery();}"></textarea>
-    </div>
-
-    <div style="display:flex; justify-content:flex-end; margin-top:16px; margin-bottom:52px;">
-      <button class="submit-btn" id="submitBtn" onclick="runQuery()">Interpret →</button>
-    </div>
-
     <!-- Loading -->
     <div id="loadingBlock" style="display:none;">
       <div class="loading-inline">
@@ -562,33 +550,28 @@
       </div>
     </div>
 
-    <!-- Results from recipient's own queries -->
+    <!-- Results from recipient's own queries — input lives below results -->
     <div id="resultContent"></div>
 
+    <!-- Live input — always at the bottom of the conversation -->
+    <div id="inputSection" style="margin-top:40px;">
+      <textarea class="input-field" id="userInput"
+        placeholder="Continue the exploration…"
+        rows="3" maxlength="600"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();runQuery();}"></textarea>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; margin-top:16px; margin-bottom:52px;">
+      <button class="submit-btn" id="submitBtn" onclick="runQuery()">Interpret →</button>
+    </div>
+
     <!-- Limit wall -->
-    <div class="limit-wall" id="limitWall">
-      <div class="limit-wall-title">Free Query Limit Reached</div>
-      <div class="limit-wall-body">You've used your 3 free interpretations. Continue your exploration below.</div>
-      <div class="limit-options">
-        <div class="limit-option">
-          <div class="limit-option-tier">One-Time</div>
-          <div class="limit-option-price">$2.99</div>
-          <div class="limit-option-desc">10 queries.<br>No subscription required.</div>
-          <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" class="limit-option-cta">Buy 10 Queries →</a>
-        </div>
-        <div class="limit-option featured">
-          <div class="limit-option-tag">Recommended</div>
-          <div class="limit-option-tier">Subscribe</div>
-          <div class="limit-option-price">from $9.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
-          <div class="limit-option-desc">Full framework access.<br>Session history saved.</div>
-          <a href="https://theprism.io/purchase.html" class="limit-option-cta solid">See Plans →</a>
-        </div>
-        <div class="limit-option">
-          <div class="limit-option-tier">Free</div>
-          <div class="limit-option-price">$0</div>
-          <div class="limit-option-desc">3 queries reset every 24 hours.</div>
-          <a href="https://theprism.io" class="limit-option-cta">← Return Tomorrow</a>
-        </div>
+    <div class="limit-wall" id="limitWall" style="text-align:center;">
+      <div class="limit-wall-title">Today's queries have been used</div>
+      <div class="limit-wall-body" style="margin-bottom:28px;">The conversation is still here. Come back tomorrow to continue — or purchase more queries to keep going now.</div>
+      <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
+        <a href="https://theprism.io/purchase.html" class="limit-option-cta solid" style="padding:13px 28px; font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; text-decoration:none;">Purchase Queries →</a>
+        <a href="https://theprism.io/share.html?t=" id="returnTomorrowLink" class="limit-option-cta" style="padding:13px 28px; font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; text-decoration:none;">Return Tomorrow</a>
       </div>
     </div>
 
@@ -797,7 +780,7 @@ async function runQuery() {
 
   // Build follow-up prompt — anchored to the shared subject, stays within Prism framework
   var subject = currentSubject || 'the shared interpretation';
-  var followUpPrompt = 'RESPONSE FORMAT: Plain prose only. No JSON, no field labels, no headers. This is a live follow-up conversation.\n\nAPPLY THE FULL GOVERNING COHERENCE FRAMEWORK: Follow the evidence wherever it leads. Engage real tension directly. Confirm correct positions without hedging. Honor Hebrew lexical precision — words chosen carry weight, words not chosen carry equal weight. Never defend the framework. Never protect a tradition the text does not establish.\n\nDELIVERY METHOD — SOCRATIC CHUNKING:\nBefore responding, mentally construct the complete answer to this question in full. Then deliver only the first meaningful piece of it — enough to establish real traction, not enough to close the question. 2-4 sentences maximum.\n\nEnd every response with a single question that:\n- arises directly from what was just said\n- is the natural next step in the full answer you are holding\n- feels like genuine curiosity, not a quiz\n- is specific enough that answering it moves the conversation forward\n- does not telegraph the full answer — it opens the next door\n\nThe user should feel they are discovering something, not being walked through a syllabus. Each exchange reveals one more layer. The complete answer unfolds across the conversation, not within a single response.\n\nNever deliver the full answer in one response regardless of how direct the question is. The constraint is always length. The exchange is the architecture.\n\n' +
+  var followUpPrompt = 'RESPONSE FORMAT: Plain prose only. No JSON, no field labels, no headers. This is a live follow-up conversation.\n\nAPPLY THE FULL GOVERNING COHERENCE FRAMEWORK: Follow the evidence wherever it leads. Engage real tension directly. Confirm correct positions without hedging. Honor Hebrew lexical precision — words chosen carry weight, words not chosen carry equal weight. Never defend the framework. Never protect a tradition the text does not establish.\n\nDELIVERY METHOD — SOCRATIC CHUNKING:\nBefore responding, mentally construct the complete answer to this question in full. Then deliver only the first meaningful piece of it — enough to establish real traction, not enough to close the question. 2-4 sentences maximum.\n\nEnd every response with a single question that:\n- arises directly from what was just said\n- is the natural next step in the full answer you are holding\n- feels like genuine curiosity, not a quiz\n- is specific enough that answering it moves the conversation forward\n- does not telegraph the full answer — it opens the next door\n\nThe user should feel they are discovering something, not being walked through a syllabus. Each exchange reveals one more layer. The complete answer unfolds across the conversation, not within a single response.\n\nNever deliver the full answer in one response regardless of how direct the question is. The constraint is always length. The exchange is the architecture.\n\nCRITICAL — READ THE USER\'S ACTUAL POSITION: Before responding, identify precisely what the user said and what they did not say. Do not defend against a challenge they did not make. Do not correct a position they did not take. If the user has identified something correctly, confirm it directly and build forward from there. Misreading the user and defending against a phantom objection is the primary failure mode to avoid.\n\n' +
     'RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER\n' +
     'These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.\n\n' +
     'First Movement: Recognition Before Terminology\n' +
@@ -884,6 +867,10 @@ async function runQuery() {
     // Add to sidebar
     addQueryToSidebar(_completedInput, fuEl);
 
+    // Scroll input back into view so conversation can continue
+    var inputSec = document.getElementById('inputSection');
+    if (inputSec) inputSec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
     // Open sidebar after first follow-up
     if (sessionQueries === 1) openSidebar();
 
@@ -901,13 +888,31 @@ async function runQuery() {
 }
 
 function showLimitWall(msg) {
+  // Hide the input section and replace with a quiet notice
+  var inputSec = document.getElementById('inputSection');
+  if (inputSec) inputSec.style.display = 'none';
   document.getElementById('submitBtn').style.display = 'none';
+
+  // Show a brief inline notice just above the limit wall
+  var notice = document.getElementById('limitNotice');
+  if (!notice) {
+    notice = document.createElement('div');
+    notice.id = 'limitNotice';
+    notice.style.cssText = 'margin-top:32px;padding:20px 0;border-top:1px solid var(--border);font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);text-align:center;';
+    notice.textContent = 'Today\'s query limit has been reached';
+    var resultContent = document.getElementById('resultContent');
+    if (resultContent) resultContent.appendChild(notice);
+  }
+
   var wall = document.getElementById('limitWall');
   if (msg) {
     var bodyEl = wall.querySelector('.limit-wall-body');
     if (bodyEl) bodyEl.textContent = msg;
   }
   wall.style.display = 'block';
+  // Point return link back to this shared thread
+  var retLink = document.getElementById('returnTomorrowLink');
+  if (retLink && shareToken) retLink.href = '/share.html?t=' + shareToken;
   wall.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
