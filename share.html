@@ -1743,32 +1743,41 @@ function addNewSubjectToSidebar(queryText, targetEl) {
   threads.appendChild(item);
 }
 
-// Renders a parsed snapshot into a target element (for new subjects inline)
+// Renders a full interpretation into a target element — identical treatment to the shared thread
 function renderSnapshotInto(snapshot, subject, targetEl) {
-  var html = '';
-  if (snapshot.verse_identified) {
-    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(snapshot.verse_identified) + '</div>' +
-      '<div class="verse-text">' + escHtml(snapshot.verse_text || '') + '</div></div>';
-  }
-  if (snapshot.recognition) {
-    html += '<div class="qt-recognition"><p>' + escHtml(snapshot.recognition) + '</p></div>';
-  }
-  if (snapshot.core_insight) {
-    html += '<div class="qt-core-insight"><p>' + escHtml(snapshot.core_insight) + '</p></div>';
-  }
-  if (snapshot.kingdom_implication) {
-    html += '<div class="kingdom-block"><div class="kingdom-label">Kingdom Implication</div>' +
-      '<div class="kingdom-text">' + escHtml(snapshot.kingdom_implication) + '</div></div>';
-  }
-  var threads = Array.isArray(snapshot.suggested_threads) ? snapshot.suggested_threads.filter(function(t){return t&&t.trim();}) : [];
-  if (threads.length > 0) {
-    html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
-    threads.forEach(function(t) {
-      html += '<button class="qt-thread-btn" onclick="prefillNewSubject(this.dataset.t)" data-t="' + escHtml(t) + '">' + escHtml(t) + '</button>';
-    });
-    html += '</div>';
-  }
-  targetEl.innerHTML = html;
+  // Reuse the main renderSnapshot machinery but point at the target element
+  // Store current shareResult, temporarily swap, render, restore
+  var realResult = document.getElementById('shareResult');
+  var realSubject = document.getElementById('shareSubject');
+  var realSidebarTitle = document.getElementById('sidebarSharedTitle');
+  var realSidebarDate  = document.getElementById('sidebarSharedDate');
+  var realSidebarEntry = document.getElementById('sidebarSharedEntry');
+
+  // Temporarily redirect renderSnapshot output to targetEl
+  var tempId = 'newSubjectRenderTarget_' + Date.now();
+  targetEl.id = tempId;
+
+  // Patch shareResult to point to our target
+  if (realResult) realResult.id = 'shareResult_saved';
+  targetEl.id = 'shareResult';
+
+  // Render — suppress sidebar and subject updates by temporarily nulling them
+  if (realSubject)     realSubject.id = 'shareSubject_saved';
+  if (realSidebarEntry) realSidebarEntry.id = 'sidebarSharedEntry_saved';
+
+  renderSnapshot(snapshot, subject);
+
+  // Restore IDs
+  targetEl.id = tempId || '';
+  if (realResult)      realResult.id = 'shareResult';
+  if (realSubject)     realSubject.id = 'shareSubject';
+  if (realSidebarEntry) realSidebarEntry.id = 'sidebarSharedEntry';
+
+  // Wire suggested thread buttons to prefill the new subject input instead
+  var threadBtns = targetEl.querySelectorAll('.qt-thread-btn');
+  threadBtns.forEach(function(btn) {
+    btn.onclick = function() { prefillNewSubject(this.dataset.t); };
+  });
 }
 
 function prefillNewSubject(text) {
