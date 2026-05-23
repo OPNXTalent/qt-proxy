@@ -1146,16 +1146,11 @@ async function pollLiveThread() {
         bodyText = response;
       } else if (response.recognition) {
         bodyText = [response.recognition, response.core_insight, response.kingdom_implication]
-          .filter(Boolean).join('
-
-');
+          .filter(Boolean).join('\n\n');
       }
 
-      var paras = bodyText.split(/
-
-/).filter(Boolean).map(function(p) {
-        return '<p>' + escHtml(p.replace(/
-/g, ' ')) + '</p>';
+      var paras = bodyText.split(/\n\n/).filter(Boolean).map(function(p) {
+        return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
       }).join('');
 
       block.innerHTML =
