@@ -1149,7 +1149,20 @@ function addQueryToSidebar(queryText, targetEl) {
 
 var _renderedFollowUpIds = new Set();
 var _threadId            = null;
-var _shareRealtimeChannel = null;
+var _shareRealtimeChannel  = null;
+var _sharePollingInterval  = null;
+
+function startSharePolling(threadId) {
+  if (_sharePollingInterval) clearInterval(_sharePollingInterval);
+  _sharePollingInterval = setInterval(function() {
+    fetch('/api/followups?threadId=' + encodeURIComponent(threadId), {
+      headers: { 'x-share-id': shareId || '' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderLiveFollowUps(data.followUps || []); })
+    .catch(function() {});
+  }, 8000);
+}
 
 function startLiveThreadPolling(threadId) {
   _threadId = threadId;
@@ -1211,6 +1224,11 @@ function startShareRealtime(threadId) {
     _shareRealtimeChannel.unsubscribe();
     _shareRealtimeChannel = null;
   }
+  if (!window.supabase) {
+    console.warn('[Realtime] supabase not loaded — using polling fallback');
+    startSharePolling(threadId);
+    return;
+  }
   try {
     var client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
     _shareRealtimeChannel = client
@@ -1236,9 +1254,13 @@ function startShareRealtime(threadId) {
 }
 
 async function saveRecipientFollowUp(input, responseText) {
-  if (!_threadId || !shareId) return;
+  console.log('[recipient followup] _threadId:', _threadId, 'shareId:', shareId);
+  if (!_threadId || !shareId) {
+    console.warn('[recipient followup] BLOCKED — missing _threadId or shareId');
+    return;
+  }
   try {
-    await fetch('/api/followups', {
+    var res = await fetch('/api/followups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1249,7 +1271,11 @@ async function saveRecipientFollowUp(input, responseText) {
         source:    'recipient'
       })
     });
-  } catch(e) {}
+    var data = await res.json();
+    console.log('[recipient followup] response:', res.status, data);
+  } catch(e) {
+    console.error('[recipient followup] error:', e.message);
+  }
 }
 
 // ── PDF Download ─────────────────────────────────────────────────────────────
@@ -1260,6 +1286,10 @@ function stripHebrew(text) {
 }
 
 function downloadPDF(mode) {
+  if (!window.jspdf) {
+    alert('PDF export is not available right now. Please try again.');
+    return;
+  }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
