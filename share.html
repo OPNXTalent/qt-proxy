@@ -1646,6 +1646,9 @@ function goNewSubject() {
     sessionStorage.setItem('prism_shared_thread', '/share.html?t=' + shareToken);
     sessionStorage.setItem('prism_shared_thread_title', currentSubject || 'Shared interpretation');
   }
+  // Mark that qt.html is being opened by a recipient, not the account holder.
+  // This prevents qt.html from loading the sender's thread history into the sidebar.
+  sessionStorage.setItem('prism_recipient_mode', '1');
   window.location.href = 'https://theprism.io/qt.html';
 }
 
