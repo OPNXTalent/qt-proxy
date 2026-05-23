@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Prism — Shared Interpretation</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
@@ -1146,67 +1147,92 @@ function addQueryToSidebar(queryText, targetEl) {
 // Renders new sender follow-ups into #liveThreadContent.
 // Also saves recipient contributions back to the thread via /api/followups.
 
-var _liveThreadPollInterval = null;
-var _renderedFollowUpIds    = new Set();
-var _threadId               = null; // populated from share.thread_id
+var _renderedFollowUpIds = new Set();
+var _threadId            = null;
+var _shareRealtimeChannel = null;
 
 function startLiveThreadPolling(threadId) {
   _threadId = threadId;
   if (!threadId) return;
-  pollLiveThread(); // immediate first poll
-  _liveThreadPollInterval = setInterval(pollLiveThread, 15000);
+
+  // Fetch existing follow-ups immediately
+  fetch('/api/followups?threadId=' + encodeURIComponent(threadId), {
+    headers: { 'x-share-id': shareId || '' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) { renderLiveFollowUps(data.followUps || []); })
+  .catch(function() {});
+
+  // Subscribe via Realtime
+  startShareRealtime(threadId);
 }
 
-async function pollLiveThread() {
-  if (!_threadId) return;
-  try {
-    var res = await fetch('/api/followups?threadId=' + encodeURIComponent(_threadId), {
-      headers: { 'x-share-id': shareId || '' }
-    });
-    if (!res.ok) return;
-    var data = await res.json();
-    var followUps = data.followUps || [];
-    if (followUps.length === 0) return;
+function renderLiveFollowUps(followUps) {
+  var section   = document.getElementById('liveThreadSection');
+  var container = document.getElementById('liveThreadContent');
+  if (!section || !container) return;
 
-    var section  = document.getElementById('liveThreadSection');
-    var container = document.getElementById('liveThreadContent');
-    if (!section || !container) return;
+  var hasNew = false;
+  followUps.forEach(function(fu) {
+    var fuId = fu.id || (fu.query + fu.created_at);
+    if (_renderedFollowUpIds.has(fuId)) return;
+    _renderedFollowUpIds.add(fuId);
+    hasNew = true;
 
-    var hasNew = false;
-    followUps.forEach(function(fu) {
-      var fuId = fu.id || (fu.query + fu.created_at);
-      if (_renderedFollowUpIds.has(fuId)) return;
-      _renderedFollowUpIds.add(fuId);
-      hasNew = true;
+    var isRecipient = fu.source === 'recipient';
+    var block = document.createElement('div');
+    block.className = 'fu-block ' + (isRecipient ? 'recipient' : 'sender');
 
-      var isRecipient = fu.source === 'recipient';
-      var block = document.createElement('div');
-      block.className = 'fu-block ' + (isRecipient ? 'recipient' : 'sender');
-
-      var response = fu.response || {};
-      var bodyText = '';
-      if (typeof response === 'string') {
-        bodyText = response;
-      } else if (response.recognition) {
-        bodyText = [response.recognition, response.core_insight, response.kingdom_implication]
-          .filter(Boolean).join('\n\n');
-      }
-
-      var paras = bodyText.split(/\n\n/).filter(Boolean).map(function(p) {
-        return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
-      }).join('');
-
-      block.innerHTML =
-        '<div class="fu-question">' + escHtml(fu.query || '') + '</div>' +
-        '<div class="fu-body">' + (paras || '<p style="color:var(--text-muted);font-style:italic;">Interpretation rendered</p>') + '</div>';
-
-      container.appendChild(block);
-    });
-
-    if (hasNew) {
-      section.style.display = 'block';
+    var response = fu.response || {};
+    var bodyText = '';
+    if (typeof response === 'string') { bodyText = response; }
+    else if (response.text) { bodyText = response.text; }
+    else if (response.recognition) {
+      bodyText = [response.recognition, response.core_insight, response.kingdom_implication]
+        .filter(Boolean).join('\n\n');
     }
-  } catch(e) {}
+
+    var paras = bodyText.split(/\n\n/).filter(Boolean).map(function(p) {
+      return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
+    }).join('');
+
+    block.innerHTML =
+      '<div class="fu-question">' + escHtml(fu.query || '') + '</div>' +
+      '<div class="fu-body">' + (paras || '') + '</div>';
+
+    container.appendChild(block);
+  });
+
+  if (hasNew && section) section.style.display = 'block';
+}
+
+function startShareRealtime(threadId) {
+  if (_shareRealtimeChannel) {
+    _shareRealtimeChannel.unsubscribe();
+    _shareRealtimeChannel = null;
+  }
+  try {
+    var client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    _shareRealtimeChannel = client
+      .channel('share_fu_' + threadId)
+      .on('postgres_changes', {
+        event:  'INSERT',
+        schema: 'public',
+        table:  'follow_ups',
+        filter: 'thread_id=eq.' + threadId
+      }, function(payload) {
+        if (!payload.new) return;
+        // Recipient sees sender's follow-ups appear in real time
+        if (payload.new.source === 'owner') {
+          renderLiveFollowUps([payload.new]);
+        }
+      })
+      .subscribe(function(status) {
+        console.log('[Realtime share] status:', status);
+      });
+  } catch(err) {
+    console.warn('[Realtime share] failed:', err.message);
+  }
 }
 
 async function saveRecipientFollowUp(input, responseText) {
