@@ -3185,13 +3185,6 @@ function initSidebar() {
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
 
-  // Show session-not-saved block if no password registered yet
-  var hasPassword = !!localStorage.getItem('qt_user_password');
-  if (!hasPassword) {
-    var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt) freePrompt.style.display = 'block';
-  }
-
   // Anonymous / free users — show sidebar with save prompt, no thread history
   if (!email || CURRENT_TIER === 'free') {
     allThreads = [];
@@ -3199,6 +3192,8 @@ function initSidebar() {
     if (sidebar) sidebar.classList.add('visible');
     if (toggle) toggle.classList.add('visible');
     sidebarHasAppeared = true;
+    var freePrompt = document.getElementById('freeUpgradePrompt');
+    if (freePrompt) freePrompt.style.display = 'block';
     loadSidebarCreditsAnon();
     return;
   }
