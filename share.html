@@ -3,2296 +3,1163 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Prism — A Framework for Understanding Reality</title>
+<title>The Prism — Shared Interpretation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Montserrat:wght@200;300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --void:       #0e0b18;
-  --deep:       #0e0b18;
-  --surface:    #131025;
-  --gold:       #d4af5f;
-  --gold-dim:   #8a7040;
-  --gold-pale:  #e8d5a0;
-  --gold-glow:  rgba(212,175,95,0.10);
-  --text:       #e8e2d4;
-  --text-dim:   rgba(232,226,212,0.65);
-  --text-muted: rgba(232,226,212,0.35);
-  --border:     rgba(232,226,212,0.08);
-  --border-lit: rgba(212,175,95,0.3);
-  --cinzel: 'Cormorant Garamond', Georgia, serif;
-  --sans: 'Montserrat', sans-serif;
-}
-
-html { scroll-behavior: smooth; }
-
-body {
-  background: var(--void);
-  color: var(--text);
-  font-family: var(--sans);
-  font-weight: 300;
-  overflow-x: hidden;
-  cursor: default;
-}
-
-/* ── NOISE OVERLAY ── */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.35;
-}
-
-/* ── NAV ── */
-nav {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 100;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px 52px;
-  background: linear-gradient(to bottom, rgba(7,7,12,0.95), transparent);
-  backdrop-filter: blur(0px);
-  opacity: 0;
-  animation: fadeIn 1s ease forwards 0.2s;
-}
-
-.nav-mark {
-  font-family: var(--cinzel);
-  font-size: 17px;
-  font-weight: 300;
-  letter-spacing: 0.2em;
-  color: var(--gold-pale);
-}
-
-.nav-mark span {
-  color: var(--gold);
-}
-
-.nav-links {
-  display: flex;
-  gap: 40px;
-  list-style: none;
-}
-
-.nav-links a {
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  text-decoration: none;
-  transition: color 0.3s;
-}
-
-.nav-links a:hover { color: var(--gold-pale); }
-
-.nav-cta {
-  font-family: var(--sans);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--gold);
-  text-decoration: none;
-  border: 0.5px solid var(--border-lit);
-  padding: 9px 20px;
-  transition: all 0.3s;
-}
-
-.nav-cta:hover {
-  background: var(--gold-glow);
-  border-color: var(--gold);
-  color: var(--gold-pale);
-}
-
-/* ── HERO ── */
-.hero {
-  position: relative;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 120px 40px 100px;
-  overflow: hidden;
-}
-
-/* Star field */
-.starfield {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-/* Radial glow center */
-.hero-glow {
-  position: absolute;
-  top: 42%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 700px;
-  height: 700px;
-  background: radial-gradient(ellipse, rgba(201,168,76,0.05) 0%, transparent 70%);
-  z-index: 1;
-  pointer-events: none;
-}
-
-
-
-/* Watermark */
-.watermark {
-  position: absolute;
-  font-family: var(--cinzel);
-  font-size: 520px;
-  font-weight: 300;
-  color: rgba(201,168,76,0.018);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -48%);
-  user-select: none;
-  z-index: 1;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.hero-content {
-  position: relative;
-  z-index: 2;
-  text-align: center;
-  max-width: 860px;
-  width: 100%;
-}
-
-.hero-eyebrow {
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0.38em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 48px;
-  opacity: 0;
-  animation: fadeUp 0.9s ease forwards 0.4s;
-}
-
-.hero-title-wrap {
-  margin-bottom: 12px;
-  opacity: 0;
-  animation: fadeUp 1.1s ease forwards 0.6s;
-}
-
-.title-pre {
-  font-family: var(--sans);
-  font-size: 17px;
-  font-weight: 200;
-  letter-spacing: 0.55em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  display: block;
-  margin-bottom: 10px;
-}
-
-.title-main {
-  font-family: var(--cinzel);
-  font-size: clamp(80px, 13vw, 130px);
-  font-weight: 300;
-  letter-spacing: 0.14em;
-  color: var(--text);
-  display: block;
-  line-height: 0.88;
-  position: relative;
-}
-
-/* Thin line beneath PRISM */
-.title-main::after {
-  content: '';
-  display: block;
-  width: 56px;
-  height: 0.5px;
-  background: var(--gold);
-  margin: 22px auto 0;
-  opacity: 0.7;
-}
-
-.title-sub {
-  font-family: var(--cinzel);
-  font-size: clamp(36px, 5vw, 58px);
-  font-weight: 300;
-  font-style: italic;
-  color: var(--gold);
-  letter-spacing: 0.1em;
-  display: block;
-  margin-top: 24px;
-  opacity: 0.9;
-}
-
-.hebrew-accent {
-  display: block;
-  margin-top: 20px;
-  opacity: 0;
-  animation: fadeUp 1.2s ease forwards 1s;
-}
-
-.hebrew-primary {
-  display: block;
-  font-family: var(--cinzel);
-  font-size: clamp(28px, 3.5vw, 42px);
-  font-weight: 300;
-  color: var(--gold-pale);
-  letter-spacing: 0.12em;
-  line-height: 1;
-  text-shadow:
-    0 0 30px rgba(212,175,95,0.28),
-    0 0 60px rgba(212,175,95,0.12);
-  margin-bottom: 14px;
-}
-
-.hebrew-translation {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-
-.hebrew-translation-line {
-  width: 36px;
-  height: 0.5px;
-  background: var(--border-lit);
-}
-
-.hebrew-translation-text {
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 300;
-  letter-spacing: 0.4em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.hero-proposition {
-  font-family: var(--cinzel);
-  font-size: clamp(18px, 2.3vw, 23px);
-  font-weight: 300;
-  line-height: 1.75;
-  color: var(--text-dim);
-  max-width: 640px;
-  margin: 44px auto 0;
-  opacity: 0;
-  animation: fadeUp 0.9s ease forwards 1.1s;
-}
-
-.hero-proposition em {
-  font-style: italic;
-  color: var(--text);
-}
-
-.hero-divider {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  justify-content: center;
-  margin: 48px auto;
-  opacity: 0;
-  animation: fadeUp 0.8s ease forwards 1.3s;
-}
-
-.hero-divider-line {
-  width: 52px;
-  height: 0.5px;
-  background: var(--border-lit);
-}
-
-.hero-divider-glyph {
-  font-family: var(--cinzel);
-  font-size: 18px;
-  color: var(--gold-dim);
-}
-
-.hero-cta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  opacity: 0;
-  animation: fadeUp 0.8s ease forwards 1.5s;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 16px;
-  background: transparent;
-  border: 0.5px solid var(--gold);
-  color: var(--gold-pale);
-  font-family: var(--sans);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  padding: 19px 44px;
-  cursor: pointer;
-  text-decoration: none;
-  position: relative;
-  overflow: hidden;
-  transition: border-color 0.3s, color 0.3s;
-}
-
-.btn-primary::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--gold-glow);
-  transform: translateX(-100%);
-  transition: transform 0.4s ease;
-}
-
-.btn-primary:hover::before { transform: translateX(0); }
-.btn-primary:hover { border-color: var(--gold-pale); }
-
-.btn-arrow { transition: transform 0.3s; }
-.btn-primary:hover .btn-arrow { transform: translateX(5px); }
-
-.btn-secondary {
-  font-family: var(--sans);
-  font-size: 9px;
-  font-weight: 300;
-  letter-spacing: 0.28em;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  cursor: pointer;
-  text-decoration: none;
-  border-bottom: 0.5px solid rgba(228,223,212,0.12);
-  padding-bottom: 3px;
-  transition: color 0.3s, border-color 0.3s;
-}
-
-.btn-secondary:hover {
-  color: var(--text-dim);
-  border-color: var(--text-muted);
-}
-
-/* Three pillars */
-.pillars {
-  display: flex;
-  gap: 0;
-  margin-top: 88px;
-  border-top: 0.5px solid var(--border);
-  opacity: 0;
-  animation: fadeUp 0.9s ease forwards 1.8s;
-}
-
-.pillar {
-  flex: 1;
-  padding: 38px 28px 34px;
-  border-right: 0.5px solid var(--border);
-  text-align: center;
-  transition: background 0.3s;
-}
-
-.pillar:last-child { border-right: none; }
-.pillar:hover { background: rgba(201,168,76,0.025); }
-
-.pillar-glyph {
-  font-family: var(--cinzel);
-  font-size: 26px;
-  color: rgba(201,168,76,0.4);
-  display: block;
-  margin-bottom: 18px;
-}
-
-.pillar-label {
-  font-family: var(--sans);
-  font-size: 8px;
-  font-weight: 500;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  display: block;
-  margin-bottom: 12px;
-}
-
-.pillar-text {
-  font-family: var(--cinzel);
-  font-size: 15px;
-  font-weight: 300;
-  color: var(--text-dim);
-  line-height: 1.65;
-  font-style: italic;
-}
-
-/* Scroll prompt */
-.scroll-prompt {
-  position: absolute;
-  bottom: 38px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  opacity: 0;
-  animation: fadeIn 1s ease forwards 2.4s;
-  z-index: 2;
-}
-
-.scroll-line {
-  width: 0.5px;
-  height: 44px;
-  background: linear-gradient(to bottom, rgba(201,168,76,0.5), transparent);
-  animation: scrollPulse 2.5s ease-in-out infinite 2.6s;
-}
-
-.scroll-label {
-  font-family: var(--sans);
-  font-size: 7px;
-  letter-spacing: 0.36em;
-  color: var(--text-muted);
-  text-transform: uppercase;
-}
-
-@keyframes scrollPulse {
-  0%, 100% { opacity: 0.4; transform: scaleY(1); }
-  50% { opacity: 1; transform: scaleY(1.12); }
-}
-
-/* ── SECTION BASE ── */
-section {
-  position: relative;
-  overflow: hidden;
-}
-
-.section-inner {
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: 0 52px;
-}
-
-/* ── WHAT IS THE PRISM ── */
-.what-section {
-  padding: 140px 0 120px;
-  background: #111020;
-  border-top: 0.5px solid var(--border);
-  overflow: visible;
-}
-
-.what-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 80px;
-  align-items: start;
-}
-
-.what-left {
-  position: sticky;
-  top: 100px;
-  align-self: start;
-  z-index: 2;
-  opacity: 0;
-  animation: fadeIn 0.9s ease forwards 0.3s;
-}
-
-.section-eyebrow {
-  font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.38em;
-  text-transform: uppercase;
-  color: var(--gold-dim);
-  margin-bottom: 28px;
-}
-
-.section-heading {
-  font-family: var(--cinzel);
-  font-size: clamp(32px, 4vw, 48px);
-  font-weight: 300;
-  line-height: 1.15;
-  color: var(--text);
-  margin-bottom: 32px;
-}
-
-.section-heading em {
-  font-style: italic;
-  color: var(--gold-pale);
-}
-
-.section-body {
-  font-family: var(--cinzel);
-  font-size: 17px;
-  font-weight: 300;
-  line-height: 1.85;
-  color: var(--text-dim);
-}
-
-.section-body + .section-body {
-  margin-top: 20px;
-}
-
-/* ── ACCORDION ── */
-.what-point {
-  border-bottom: 0.5px solid var(--border);
-  cursor: pointer;
-  transition: background 0.25s;
-}
-
-.what-point:last-child { border-bottom: none; }
-.what-point:hover { background: rgba(212,175,95,0.025); }
-
-.what-point-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 28px 32px;
-  gap: 16px;
-}
-
-.what-point-header-left { flex: 1; }
-
-.what-point-toggle {
-  font-family: var(--sans);
-  font-size: 14px;
-  color: var(--gold-dim);
-  flex-shrink: 0;
-  transition: transform 0.35s ease, color 0.25s;
-  line-height: 1;
-  user-select: none;
-}
-
-.what-point.open .what-point-toggle {
-  transform: rotate(45deg);
-  color: var(--gold);
-}
-
-.what-point-drawer {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.what-point.open .what-point-drawer {
-  max-height: 1800px;
-}
-
-.what-point-drawer-inner {
-  padding: 0 32px 28px;
-  border-top: 0.5px solid var(--border);
-}
-
-.drawer-body {
-  font-family: var(--cinzel);
-  font-size: 15px;
-  font-weight: 300;
-  font-style: italic;
-  color: var(--text-dim);
-  line-height: 1.85;
-  margin-bottom: 16px;
-}
-
-.drawer-body:last-child { margin-bottom: 0; }
-
-.drawer-property {
-  margin-bottom: 20px;
-  padding-left: 16px;
-  border-left: 0.5px solid var(--border-lit);
-}
-
-.drawer-property:last-of-type { margin-bottom: 0; }
-
-.drawer-property-name {
-  font-family: var(--sans);
-  font-size: 8px;
-  font-weight: 500;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--gold);
-  display: block;
-  margin-bottom: 8px;
-}
-
-.drawer-property-body {
-  font-family: var(--cinzel);
-  font-size: 15px;
-  font-weight: 300;
-  font-style: italic;
-  color: var(--text-dim);
-  line-height: 1.8;
-}
-
-.drawer-property-sub {
-  font-family: var(--cinzel);
-  font-size: 13px;
-  font-weight: 300;
-  color: var(--text-muted);
-  line-height: 1.7;
-  margin-top: 6px;
-  font-style: normal;
-}
-
-.drawer-disclaimer {
-  margin-top: 24px;
-  padding: 18px 20px;
-  border: 0.5px solid var(--border-lit);
-  background: rgba(212,175,95,0.03);
-}
-
-.drawer-disclaimer-label {
-  font-family: var(--sans);
-  font-size: 7px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--gold-dim);
-  display: block;
-  margin-bottom: 10px;
-}
-
-.drawer-disclaimer-text {
-  font-family: var(--cinzel);
-  font-size: 14px;
-  font-weight: 300;
-  color: var(--text-dim);
-  line-height: 1.8;
-}
-
-.what-right {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border: 0.5px solid var(--border);
-}
-
-.what-point-num {
-  font-family: var(--sans);
-  font-size: 8px;
-  letter-spacing: 0.3em;
-  color: var(--gold-dim);
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 8px;
-}
-
-.what-point-title {
-  font-family: var(--cinzel);
-  font-size: 18px;
-  font-weight: 400;
-  color: var(--text);
-  line-height: 1.2;
-}
-
-/* ── THE INTERPRETER / APP ── */
-.app-section {
-  padding: 140px 0 120px;
-  background: var(--void);
-  border-top: 0.5px solid var(--border);
-}
-
-.app-header {
-  text-align: center;
-  max-width: 640px;
-  margin: 0 auto 80px;
-}
-
-.app-header .section-eyebrow { text-align: center; }
-.app-header .section-heading { text-align: center; }
-.app-header .section-body { text-align: center; }
-
-/* Tier cards */
-.tiers {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0;
-  border: 0.5px solid var(--border);
-  margin-bottom: 64px;
-}
-
-.tier-card {
-  padding: 40px 28px 36px;
-  border-right: 0.5px solid var(--border);
-  position: relative;
-  transition: background 0.3s;
-}
-
-.tier-card:last-child { border-right: none; }
-.tier-card:hover { background: rgba(201,168,76,0.025); }
-
-.tier-card.featured {
-  background: rgba(201,168,76,0.04);
-  border-color: var(--border-lit);
-}
-
-.tier-card.featured::before {
-  content: 'Most Popular';
-  position: absolute;
-  top: -1px; left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--sans);
-  font-size: 7px;
-  font-weight: 500;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--gold);
-  background: var(--void);
-  padding: 4px 14px;
-  border: 0.5px solid var(--border-lit);
-  border-top: none;
-  white-space: nowrap;
-}
-
-.tier-name {
-  font-family: var(--sans);
-  font-size: 8px;
-  font-weight: 500;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  display: block;
-  margin-bottom: 20px;
-}
-
-.tier-price {
-  font-family: var(--cinzel);
-  font-size: 38px;
-  font-weight: 300;
-  color: var(--text);
-  line-height: 1;
-  margin-bottom: 4px;
-}
-
-.tier-price sup {
-  font-size: 16px;
-  vertical-align: super;
-}
-
-.tier-cadence {
-  font-family: var(--sans);
-  font-size: 9px;
-  letter-spacing: 0.15em;
-  color: var(--text-muted);
-  margin-bottom: 28px;
-  display: block;
-}
-
-.tier-features {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 32px;
-}
-
-.tier-features li {
-  font-family: var(--cinzel);
-  font-size: 13px;
-  font-weight: 300;
-  color: var(--text-dim);
-  line-height: 1.5;
-  padding-left: 16px;
-  position: relative;
-}
-
-.tier-features li::before {
-  content: '—';
-  position: absolute;
-  left: 0;
-  color: var(--gold-dim);
-  font-size: 10px;
-}
-
-.tier-btn {
-  display: block;
-  width: 100%;
-  text-align: center;
-  font-family: var(--sans);
-  font-size: 8px;
-  font-weight: 500;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  padding: 13px 0;
-  border: 0.5px solid var(--border-lit);
-  color: var(--gold);
-  text-decoration: none;
-  cursor: pointer;
-  transition: all 0.3s;
-  background: transparent;
-}
-
-.tier-btn:hover {
-  background: var(--gold-glow);
-  border-color: var(--gold);
-  color: var(--gold-pale);
-}
-
-.tier-card.featured .tier-btn {
-  border-color: var(--gold);
-  color: var(--gold-pale);
-}
-
-/* ── HOW IT WORKS ── */
-.how-section {
-  padding: 140px 0 120px;
-  background: #111020;
-  border-top: 0.5px solid var(--border);
-}
-
-.how-header {
-  text-align: center;
-  max-width: 580px;
-  margin: 0 auto 88px;
-}
-
-.how-steps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0;
-}
-
-.how-step {
-  padding: 0 40px;
-  border-right: 0.5px solid var(--border);
-  position: relative;
-}
-
-.how-step:first-child { padding-left: 0; }
-.how-step:last-child { border-right: none; padding-right: 0; }
-
-.step-number {
-  font-family: var(--sans);
-  font-size: 60px;
-  font-weight: 200;
-  color: rgba(201,168,76,0.08);
-  line-height: 1;
-  margin-bottom: 20px;
-  display: block;
-  letter-spacing: -0.02em;
-}
-
-.step-title {
-  font-family: var(--cinzel);
-  font-size: 20px;
-  font-weight: 400;
-  color: var(--text);
-  margin-bottom: 14px;
-}
-
-.step-body {
-  font-family: var(--cinzel);
-  font-size: 15px;
-  font-weight: 300;
-  font-style: italic;
-  color: var(--text-dim);
-  line-height: 1.75;
-}
-
-/* ── THE BOOK ── */
-.book-section {
-  padding: 140px 0 120px;
-  background: var(--void);
-  border-top: 0.5px solid var(--border);
-}
-
-.book-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 100px;
-  align-items: center;
-}
-
-.book-visual {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.book-right {}
-
-.book-release {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  font-family: var(--sans);
-  font-size: 8px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--gold-dim);
-  border: 0.5px solid var(--border-lit);
-  padding: 8px 16px;
-  margin-bottom: 36px;
-}
-
-.book-release-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--gold);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.3); }
-}
-
-/* ── QUOTE/MANIFESTO ── */
-.manifesto-section {
-  padding: 120px 0;
-  background: #111020;
-  border-top: 0.5px solid var(--border);
-}
-
-.manifesto-inner {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 0 52px;
-  text-align: center;
-}
-
-.manifesto-quote {
-  font-family: var(--cinzel);
-  font-size: clamp(22px, 3vw, 32px);
-  font-weight: 300;
-  line-height: 1.7;
-  color: var(--text-dim);
-  font-style: italic;
-  position: relative;
-  margin-bottom: 40px;
-}
-
-.manifesto-quote::before {
-  content: '"';
-  font-size: 80px;
-  color: rgba(201,168,76,0.1);
-  font-family: var(--cinzel);
-  position: absolute;
-  top: -20px;
-  left: -20px;
-  line-height: 1;
-}
-
-.manifesto-source {
-  font-family: var(--sans);
-  font-size: 8px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-/* ── FINAL CTA ── */
-.final-cta-section {
-  padding: 140px 0;
-  background: var(--void);
-  border-top: 0.5px solid var(--border);
-  text-align: center;
-}
-
-.final-cta-inner {
-  max-width: 620px;
-  margin: 0 auto;
-  padding: 0 52px;
-}
-
-.final-cta-heading {
-  font-family: var(--cinzel);
-  font-size: clamp(32px, 5vw, 52px);
-  font-weight: 300;
-  line-height: 1.2;
-  color: var(--text);
-  margin-bottom: 24px;
-}
-
-.final-cta-heading em {
-  font-style: italic;
-  color: var(--gold-pale);
-}
-
-.final-cta-sub {
-  font-family: var(--cinzel);
-  font-size: 18px;
-  font-weight: 300;
-  font-style: italic;
-  color: var(--text-dim);
-  line-height: 1.75;
-  margin-bottom: 52px;
-}
-
-.final-btns {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-}
-
-/* ── FOOTER ── */
-footer {
-  padding: 40px 52px;
-  border-top: 0.5px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--void);
-}
-
-.footer-mark {
-  font-family: var(--cinzel);
-  font-size: 14px;
-  letter-spacing: 0.2em;
-  color: var(--text-muted);
-}
-
-.footer-copy {
-  font-family: var(--sans);
-  font-size: 9px;
-  letter-spacing: 0.15em;
-  color: var(--text-muted);
-}
-
-.footer-links {
-  display: flex;
-  gap: 28px;
-  list-style: none;
-}
-
-.footer-links a {
-  font-family: var(--sans);
-  font-size: 8px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  text-decoration: none;
-  transition: color 0.3s;
-}
-
-.footer-links a:hover { color: var(--gold-pale); }
-
-/* ── ANIMATIONS ── */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-/* Scroll reveal */
-.reveal {
-  opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.8s ease, transform 0.8s ease;
-}
-
-.reveal.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.reveal-delay-1 { transition-delay: 0.1s; }
-.reveal-delay-2 { transition-delay: 0.2s; }
-.reveal-delay-3 { transition-delay: 0.3s; }
-.reveal-delay-4 { transition-delay: 0.4s; }
-
-/* ── RESPONSIVE ── */
-@media (max-width: 900px) {
-  nav { padding: 20px 28px; }
-  .nav-links { display: none; }
-  .what-grid, .book-grid { grid-template-columns: 1fr; gap: 48px; }
-  .tiers { grid-template-columns: 1fr 1fr; }
-  .how-steps { grid-template-columns: 1fr; gap: 48px; }
-  .how-step { border-right: none; border-bottom: 0.5px solid var(--border); padding: 0 0 40px; }
-  .how-step:last-child { border-bottom: none; padding-bottom: 0; }
-  .how-step:first-child { padding-left: 0; }
-  .section-inner { padding: 0 28px; }
-  .pillars { flex-direction: column; }
-  .pillar { border-right: none; border-bottom: 0.5px solid var(--border); }
-  footer { flex-direction: column; gap: 20px; text-align: center; }
-}
-
-@media (max-width: 600px) {
-  .tiers { grid-template-columns: 1fr; }
-  .hero { padding: 100px 24px 80px; }
-}
-
-
-/* ── SHARE RETURN BAR ── */
-#shareReturnBar {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  z-index: 200;
-  background: rgba(13,13,20,0.96);
-  border-top: 1px solid rgba(201,168,76,0.2);
-  backdrop-filter: blur(12px);
-  padding: 14px 28px;
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-#shareReturnBar a.return-link {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--gold);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-#shareReturnBar a.return-link:hover { color: var(--gold-pale, #e8d5a0); }
-#shareReturnBar button.dismiss-btn {
-  background: transparent;
-  border: none;
-  color: rgba(201,168,76,0.4);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  transition: color 0.2s;
-  flex-shrink: 0;
-}
-#shareReturnBar button.dismiss-btn:hover { color: var(--gold); }
+  :root {
+    --void: #06060a;
+    --deep: #0d0d14;
+    --surface: #13131e;
+    --surface-2: #1a1a28;
+    --border: #2a2a40;
+    --border-lit: #4a4a70;
+    --gold: #c9a84c;
+    --gold-dim: #7a6230;
+    --gold-pale: #e8d5a0;
+    --blue-deep: #1e2a4a;
+    --text: #d8d4e8;
+    --text-dim: #7a7890;
+    --text-muted: #3a384a;
+    --hebrew: #b8a8d0;
+    --collab: rgba(80,180,120,0.8);
+    --collab-dim: rgba(80,180,120,0.4);
+    --cinzel: 'Cinzel', serif;
+    --crimson: 'Crimson Pro', Georgia, serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--crimson);
+    font-size: 20px;
+    line-height: 1.7;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(200,180,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 10%, rgba(200,180,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 60%, rgba(200,180,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 15% 75%, rgba(200,180,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 50%, rgba(200,180,255,0.25) 0%, transparent 100%),
+      radial-gradient(2px 2px at 75% 35%, rgba(201,168,76,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 45% 45%, rgba(200,180,255,0.4) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 280px; min-width: 280px;
+    background: var(--deep);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    position: fixed; top: 0; left: 0; bottom: 0;
+    z-index: 200;
+    transform: translateX(-280px);
+    transition: transform 0.3s ease;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-toggle {
+    position: fixed; top: 20px; left: 20px; z-index: 300;
+    width: 36px; height: 36px;
+    background: rgba(6,6,10,0.9); border: 1px solid var(--border);
+    color: var(--gold-dim); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; transition: all 0.2s; backdrop-filter: blur(8px);
+  }
+  .sidebar-toggle:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  .sidebar-header {
+    padding: 68px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .sidebar-logo { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.18em; color: var(--gold-pale); text-transform: uppercase; margin-bottom: 4px; }
+  .sidebar-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--gold-dim); text-transform: uppercase; }
+
+  /* Anonymous warning bar */
+  .anon-warning {
+    margin: 12px 16px;
+    padding: 12px 14px;
+    border: 1px solid rgba(201,168,76,0.2);
+    background: rgba(201,168,76,0.03);
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    line-height: 1.7;
+    color: var(--gold-dim);
+  }
+  .anon-warning strong { color: var(--gold-pale); display: block; margin-bottom: 4px; letter-spacing: 0.16em; text-transform: uppercase; }
+
+  /* Save profile CTA */
+  .save-profile-bar {
+    margin: 8px 16px 4px;
+    padding: 0;
+  }
+  .save-profile-btn {
+    width: 100%;
+    font-family: var(--cinzel);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 11px 16px;
+    border: 1px solid var(--gold-dim);
+    background: rgba(201,168,76,0.04);
+    color: var(--gold-pale);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .save-profile-btn:hover { background: rgba(201,168,76,0.09); border-color: var(--gold); }
+
+  /* Inline email capture inside sidebar */
+  .email-capture-inline {
+    display: none;
+    margin: 8px 16px;
+    padding: 14px;
+    border: 1px solid var(--gold-dim);
+    background: rgba(201,168,76,0.03);
+  }
+  .email-capture-inline.open { display: block; }
+  .email-capture-inline input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--crimson);
+    font-size: 15px;
+    padding: 9px 12px;
+    outline: none;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+  .email-capture-inline input:focus { border-color: var(--gold-dim); }
+  .email-capture-inline input::placeholder { color: var(--text-muted); font-style: italic; }
+  .email-capture-inline button {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 9px;
+    border: 1px solid var(--gold-dim);
+    background: transparent;
+    color: var(--gold-pale);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .email-capture-inline button:hover { background: rgba(201,168,76,0.08); }
+  .email-capture-status {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--gold-dim);
+    margin-top: 6px;
+    display: none;
+  }
+
+  .sidebar-section-label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding: 14px 20px 8px; flex-shrink: 0;
+  }
+
+  .sidebar-threads { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+  .sidebar-threads::-webkit-scrollbar { width: 3px; }
+  .sidebar-threads::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .thread-item {
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(42,42,64,0.5);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .thread-item:hover { background: rgba(255,255,255,0.02); }
+  .thread-item.active { background: rgba(201,168,76,0.05); border-left: 2px solid var(--gold-dim); padding-left: 18px; }
+  .thread-item.shared-origin { border-left: 2px solid var(--collab-dim); }
+  .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text); line-height: 1.4; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .thread-date { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--text-muted); }
+  .thread-badge { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 7px; color: #ffffff; background: rgba(201,168,76,0.25); }
+  .thread-badge.shared { background: rgba(80,180,120,0.25); }
+
+  .sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sidebar-footer a {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--text-muted); text-decoration: none;
+    transition: color 0.2s;
+  }
+  .sidebar-footer a:hover { color: var(--gold-dim); }
+
+  /* ── LAYOUT ── */
+  .page-wrap { display: flex; min-height: 100vh; }
+  .main-content { flex: 1; transition: margin-left 0.3s ease; min-width: 0; }
+  .main-content.sidebar-open { margin-left: 280px; }
+  @media (max-width: 900px) { .main-content.sidebar-open { margin-left: 0; } }
+
+  .shell {
+    position: relative; z-index: 1;
+    max-width: 860px; width: 100%;
+    margin: 0 auto;
+    padding: 60px 40px 100px;
+  }
+
+  /* ── SHARED BANNER ── */
+  .share-banner {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 48px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .share-banner span { color: var(--gold-dim); }
+
+  /* ── HEADER ── */
+  .header { text-align: center; margin-bottom: 64px; }
+  .header h1 { font-family: var(--cinzel); font-size: 44px; font-weight: 400; letter-spacing: 0.08em; color: var(--gold-pale); line-height: 1.2; margin-bottom: 8px; }
+  .header-sub { font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.2em; color: var(--text-muted); margin-bottom: 28px; }
+  .header-rule { width: 120px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold-dim), transparent); margin: 0 auto 24px; }
+  .header-premise { font-size: 17px; color: var(--text-dim); font-style: italic; max-width: 560px; margin: 0 auto; line-height: 1.75; }
+
+  /* ── VERSE BANNER ── */
+  .verse-banner { border-left: 2px solid var(--gold-dim); padding: 20px 28px; background: linear-gradient(135deg, rgba(201,168,76,0.04), transparent); margin-bottom: 40px; }
+  .verse-ref { font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold-dim); margin-bottom: 10px; }
+  .verse-text { font-size: 23px; color: var(--gold-pale); font-style: italic; line-height: 1.6; }
+
+  /* ── RECOGNITION ── */
+  .qt-recognition { padding: 28px 0 28px; margin-bottom: 8px; }
+  .qt-recognition p { font-family: var(--crimson); font-size: 18.5px; font-style: italic; color: var(--text); line-height: 1.8; margin: 0; }
+
+  /* ── CORE INSIGHT ── */
+  .qt-core-insight { padding: 24px 0 28px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+  .qt-core-insight p { font-family: var(--crimson); font-size: 18px; color: var(--text); line-height: 1.8; margin: 0; }
+
+  /* ── KINGDOM BLOCK ── */
+  .kingdom-block { border: 1px solid var(--gold-dim); background: linear-gradient(135deg, rgba(201,168,76,0.06), rgba(30,42,74,0.3)); padding: 28px 32px; margin-top: 12px; position: relative; }
+  .kingdom-block::before { content: '✦'; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--void); padding: 0 10px; color: var(--gold-dim); font-size: 17px; }
+  .kingdom-label { font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold-dim); margin-bottom: 14px; text-align: center; }
+  .kingdom-text { font-size: 21px; color: var(--gold-pale); font-style: italic; text-align: center; line-height: 1.7; }
+
+  /* ── SUGGESTED THREADS ── */
+  .qt-threads { margin: 32px 0; }
+  .qt-threads-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; }
+  .qt-thread-btn { display: block; width: 100%; text-align: left; background: transparent; border: 1px solid var(--border); color: var(--text-dim); font-family: var(--crimson); font-size: 16.5px; font-style: italic; line-height: 1.6; padding: 13px 18px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
+  .qt-thread-btn:hover { border-color: var(--gold-dim); color: var(--gold-pale); background: rgba(201,168,76,0.03); }
+  .qt-thread-btn::before { content: '→ '; color: var(--gold-dim); font-style: normal; font-family: var(--mono); font-size: 13px; margin-right: 4px; }
+
+  /* ── FRAMEWORK SECTIONS ── */
+  .qt-framework-toggle { display: block; width: 100%; text-align: center; background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; padding: 12px 20px; cursor: pointer; margin-bottom: 32px; transition: border-color 0.2s, color 0.2s; }
+  .qt-framework-toggle:hover { border-color: var(--gold-dim); color: var(--gold-dim); }
+  .qt-framework-body { display: none; }
+  .qt-framework-body.open { display: block; }
+  .qt-section { margin-bottom: 32px; border: 1px solid var(--border); background: var(--surface); overflow: hidden; }
+  .qt-section-head { display: flex; align-items: baseline; gap: 14px; padding: 16px 24px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  .qt-section-num { font-family: var(--mono); font-size: 17px; color: var(--gold-dim); letter-spacing: 0.1em; flex-shrink: 0; }
+  .qt-section-title { font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text); flex: 1; }
+  .qt-section-hebrew { font-size: 18px; color: var(--hebrew); font-family: var(--crimson); flex-shrink: 0; }
+  .qt-section-body { padding: 22px 24px; font-size: 19px; color: var(--text); line-height: 1.75; }
+  .qt-section-body p { margin-bottom: 12px; }
+  .qt-section-body p:last-child { margin-bottom: 0; }
+  .qt-table { width: 100%; border-collapse: collapse; font-size: 17px; }
+  .qt-table th { font-family: var(--mono); font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); background: rgba(201,168,76,0.04); }
+  .qt-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-dim); vertical-align: top; }
+  .qt-table td:first-child { color: var(--text); font-weight: 600; width: 36%; }
+  .qt-table tr:last-child td { border-bottom: none; }
+
+  /* ── DIVIDER BETWEEN SHARED + OWN QUERIES ── */
+  .own-query-divider {
+    margin: 52px 0 36px;
+    text-align: center;
+    position: relative;
+  }
+  .own-query-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+  }
+  .own-query-divider span {
+    position: relative;
+    background: var(--void);
+    padding: 0 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* ── INPUT AREA ── */
+  .input-field {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--crimson); font-size: 16px;
+    padding: 18px 20px; resize: vertical; min-height: 100px; line-height: 1.6;
+    transition: border-color 0.2s; outline: none;
+  }
+  .input-field:focus { border-color: var(--gold-dim); }
+  .input-field::placeholder { color: var(--text-muted); font-style: italic; }
+
+  .submit-btn {
+    font-family: var(--cinzel); font-size: 17px; letter-spacing: 0.2em;
+    text-transform: uppercase; padding: 16px 36px;
+    border: 1px solid var(--gold-dim); background: transparent;
+    color: var(--gold-pale); cursor: pointer; transition: all 0.25s;
+  }
+  .submit-btn:hover { border-color: var(--gold); background: rgba(201,168,76,0.06); }
+  .submit-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── FOLLOW-UP BLOCKS ── */
+  .fu-block { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 32px; }
+  .fu-question { font-family: var(--crimson); font-size: 15px; font-style: italic; color: var(--gold-dim); letter-spacing: 0.01em; margin-bottom: 20px; padding-left: 14px; border-left: 2px solid var(--border); line-height: 1.55; }
+  .fu-question::before { content: 'Your question — '; font-family: var(--mono); font-size: 10px; font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px; }
+  .fu-body { font-family: var(--crimson); font-size: 18px; color: var(--text); line-height: 1.8; }
+  .fu-body p { margin: 0 0 16px 0; }
+  .fu-body p:last-child { margin-bottom: 0; }
+
+  /* ── COLLABORATION PANEL ── */
+  .collab-panel {
+    margin-top: 48px;
+    border: 1px solid var(--collab-dim);
+    background: rgba(80,180,120,0.02);
+    overflow: hidden;
+  }
+  .collab-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--collab-dim);
+    background: rgba(80,180,120,0.04);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .collab-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--collab);
+    animation: collabPulse 2s ease-in-out infinite;
+  }
+  @keyframes collabPulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+  .collab-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--collab); }
+  .collab-messages { padding: 20px; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+  .collab-messages::-webkit-scrollbar { width: 3px; }
+  .collab-messages::-webkit-scrollbar-thumb { background: var(--border); }
+  .collab-msg { padding: 12px 16px; border: 1px solid var(--border); background: var(--surface); }
+  .collab-msg.own { border-color: var(--collab-dim); background: rgba(80,180,120,0.03); }
+  .collab-msg-meta { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+  .collab-msg.own .collab-msg-meta { color: rgba(80,180,120,0.6); }
+  .collab-msg-body { font-family: var(--crimson); font-size: 16px; color: var(--text-dim); line-height: 1.7; }
+  .collab-input-row { padding: 16px 20px; border-top: 1px solid var(--collab-dim); display: flex; gap: 10px; align-items: flex-end; }
+  .collab-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--crimson); font-size: 15px;
+    padding: 10px 14px; outline: none; resize: none; min-height: 48px;
+    transition: border-color 0.2s; line-height: 1.5;
+  }
+  .collab-input:focus { border-color: var(--collab-dim); }
+  .collab-input::placeholder { color: var(--text-muted); font-style: italic; }
+  .collab-send-btn {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    padding: 10px 16px; border: 1px solid var(--collab-dim); background: transparent;
+    color: var(--collab); cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .collab-send-btn:hover { background: rgba(80,180,120,0.06); }
+  .collab-closed-notice { padding: 20px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text-muted); text-align: center; text-transform: uppercase; }
+
+  /* ── LOADING / ERROR ── */
+  .state-block { text-align: center; padding: 80px 0; position: relative; z-index: 1; }
+  .state-symbol { font-family: var(--cinzel); font-size: 32px; color: var(--gold-dim); margin-bottom: 20px; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+  .state-text { font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); }
+  .state-block.error .state-symbol { animation: none; opacity: 0.5; }
+  .back-link { display: inline-block; margin-top: 24px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); text-decoration: none; border: 1px solid var(--border); padding: 10px 20px; transition: all 0.2s; }
+  .back-link:hover { border-color: var(--gold-dim); color: var(--gold-dim); }
+
+  /* ── LOADING INLINE ── */
+  .loading-inline { text-align: center; padding: 40px 0; }
+  .loading-inline .ls { font-family: var(--cinzel); font-size: 24px; color: var(--gold-dim); animation: pulse 2s ease-in-out infinite; }
+  .loading-inline .lt { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); margin-top: 12px; }
+
+  /* ── LIMIT WALL ── */
+  .limit-wall { margin-top: 32px; border: 1px solid var(--border); padding: 36px 40px; text-align: center; background: rgba(180,140,60,0.04); display: none; }
+  .limit-wall-title { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.22em; color: var(--gold); margin-bottom: 16px; text-transform: uppercase; }
+  .limit-wall-body { font-family: var(--crimson); font-size: 19px; color: var(--text); line-height: 1.8; margin-bottom: 32px; }
+  .limit-options { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; text-align: left; }
+  .limit-option { border: 1px solid var(--border); padding: 24px 20px; background: var(--surface); }
+  .limit-option.featured { border-color: var(--gold-dim); background: linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position: relative; }
+  .limit-option-tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--void); padding: 0 10px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); }
+  .limit-option-tier { font-family: var(--cinzel); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold-dim); margin-bottom: 8px; }
+  .limit-option-price { font-family: var(--cinzel); font-size: 22px; color: var(--gold-pale); margin-bottom: 4px; }
+  .limit-option-desc { font-family: var(--crimson); font-size: 15px; color: var(--text-dim); line-height: 1.6; margin-bottom: 20px; }
+  .limit-option-cta { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-pale); text-decoration: none; border: 1px solid var(--gold-dim); padding: 9px 16px; display: block; text-align: center; transition: all 0.25s; }
+  .limit-option-cta:hover { background: rgba(201,168,76,0.1); }
+  .limit-option-cta.solid { background: var(--gold-dim); color: var(--void); }
+  .limit-option-cta.solid:hover { background: var(--gold); }
+
+  /* ── FOOTER ── */
+  .site-footer { padding: 32px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1; }
+  .footer-mark { font-family: var(--cinzel); font-size: 13px; letter-spacing: 0.12em; color: var(--text-muted); text-decoration: none; }
+  .footer-mark:hover { color: var(--gold); }
+  .footer-copy { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-muted); }
+
+  @media (max-width: 768px) {
+    .shell { padding: 40px 20px 80px; }
+    .header h1 { font-size: 28px; }
+    .limit-options { grid-template-columns: 1fr; }
+    .site-footer { flex-direction: column; gap: 16px; text-align: center; padding: 28px; }
+  }
 </style>
 </head>
 <body>
 
-<!-- ── SHARE RETURN BAR ── -->
-<div id="shareReturnBar">
-  <a class="return-link" id="shareReturnLink" href="#">← Return to the interpretation shared with you</a>
-  <button class="dismiss-btn" onclick="dismissReturnBar()" title="Dismiss">✕</button>
-</div>
+<!-- ── SIDEBAR TOGGLE ── -->
+<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Session history">☰</button>
 
-<script>
-(function() {
-  var token = sessionStorage.getItem('prism_shared_thread');
-  if (!token) return;
-  var bar  = document.getElementById('shareReturnBar');
-  var link = document.getElementById('shareReturnLink');
-  if (!bar || !link) return;
-  link.href = '/share.html?t=' + encodeURIComponent(token);
-  bar.style.display = 'flex';
-
-  // Redirect all "Open the Interpreter" CTAs back to the shared interpretation
-  var shareUrl = '/share.html?t=' + encodeURIComponent(token);
-  document.querySelectorAll('a[href="/qt-gateway.html"]').forEach(function(el) {
-    el.href = shareUrl;
-    // Update label on nav CTA only
-    if (el.classList.contains('nav-cta')) {
-      el.textContent = '← Return to Interpretation';
-    }
-  });
-  // Push nav down so it doesn't overlap
-
-})();
-
-function dismissReturnBar() {
-  sessionStorage.removeItem('prism_shared_thread');
-  var bar = document.getElementById('shareReturnBar');
-  if (bar) bar.style.display = 'none';
-
-}
-</script>
-
-<!-- ── NAV ── -->
-<nav>
-  <div class="nav-mark">
-    <img src="ThePrism.png" alt="The Prism" style="height:36px; width:36px; object-fit:contain; opacity:0.9; vertical-align:middle; margin-right:10px;">
-    <span style="vertical-align:middle;">The <span style="color:var(--gold);">Prism</span></span>
-  </div>
-  <ul class="nav-links">
-    <li><a href="#what">The Framework</a></li>
-    <li><a href="#interpreter">The Interpreter</a></li>
-    <li><a href="#rct">RCT</a></li>
-    <li><a href="#book">The Book</a></li>
-    <li><a href="/author.html">The Author</a></li>
-  </ul>
-  <a href="/qt-gateway.html" class="nav-cta">Open the Interpreter →</a>
-</nav>
-
-<!-- ── HERO ── -->
-<section class="hero">
-
-  <!-- Starfield SVG -->
-  <svg class="starfield" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
-    <rect width="1440" height="900" fill="#0e0b18"/>
-    <g fill="white">
-      <circle cx="72"  cy="88"  r="0.7" opacity="0.5"/>
-      <circle cx="210" cy="44"  r="0.4" opacity="0.4"/>
-      <circle cx="490" cy="28"  r="0.9" opacity="0.55"/>
-      <circle cx="730" cy="62"  r="0.5" opacity="0.45"/>
-      <circle cx="980" cy="82"  r="0.7" opacity="0.5"/>
-      <circle cx="1190" cy="38" r="0.4" opacity="0.4"/>
-      <circle cx="1370" cy="95" r="0.6" opacity="0.45"/>
-      <circle cx="55"  cy="210" r="0.6" opacity="0.4"/>
-      <circle cx="310" cy="178" r="0.9" opacity="0.5"/>
-      <circle cx="540" cy="155" r="0.4" opacity="0.35"/>
-      <circle cx="820" cy="195" r="0.7" opacity="0.45"/>
-      <circle cx="1060" cy="168" r="0.5" opacity="0.4"/>
-      <circle cx="1290" cy="205" r="0.8" opacity="0.5"/>
-      <circle cx="170" cy="360" r="0.4" opacity="0.35"/>
-      <circle cx="420" cy="315" r="0.8" opacity="0.45"/>
-      <circle cx="690" cy="298" r="0.5" opacity="0.4"/>
-      <circle cx="1080" cy="330" r="0.6" opacity="0.4"/>
-      <circle cx="1395" cy="348" r="0.4" opacity="0.35"/>
-      <circle cx="88"  cy="510" r="0.7" opacity="0.45"/>
-      <circle cx="365" cy="495" r="0.4" opacity="0.35"/>
-      <circle cx="640" cy="528" r="0.9" opacity="0.5"/>
-      <circle cx="945" cy="502" r="0.5" opacity="0.4"/>
-      <circle cx="1240" cy="518" r="0.7" opacity="0.45"/>
-      <circle cx="195" cy="658" r="0.5" opacity="0.4"/>
-      <circle cx="480" cy="688" r="0.7" opacity="0.45"/>
-      <circle cx="768" cy="648" r="0.4" opacity="0.35"/>
-      <circle cx="1068" cy="672" r="0.9" opacity="0.5"/>
-      <circle cx="1350" cy="660" r="0.6" opacity="0.4"/>
-      <circle cx="135" cy="790" r="0.8" opacity="0.45"/>
-      <circle cx="455" cy="808" r="0.4" opacity="0.35"/>
-      <circle cx="752" cy="822" r="0.6" opacity="0.4"/>
-      <circle cx="1012" cy="796" r="0.5" opacity="0.4"/>
-      <circle cx="1305" cy="816" r="0.7" opacity="0.45"/>
-    </g>
-    <!-- Gold accent stars -->
-    <g fill="rgba(201,168,76,0.5)">
-      <circle cx="285" cy="125" r="1.2"/>
-      <circle cx="1155" cy="195" r="1.4"/>
-      <circle cx="695"  cy="405" r="0.9"/>
-      <circle cx="105"  cy="598" r="1.1"/>
-      <circle cx="1390" cy="488" r="1.0"/>
-    </g>
-  </svg>
-
-
-
-  <!-- Watermark -->
-  <div class="watermark" aria-hidden="true">אחד</div>
-
-  <!-- Glow -->
-  <div class="hero-glow"></div>
-
-  <!-- Content -->
-  <div class="hero-content">
-
-    <!-- Logo seal -->
-    <div style="margin-bottom:40px; opacity:0; animation:fadeUp 1s ease forwards 0.2s;">
-      <img src="ThePrism.png" alt="The Prism Seal"
-        style="width:clamp(140px,18vw,200px); height:clamp(140px,18vw,200px); object-fit:contain;
-               filter: drop-shadow(0 0 28px rgba(201,168,76,0.25)) drop-shadow(0 0 8px rgba(201,168,76,0.15));
-               transition: filter 0.5s ease;"
-        onmouseover="this.style.filter='drop-shadow(0 0 44px rgba(201,168,76,0.4)) drop-shadow(0 0 12px rgba(201,168,76,0.25))'"
-        onmouseout="this.style.filter='drop-shadow(0 0 28px rgba(201,168,76,0.25)) drop-shadow(0 0 8px rgba(201,168,76,0.15))'">
-    </div>
-
-    <p class="hero-eyebrow">A framework for understanding reality</p>
-
-    <div class="hero-title-wrap">
-      <span class="title-pre">The</span>
-      <span class="title-main">PRISM</span>
-      <span class="title-sub">Echad B'Emet</span>
-    </div>
-
-    <span class="hebrew-accent">
-      <span class="hebrew-primary">אֶחָד בֶּאֱמֶת</span>
-      <span class="hebrew-translation">
-        <span class="hebrew-translation-line"></span>
-        <span class="hebrew-translation-text">One in Truth</span>
-        <span class="hebrew-translation-line"></span>
-      </span>
-    </span>
-
-    <p class="hero-proposition">
-      The most rigorous description of physical reality and the oldest account of existence
-      converge on the same structure: <em>relation is the ground of being.</em>
-      What you conclude from that is yours.
-    </p>
-
-    <div class="hero-divider">
-      <div class="hero-divider-line"></div>
-      <span class="hero-divider-glyph">◈</span>
-      <div class="hero-divider-line"></div>
-    </div>
-
-    <div class="hero-cta">
-      <a href="/qt-gateway.html" class="btn-primary">
-        Open the Interpreter
-        <span class="btn-arrow">→</span>
-      </a>
-      <a href="#book" class="btn-secondary">The Book — Coming Soon</a>
-    </div>
-
-    <!-- Three pillars -->
-    <div class="pillars">
-      <div class="pillar">
-        <span class="pillar-glyph">ψ</span>
-        <span class="pillar-label">Quantum Mechanics</span>
-        <p class="pillar-text">No absolute observer. Reality emerges only through relation.</p>
-      </div>
-      <div class="pillar">
-        <span class="pillar-glyph">◈</span>
-        <span class="pillar-label">The Prism</span>
-        <p class="pillar-text">A coherent lens. One light, refracted into visible structure.</p>
-      </div>
-      <div class="pillar">
-        <span class="pillar-glyph">א</span>
-        <span class="pillar-label">Relational Ontology</span>
-        <p class="pillar-text">Being is not substance. Being is bond. Echad — unified through relation.</p>
-      </div>
-    </div>
-
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a href="https://theprism.io/index.html" style="display:block; font-family:var(--cinzel); font-size:13px; letter-spacing:0.18em; color:var(--gold-pale); text-transform:uppercase; text-decoration:none; margin-bottom:10px; transition:color 0.2s;"
+      onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gold-pale)'">The Prism</a>
+    <a href="https://theprism.io/purchase.html" style="display:block; font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--gold-dim); text-transform:uppercase; text-decoration:none; transition:color 0.2s;"
+      onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gold-dim)'">Expand Your Access →</a>
   </div>
 
-  <div class="scroll-prompt">
-    <div class="scroll-line"></div>
-    <span class="scroll-label">Explore</span>
+  <!-- Anonymous warning -->
+  <div class="anon-warning" id="anonWarning">
+    <strong>Session not saved</strong>
+    Closing this browser will erase your work. Save your email to keep it for 30 days.
   </div>
 
-</section>
-
-<!-- ── WHAT IS THE PRISM ── -->
-<section class="what-section" id="what">
-  <div class="section-inner">
-    <div class="what-grid">
-
-      <div class="what-left">
-        <p class="section-eyebrow">What is The Prism</p>
-        <h2 class="section-heading">A <em>lens</em> for reality.</h2>
-        <p class="section-body">
-          Physics has known for decades that reality is not made of things. It is made of relations between things. Carlo Rovelli's Relational Quantum Mechanics formalized what the oldest textual tradition already encoded: that existence is fundamentally relational at every level.
-        </p>
-        <p class="section-body" style="margin-top:20px;">
-          The Prism is a framework that makes this structure visible — applied to any text, question, or concept. It does not tell you what to believe. It reveals the architecture already present in what you are examining.
-        </p>
-      </div>
-
-      <div class="what-right reveal reveal-delay-2">
-
-        <!-- 01 Relational Coherence -->
-        <div class="what-point" onclick="togglePoint(this)">
-          <div class="what-point-header">
-            <div class="what-point-header-left">
-              <span class="what-point-num">01</span>
-              <div class="what-point-title">Relational Coherence</div>
-            </div>
-            <span class="what-point-toggle">+</span>
-          </div>
-          <div class="what-point-drawer">
-            <div class="what-point-drawer-inner">
-              <p class="drawer-body">Relational Coherence is the principle that meaning, stability, and intelligibility emerge through relationship rather than isolation. A thing is not fully understood merely by examining its individual components, but by examining how those components exist, interact, and resolve within a larger relational structure.</p>
-              <p class="drawer-body">In practical terms, no system exists alone. Human beings, organizations, ecosystems, language, morality, and even physical reality operate within networks of influence and constraint. What appears chaotic at one level may reveal underlying order when viewed relationally rather than reductionistically.</p>
-              <p class="drawer-body">Relational Coherence proposes that coherence is not accidental. Stable outcomes emerge when relationships within a system align in ways that preserve structure, signal integrity, and functional continuity over time. Conversely, instability, fragmentation, and incoherence arise when relational tensions exceed the system's capacity to resolve them.</p>
-              <p class="drawer-body">This principle moves beyond simplistic cause-and-effect thinking. Traditional analysis often isolates variables as though they operate independently. Relational Coherence instead recognizes that outcomes are shaped by context, feedback, interdependence, and the configuration of the field itself.</p>
-              <p class="drawer-body">Within the RCT framework, coherence does not imply perfection or uniformity. Tension, variance, and competing pressures are expected features of reality. Properly bounded tension is often necessary for adaptation, growth, and transformation. The critical question is whether a system can continue resolving these pressures without collapsing into incoherence.</p>
-              <p class="drawer-body">Relational Coherence also rejects the idea that reality is fundamentally random or meaningless. Beneath observable complexity exists a lawful structure — a patterned architecture governing what can stabilize, what degrades, and what becomes sustainable over time.</p>
-              <p class="drawer-body">Rather than viewing truth as merely abstract or ideological, Relational Coherence treats truth as that which remains structurally resolvable across context and time. Coherence is not simply intellectual agreement, but the sustained integrity of relationship within a system.</p>
-              <div class="drawer-disclaimer">
-                <span class="drawer-disclaimer-label">Scope of Application</span>
-                <p class="drawer-disclaimer-text">RCT applies this principle across multiple domains — leadership, systems analysis, organizational behavior, theology, human psychology, and social dynamics. The goal is not to impose artificial certainty, but to better understand how reality <em>organizes, preserves, and destabilizes itself</em> under constraint.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 02 Two-Realm Architecture -->
-        <div class="what-point" onclick="togglePoint(this)">
-          <div class="what-point-header">
-            <div class="what-point-header-left">
-              <span class="what-point-num">02</span>
-              <div class="what-point-title">Two-Realm Architecture</div>
-            </div>
-            <span class="what-point-toggle">+</span>
-          </div>
-          <div class="what-point-drawer">
-            <div class="what-point-drawer-inner">
-              <p class="drawer-body">The Hebraic worldview approaches reality as fundamentally relational rather than merely material. Existence is not viewed as a disconnected collection of objects moving through empty space, but as an ordered, meaningful structure sustained through relationship, purpose, and coherence.</p>
-
-              <div class="drawer-disclaimer" style="margin-top:0; margin-bottom:20px;">
-                <span class="drawer-disclaimer-label">Three-Realm Architecture</span>
-                <div style="display:flex; flex-direction:column; gap:14px; margin-top:4px;">
-                  <div>
-                    <span class="drawer-property-name" style="display:block; margin-bottom:4px;">Olam HaZeh — The Present World</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">The material and experiential realm of human existence, action, limitation, and temporal life.</p>
-                  </div>
-                  <div>
-                    <span class="drawer-property-name" style="display:block; margin-bottom:4px;">Shamayim — The Heavens</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Not merely outer space, but the higher ordering realm associated with divine authority, structure, and governance.</p>
-                  </div>
-                  <div>
-                    <span class="drawer-property-name" style="display:block; margin-bottom:4px;">Olam HaBa — The World to Come</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">The realm of ultimate fulfillment, restoration, continuity, and perfected resolution.</p>
-                  </div>
-                </div>
-                <p class="drawer-disclaimer-text" style="margin-top:14px;">These are not necessarily "places" in the simplistic modern sense. Rather, they represent <em>interconnected dimensions of reality</em> participating within a unified relational structure.</p>
-              </div>
-
-              <p class="drawer-body">This is where Relational Quantum Mechanics becomes philosophically intriguing. RQM proposes that physical properties do not exist as isolated absolutes independent of interaction. Instead, the state of a system becomes meaningful relationally — through interaction, observation, and contextual exchange.</p>
-
-              <p class="drawer-body">While RCT does not claim that quantum physics proves theology, it observes a striking structural resonance between relational physics and the Hebraic worldview. The Hebraic tradition consistently treats reality as participatory and relational:</p>
-
-              <div class="drawer-property">
-                <span class="drawer-property-name">Identity</span>
-                <p class="drawer-property-body">Emerges through covenant and relationship — not as an intrinsic fixed property, but as something constituted through faithful engagement over time.</p>
-              </div>
-              <div class="drawer-property">
-                <span class="drawer-property-name">Meaning</span>
-                <p class="drawer-property-body">Emerges through context and continuity. A word, act, or event does not carry meaning in isolation — it carries meaning within the relational field that surrounds it.</p>
-              </div>
-              <div class="drawer-property">
-                <span class="drawer-property-name">Truth</span>
-                <p class="drawer-property-body">Understood not merely as abstract correspondence, but as faithfulness, integrity, and coherence across time. Emet — the Hebrew word for truth — spans the first, middle, and last letters of the Hebrew alphabet. It is structural, not merely propositional.</p>
-              </div>
-              <div class="drawer-property">
-                <span class="drawer-property-name">Fragmentation</span>
-                <p class="drawer-property-body">Separation from relational order produces disorder. Restoration is not correction of belief — it is reconciliation and reintegration into proper relationship.</p>
-              </div>
-
-              <p class="drawer-body">RCT recognizes that the three-realm architecture mirrors a layered coherence structure. Olam HaZeh reflects the domain of variance, tension, embodiment, and constrained experience. Shamayim represents higher-order structure and governing principles beyond immediate perception. Olam HaBa reflects ultimate resolution — the restoration of complete coherence where fragmentation is overcome.</p>
-
-              <p class="drawer-body">This alignment is significant because modern Western thought often fractures reality into competing categories: physical versus spiritual, sacred versus secular, objective versus subjective. The Hebraic model resists these divisions. It assumes continuity between seen and unseen, material and transcendent, action and meaning.</p>
-
-              <div class="drawer-disclaimer">
-                <span class="drawer-disclaimer-label">The Architectural Claim</span>
-                <p class="drawer-disclaimer-text">RCT does not attempt to collapse theology into physics, nor physics into theology. Instead, it suggests that both may be pointing toward a deeper relational architecture underlying reality itself — one in which <em>coherence, relationship, and lawful structure are more fundamental than isolated objects moving through meaningless space.</em></p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 03 Five Interpretive Lenses -->
-        <div class="what-point" onclick="togglePoint(this)">
-          <div class="what-point-header">
-            <div class="what-point-header-left">
-              <span class="what-point-num">03</span>
-              <div class="what-point-title">Five Interpretive Lenses</div>
-            </div>
-            <span class="what-point-toggle">+</span>
-          </div>
-          <div class="what-point-drawer">
-            <div class="what-point-drawer-inner">
-              <p class="drawer-body">The Prism applies five structured lenses to any input — surfacing what the text or concept is architecturally carrying. These are not categories imported from theology. They are quantum-aligned structural properties of reality itself.</p>
-
-              <div class="drawer-property">
-                <span class="drawer-property-name">01 · Relationality</span>
-                <p class="drawer-property-body">Nothing exists in total isolation. Meaning, identity, and behavior emerge through relationship and interaction rather than standalone substance.</p>
-                <p class="drawer-property-sub">In QT/RCT terms: entities are understood through relational configuration, not merely intrinsic properties.</p>
-              </div>
-
-              <div class="drawer-property">
-                <span class="drawer-property-name">02 · Context-Sensitivity</span>
-                <p class="drawer-property-body">Outcomes and interpretations depend on surrounding conditions, constraints, and observational position. The same signal can resolve differently depending on the field in which it is encountered.</p>
-                <p class="drawer-property-sub">This is not relativism. It is observer-frame precision — the same structure quantum mechanics requires.</p>
-              </div>
-
-              <div class="drawer-property">
-                <span class="drawer-property-name">03 · Non-Locality</span>
-                <p class="drawer-property-body">Systems may exhibit meaningful correlation or coherence across separation without requiring direct linear proximity in the classical sense.</p>
-                <p class="drawer-property-sub">In the framework this appears as distributed influence across the relational field rather than simple point-to-point causation.</p>
-              </div>
-
-              <div class="drawer-property">
-                <span class="drawer-property-name">04 · Holism</span>
-                <p class="drawer-property-body">The whole possesses properties not reducible to isolated components. A coherent structure cannot always be understood by dissecting parts independently — the organization itself carries information.</p>
-                <p class="drawer-property-sub">This is why reductive analysis alone is insufficient for understanding relational systems.</p>
-              </div>
-
-              <div class="drawer-property">
-                <span class="drawer-property-name">05 · Law-Like Structure</span>
-                <p class="drawer-property-body">Reality is not random chaos. Stable patterns, constraints, and repeatable architectures exist beneath apparent variance. The Prism is not mystical relativism.</p>
-                <p class="drawer-property-sub">RCT insists there are real constraints governing possibility space. This is the anchor bolt. Without it, the framework drifts into territory where everything is intuition and nothing is accountable.</p>
-              </div>
-
-              <div class="drawer-disclaimer">
-                <span class="drawer-disclaimer-label">A Critical Distinction</span>
-                <p class="drawer-disclaimer-text">RCT does not claim quantum mechanics <em>proves</em> theology. That would be the amateur mistake — apologetic opportunism dressed as rigor. Instead, The Prism treats certain quantum-era observations as <em>structurally compatible</em> with a relational ontology already present in Hebraic thought. One is selective evidence-gathering. The other is philosophical architecture. The distinction matters enormously.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 04 No Prescribed Conclusions -->
-        <div class="what-point" onclick="togglePoint(this)">
-          <div class="what-point-header">
-            <div class="what-point-header-left">
-              <span class="what-point-num">04</span>
-              <div class="what-point-title">No Prescribed Conclusions</div>
-            </div>
-            <span class="what-point-toggle">+</span>
-          </div>
-          <div class="what-point-drawer">
-            <div class="what-point-drawer-inner">
-              <p class="drawer-body">One of the central methodological commitments of RCT is the refusal to impose predetermined conclusions upon the reader. The framework is designed to explore, refine, and constrain plausible possibilities through logic, structure, and relational analysis — not to manufacture ideological compliance or force artificial certainty.</p>
-
-              <p class="drawer-body">The author recognizes that all people — scholars, scientists, theologians, skeptics, and philosophers alike — approach reality with prior assumptions, intuitions, experiences, and interpretive biases. Complete neutrality is neither realistic nor honestly attainable. The question, therefore, is not whether a perspective exists, but whether that perspective remains open to examination, pressure, and coherent challenge.</p>
-
-              <p class="drawer-body">RCT attempts to create a disciplined space for that examination. Rather than beginning with dogmatic declarations, the methodology focuses on identifying:</p>
-
-              <div class="drawer-disclaimer" style="margin-bottom:20px;">
-                <span class="drawer-disclaimer-label">The Methodology Focuses On</span>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Underlying Constraints</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">What limits what is possible within a given system or field of inquiry.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Relational Structures</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">How components within a system relate, interact, and resolve against one another.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Internal Consistency</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Whether a framework holds together under pressure without requiring special pleading.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Explanatory Power</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">How much of observable reality a framework can account for coherently.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Long-Term Coherence</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Whether explanations remain structurally stable across varying contexts and over time.</p>
-                  </div>
-                </div>
-              </div>
-
-              <p class="drawer-body">Possibilities are not treated as equally valid simply because they exist. Some explanations collapse under contradiction, others fail to resolve critical tensions, and some survive scrutiny more effectively than others. The framework engages in a process of progressive refinement — stripping away weaker explanations while clarifying which possibilities remain structurally plausible.</p>
-
-              <p class="drawer-body">Importantly, this process is not intended to corner the reader into a mandated conclusion. RCT does not function as a system of intellectual coercion. It does not seek to override individual conscience, suppress skepticism, or punish disagreement. Instead, it attempts to provide a coherent architecture through which difficult questions may be examined honestly and rigorously.</p>
-
-              <div class="drawer-property">
-                <span class="drawer-property-name">The Critical Distinction</span>
-                <p class="drawer-property-body">Dogmatic systems often begin with the conclusion and work backward to defend it. RCT attempts the opposite: examining the structure of reality, the persistence of patterns, the nature of coherence, and the limits of explanation — before asserting certainty where certainty may not yet be justified.</p>
-              </div>
-
-              <p class="drawer-body">This creates intentional space for individual interpretation and personal responsibility. The reader is encouraged to wrestle with the implications of the framework directly rather than outsourcing judgment to institutional authority, ideological tribalism, or the author himself. The goal is not passive agreement, but active engagement.</p>
-
-              <p class="drawer-body">The framework does not promise absolute answers to every metaphysical, theological, or philosophical question. Some tensions may remain unresolved. Some mysteries may persist beyond the current limits of human perception or language. Yet uncertainty is not treated as failure.</p>
-
-              <div class="drawer-disclaimer">
-                <span class="drawer-disclaimer-label">The Purpose of the Framework</span>
-                <p class="drawer-disclaimer-text">RCT maintains that honest inquiry conducted within coherent boundaries is more valuable than false certainty sustained through denial, reductionism, or ideological rigidity. The purpose of the framework is not to eliminate thought, but to <em>sharpen it</em> — allowing individuals to arrive at conclusions they believe are most coherent, meaningful, and sustainable within the reality they encounter.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-    </div>
+  <!-- Save profile CTA -->
+  <div class="save-profile-bar" id="saveProfileBar">
+    <button class="save-profile-btn" onclick="openEmailCapture()">Save my work →</button>
   </div>
-</section>
 
-<!-- ── THE INTERPRETER ── -->
-<section class="app-section" id="interpreter">
-  <div class="section-inner">
-
-    <div class="app-header reveal">
-      <p class="section-eyebrow" style="text-align:center;">The Interpreter</p>
-      <h2 class="section-heading" style="text-align:center;">Submit a verse, phrase,<br>theme, or concept.</h2>
-      <p class="section-body" style="text-align:center; margin-top:16px;">
-        The Prism applies the full relational framework and returns a structured interpretation across five lenses. Available by query or subscription.
-      </p>
-    </div>
-
-    <!-- Billing toggle -->
-    <div class="reveal reveal-delay-1" style="display:flex; justify-content:center; align-items:center; gap:14px; margin-bottom:36px;">
-      <span id="toggle-monthly-label" style="font-family:var(--sans); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold);">Monthly</span>
-      <div id="billing-toggle" onclick="toggleBilling()" style="width:44px; height:24px; background:var(--surface-2); border:1px solid var(--border-lit); border-radius:12px; cursor:pointer; position:relative; transition:background 0.3s;">
-        <div id="toggle-knob" style="width:18px; height:18px; background:var(--gold); border-radius:50%; position:absolute; top:2px; left:3px; transition:left 0.3s;"></div>
-      </div>
-      <span id="toggle-annual-label" style="font-family:var(--sans); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted);">Annual <span style="color:var(--gold-dim); font-size:9px; letter-spacing:0.18em;">SAVE 17%</span></span>
-    </div>
-
-    <!-- Tier cards -->
-    <div class="tiers reveal reveal-delay-1">
-
-      <div class="tier-card">
-        <span class="tier-name">Observer</span>
-        <div class="tier-price">Free</div>
-        <span class="tier-cadence">3 queries / 24 hrs</span>
-        <ul class="tier-features">
-          <li>3 free daily interpretations</li>
-          <li>Full five-lens output</li>
-          <li>No account required</li>
-        </ul>
-        <a href="#" class="tier-btn" onclick="(function(){sessionStorage.setItem('qt_anon','1');sessionStorage.setItem('qt_anon_mode','1');sessionStorage.setItem('qt_anon_queries','0');window.location.href='qt.html?mode=anon';})();return false;">Start Free →</a>
-      </div>
-
-      <div class="tier-card featured">
-        <span class="tier-name">Refraction</span>
-        <div class="tier-price"><sup>$</sup><span id="refraction-price">9<span style="font-size:20px;">.99</span></span></div>
-        <span id="refraction-cadence" class="tier-cadence">per month · 100 queries</span>
-        <ul class="tier-features">
-          <li>100 queries / month</li>
-          <li>Session history — 90 days</li>
-          <li>Follow-up thread support</li>
-          <li>Full five-lens output</li>
-        </ul>
-        <a id="refraction-btn" href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" class="tier-btn">Subscribe →</a>
-      </div>
-
-      <div class="tier-card">
-        <span class="tier-name">Full Spectrum</span>
-        <div class="tier-price"><sup>$</sup><span id="fullspectrum-price">24<span style="font-size:20px;">.99</span></span></div>
-        <span id="fullspectrum-cadence" class="tier-cadence">per month · 250 queries</span>
-        <ul class="tier-features">
-          <li>250 queries / month</li>
-          <li>Session history — 180 days</li>
-          <li>Follow-up thread support</li>
-          <li>Priority response</li>
-        </ul>
-        <a id="fullspectrum-btn" href="https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05" class="tier-btn">Subscribe →</a>
-      </div>
-
-      <div class="tier-card" style="grid-column: span 1; padding: 0; border: none; background: transparent;">
-        <div style="border: 0.5px solid var(--border-lit); padding: 16px 20px 12px; margin-bottom: 0; background: rgba(212,175,95,0.03);">
-          <span class="tier-name" style="color: var(--gold);">Signal Sessions</span>
-          <div style="font-family:var(--cinzel); font-size:12px; font-style:italic; color:var(--text-muted); margin-bottom:14px; line-height:1.5;">No subscription. Buy exactly what you need. Queries never expire.</div>
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:0.5px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(212,175,95,0.05)'" onmouseout="this.style.background='transparent'">
-              <div>
-                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Signal 10</div>
-                <div style="font-family:var(--cinzel); font-size:13px; color:var(--text);">10 queries</div>
-              </div>
-              <div style="text-align:right;">
-                <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale);">$2.99</div>
-                <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
-              </div>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:0.5px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(212,175,95,0.05)'" onmouseout="this.style.background='transparent'">
-              <div>
-                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Signal 25</div>
-                <div style="font-family:var(--cinzel); font-size:13px; color:var(--text);">25 queries</div>
-              </div>
-              <div style="text-align:right;">
-                <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale);">$6.99</div>
-                <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
-              </div>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:0.5px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(212,175,95,0.05)'" onmouseout="this.style.background='transparent'">
-              <div>
-                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); margin-bottom:3px;">Signal 50</div>
-                <div style="font-family:var(--cinzel); font-size:13px; color:var(--text);">50 queries</div>
-              </div>
-              <div style="text-align:right;">
-                <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale);">$12.99</div>
-                <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
-              </div>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.04); transition:background 0.2s;" onmouseover="this.style.background='rgba(212,175,95,0.08)'" onmouseout="this.style.background='rgba(212,175,95,0.04)'">
-              <div>
-                <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:3px;">Signal 100</div>
-                <div style="font-family:var(--cinzel); font-size:13px; color:var(--text);">100 queries</div>
-              </div>
-              <div style="text-align:right;">
-                <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale);">$19.99</div>
-                <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:0.5px solid var(--border-lit);">Buy →</a>
-              </div>
-            </div>
-          </div>
-          <div style="font-family:var(--cinzel); font-size:11px; font-style:italic; color:var(--text-muted); margin-top:14px; text-align:center; line-height:1.6;">Queries never expire · Bundles stack</div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- One-time option note -->
-    <p style="text-align:center; font-family:var(--cinzel); font-size:14px; font-style:italic; color:var(--text-muted); margin-top:28px;" class="reveal reveal-delay-2">
-      Signal Sessions queries never expire and bundles stack — use them at your own pace.
-    </p>
-
+  <!-- Inline email capture -->
+  <div class="email-capture-inline" id="emailCaptureInline">
+    <input type="email" id="sidebarEmailInput" placeholder="your@email.com" autocomplete="email"
+      onkeydown="if(event.key==='Enter') saveEmail()" />
+    <button onclick="saveEmail()">Keep this interpretation →</button>
+    <div class="email-capture-status" id="emailCaptureStatus"></div>
   </div>
-</section>
 
-<!-- ── HOW IT WORKS ── -->
-<section class="how-section">
-  <div class="section-inner">
+  <div class="sidebar-section-label">This Session</div>
 
-    <div class="how-header reveal">
-      <p class="section-eyebrow" style="text-align:center;">How It Works</p>
-      <h2 class="section-heading" style="text-align:center; font-size:clamp(28px,3.5vw,42px);">The Prism in three moves.</h2>
-    </div>
-
-    <div class="how-steps">
-      <div class="how-step reveal">
-        <span class="step-number">01</span>
-        <div class="step-title">Submit your input</div>
-        <p class="step-body">A Scripture reference, a phrase, a theme, a question you are holding. The Prism accepts any entry point.</p>
-      </div>
-      <div class="how-step reveal reveal-delay-2">
-        <span class="step-number">02</span>
-        <div class="step-title">The framework engages</div>
-        <p class="step-body">Five structured lenses — Entanglement, Coherence, Noise, Telos, and the Eternal Frame — refract the input and surface its relational architecture.</p>
-      </div>
-      <div class="how-step reveal reveal-delay-3">
-        <span class="step-number">03</span>
-        <div class="step-title">You see what was already there</div>
-        <p class="step-body">The Prism does not manufacture meaning. It makes visible the structure the text was always carrying. What you do with that is yours.</p>
-      </div>
-    </div>
-
-    <!-- Book CTA -->
-    <div class="reveal" style="margin-top:72px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03); display:grid; grid-template-columns:1fr auto; align-items:center; gap:40px; padding:36px 48px;">
-      <div style="display:flex; align-items:center; gap:28px;">
-        <img src="ThePrism.png" alt="The Prism" style="width:56px; height:56px; object-fit:contain; opacity:0.7; filter:drop-shadow(0 0 8px rgba(212,175,95,0.2)); flex-shrink:0;">
-        <div>
-          <div style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.35em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">The Book · Coming Soon</div>
-          <div style="font-family:var(--cinzel); font-size:22px; font-weight:300; color:var(--text); margin-bottom:4px;">The Prism <span style="color:var(--gold); font-style:italic;">· Echad B'Emet</span></div>
-          <div style="font-family:var(--cinzel); font-size:14px; font-style:italic; color:var(--text-muted); line-height:1.6;">The complete framework. The foundation beneath the Interpreter. Available on Amazon.</div>
-        </div>
-      </div>
-      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:12px; flex-shrink:0;">
-        <a href="/coming-soon.html" class="btn-primary" style="font-size:9px; padding:15px 28px; white-space:nowrap;">
-          Order on Amazon
-          <span class="btn-arrow">→</span>
-        </a>
-        <span style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted);"></span>
-      </div>
-    </div>
-
-  </div>
-</section>
-<section class="manifesto-section">
-  <div class="manifesto-inner reveal">
-    <img src="ThePrism.png" alt="" aria-hidden="true"
-      style="width:64px; height:64px; object-fit:contain; opacity:0.18; margin-bottom:32px;
-             filter: drop-shadow(0 0 8px rgba(201,168,76,0.3));">
-    <p class="manifesto-quote">
-      The aleph is not just the first letter — or symbolic decoration. It represents originating coherence: the sustaining source that allows <em>emet</em> to remain whole. Remove it, and reality does not merely become mistaken. It loses grounding. Resolution fails. Structure decays into fragmentation.
-    </p>
-    <div style="margin-bottom: 32px;">
-      <span style="display:block; font-family:var(--cinzel); font-size:clamp(36px, 5vw, 58px); font-weight:300; font-style:italic; color:var(--gold); letter-spacing:0.1em; opacity:0.9; margin-bottom:16px;">Emet</span>
-      <span style="display:block; font-family:var(--cinzel); font-size:clamp(28px, 3.5vw, 42px); font-weight:300; color:var(--gold-pale); letter-spacing:0.12em; line-height:1; text-shadow: 0 0 30px rgba(212,175,95,0.28), 0 0 60px rgba(212,175,95,0.12); margin-bottom:14px;">אֱמֶת</span>
-      <div style="display:flex; align-items:center; justify-content:center; gap:16px;">
-        <span style="width:36px; height:0.5px; background:var(--border-lit); display:block;"></span>
-        <span style="font-family:var(--sans); font-size:10px; font-weight:300; letter-spacing:0.4em; text-transform:uppercase; color:var(--text-muted);">Truth</span>
-        <span style="width:36px; height:0.5px; background:var(--border-lit); display:block;"></span>
-      </div>
-    </div>
-    <span class="manifesto-source">— The Prism · Echad B'Emet</span>
-  </div>
-</section>
-
-<!-- ── RCT BOOK ── -->
-<section style="padding:140px 0 120px; background:var(--deep); border-top:0.5px solid var(--border);" id="rct">
-  <div class="section-inner">
-
-    <div style="display:grid; grid-template-columns:1.1fr 1fr; gap:100px; align-items:start;">
-
-      <!-- Left: content -->
-      <div class="reveal">
-        <p class="section-eyebrow">Book One · The Foundation</p>
-        <h2 class="section-heading" style="margin-bottom:28px;">Relational Coherence<br><em>Theory</em></h2>
-        <p style="font-family:var(--cinzel); font-size:17px; font-weight:300; line-height:1.85; color:var(--text-dim); margin-bottom:20px;">
-          Relational Coherence Theory is a philosophical and systems-based framework exploring how coherence, tension, order, and collapse emerge within relational structures across reality. Rather than treating events, people, systems, or ideas as isolated objects, RCT approaches reality as fundamentally relational — shaped by context, interaction, constraint, and feedback over time.
-        </p>
-        <p style="font-family:var(--cinzel); font-size:17px; font-weight:300; line-height:1.85; color:var(--text-dim); margin-bottom:20px;">
-          The book examines how stable systems maintain coherence, why others drift toward fragmentation, and how unresolved tension accumulates into instability or collapse. Drawing from systems thinking, philosophy, organizational dynamics, theology, physics, and human behavior, RCT proposes that many forms of disorder are not random events — but the result of relational breakdown within a larger structure.
-        </p>
-        <p style="font-family:var(--cinzel); font-size:17px; font-weight:300; line-height:1.85; color:var(--text-dim); margin-bottom:36px;">
-          At its core, RCT is an exploration of whether coherence itself may represent one of the deepest organizing principles of reality. It is intentionally interdisciplinary — not a scientific text, theological argument, political ideology, or self-help system, but a diagnostic lens for examining how reality organizes, adapts, destabilizes, and resolves across multiple domains.
-        </p>
-
-        <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
-          <a href="/coming-soon.html" class="btn-primary" style="font-size:9px; padding:16px 32px;">
-            Order on Amazon
-            <span class="btn-arrow">→</span>
-          </a>
-          <a href="/qt-gateway.html" class="btn-secondary" style="align-self:center;">Explore the Interpreter</a>
-        </div>
-      </div>
-
-      <!-- Right: key concepts accordion -->
-      <div class="reveal reveal-delay-2" style="display:flex; flex-direction:column; gap:0; border:0.5px solid var(--border);">
-
-        <div style="padding:20px 24px; border-bottom:0.5px solid var(--border); background:rgba(212,175,95,0.03);">
-          <span style="font-family:var(--sans); font-size:8px; font-weight:500; letter-spacing:0.32em; text-transform:uppercase; color:var(--gold-dim);">Key Concepts</span>
-        </div>
-
-        <!-- 01 Constraint and Possibility Space -->
-        <div class="rct-point" onclick="toggleRct(this)" style="border-bottom:0.5px solid var(--border); cursor:pointer; transition:background 0.25s;">
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; gap:12px;">
-            <div>
-              <span style="font-family:var(--cinzel); font-size:16px; color:var(--text);">Constraint and Possibility Space</span>
-              <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.6; margin-top:5px;">What limits what is possible within any system or field of inquiry.</p>
-            </div>
-            <span class="rct-toggle" style="font-family:var(--sans); font-size:14px; color:var(--gold-dim); flex-shrink:0; transition:transform 0.35s ease, color 0.25s; line-height:1; user-select:none;">+</span>
-          </div>
-          <div class="rct-drawer" style="max-height:0; overflow:hidden; transition:max-height 0.5s cubic-bezier(0.4,0,0.2,1);">
-            <div style="padding:0 24px 24px; border-top:0.5px solid var(--border);">
-              <p class="drawer-body" style="margin-top:18px;">Within RCT, every system operates inside a bounded field of possibility. Not everything can occur, and not every outcome is equally sustainable. Constraints are the structures, conditions, laws, and limitations that define what is possible within a given system. A possibility space is the range of potential outcomes available under those constraints.</p>
-              <p class="drawer-body">In simple terms, constraints shape the boundaries of reality within a system. Gravity constrains physical motion. Biological limits constrain living organisms. Economic pressures constrain institutions. Time, energy, information, and relational dynamics all act as constraints that influence what can emerge, stabilize, or collapse.</p>
-              <p class="drawer-body">Importantly, constraints are not inherently negative. In many cases, they are what make coherence possible in the first place. Without boundaries, systems drift into instability, randomness, or incoherence. Structure enables meaningful resolution.</p>
-              <p class="drawer-body">RCT views possibility not as infinite abstraction, but as constrained potential. The question is not merely "What could happen?" but "What can realistically emerge and sustain coherence under the conditions present?"</p>
-              <p class="drawer-body">As constraints shift, the possibility space shifts with them. Some outcomes become more probable, others less viable, and entirely new configurations may emerge. This principle applies across physics, leadership, theology, organizations, psychology, and human systems alike.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- 02 Feedback and Information Availability -->
-        <div class="rct-point" onclick="toggleRct(this)" style="border-bottom:0.5px solid var(--border); cursor:pointer; transition:background 0.25s;">
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; gap:12px;">
-            <div>
-              <span style="font-family:var(--cinzel); font-size:16px; color:var(--text);">Feedback and Information Availability</span>
-              <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.6; margin-top:5px;">How systems receive, process, and respond to signal within their relational field.</p>
-            </div>
-            <span class="rct-toggle" style="font-family:var(--sans); font-size:14px; color:var(--gold-dim); flex-shrink:0; transition:transform 0.35s ease, color 0.25s; line-height:1; user-select:none;">+</span>
-          </div>
-          <div class="rct-drawer" style="max-height:0; overflow:hidden; transition:max-height 0.5s cubic-bezier(0.4,0,0.2,1);">
-            <div style="padding:0 24px 24px; border-top:0.5px solid var(--border);">
-              <p class="drawer-body" style="margin-top:18px;">Within RCT, systems do not operate in isolation. Every system continuously interacts with its surrounding environment through feedback — the ongoing exchange of signal, response, correction, reinforcement, and adaptation within a relational field. Feedback is how a system learns about itself and its environment.</p>
-              <p class="drawer-body">Information availability refers to the quality, clarity, accessibility, and integrity of the signals available to that system. A system can only respond effectively to the information it is capable of receiving, processing, and recognizing.</p>
-              <p class="drawer-body">When feedback is accurate and accessible, systems are better able to adapt, self-correct, and maintain coherence over time. When feedback becomes distorted, delayed, suppressed, fragmented, or overloaded, systems begin making decisions against incomplete or corrupted representations of reality. RCT treats signal integrity as foundational to stability.</p>
-
-              <div style="margin:20px 0; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:12px;">This Principle Applies Across Domains</span>
-                <div style="display:flex; flex-direction:column; gap:8px;">
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Biological Systems</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Rely on feedback for regulation and survival.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Organizations</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Depend on accurate reporting and communication to maintain structural integrity.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Human Relationships</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Require honest relational exchange to remain coherent over time.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Markets</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Respond to information flow and the perception of available signal.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Individuals</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Navigate reality through perception, interpretation, and response to their relational field.</p>
-                  </div>
-                </div>
-              </div>
-
-              <p class="drawer-body">Importantly, more information does not necessarily produce greater coherence. Excessive noise, contradiction, manipulation, or informational saturation can overwhelm a system's ability to distinguish meaningful signal from distortion. Incoherence is often not caused by the absence of information alone, but by degraded informational architecture.</p>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:12px;">RCT Therefore Examines</span>
-                <div style="display:flex; flex-direction:column; gap:8px;">
-                  <div class="drawer-property" style="margin-bottom:0;"><span class="drawer-property-name">Access</span><p class="drawer-property-sub" style="color:var(--text-dim);">Who can receive the available information within the system.</p></div>
-                  <div class="drawer-property" style="margin-bottom:0;"><span class="drawer-property-name">Propagation</span><p class="drawer-property-sub" style="color:var(--text-dim);">How clearly signal moves through the relational field.</p></div>
-                  <div class="drawer-property" style="margin-bottom:0;"><span class="drawer-property-name">Distortion</span><p class="drawer-property-sub" style="color:var(--text-dim);">What filters, biases, or structural conditions corrupt the signal in transit.</p></div>
-                  <div class="drawer-property" style="margin-bottom:0;"><span class="drawer-property-name">Response Capacity</span><p class="drawer-property-sub" style="color:var(--text-dim);">Whether the system possesses the relational capacity to act appropriately on what it receives.</p></div>
-                </div>
-                <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.7; margin-top:14px;">The health of a system is often directly tied to the quality of its feedback loops and the integrity of the signals moving through them.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 03 Coherence, Tension, Decoherence -->
-        <div class="rct-point" onclick="toggleRct(this)" style="border-bottom:0.5px solid var(--border); cursor:pointer; transition:background 0.25s;">
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; gap:12px;">
-            <div>
-              <span style="font-family:var(--cinzel); font-size:16px; color:var(--text);">Coherence, Tension, Decoherence</span>
-              <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.6; margin-top:5px;">The four-tier architecture: Coherence → Tension → Decoherence → Incoherence.</p>
-            </div>
-            <span class="rct-toggle" style="font-family:var(--sans); font-size:14px; color:var(--gold-dim); flex-shrink:0; transition:transform 0.35s ease, color 0.25s; line-height:1; user-select:none;">+</span>
-          </div>
-          <div class="rct-drawer" style="max-height:0; overflow:hidden; transition:max-height 0.5s cubic-bezier(0.4,0,0.2,1);">
-            <div style="padding:0 24px 24px; border-top:0.5px solid var(--border);">
-              <p class="drawer-body" style="margin-top:18px;">RCT describes reality through a four-tier relational architecture that examines how systems stabilize, strain, fragment, and ultimately collapse under pressure over time. This progression is not strictly linear or irreversible — systems may recover, adapt, oscillate between states, or temporarily mask instability. Nevertheless, the framework provides a structural lens for understanding the lifecycle of coherence within relational systems.</p>
-
-              <!-- Tier 1: Coherence -->
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); display:block; margin-bottom:10px;">Tier 01 · Coherence</span>
-                <p class="drawer-body" style="margin-top:0;">Coherence is the condition in which a system maintains functional relational stability under constraint. Information flows effectively, tensions remain manageable, feedback loops remain intact, and the system preserves meaningful continuity across time.</p>
-                <p class="drawer-body">Coherence does not imply perfection, agreement, or the absence of difficulty. Healthy systems often contain disagreement, friction, adaptation, and complexity. What defines coherence is the system's ongoing ability to resolve tension without losing structural integrity. A coherent system remains intelligible, responsive, and sustainable.</p>
-              </div>
-
-              <!-- Tier 2: Tension -->
-              <div style="margin-top:12px; padding:16px 20px; border:0.5px solid var(--border); background:transparent;">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:10px;">Tier 02 · Tension</span>
-                <p class="drawer-body" style="margin-top:0;">Tension emerges when pressures, contradictions, competing demands, or unresolved variances begin accumulating within the system. RCT does not treat tension as inherently negative — in many cases it is necessary for growth, adaptation, creativity, and transformation. Properly bounded tension can strengthen a system by forcing refinement and recalibration.</p>
-                <p class="drawer-body">The critical issue is whether the system possesses sufficient coherence to metabolize the tension being introduced. When tensions exceed the system's capacity for resolution, instability begins to accumulate.</p>
-              </div>
-
-              <!-- Tier 3: Decoherence -->
-              <div style="margin-top:12px; padding:16px 20px; border:0.5px solid var(--border); background:transparent;">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:10px;">Tier 03 · Decoherence</span>
-                <p class="drawer-body" style="margin-top:0;">Decoherence occurs when the system begins losing relational synchronization and structural continuity. Communication degrades, signals fragment, trust erodes, feedback loops weaken, and previously stable patterns become increasingly unstable or contradictory. The system may still appear functional externally, but internally its coherence architecture is deteriorating.</p>
-                <p class="drawer-body">Decoherence is often subtle at first. Systems frequently compensate through appearances, rituals, bureaucracy, narrative control, or artificial stabilization mechanisms — producing what RCT calls <em>pseudo-coherence</em>: the illusion of stability masking growing fragmentation beneath the surface.</p>
-              </div>
-
-              <!-- Tier 4: Incoherence -->
-              <div style="margin-top:12px; padding:16px 20px; border:0.5px solid rgba(232,226,212,0.05); background:rgba(0,0,0,0.15);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:10px; opacity:0.6;">Tier 04 · Incoherence</span>
-                <p class="drawer-body" style="margin-top:0;">Incoherence is the condition in which the system can no longer reliably resolve tension or sustain stable relational structure. Fragmentation overwhelms integration. Signals lose reliability, prediction becomes unstable, trust collapses, and the system experiences persistent breakdown in coordination, identity, or function.</p>
-                <p class="drawer-body">An incoherent system may continue existing physically or institutionally for some time, but it no longer maintains meaningful structural integrity. Its outputs become increasingly erratic, contradictory, unsustainable, or disconnected from reality. Incoherence is not simply disorder — it is the loss of stable resolution architecture itself.</p>
-              </div>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:10px;">The Diagnostic Purpose</span>
-                <p class="drawer-disclaimer-text">Across organizations, societies, relationships, individuals, and conceptual systems, RCT proposes that many visible crises are not isolated failures, but <em>manifestations of deeper relational incoherence accumulating over time.</em> The framework seeks not merely to diagnose surface symptoms, but to examine the underlying coherence structures determining whether a system can continue sustaining itself under pressure.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 04 Signal Integrity and Pseudo-Coherence -->
-        <div class="rct-point" onclick="toggleRct(this)" style="border-bottom:0.5px solid var(--border); cursor:pointer; transition:background 0.25s;">
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; gap:12px;">
-            <div>
-              <span style="font-family:var(--cinzel); font-size:16px; color:var(--text);">Signal Integrity and Pseudo-Coherence</span>
-              <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.6; margin-top:5px;">Identifying systems that appear stable while structural breakdown is already underway.</p>
-            </div>
-            <span class="rct-toggle" style="font-family:var(--sans); font-size:14px; color:var(--gold-dim); flex-shrink:0; transition:transform 0.35s ease, color 0.25s; line-height:1; user-select:none;">+</span>
-          </div>
-          <div class="rct-drawer" style="max-height:0; overflow:hidden; transition:max-height 0.5s cubic-bezier(0.4,0,0.2,1);">
-            <div style="padding:0 24px 24px; border-top:0.5px solid var(--border);">
-              <p class="drawer-body" style="margin-top:18px;">Within RCT, systems depend upon the reliable transmission of meaningful signal in order to maintain coherence over time. Signal integrity refers to the accuracy, consistency, clarity, and trustworthiness of the information moving through a relational system. A coherent system requires more than activity or appearance — it requires signals that meaningfully correspond to underlying reality.</p>
-              <p class="drawer-body">When signal integrity is strong, systems can self-correct, adapt to changing conditions, and respond appropriately to tension or instability. Feedback loops remain functional because the information being exchanged retains sufficient fidelity to support coherent decision-making.</p>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); display:block; margin-bottom:10px;">Pseudo-Coherence Defined</span>
-                <p class="drawer-disclaimer-text">Pseudo-coherence emerges when a system continues projecting the appearance of stability while its underlying relational architecture is already degrading. The system may still appear organized externally — institutions continue functioning, metrics remain positive, routines persist, leadership projects confidence, and formal structures remain intact. Yet beneath the surface, <em>signal integrity has begun deteriorating.</em></p>
-              </div>
-
-              <p class="drawer-body" style="margin-top:20px;">Information may be distorted, suppressed, manipulated, delayed, politically filtered, or overwhelmed by noise. Individuals within the system increasingly respond to appearances, incentives, narratives, or artificial indicators rather than reality itself. As a result, the system loses the capacity for honest self-correction.</p>
-              <p class="drawer-body">RCT views pseudo-coherence as particularly dangerous because it often masks instability long enough for deeper fragmentation to accumulate unnoticed. The system appears coherent precisely when meaningful coherence is already weakening.</p>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border); background:transparent;">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:12px;">This Phenomenon Appears Across Domains</span>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Organizations</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Hiding operational dysfunction behind polished reporting and positive metrics.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Relationships</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Maintaining ritualistic normalcy despite relational collapse beneath the surface.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Political Systems</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Preserving symbolic legitimacy while institutional trust quietly erodes.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Individuals</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Projecting confidence while internally fragmenting under unresolved tension.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Ideological Systems</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Suppressing contradictory information to preserve narrative continuity at the cost of accuracy.</p>
-                  </div>
-                </div>
-                <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.7; margin-top:14px;">In pseudo-coherent systems, stability becomes performative rather than structural.</p>
-              </div>
-
-              <p class="drawer-body" style="margin-top:20px;">The danger is not merely deception, but delayed recognition. By the time incoherence becomes externally visible, the underlying breakdown may already be deeply embedded within the system's architecture.</p>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:10px;">The Deeper Question</span>
-                <p class="drawer-disclaimer-text">RCT emphasizes that coherence cannot be measured solely by surface order, institutional persistence, or outward appearance. The deeper question is whether the system still possesses sufficient signal integrity to accurately perceive itself, process tension honestly, and respond coherently to reality. <em>A system unable to recognize its own fragmentation is often far closer to collapse than it appears.</em></p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 05 Variance and Redistribution -->
-        <div class="rct-point" onclick="toggleRct(this)" style="border-bottom:0.5px solid var(--border); cursor:pointer; transition:background 0.25s;">
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; gap:12px;">
-            <div>
-              <span style="font-family:var(--cinzel); font-size:16px; color:var(--text);">Variance and Redistribution</span>
-              <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.6; margin-top:5px;">How pressure moves through relational systems and where it accumulates.</p>
-            </div>
-            <span class="rct-toggle" style="font-family:var(--sans); font-size:14px; color:var(--gold-dim); flex-shrink:0; transition:transform 0.35s ease, color 0.25s; line-height:1; user-select:none;">+</span>
-          </div>
-          <div class="rct-drawer" style="max-height:0; overflow:hidden; transition:max-height 0.5s cubic-bezier(0.4,0,0.2,1);">
-            <div style="padding:0 24px 24px; border-top:0.5px solid var(--border);">
-              <p class="drawer-body" style="margin-top:18px;">Within RCT, variance refers to deviation, instability, imbalance, or pressure emerging within a relational system. No system remains perfectly static. Differences in energy, resources, behavior, perception, performance, or structure naturally create variance over time.</p>
-              <p class="drawer-body">Variance is not inherently negative — in many cases it is the engine of adaptation, creativity, innovation, and transformation. However, unresolved variance introduces pressure into the relational field that must be absorbed, resolved, transferred, or redistributed somewhere within the system.</p>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); display:block; margin-bottom:10px;">The Central Principle</span>
-                <p class="drawer-disclaimer-text"><em>Pressure rarely disappears. It moves.</em> Redistribution describes the process by which systems transfer, contain, displace, or absorb variance across relational structures. When one area of a system cannot adequately resolve accumulating tension, the pressure shifts elsewhere.</p>
-              </div>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border); background:transparent;">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:12px;">This Dynamic Appears Across Domains</span>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Economic Instability</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Redistributes pressure into labor markets, households, or political systems.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Organizational Dysfunction</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Shifts strain onto employees, customers, or operational processes downstream.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Emotional Suppression</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Redistributes unresolved tension into relationships, behavior, or psychological fragmentation.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Infrastructure Neglect</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Redistributes risk into future crises and compounding maintenance failure.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Institutional Dishonesty</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Redistributes mistrust across society — often irreversibly — over time.</p>
-                  </div>
-                </div>
-              </div>
-
-              <p class="drawer-body" style="margin-top:20px;">In coherent systems, redistribution mechanisms help stabilize variance before it becomes destructive. Healthy feedback loops, adaptive structures, transparency, accountability, and relational trust allow pressure to move in manageable and sustainable ways.</p>
-              <p class="drawer-body">In incoherent systems, redistribution becomes distorted or uneven. Pressure accumulates disproportionately in vulnerable areas while surface stability is artificially preserved elsewhere — creating delayed consequences. Systems may appear functional for extended periods because variance has been displaced rather than resolved. Unresolved pressure continues accumulating beneath the surface until thresholds are exceeded and fragmentation becomes externally visible.</p>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:10px;">The Diagnostic Implication</span>
-                <p class="drawer-disclaimer-text">The location where pressure becomes visible is not always the origin of the problem. A breakdown may manifest in leadership, economics, relationships, institutions, or culture — while the deeper source of incoherence resides elsewhere within the relational architecture. Understanding a system therefore requires tracing not only where variance appears, but <em>how pressure moves, where it accumulates, and whether the system possesses sufficient coherence to redistribute tension without eventual collapse.</em></p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 06 Relational Stability Across Systems -->
-        <div class="rct-point" onclick="toggleRct(this)" style="cursor:pointer; transition:background 0.25s;">
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; gap:12px;">
-            <div>
-              <span style="font-family:var(--cinzel); font-size:16px; color:var(--text);">Relational Stability Across Systems</span>
-              <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.6; margin-top:5px;">What determines whether a system can sustain coherence under sustained constraint.</p>
-            </div>
-            <span class="rct-toggle" style="font-family:var(--sans); font-size:14px; color:var(--gold-dim); flex-shrink:0; transition:transform 0.35s ease, color 0.25s; line-height:1; user-select:none;">+</span>
-          </div>
-          <div class="rct-drawer" style="max-height:0; overflow:hidden; transition:max-height 0.5s cubic-bezier(0.4,0,0.2,1);">
-            <div style="padding:0 24px 24px; border-top:0.5px solid var(--border);">
-              <p class="drawer-body" style="margin-top:18px;">Within RCT, relational stability refers to a system's ability to sustain coherence over time while operating under ongoing constraint, pressure, tension, and change. No living system exists in perfect equilibrium — individuals, organizations, societies, ecosystems, and institutions are constantly subjected to competing demands, uncertainty, resource limitations, external pressures, and internal variance.</p>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); display:block; margin-bottom:10px;">The Foundational Claim</span>
-                <p class="drawer-disclaimer-text"><em>Stability is not the absence of stress. Stability is the sustained capacity to remain coherent despite it.</em> RCT proposes that the durability of a system depends less on raw strength alone and more on the quality of its relational architecture.</p>
-              </div>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border); background:transparent;">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:12px;">A System Remains Stable When</span>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Feedback Loops</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Remain functional — the system can still receive and process honest signal about itself.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Signal Integrity</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Is preserved — information moving through the system corresponds to underlying reality.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Tension</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Can be metabolized constructively without accumulating beyond the system's resolution capacity.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Variance</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Is redistributed sustainably rather than displaced onto vulnerable areas.</p>
-                  </div>
-                  <div class="drawer-property" style="margin-bottom:0;">
-                    <span class="drawer-property-name">Relational Coherence</span>
-                    <p class="drawer-property-sub" style="color:var(--text-dim);">Is maintained sufficiently to allow adaptation without structural fragmentation.</p>
-                  </div>
-                </div>
-              </div>
-
-              <p class="drawer-body" style="margin-top:20px;">This principle challenges purely reductionistic models that evaluate systems only through isolated metrics or surface performance. A system may appear successful temporarily while deeper relational instability accumulates beneath the surface. RCT therefore distinguishes between short-term persistence and true structural stability.</p>
-
-              <p class="drawer-body">Relationally stable systems possess adaptive capacity. They absorb shocks, process tension, self-correct, and reorganize without collapsing into incoherence. They maintain continuity not because they are rigid, but because they possess enough coherence to evolve under changing conditions.</p>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border); background:transparent;">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:12px; opacity:0.8;">Unstable Systems Often Rely On</span>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                  <div class="drawer-property" style="margin-bottom:0;"><span class="drawer-property-name">Suppression of Feedback</span><p class="drawer-property-sub" style="color:var(--text-dim);">Blocking honest signal to preserve the appearance of coherence.</p></div>
-                  <div class="drawer-property" style="margin-bottom:0;"><span class="drawer-property-name">Excessive Centralization</span><p class="drawer-property-sub" style="color:var(--text-dim);">Concentrating control in ways that eliminate adaptive capacity at the edges.</p></div>
-                  <div class="drawer-property" style="margin-bottom:0;"><span class="drawer-property-name">Narrative Control</span><p class="drawer-property-sub" style="color:var(--text-dim);">Managing perception rather than addressing underlying structural tension.</p></div>
-                  <div class="drawer-property" style="margin-bottom:0;"><span class="drawer-property-name">Denial of Variance</span><p class="drawer-property-sub" style="color:var(--text-dim);">Refusing to acknowledge pressure accumulating within the system.</p></div>
-                  <div class="drawer-property" style="margin-bottom:0;"><span class="drawer-property-name">Pressure Displacement</span><p class="drawer-property-sub" style="color:var(--text-dim);">Continuously shifting tension onto vulnerable areas to preserve surface stability elsewhere.</p></div>
-                </div>
-                <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.7; margin-top:14px;">These strategies may preserve appearances temporarily, but they often weaken long-term resilience by degrading signal integrity and reducing the system's ability to respond honestly to reality.</p>
-              </div>
-
-              <p class="drawer-body" style="margin-top:20px;">RCT further recognizes that relational stability is multi-layered. A system may appear stable economically while degrading socially. A relationship may appear functional externally while emotionally fragmenting internally. An institution may preserve operational continuity while losing moral or structural coherence beneath the surface.</p>
-
-              <div style="margin-top:20px; padding:16px 20px; border:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-                <span style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold-dim); display:block; margin-bottom:10px;">The Key Question</span>
-                <p class="drawer-disclaimer-text">The question is not simply whether a system continues existing, but whether it remains <em>meaningfully coherent across time and pressure.</em> Relational stability is not static preservation — it is the ongoing ability of a system to sustain intelligibility, adaptability, and functional integrity while navigating the unavoidable tensions of reality.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style="padding:18px 24px; border-top:0.5px solid var(--border-lit); background:rgba(212,175,95,0.03);">
-          <p style="font-family:var(--cinzel); font-size:13px; font-style:italic; color:var(--text-muted); line-height:1.7;">RCT does not demand prescribed conclusions. Its methodology focuses on refining plausible possibilities through logic, structure, and relational analysis — leaving room for individual interpretation, skepticism, and reflection.</p>
-        </div>
-
+  <div class="sidebar-threads" id="sidebarThreads">
+    <div id="sidebarSharedEntry" style="display:none; cursor:pointer;" class="thread-item shared-origin active" onclick="var el=document.getElementById('shareResult'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'});">
+      <div class="thread-title" id="sidebarSharedTitle">Shared interpretation</div>
+      <div class="thread-meta">
+        <span class="thread-date" id="sidebarSharedDate"></span>
+        <span class="thread-badge shared">Shared</span>
       </div>
     </div>
   </div>
-</section>
 
-<!-- ── THE BOOK ── -->
-<section class="book-section" id="book">
-  <div class="section-inner">
-    <div class="book-grid">
+  <div class="sidebar-footer">
+    <a href="https://theprism.io/index.html">theprism.io</a>
+    <a href="mailto:support@theprism.io">support</a>
+  </div>
+</aside>
 
-      <div class="book-visual reveal">
-        <div style="position:relative; display:flex; flex-direction:column; align-items:center; gap:28px;">
-          <img src="ThePrism.png" alt="The Prism — Echad B'Emet"
-            style="width:clamp(260px,32vw,360px); height:clamp(260px,32vw,360px); object-fit:contain;
-                   filter: drop-shadow(0 0 48px rgba(201,168,76,0.22)) drop-shadow(0 0 16px rgba(201,168,76,0.12));
-                   transition: filter 0.5s ease, transform 0.5s ease;"
-            onmouseover="this.style.filter='drop-shadow(0 0 72px rgba(201,168,76,0.38)) drop-shadow(0 0 24px rgba(201,168,76,0.22))'; this.style.transform='scale(1.03)'"
-            onmouseout="this.style.filter='drop-shadow(0 0 48px rgba(201,168,76,0.22)) drop-shadow(0 0 16px rgba(201,168,76,0.12))'; this.style.transform='scale(1)'">
-          <!-- Ambient glow beneath -->
-          <div style="position:absolute; bottom:-40px; left:50%; transform:translateX(-50%);
-                      width:280px; height:60px;
-                      background:radial-gradient(ellipse, rgba(201,168,76,0.14), transparent);
-                      filter:blur(24px); pointer-events:none;"></div>
-          <!-- Book label -->
-          <div style="font-family:var(--sans); font-size:8px; letter-spacing:0.32em; text-transform:uppercase; color:var(--text-muted); margin-top:8px;">
-            The Prism &nbsp;·&nbsp; Echad B'Emet
-          </div>
+<div class="page-wrap">
+<div class="main-content" id="mainContent">
+<div class="shell">
+
+  <!-- LOADING STATE -->
+  <div class="state-block" id="loadingState">
+    <div class="state-symbol">✦</div>
+    <div class="state-text">Loading interpretation…</div>
+  </div>
+
+  <!-- ERROR STATE -->
+  <div class="state-block error" id="errorState" style="display:none;">
+    <div class="state-symbol">⦿</div>
+    <div class="state-text" id="errorText">This interpretation could not be found.</div>
+    <a href="https://theprism.io" class="back-link">← Return to The Prism</a>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="shareContent" style="display:none;">
+
+    <div class="share-banner">
+      Shared interpretation &nbsp;·&nbsp; <a href="https://theprism.io/index.html" style="color:var(--gold);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='var(--gold-pale)'" onmouseout="this.style.color='var(--gold)'">The Prism</a> &nbsp;·&nbsp; <a href="https://theprism.io/purchase.html" style="color:var(--text-muted);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">theprism.io</a>
+    </div>
+
+    <header class="header">
+      <img src="/ThePrism.png" alt="The Prism" style="height:72px; margin-bottom:12px;">
+      <h1>The Prism</h1>
+      <div style="font-family:var(--cinzel); font-size:20px; letter-spacing:0.18em; color:var(--gold); margin-bottom:4px;">Echad b'Emet</div>
+      <div style="font-family:var(--crimson); font-size:24px; color:var(--hebrew); letter-spacing:0.08em; margin-bottom:16px; direction:rtl;">אֶחָד בֶּאֱמֶת</div>
+      <div class="header-sub">Framework Interpreter</div>
+      <div class="header-rule"></div>
+      <p class="header-premise" id="shareSubject"></p>
+    </header>
+
+    <!-- Shared interpretation renders here -->
+    <div id="shareResult"></div>
+
+    <!-- Collaboration panel (shown when collaboration_open = true) -->
+    <div class="collab-panel" id="collabPanel" style="display:none;">
+      <div class="collab-header">
+        <div class="collab-dot"></div>
+        <div class="collab-label">Live Discussion</div>
+      </div>
+      <div class="collab-messages" id="collabMessages">
+        <!-- messages injected by JS -->
+      </div>
+      <div class="collab-input-row" id="collabInputRow">
+        <textarea class="collab-input" id="collabInput" placeholder="Add to the discussion…" rows="2"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCollabMessage();}"></textarea>
+        <button class="collab-send-btn" onclick="sendCollabMessage()">Send →</button>
+      </div>
+      <div class="collab-closed-notice" id="collabClosedNotice" style="display:none;">
+        This discussion has been closed by the sender. The exchange is preserved above.
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="own-query-divider">
+      <span>Bring your own question</span>
+    </div>
+
+    <!-- Live input — recipient's own queries -->
+    <div id="inputSection">
+      <textarea class="input-field" id="userInput"
+        placeholder="A verse, a question, or whatever is on your mind…"
+        rows="3" maxlength="600"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();runQuery();}"></textarea>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; margin-top:16px; margin-bottom:52px;">
+      <button class="submit-btn" id="submitBtn" onclick="runQuery()">Interpret →</button>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingBlock" style="display:none;">
+      <div class="loading-inline">
+        <div class="ls">✦</div>
+        <div class="lt">Reading the relational field…</div>
+      </div>
+    </div>
+
+    <!-- Results from recipient's own queries -->
+    <div id="resultContent"></div>
+
+    <!-- Limit wall -->
+    <div class="limit-wall" id="limitWall">
+      <div class="limit-wall-title">Free Query Limit Reached</div>
+      <div class="limit-wall-body">You've used your 3 free interpretations. Continue your exploration below.</div>
+      <div class="limit-options">
+        <div class="limit-option">
+          <div class="limit-option-tier">One-Time</div>
+          <div class="limit-option-price">$2.99</div>
+          <div class="limit-option-desc">10 queries.<br>No subscription required.</div>
+          <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" class="limit-option-cta">Buy 10 Queries →</a>
+        </div>
+        <div class="limit-option featured">
+          <div class="limit-option-tag">Recommended</div>
+          <div class="limit-option-tier">Subscribe</div>
+          <div class="limit-option-price">from $9.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
+          <div class="limit-option-desc">Full framework access.<br>Session history saved.</div>
+          <a href="https://theprism.io/purchase.html" class="limit-option-cta solid">See Plans →</a>
+        </div>
+        <div class="limit-option">
+          <div class="limit-option-tier">Free</div>
+          <div class="limit-option-price">$0</div>
+          <div class="limit-option-desc">3 queries reset every 24 hours.</div>
+          <a href="https://theprism.io" class="limit-option-cta">← Return Tomorrow</a>
         </div>
       </div>
-
-      <div class="book-right reveal reveal-delay-2">
-        <div class="book-release">
-          <span class="book-release-dot"></span>
-          Coming Soon
-        </div>
-
-        <p class="section-eyebrow">The Book</p>
-        <h2 class="section-heading">The framework,<br>in full.</h2>
-        <p class="section-body">
-          The Prism began as a manuscript. The book makes the complete framework available in one place — the philosophical architecture, the relational ontology, the two-realm cosmology, and the convergence point where quantum mechanics and the oldest textual tradition arrive at the same answer.
-        </p>
-        <p class="section-body" style="margin-top:20px;">
-          The Interpreter is the application. The book is the foundation. Neither requires the other — but together they are a complete system.
-        </p>
-
-        <div style="margin-top:40px; display:flex; gap:16px; flex-wrap:wrap;">
-          <a href="/coming-soon.html" class="btn-primary" style="font-size:9px; padding:16px 32px;">
-            Order on Amazon
-            <span class="btn-arrow">→</span>
-          </a>
-          <a href="/qt-gateway.html" class="btn-secondary" style="align-self:center;">Or start with the Interpreter</a>
-        </div>
-      </div>
-
     </div>
-  </div>
-</section>
 
-<!-- ── FINAL CTA ── -->
-<section class="final-cta-section">
-  <div class="final-cta-inner reveal">
-    <h2 class="final-cta-heading">What does the text<br><em>actually</em> say?</h2>
-    <p class="final-cta-sub">
-      Submit anything. The framework doesn't require agreement to engage. It only requires a question you are willing to examine without reducing it.
-    </p>
-    <div class="final-btns">
-      <a href="/qt-gateway.html" class="btn-primary">
-        Open the Interpreter
-        <span class="btn-arrow">→</span>
-      </a>
-      <a href="#book" class="btn-secondary">Learn about the book first</a>
-    </div>
-  </div>
-</section>
+  </div><!-- /#shareContent -->
 
-<!-- ── FOOTER ── -->
-<footer>
-  <div class="footer-mark">The Prism</div>
-  <div class="footer-copy">OPNX LLC &nbsp;·&nbsp; © 2025 All Rights Reserved</div>
-  <ul class="footer-links">
-    <li><a href="/terms">Terms</a></li>
-    <li><a href="/privacy">Privacy</a></li>
-    <li><a href="mailto:support@theprism.io">Support</a></li>
-  </ul>
+</div><!-- /.shell -->
+</div><!-- /.main-content -->
+</div><!-- /.page-wrap -->
+
+<footer class="site-footer">
+  <a href="https://theprism.io" class="footer-mark">The Prism</a>
+  <div class="footer-copy">OPNX LLC &nbsp;·&nbsp; © 2026 All Rights Reserved</div>
 </footer>
 
 <script>
-// ── SCROLL REVEAL ──
-const revealEls = document.querySelectorAll('.reveal');
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
-      observer.unobserve(entry.target);
+// ── State ────────────────────────────────────────────────────────────────────
+var shareToken      = null;
+var shareId         = null;
+var channelId       = null;
+var collabOpen      = false;
+var sessionQueries  = 0;
+var QUERY_LIMIT     = 3;
+var currentSubject  = '';
+var collabPollInterval = null;
+var lastMessageCount   = 0;
+
+var SUPABASE_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatNow() {
+  var now = new Date();
+  return now.toLocaleString('en-US',{month:'short',day:'numeric'}) + ' · ' +
+    now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+var sidebarOpen = false;
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  var sb = document.getElementById('sidebar');
+  var mc = document.getElementById('mainContent');
+  var tg = document.getElementById('sidebarToggle');
+  if (sb) sb.classList.toggle('open', sidebarOpen);
+  if (mc) mc.classList.toggle('sidebar-open', sidebarOpen);
+  if (tg) tg.textContent = sidebarOpen ? '‹' : '☰';
+}
+
+function openSidebar() {
+  if (!sidebarOpen) toggleSidebar();
+}
+
+// ── Email capture ─────────────────────────────────────────────────────────────
+function openEmailCapture() {
+  var bar    = document.getElementById('saveProfileBar');
+  var inline = document.getElementById('emailCaptureInline');
+  if (bar)    bar.style.display    = 'none';
+  if (inline) inline.classList.add('open');
+  var inp = document.getElementById('sidebarEmailInput');
+  if (inp) setTimeout(function(){ inp.focus(); }, 100);
+  openSidebar();
+}
+
+async function saveEmail() {
+  var inp      = document.getElementById('sidebarEmailInput');
+  var statusEl = document.getElementById('emailCaptureStatus');
+  if (!inp) return;
+  var email = inp.value.trim();
+  var re    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!re.test(email)) {
+    statusEl.textContent = 'Please enter a valid email address.';
+    statusEl.style.color = '#b85c5c';
+    statusEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    var res = await fetch('/api/register-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, sharedToken: shareToken })
+    });
+    var data = await res.json();
+    if (data.success || res.ok) {
+      localStorage.setItem('qt_user_email', email);
+      statusEl.textContent = 'Saved. Your session is held for 30 days.';
+      statusEl.style.color = 'var(--gold-dim)';
+      statusEl.style.display = 'block';
+      // Hide warning, update sidebar label
+      var warn = document.getElementById('anonWarning');
+      if (warn) warn.style.display = 'none';
+      setTimeout(function() {
+        var inline = document.getElementById('emailCaptureInline');
+        if (inline) inline.classList.remove('open');
+      }, 2500);
+    }
+  } catch (err) {
+    statusEl.textContent = 'Could not save. Please try again.';
+    statusEl.style.color = '#b85c5c';
+    statusEl.style.display = 'block';
+  }
+}
+
+// ── Render shared snapshot ────────────────────────────────────────────────────
+function renderSnapshot(snapshot, subject) {
+  currentSubject = subject || '';
+
+  // Subject in header
+  var subjectEl = document.getElementById('shareSubject');
+  if (subjectEl) subjectEl.textContent = subject || '';
+
+  // Populate sidebar entry
+  var sidebarTitle = document.getElementById('sidebarSharedTitle');
+  var sidebarDate  = document.getElementById('sidebarSharedDate');
+  var sidebarEntry = document.getElementById('sidebarSharedEntry');
+  if (sidebarTitle) sidebarTitle.textContent = subject ? (subject.length > 52 ? subject.slice(0,52)+'…' : subject) : 'Shared interpretation';
+  if (sidebarDate)  sidebarDate.textContent  = formatNow();
+  if (sidebarEntry) sidebarEntry.style.display = 'block';
+
+  var sections = [
+    { num: '00', title: "Echad b'Emet",         hebrew: 'אֶחָד בֶּאֱמֶת', content: snapshot.prism_summary },
+    { num: '01', title: 'Entanglement',          hebrew: 'קֶשֶׁר',          content: snapshot.entanglement },
+    { num: '02', title: 'Coherence & Alignment', hebrew: 'יִחוּד',          content: snapshot.coherence_alignment },
+    { num: '03', title: 'Noise & Decoherence',   hebrew: 'פֵּרוּד',          content: snapshot.noise_decoherence },
+    { num: '04', title: 'Telos',                 hebrew: 'תַּכְלִית',       content: snapshot.telos_insight },
+    { num: '05', title: 'Olam HaBa — Non-Local View', hebrew: 'עוֹלָם הַבָּא', content: snapshot.olam_haba },
+  ];
+
+  var html = '';
+
+  if (snapshot.verse_identified) {
+    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(snapshot.verse_identified) + '</div><div class="verse-text">' + escHtml(snapshot.verse_text || '') + '</div></div>';
+  }
+
+  if (snapshot.recognition) {
+    html += '<div class="qt-recognition"><p>' + escHtml(snapshot.recognition) + '</p></div>';
+  }
+
+  if (snapshot.core_insight) {
+    html += '<div class="qt-core-insight"><p>' + escHtml(snapshot.core_insight) + '</p></div>';
+  }
+
+  html += '<div class="kingdom-block"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(snapshot.kingdom_implication || '') + '</div></div>';
+
+  var threads = Array.isArray(snapshot.suggested_threads) ? snapshot.suggested_threads.filter(function(t){return t&&t.trim();}) : [];
+  if (threads.length > 0) {
+    html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
+    threads.forEach(function(t) {
+      html += '<button class="qt-thread-btn" onclick="submitThread(this.dataset.t)" data-t="' + escHtml(t) + '">' + escHtml(t) + '</button>';
+    });
+    html += '</div>';
+  }
+
+  var hasFramework = sections.some(function(s){return s.content;}) || (snapshot.key_terms && snapshot.key_terms.length > 0);
+  if (hasFramework) {
+    var fhtml = '';
+    sections.forEach(function(s) {
+      if (!s.content) return;
+      fhtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">' + s.num + '</span><span class="qt-section-title">' + s.title + '</span><span class="qt-section-hebrew">' + s.hebrew + '</span></div><div class="qt-section-body"><p>' + escHtml(s.content) + '</p></div></div>';
+    });
+    if (snapshot.key_terms && snapshot.key_terms.length > 0) {
+      var rows = snapshot.key_terms.map(function(t){
+        var h = t.hebrew ? ' <span style="color:var(--hebrew);font-size:15px;">' + escHtml(t.hebrew) + '</span>' : '';
+        return '<tr><td>' + escHtml(t.term) + h + '</td><td>' + escHtml(t.prism_meaning || t.qt_meaning || '') + '</td></tr>';
+      }).join('');
+      fhtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body" style="padding:0;"><table class="qt-table"><thead><tr><th>Term</th><th>Prism Meaning</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }
+    html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + fhtml + '</div>';
+  }
+
+  document.getElementById('shareResult').innerHTML = html;
+}
+
+function toggleFramework(btn) {
+  var body = document.getElementById('qtFrameworkBody');
+  if (!body) return;
+  var isOpen = body.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen);
+  btn.textContent = isOpen ? 'Hide framework interpretation' : 'View full framework interpretation';
+}
+
+function submitThread(text) {
+  var inp = document.getElementById('userInput');
+  if (!inp) return;
+  inp.value = text;
+  inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  runQuery();
+}
+
+// ── Recipient query flow ──────────────────────────────────────────────────────
+async function runQuery() {
+  var input = document.getElementById('userInput').value.trim();
+  if (!input) return;
+
+  if (sessionQueries >= QUERY_LIMIT) { showLimitWall(); return; }
+
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('loadingBlock').style.display = 'block';
+  document.getElementById('loadingBlock').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  var prompt = buildPrompt(input);
+
+  try {
+    var res = await fetch('/api/interpret', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: prompt }],
+        email: localStorage.getItem('qt_user_email') || null,
+        rawQuery: input,
+        isFollowUp: false
+      })
+    });
+
+    if (res.status === 429) {
+      var limitData = {};
+      try { limitData = await res.json(); } catch {}
+      showLimitWall(limitData.message);
+      return;
+    }
+
+    if (!res.ok) throw new Error('SERVER_ERROR');
+
+    // Stream the response
+    var fuEl = document.createElement('div');
+    fuEl.className = 'fu-block';
+    fuEl.innerHTML = '<div class="fu-question">' + escHtml(input) + '</div>';
+    var bodyEl = document.createElement('div');
+    bodyEl.className = 'fu-body';
+    fuEl.appendChild(bodyEl);
+    document.getElementById('resultContent').appendChild(fuEl);
+
+    var reader  = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer  = '';
+    var fullText = '';
+    bodyEl.innerHTML = '<span style="opacity:0.4;font-family:var(--mono);font-size:11px;letter-spacing:0.12em;">interpreting…</span>';
+
+    while (true) {
+      var _ref = await reader.read();
+      if (_ref.done) break;
+      buffer += decoder.decode(_ref.value, { stream: true });
+      var lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (line.startsWith('data: ')) {
+          try {
+            var parsed = JSON.parse(line.slice(6).trim());
+            if (parsed.type === 'delta' && parsed.text) {
+              fullText += parsed.text;
+              var paras = fullText.split(/\n\n/);
+              bodyEl.innerHTML = paras.map(function(p, idx) {
+                return '<p>' + escHtml(p.replace(/\n/g,' ')) + '</p>';
+              }).join('');
+            }
+          } catch {}
+        }
+      }
+    }
+
+    var _completedInput = input;
+    document.getElementById('userInput').value = '';
+    sessionQueries++;
+
+    // Add this query to the sidebar
+    addQueryToSidebar(_completedInput, fuEl);
+
+    // Open sidebar after first query to surface the save prompt
+    if (sessionQueries === 1) {
+      openSidebar();
+    }
+
+    if (sessionQueries >= QUERY_LIMIT) {
+      showLimitWall();
+    }
+
+  } catch (err) {
+    var errEl = document.createElement('div');
+    errEl.style.cssText = 'border:1px solid #5a2a2a;background:#1a0a0a;padding:20px 24px;color:#c08080;font-size:17px;margin-top:20px;';
+    errEl.textContent = 'Something went wrong. Please try again.';
+    document.getElementById('resultContent').appendChild(errEl);
+  } finally {
+    document.getElementById('loadingBlock').style.display = 'none';
+    document.getElementById('submitBtn').disabled = false;
+  }
+}
+
+function buildPrompt(input) {
+  return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. START WITH { END WITH }.
+
+You are The Prism framework interpreter. The user has submitted: "${input}"
+
+Infer the query type from the content — verse reference, phrase, theme, or open question. Apply the complete Prism framework regardless of input type.
+
+Prism Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
+
+Return this exact JSON:
+{
+  "recognition": "2-4 sentences of plain-language recognition. No framework vocabulary.",
+  "core_insight": "The single most important thing the framework sees. One paragraph.",
+  "suggested_threads": ["specific door 1", "specific door 2"],
+  "verse_identified": "Most relevant Scripture",
+  "verse_text": "Verse quoted accurately",
+  "prism_summary": "Two sharp sentences — Section 00 Echad b'Emet",
+  "entanglement": "God's initiation here",
+  "coherence_alignment": "How this calls toward alignment",
+  "noise_decoherence": "What distortions this exposes",
+  "telos_insight": "Christ-form being called toward",
+  "olam_haba": "Time-transcendent view",
+  "kingdom_implication": "One crisp Kingdom punchline",
+  "key_terms": [{"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"}]
+}`;
+}
+
+function showLimitWall(msg) {
+  document.getElementById('submitBtn').style.display = 'none';
+  var wall = document.getElementById('limitWall');
+  if (msg) {
+    var bodyEl = wall.querySelector('.limit-wall-body');
+    if (bodyEl) bodyEl.textContent = msg;
+  }
+  wall.style.display = 'block';
+  wall.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Collaboration ─────────────────────────────────────────────────────────────
+async function loadCollabMessages() {
+  if (!channelId) return;
+  try {
+    var res = await fetch(
+      SUPABASE_URL + '/rest/v1/room_messages?channel_id=eq.' + encodeURIComponent(channelId) + '&order=created_at.asc&select=id,content,message_type,created_at',
+      { headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON } }
+    );
+    var messages = await res.json();
+    if (!Array.isArray(messages)) return;
+    if (messages.length === lastMessageCount) return;
+    lastMessageCount = messages.length;
+    renderCollabMessages(messages);
+  } catch {}
+}
+
+function renderCollabMessages(messages) {
+  var container = document.getElementById('collabMessages');
+  if (!container) return;
+  container.innerHTML = '';
+  messages.forEach(function(msg) {
+    var isOwn = msg.message_type === 'recipient';
+    var el = document.createElement('div');
+    el.className = 'collab-msg' + (isOwn ? ' own' : '');
+    var time = new Date(msg.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    el.innerHTML = '<div class="collab-msg-meta">' + (isOwn ? 'You' : 'Sender') + ' · ' + time + '</div><div class="collab-msg-body">' + escHtml(msg.content) + '</div>';
+    container.appendChild(el);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendCollabMessage() {
+  var input = document.getElementById('collabInput');
+  if (!input || !channelId) return;
+  var content = input.value.trim();
+  if (!content) return;
+
+  input.value = '';
+  input.disabled = true;
+
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/room_messages', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON,
+        'Authorization': 'Bearer ' + SUPABASE_ANON,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        channel_id:   channelId,
+        user_id:      '00000000-0000-0000-0000-000000000000', // anonymous recipient
+        content:      content,
+        message_type: 'recipient',
+        prism_thread_id: shareId || null
+      })
+    });
+    await loadCollabMessages();
+  } catch {} finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+
+function startCollabPolling() {
+  if (collabPollInterval) clearInterval(collabPollInterval);
+  collabPollInterval = setInterval(loadCollabMessages, 4000);
+}
+
+// ── Load share ────────────────────────────────────────────────────────────────
+async function loadShare() {
+  var params = new URLSearchParams(window.location.search);
+  shareToken = params.get('t');
+
+  if (!shareToken) {
+    showError('This link appears to be incomplete. Please check the original invitation.');
+    return;
+  }
+
+  try {
+    var res = await fetch('/api/share?t=' + encodeURIComponent(shareToken));
+
+    if (res.status === 410) {
+      showError('This share has been closed by the sender.');
+      return;
+    }
+    if (res.status === 404) {
+      showError('This interpretation could not be found or has expired.');
+      return;
+    }
+    if (!res.ok) {
+      showError('Could not load this interpretation. Please try again.');
+      return;
+    }
+
+    var data = await res.json();
+    var share = data.share;
+    channelId   = data.channelId || null;
+    shareId     = share.id;
+    collabOpen  = share.collaboration_open;
+
+    var snapshot = share.snapshot;
+    var subject  = share.subject || snapshot._subject || '';
+
+    renderSnapshot(snapshot, subject);
+
+    // Show collaboration panel if open
+    if (collabOpen && channelId) {
+      var panel = document.getElementById('collabPanel');
+      if (panel) panel.style.display = 'block';
+      await loadCollabMessages();
+      startCollabPolling();
+    } else if (collabOpen && !channelId) {
+      // Collab open but no channel yet — show panel without input
+      var panel = document.getElementById('collabPanel');
+      if (panel) panel.style.display = 'block';
+    }
+
+    // Hide loading, show content
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('shareContent').style.display = 'block';
+
+    // If user already has email, hide the warning
+    if (localStorage.getItem('qt_user_email')) {
+      var warn = document.getElementById('anonWarning');
+      var bar  = document.getElementById('saveProfileBar');
+      if (warn) warn.style.display = 'none';
+      if (bar)  bar.style.display  = 'none';
+    }
+
+  } catch (err) {
+    showError('Could not load this interpretation. Please try again.');
+  }
+}
+
+function showError(msg) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('errorState').style.display = 'block';
+  document.getElementById('errorText').textContent = msg;
+}
+
+// ── Sidebar query tracking ───────────────────────────────────────────────────
+// Each recipient query gets a sidebar entry so they can navigate back to it.
+
+var _sidebarQueryCount = 0;
+
+function addQueryToSidebar(queryText, targetEl) {
+  _sidebarQueryCount++;
+  var threads = document.getElementById('sidebarThreads');
+  if (!threads) return;
+
+  var item = document.createElement('div');
+  item.className = 'thread-item';
+  item.style.cursor = 'pointer';
+
+  var title = queryText.length > 52 ? queryText.slice(0, 52) + '…' : queryText;
+  var now = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+
+  item.innerHTML = '<div class="thread-title">' + escHtml(title) + '</div>' +
+    '<div class="thread-meta"><span class="thread-date">Today · ' + now + '</span>' +
+    '<span class="thread-badge">Q' + _sidebarQueryCount + '</span></div>';
+
+  item.addEventListener('click', function() {
+    if (targetEl) targetEl.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+
+  threads.appendChild(item);
+}
+
+// ── Presence heartbeat ────────────────────────────────────────────────────────
+// Fires on first interaction (keystroke, thread tap, scroll) and then
+// every 30s while the tab is open. Signals the sender the page is live.
+
+var _heartbeatInterval  = null;
+var _heartbeatSent      = false;
+var _creditedCallback   = null; // set by qt.html if in embedded mode (unused here)
+
+function sendHeartbeat() {
+  if (!shareToken) return;
+  fetch('/api/share-presence', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: shareToken })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    // data.credited = true means this was the first heartbeat and sender got +1
+    // Nothing to do on recipient side — the sender's qt.html handles the animation
+  })
+  .catch(function() {});
+}
+
+function startHeartbeat() {
+  if (_heartbeatInterval) return; // already running
+  sendHeartbeat();
+  _heartbeatSent = true;
+  _heartbeatInterval = setInterval(sendHeartbeat, 30000);
+}
+
+function onRecipientInteraction() {
+  if (!_heartbeatSent) startHeartbeat();
+}
+
+// Attach interaction listeners after content loads
+function attachInteractionListeners() {
+  // Input field activity
+  var inp = document.getElementById('userInput');
+  if (inp) inp.addEventListener('keydown', onRecipientInteraction, { once: true });
+
+  // Suggested thread taps — delegated
+  document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList.contains('qt-thread-btn')) {
+      onRecipientInteraction();
+    }
+  }, { once: true });
+
+  // Collab input
+  var ci = document.getElementById('collabInput');
+  if (ci) ci.addEventListener('keydown', onRecipientInteraction, { once: true });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  loadShare();
+  // Store share token in sessionStorage so index.html can offer a return path
+  var params = new URLSearchParams(window.location.search);
+  var t = params.get('t');
+  if (t) sessionStorage.setItem('prism_shared_thread', t);
+  attachInteractionListeners();
+
+  // Stop heartbeat when tab hidden/closed
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      if (_heartbeatInterval) { clearInterval(_heartbeatInterval); _heartbeatInterval = null; }
+    } else {
+      if (_heartbeatSent) startHeartbeat(); // resume on return
     }
   });
-}, { threshold: 0.12 });
-
-revealEls.forEach(el => observer.observe(el));
-
-// ── PARALLAX WATERMARK ──
-const watermark = document.querySelector('.watermark');
-window.addEventListener('scroll', () => {
-  const y = window.scrollY;
-  if (watermark) watermark.style.transform = `translate(-50%, calc(-48% + ${y * 0.15}px))`;
-}, { passive: true });
-
-// ── WHAT IS THE PRISM ACCORDION ──
-function togglePoint(el) {
-  const isOpen = el.classList.contains('open');
-  document.querySelectorAll('.what-point.open').forEach(p => p.classList.remove('open'));
-  if (!isOpen) el.classList.add('open');
-}
-
-// ── RCT ACCORDION ──
-function toggleRct(el) {
-  const isOpen = el.classList.contains('rct-open');
-  document.querySelectorAll('.rct-point.rct-open').forEach(p => {
-    p.classList.remove('rct-open');
-    p.querySelector('.rct-drawer').style.maxHeight = '0';
-    p.querySelector('.rct-toggle').style.transform = 'rotate(0deg)';
-    p.querySelector('.rct-toggle').style.color = 'var(--gold-dim)';
-    p.style.background = 'transparent';
-  });
-  if (!isOpen) {
-    el.classList.add('rct-open');
-    el.querySelector('.rct-drawer').style.maxHeight = '2000px';
-    el.querySelector('.rct-toggle').style.transform = 'rotate(45deg)';
-    el.querySelector('.rct-toggle').style.color = 'var(--gold)';
-    el.style.background = 'rgba(212,175,95,0.025)';
-  }
-}
-
-/* ── BILLING TOGGLE ── */
-var _billingAnnual = false;
-function toggleBilling() {
-  _billingAnnual = !_billingAnnual;
-  var knob = document.getElementById('toggle-knob');
-  var mLabel = document.getElementById('toggle-monthly-label');
-  var aLabel = document.getElementById('toggle-annual-label');
-  var rPrice = document.getElementById('refraction-price');
-  var rCad = document.getElementById('refraction-cadence');
-  var rBtn = document.getElementById('refraction-btn');
-  var fsPrice = document.getElementById('fullspectrum-price');
-  var fsCad = document.getElementById('fullspectrum-cadence');
-  var fsBtn = document.getElementById('fullspectrum-btn');
-
-  if (_billingAnnual) {
-    knob.style.left = '23px';
-    mLabel.style.color = 'var(--text-muted)';
-    aLabel.style.color = 'var(--gold)';
-    rPrice.innerHTML = '99<span style="font-size:20px;">/yr</span>';
-    rCad.textContent = 'per year · 100 queries / month';
-    rBtn.href = 'https://buy.stripe.com/dRm3cv2UKcHeg8N1Ut18c0d';
-    fsPrice.innerHTML = '249<span style="font-size:20px;">/yr</span>';
-    fsCad.textContent = 'per year · 250 queries / month';
-    fsBtn.href = 'https://buy.stripe.com/28EaEX66WdLie0Fcz718c0c';
-  } else {
-    knob.style.left = '3px';
-    mLabel.style.color = 'var(--gold)';
-    aLabel.style.color = 'var(--text-muted)';
-    rPrice.innerHTML = '9<span style="font-size:20px;">.99</span>';
-    rCad.textContent = 'per month · 100 queries';
-    rBtn.href = 'https://buy.stripe.com/8x214n9j88qY09P6aJ18c04';
-    fsPrice.innerHTML = '24<span style="font-size:20px;">.99</span>';
-    fsCad.textContent = 'per month · 250 queries';
-    fsBtn.href = 'https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05';
-  }
-}
-
+});
 </script>
 
 </body>
