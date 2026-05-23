@@ -3114,20 +3114,9 @@ async function handleShareBtn() {
     // Start polling for recipient presence
     startPresencePolling(data.token);
 
-    // Trigger native share sheet / copy — skip modal step 1
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'The Prism — ' + (currentSubject || 'An interpretation'),
-          text: 'An interpretation from The Prism.',
-          url: data.shareUrl
-        });
-      } catch(e) { /* user cancelled native sheet — link still created */ }
-    } else {
-      // No native share — copy to clipboard silently and show brief toast
-      try { await navigator.clipboard.writeText(data.shareUrl); } catch(e) {}
-      showCopyToast(data.shareUrl);
-    }
+    // Copy link to clipboard silently — no share sheet
+    try { await navigator.clipboard.writeText(data.shareUrl); } catch(e) {}
+    showCopyToast(data.shareUrl);
 
   } catch (err) {
     console.error('Share failed:', err);
