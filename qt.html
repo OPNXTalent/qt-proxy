@@ -2645,6 +2645,7 @@ function selectThread(id) {
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
     var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
+    window._shareHandlingFollowUps = false;
     // Stop any existing Realtime subscription
     if (window._qtRealtimeChannel) {
       window._qtRealtimeChannel.unsubscribe();
@@ -2666,7 +2667,11 @@ function selectThread(id) {
       })
       .then(function(r) { return r.json(); })
       .then(function(rows) {
-        if (!rows || !rows.length) return;
+        if (!rows || !rows.length) {
+          window._shareHandlingFollowUps = false;
+          return;
+        }
+        window._shareHandlingFollowUps = true;
         var share = rows[0];
         _currentSharedSessionId = share.id;
         window._shareActive     = true;
@@ -2731,7 +2736,7 @@ function selectThread(id) {
     if (urlDisp) urlDisp.textContent = '';
     var discRow = document.getElementById('discussionRow');
     if (discRow) discRow.style.display = 'none';
-    restoreFollowUps(id);
+    if (!window._shareHandlingFollowUps) restoreFollowUps(id);
   } else {
     var rb = document.getElementById('resultBlock');      if (rb)  rb.classList.remove('visible');
     var sb = document.getElementById('subjectBanner');    if (sb)  sb.style.display = 'none';
@@ -3276,6 +3281,21 @@ async function handleShareBtn() {
   var snapshot    = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
   var senderEmail = localStorage.getItem('qt_user_email') || null;
   var threadId    = activeThreadId || null;
+
+  // If thread hasn't been saved to Supabase yet (pending-), resolve the real ID first
+  if (!threadId || threadId.startsWith('pending-')) {
+    if (userEmail()) {
+      try {
+        var tRes = await fetch(API_BASE + '/api/threads', { headers: { 'x-user-email': userEmail() } });
+        var tData = await tRes.json();
+        if (tData.threads && tData.threads.length > 0) {
+          threadId = tData.threads[0].id;
+          activeThreadId = threadId;
+          allThreads = tData.threads;
+        }
+      } catch(e) {}
+    }
+  }
 
   try {
     var res = await fetch('/api/share', {
