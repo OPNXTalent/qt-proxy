@@ -3197,18 +3197,6 @@ function initSidebar() {
     }
   }
 
-  // If we arrived here from share.html via "New Subject", this is a recipient session.
-  // Do NOT fetch the account holder's thread history — show an empty sidebar instead.
-  if (sessionStorage.getItem('prism_recipient_mode') === '1') {
-    sessionStorage.removeItem('prism_recipient_mode'); // clear so it doesn't persist
-    allThreads = [];
-    renderThreads(allThreads); // injects the shared thread entry at top via _sharedThreadUrl
-    if (sidebar) sidebar.classList.add('visible');
-    if (toggle) toggle.classList.add('visible');
-    sidebarHasAppeared = true;
-    return;
-  }
-
   fetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': email } })
   .then(function(r) { return r.json(); })
   .then(function(data) {
