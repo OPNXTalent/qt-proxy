@@ -2647,25 +2647,76 @@ function selectThread(id) {
     // Stop any existing follow-up polling
     if (window._qtFollowUpPoll) { clearInterval(window._qtFollowUpPoll); window._qtFollowUpPoll = null; }
 
-    // If this thread has an active share, poll for recipient contributions every 15s
-    if (window._shareActive && _currentSharedSessionId) {
-      window._qtFollowUpPoll = setInterval(function() {
-        fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), {
+    // Reset share state for this thread — will be restored below if share exists
+    window._shareActive = false;
+    _currentSharedSessionId = null;
+
+    // Look up whether this thread has an active share — restore state and start polling
+    (function(threadId) {
+      var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://fgngixbhpilefmyyeldr.supabase.co';
+      var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+      fetch(SUPA_URL + '/rest/v1/shares?thread_id=eq.' + encodeURIComponent(threadId) + '&status=eq.active&select=id,token,collaboration_open&limit=1', {
+        headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) {
+        if (!rows || !rows.length) return;
+        var share = rows[0];
+        _currentSharedSessionId = share.id;
+        window._shareActive     = true;
+        window._currentShareToken = share.token;
+        window._currentShareUrl = 'https://theprism.io/share.html?t=' + share.token;
+
+        // Restore share button state
+        var shareBtn = document.getElementById('shareBtn');
+        if (shareBtn) {
+          shareBtn.textContent   = 'Shared ✓';
+          shareBtn.style.borderColor = 'rgba(80,180,120,0.5)';
+          shareBtn.style.color       = 'rgba(80,180,120,0.9)';
+        }
+
+        // Restore URL display
+        var urlRow  = document.getElementById('shareUrlRow');
+        var urlDisp = document.getElementById('shareUrlDisplay');
+        if (urlRow)  urlRow.style.display = 'flex';
+        if (urlDisp) urlDisp.textContent  = window._currentShareUrl;
+
+        // Restore presence dot
+        var dot = document.getElementById('presenceDot');
+        if (dot) { dot.style.display = 'block'; startPresencePolling(share.token); }
+
+        // Restore collaboration state
+        if (share.collaboration_open) {
+          _collabOpen = true;
+          var discRow = document.getElementById('discussionRow');
+          if (discRow) discRow.style.display = 'block';
+          updateCollabToggleUI();
+        }
+
+        // Start polling for recipient contributions
+        window._qtFollowUpPoll = setInterval(function() {
+          fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
+            headers: { 'x-user-email': userEmail() }
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
+          })
+          .catch(function() {});
+        }, 15000);
+
+        // Immediate poll to show existing recipient contributions
+        fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
           headers: { 'x-user-email': userEmail() }
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-          if (data.followUps && data.followUps.length > 0) {
-            renderFUWithSource(data.followUps);
-          }
+          if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
         })
         .catch(function() {});
-      }, 15000);
-    }
-
-    // Reset share state for this thread
-    window._shareActive = false;
-    _currentSharedSessionId = null;
+      })
+      .catch(function() {});
+    })(id);
     _shareStatus = 'off';
     _collabOpen = false;
     var shareBtn = document.getElementById('shareBtn');
@@ -4045,24 +4096,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (window._sharedThreadUrl) {
     injectSharedThreadEntry();
 
-    // Bottom return bar
-    var bar = document.createElement('div');
-    bar.id = 'sharedReturnBar';
-    bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:300;background:rgba(13,13,20,0.97);border-top:1px solid rgba(201,168,76,0.2);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;backdrop-filter:blur(12px);';
-    var link = document.createElement('a');
-    link.href = window._sharedThreadUrl;
-    link.style.cssText = 'font-family:var(--cinzel);font-size:13px;letter-spacing:0.16em;text-transform:uppercase;color:var(--gold);text-decoration:none;';
-    link.textContent = '← Return to shared interpretation';
-    var dismiss = document.createElement('button');
-    dismiss.style.cssText = 'background:transparent;border:none;color:rgba(201,168,76,0.3);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;';
-    dismiss.textContent = '✕';
-    dismiss.onclick = function() {
-      bar.remove();
-      // Keep sessionStorage so sidebar entry persists
-    };
-    bar.appendChild(link);
-    bar.appendChild(dismiss);
-    document.body.appendChild(bar);
+    // Sidebar entry is sufficient — no bottom bar needed
   }
 });
 </script>
