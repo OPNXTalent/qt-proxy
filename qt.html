@@ -7,8 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/realtime.js" defer></script>
 <style>
   :root {
     --void: #06060a;
@@ -780,21 +778,6 @@
     box-shadow: 0 0 8px rgba(220,60,60,0.4);
     animation: micPulse 1.2s ease-in-out infinite;
   }
-  /* Recipient contribution styling in sender's thread */
-  .follow-up-block.from-recipient {
-    border-left: 2px solid rgba(80,180,120,0.4);
-    padding-left: 16px;
-    margin-top: 32px;
-  }
-  .fu-label-recipient {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: rgba(80,180,120,0.6);
-    margin-bottom: 8px;
-  }
-
   @keyframes micPulse {
     0%, 100% { box-shadow: 0 0 6px rgba(220,60,60,0.3); }
     50% { box-shadow: 0 0 14px rgba(220,60,60,0.6); }
@@ -1072,30 +1055,21 @@
     <!-- DOWNLOAD -->
     <div id="downloadRow" style="display:none; margin-top:36px; padding:24px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
 
-      <!-- PDF downloads + Share button row — Dark | Share | Light -->
-      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:0; align-items:center;">
+      <!-- PDF downloads + Share button row -->
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:0;">
         <button onclick="downloadPDF('dark')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">↓ Dark Version</button>
+        <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Print Version</button>
 
-        <!-- Share button — centre position -->
+        <!-- Share button — single action, no modal pre-step -->
         <div style="position:relative; display:inline-flex; align-items:center; gap:10px;">
           <button id="shareBtn" onclick="handleShareBtn()" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;"
             onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'"
             onmouseout="if(!window._shareActive)this.style.borderColor='var(--border-lit)';if(!window._shareActive)this.style.color='var(--text-dim)'">
-            Share
+            Share this reflection →
           </button>
           <!-- Presence dot — hidden until share exists -->
           <div id="presenceDot" style="display:none; width:10px; height:10px; border-radius:50%; background:rgba(80,180,120,0.3); transition:background 0.5s;" title="Viewing status"></div>
         </div>
-
-        <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Light Version</button>
-      </div>
-
-      <!-- Share URL — revealed inline after share created -->
-      <div id="shareUrlRow" style="display:none; margin-top:16px; justify-content:center; align-items:center; gap:10px;">
-        <div id="shareUrlDisplay" style="font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:360px;"></div>
-        <button onclick="shareViaCopy()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
-          onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
-          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Copy</button>
       </div>
 
       <!-- Discussion button — appears after share created -->
@@ -1520,9 +1494,7 @@ You are The Prism framework interpreter. The user previously received a full Pri
 
 Their follow-up question is: "${input}"
 
-Respond within the Prism framework — grounded in Echad b'Emet, relational ontology, entanglement/coherence/decoherence, telos, and Hebrew two-world cosmology where relevant. Be direct and precise. Plain prose, no JSON, no markdown headers.
-
-DELIVERY — SOCRATIC CHUNKING: Before responding, construct the complete answer mentally. Then deliver only the first meaningful layer — 2-4 sentences of real substance. End with a single question that is the natural next step in the full answer you are holding. The question must arise from what was just said, feel like genuine curiosity, and open the next door without telegraphing what is behind it. Never deliver the full answer in one response. The exchange is the architecture.`;
+Respond within the Prism framework — grounded in Echad b'Emet, relational ontology, entanglement/coherence/decoherence, telos, and Hebrew two-world cosmology where relevant. Be direct and precise. Plain prose, no JSON, no markdown headers.`;
 
   // Create follow-up element immediately so we can stream into it
   const followUpEl = document.createElement('div');
@@ -2507,8 +2479,6 @@ function renderThreads(threads) {
   var list = document.getElementById('sidebarThreads');
   if (!list) return;
   while (list.firstChild) list.removeChild(list.firstChild);
-  // Re-inject shared thread entry at top if present
-  if (window._sharedThreadUrl) injectSharedThreadEntry();
 
   if (!threads || threads.length === 0) {
     var empty = document.createElement('div');
@@ -2646,98 +2616,23 @@ function selectThread(id) {
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
     var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
-    window._shareHandlingFollowUps = false;
-    // Stop any existing Realtime subscription
-    if (window._qtRealtimeChannel) {
-      window._qtRealtimeChannel.unsubscribe();
-      window._qtRealtimeChannel = null;
-    }
-    // Reset rendered ID tracker for new thread
-    _renderedFuIds = new Set();
-
-    // Reset share state for this thread — will be restored below if share exists
+    // Reset share state for this thread
     window._shareActive = false;
     _currentSharedSessionId = null;
-
-    // Look up whether this thread has an active share — restore state and start polling
-    (function(threadId) {
-      var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://fgngixbhpilefmyyeldr.supabase.co';
-      var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-      fetch(SUPA_URL + '/rest/v1/shares?thread_id=eq.' + encodeURIComponent(threadId) + '&status=eq.active&select=id,token,collaboration_open&limit=1', {
-        headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(rows) {
-        if (!rows || !rows.length) {
-          window._shareHandlingFollowUps = false;
-          return;
-        }
-        window._shareHandlingFollowUps = true;
-        var share = rows[0];
-        _currentSharedSessionId = share.id;
-        window._shareActive     = true;
-        window._currentShareToken = share.token;
-        window._currentShareUrl = 'https://theprism.io/share.html?t=' + share.token;
-
-        // Restore share button state
-        var shareBtn = document.getElementById('shareBtn');
-        if (shareBtn) {
-          shareBtn.textContent   = 'Shared ✓';
-          shareBtn.style.borderColor = 'rgba(80,180,120,0.5)';
-          shareBtn.style.color       = 'rgba(80,180,120,0.9)';
-        }
-
-        // Restore URL display
-        var urlRow  = document.getElementById('shareUrlRow');
-        var urlDisp = document.getElementById('shareUrlDisplay');
-        if (urlRow)  urlRow.style.display = 'flex';
-        if (urlDisp) urlDisp.textContent  = window._currentShareUrl;
-
-        // Restore presence dot
-        var dot = document.getElementById('presenceDot');
-        if (dot) { dot.style.display = 'block'; startPresencePolling(share.token); }
-
-        // Restore collaboration state
-        if (share.collaboration_open) {
-          _collabOpen = true;
-          var discRow = document.getElementById('discussionRow');
-          if (discRow) discRow.style.display = 'block';
-          updateCollabToggleUI();
-        }
-
-        // Fetch existing recipient contributions immediately
-        fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
-          headers: { 'x-user-email': userEmail() }
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
-        })
-        .catch(function() {});
-
-        // Subscribe via Realtime for instant updates
-        startFollowUpRealtime(threadId);
-      })
-      .catch(function() {});
-    })(id);
     _shareStatus = 'off';
     _collabOpen = false;
     var shareBtn = document.getElementById('shareBtn');
     if (shareBtn) {
       shareBtn.disabled = false;
-      shareBtn.textContent = 'Share';
+      shareBtn.textContent = 'Share this reflection →';
       shareBtn.style.borderColor = 'var(--border-lit)';
       shareBtn.style.color = 'var(--text-dim)';
     }
     var dot = document.getElementById('presenceDot');
     if (dot) dot.style.display = 'none';
-    var urlRow = document.getElementById('shareUrlRow');
-    if (urlRow) urlRow.style.display = 'none';
-    var urlDisp = document.getElementById('shareUrlDisplay');
-    if (urlDisp) urlDisp.textContent = '';
     var discRow = document.getElementById('discussionRow');
     if (discRow) discRow.style.display = 'none';
-    if (!window._shareHandlingFollowUps) restoreFollowUps(id);
+    restoreFollowUps(id);
   } else {
     var rb = document.getElementById('resultBlock');      if (rb)  rb.classList.remove('visible');
     var sb = document.getElementById('subjectBanner');    if (sb)  sb.style.display = 'none';
@@ -2776,98 +2671,9 @@ function restoreFollowUps(id) {
   if (!id.startsWith('pending-') && userEmail()) {
     fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-user-email': userEmail() } })
     .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps); })
+    .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFU(data.followUps); })
     .catch(function() {});
   }
-}
-
-// ── Supabase Realtime — see /realtime.js ────────────────────────────────────────
-
-// Realtime functions loaded from /realtime.js (defer) to avoid security extension conflicts
-
-function startFollowUpRealtime(threadId) {
-  if (window._qtRealtimeChannel) {
-    window._qtRealtimeChannel.unsubscribe();
-    window._qtRealtimeChannel = null;
-  }
-  if (!window.supabase) {
-    console.warn('[Realtime] supabase not loaded — using polling fallback');
-    startFollowUpPolling(threadId);
-    return;
-  }
-  try {
-    var client = getSupabaseClient();
-    window._qtRealtimeChannel = client
-      .channel('follow_ups_' + threadId)
-      .on('postgres_changes', {
-        event:  'INSERT',
-        schema: 'public',
-        table:  'follow_ups',
-        filter: 'thread_id=eq.' + threadId
-      }, function(payload) {
-        if (!payload.new) return;
-        // Only render recipient contributions — owner's own follow-ups
-        // are already rendered by the local submit flow
-        if (payload.new.source === 'recipient') {
-          renderFUWithSource([payload.new]);
-        }
-      })
-      .subscribe(function(status) {
-        if (status === 'SUBSCRIBED') {
-          console.log('[Realtime] subscribed to follow_ups for thread:', threadId);
-        }
-      });
-  } catch(err) {
-    console.warn('[Realtime] failed to subscribe:', err.message);
-  }
-}
-
-function renderFUWithSource(list) {
-  if (!list || !list.length) return;
-
-  var fuSec = document.getElementById('followUpSection');
-  if (!fuSec) return;
-  fuSec.style.display = 'block';
-
-  // Find resultContent — follow-ups render there alongside streamed ones
-  var container = document.getElementById('resultContent') || fuSec;
-
-  list.forEach(function(fu) {
-    // Skip already-rendered entries
-    var fuId = fu.id || (fu.query + '_' + fu.created_at);
-    if (_renderedFuIds.has(fuId)) return;
-    _renderedFuIds.add(fuId);
-
-    var isRecipient = fu.source === 'recipient';
-
-    // Extract response text
-    var response = fu.response || {};
-    var bodyText = '';
-    if (typeof response === 'string') {
-      bodyText = response;
-    } else if (response.text) {
-      bodyText = response.text;
-    } else if (response.recognition) {
-      bodyText = [response.recognition, response.core_insight, response.kingdom_implication]
-        .filter(Boolean).join('\n\n');
-    }
-
-    // Use same CSS classes as the streamed follow-up renderer
-    var el = document.createElement('div');
-    el.className = 'fu-block' + (isRecipient ? ' from-recipient' : '');
-
-    var paras = bodyText.split(/\n\n/).filter(Boolean).map(function(p) {
-      return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
-    }).join('');
-
-    el.innerHTML =
-      (isRecipient ? '<div class="fu-label-recipient">From the person you shared with</div>' : '') +
-      '<div class="fu-question">' + escHtml(fu.query || '') + '</div>' +
-      '<div class="fu-body">' + (paras || '<p>' + escHtml(bodyText) + '</p>') + '</div>';
-
-    container.appendChild(el);
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  });
 }
 
 // SAVE FOLLOW-UP
@@ -3256,7 +3062,7 @@ async function handleLogout() {
 window._shareActive     = false;  // true once share is created
 var _presencePollInterval = null;
 
-// Called when user taps "Share"
+// Called when user taps "Share this reflection →"
 // First tap: creates share + starts delivery flow
 // Subsequent taps: opens management modal (step 3)
 async function handleShareBtn() {
@@ -3274,21 +3080,6 @@ async function handleShareBtn() {
   var snapshot    = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
   var senderEmail = localStorage.getItem('qt_user_email') || null;
   var threadId    = activeThreadId || null;
-
-  // If thread hasn't been saved to Supabase yet (pending-), resolve the real ID first
-  if (!threadId || threadId.startsWith('pending-')) {
-    if (userEmail()) {
-      try {
-        var tRes = await fetch(API_BASE + '/api/threads', { headers: { 'x-user-email': userEmail() } });
-        var tData = await tRes.json();
-        if (tData.threads && tData.threads.length > 0) {
-          threadId = tData.threads[0].id;
-          activeThreadId = threadId;
-          allThreads = tData.threads;
-        }
-      } catch(e) {}
-    }
-  }
 
   try {
     var res = await fetch('/api/share', {
@@ -3314,28 +3105,35 @@ async function handleShareBtn() {
       btn.onmouseout  = function() {};
     }
 
-    // Show presence dot, share URL row, and discussion button
+    // Show presence dot and discussion button
     var dot = document.getElementById('presenceDot');
     if (dot) dot.style.display = 'block';
-    var urlRow = document.getElementById('shareUrlRow');
-    if (urlRow) urlRow.style.display = 'flex';
-    var urlDisp = document.getElementById('shareUrlDisplay');
-    if (urlDisp) urlDisp.textContent = data.shareUrl;
     var discRow = document.getElementById('discussionRow');
     if (discRow) discRow.style.display = 'block';
 
     // Start polling for recipient presence
     startPresencePolling(data.token);
 
-    // Copy link to clipboard immediately — no sheet, no modal
-    try { await navigator.clipboard.writeText(data.shareUrl); } catch(e) {}
-    showCopyToast(data.shareUrl);
+    // Trigger native share sheet / copy — skip modal step 1
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'The Prism — ' + (currentSubject || 'An interpretation'),
+          text: 'An interpretation from The Prism.',
+          url: data.shareUrl
+        });
+      } catch(e) { /* user cancelled native sheet — link still created */ }
+    } else {
+      // No native share — copy to clipboard silently and show brief toast
+      try { await navigator.clipboard.writeText(data.shareUrl); } catch(e) {}
+      showCopyToast(data.shareUrl);
+    }
 
   } catch (err) {
     console.error('Share failed:', err);
     if (btn) {
       btn.disabled  = false;
-      btn.textContent = 'Share';
+      btn.textContent = 'Share this reflection →';
     }
   }
 }
@@ -4123,54 +3921,5 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </footer>
   
-<script>
-// Shared thread return — injects sidebar entry and bottom bar when arriving from share.html
-
-window._sharedThreadUrl   = sessionStorage.getItem('prism_shared_thread') || null;
-window._sharedThreadTitle = sessionStorage.getItem('prism_shared_thread_title') || 'Shared interpretation';
-
-function injectSharedThreadEntry() {
-  if (!window._sharedThreadUrl) return;
-  var list = document.getElementById('sidebarThreads');
-  if (!list) return;
-  // Remove any existing shared entry first
-  var existing = document.getElementById('sharedThreadSidebarEntry');
-  if (existing) existing.remove();
-
-  var item = document.createElement('div');
-  item.id = 'sharedThreadSidebarEntry';
-  item.className = 'thread-item';
-  item.style.borderLeft = '2px solid rgba(80,180,120,0.4)';
-  item.style.paddingLeft = '18px';
-  item.style.cursor = 'pointer';
-  item.title = 'Return to shared thread';
-
-  var title = document.createElement('div');
-  title.className = 'thread-title';
-  title.textContent = window._sharedThreadTitle;
-
-  var meta = document.createElement('div');
-  meta.className = 'thread-meta';
-  meta.innerHTML = '<span class="thread-date">Shared with you</span><span class="thread-badge" style="background:rgba(80,180,120,0.25);color:#fff;">Shared</span>';
-
-  item.appendChild(title);
-  item.appendChild(meta);
-  item.addEventListener('click', function() {
-    window.location.href = window._sharedThreadUrl;
-  });
-
-  // Insert at top of list
-  list.insertBefore(item, list.firstChild);
-}
-
-// Inject on DOMContentLoaded
-document.addEventListener('DOMContentLoaded', function() {
-  if (window._sharedThreadUrl) {
-    injectSharedThreadEntry();
-
-    // Sidebar entry is sufficient — no bottom bar needed
-  }
-});
-</script>
 </body>
 </html>
