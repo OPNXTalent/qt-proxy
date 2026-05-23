@@ -1408,6 +1408,24 @@ async function runInterpretation() {
     document.getElementById('followUpSection').style.display = 'block';
     document.getElementById('downloadRow').style.display = 'block';
 
+    // Delay share button availability until thread ID resolves from pending- to real UUID
+    var _shareReadyCheck = setInterval(function() {
+      if (activeThreadId && !activeThreadId.startsWith('pending-')) {
+        clearInterval(_shareReadyCheck);
+        var sb = document.getElementById('shareBtn');
+        if (sb && !window._shareActive) {
+          sb.style.opacity = '1';
+          sb.style.pointerEvents = 'auto';
+        }
+      }
+    }, 500);
+    // Dim share button until thread resolves
+    var sbInit = document.getElementById('shareBtn');
+    if (sbInit && !window._shareActive) {
+      sbInit.style.opacity = '0.4';
+      sbInit.style.pointerEvents = 'none';
+    }
+
     sessionQueryCount++;
     decrementSidebarCounter();
     // Only lock the UI for free/anonymous users — paid subscribers are gated server-side
