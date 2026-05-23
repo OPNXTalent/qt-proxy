@@ -1072,22 +1072,21 @@
         <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Light Version</button>
       </div>
 
-      <!-- Share URL — shown beneath buttons after share created -->
+      <!-- Share URL row — Open Discussion | URL | Copy -->
       <div id="shareUrlRow" style="display:none; margin-top:16px; justify-content:center; align-items:center; gap:10px;">
-        <div id="shareLinkDisplay" style="font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:380px;"></div>
-        <button onclick="copyShareLink()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s;"
-          onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
-          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Copy</button>
-      </div>
-
-      <!-- Discussion button — appears after share created -->
-      <div id="discussionRow" style="display:none; margin-top:18px; text-align:center;">
-        <button id="collabToggleBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;"
+        <button id="collabToggleBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; padding:9px 16px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
           onmouseover="this.style.borderColor='rgba(80,180,120,0.5)';this.style.color='rgba(80,180,120,0.8)'"
           onmouseout="if(!_collabOpen){this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'}">
           Open Discussion
         </button>
+        <div id="shareLinkDisplay" style="font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:300px; flex:1;"></div>
+        <button onclick="copyShareLink()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
+          onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Copy</button>
       </div>
+
+      <!-- Hidden legacy discussionRow — kept for JS compatibility -->
+      <div id="discussionRow" style="display:none;"></div>
 
       <!-- Hidden legacy collabToggleRow — kept for JS compatibility -->
       <div id="collabToggleRow" style="display:none;"></div>
