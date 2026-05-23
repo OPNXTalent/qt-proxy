@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Prism — Shared Interpretation</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
@@ -455,9 +457,14 @@
     <button class="save-profile-btn" onclick="openEmailCapture()">Save my work →</button>
   </div>
 
-  <!-- Inline email capture -->
+  <!-- Inline email + password capture -->
   <div class="email-capture-inline" id="emailCaptureInline">
     <input type="email" id="sidebarEmailInput" placeholder="your@email.com" autocomplete="email"
+      style="margin-bottom:8px;"
+      onkeydown="if(event.key==='Enter') document.getElementById('sidebarPasswordInput').focus()" />
+    <input type="password" id="sidebarPasswordInput" placeholder="Create a password"
+      style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:15px;padding:9px 12px;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin-bottom:10px;"
+      onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
       onkeydown="if(event.key==='Enter') saveEmail()" />
     <button onclick="saveEmail()">Keep this interpretation →</button>
     <div class="email-capture-status" id="emailCaptureStatus"></div>
@@ -570,10 +577,27 @@
       <div class="limit-wall-title">Today's queries have been used</div>
       <div class="limit-wall-body" style="margin-bottom:28px;">The conversation is still here. Come back tomorrow to continue — or purchase more queries to keep going now.</div>
       <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
-        <a href="https://theprism.io/purchase.html" class="limit-option-cta solid" style="padding:13px 28px; font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; text-decoration:none;">Purchase Queries →</a>
+        <a id="purchaseLink" href="https://theprism.io/purchase.html" class="limit-option-cta solid" style="padding:13px 28px; font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; text-decoration:none;">Purchase Queries →</a>
         <a href="https://theprism.io/share.html?t=" id="returnTomorrowLink" class="limit-option-cta" style="padding:13px 28px; font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; text-decoration:none;">Return Tomorrow</a>
       </div>
     </div>
+
+  <!-- Action bar — PDF, Share, New Subject -->
+  <div id="recipientActionBar" style="display:none; margin-top:40px; padding:24px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+    <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; align-items:center;">
+      <button onclick="downloadPDF('dark')" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; padding:12px 24px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">↓ Dark Version</button>
+      <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; padding:12px 24px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Light Version</button>
+      <button onclick="handleRecipientShare()" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; padding:12px 24px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'" onmouseout="if(!window._recipientShared)this.style.borderColor='var(--border-lit)';if(!window._recipientShared)this.style.color='var(--text-dim)'">Share</button>
+      <button onclick="goNewSubject()" style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; padding:12px 24px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'" onmouseout="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'">+ New Subject</button>
+    </div>
+    <!-- Share credit notice — shown after share if no email yet -->
+    <div id="recipientShareNotice" style="display:none; margin-top:14px; text-align:center; font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim);">Link copied — add your email to earn a free query when someone explores it</div>
+    <!-- Inline email capture for credit -->
+    <div id="recipientEmailCapture" style="display:none; margin-top:12px; display:none; justify-content:center; gap:8px; align-items:center;">
+      <input type="email" id="recipientCreditEmail" placeholder="your@email.com" style="background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:15px;padding:8px 14px;outline:none;width:220px;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'" onkeydown="if(event.key==='Enter')saveRecipientEmail()">
+      <button onclick="saveRecipientEmail()" style="font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;padding:8px 16px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;">Save →</button>
+    </div>
+  </div>
 
   </div><!-- /#shareContent -->
 
@@ -664,6 +688,10 @@ async function saveEmail() {
     var data = await res.json();
     if (data.success || res.ok) {
       localStorage.setItem('qt_user_email', email);
+      var passInp = document.getElementById('sidebarPasswordInput');
+      if (passInp && passInp.value.trim().length >= 6) {
+        localStorage.setItem('qt_user_password', btoa(passInp.value.trim()));
+      }
       statusEl.textContent = 'Saved. Your session is held for 30 days.';
       statusEl.style.color = 'var(--gold-dim)';
       statusEl.style.display = 'block';
@@ -921,6 +949,13 @@ function showLimitWall(msg) {
   // Point return link back to this shared thread
   var retLink = document.getElementById('returnTomorrowLink');
   if (retLink && shareToken) retLink.href = '/share.html?t=' + shareToken;
+
+  // Point purchase link to purchase page with return destination
+  var purLink = document.getElementById('purchaseLink');
+  if (purLink && shareToken) {
+    purLink.href = 'https://theprism.io/purchase.html?return=' + encodeURIComponent('/share.html?t=' + shareToken);
+  }
+
   wall.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -1060,6 +1095,7 @@ async function loadShare() {
     // Hide loading, show content
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('shareContent').style.display = 'block';
+    document.getElementById('recipientActionBar').style.display = 'block';
 
     // If user already has email, hide the warning
     if (localStorage.getItem('qt_user_email')) {
@@ -1080,32 +1116,39 @@ function showError(msg) {
   document.getElementById('errorText').textContent = msg;
 }
 
-// ── Sidebar query tracking ───────────────────────────────────────────────────
-// Each recipient query gets a sidebar entry so they can navigate back to it.
+// ── Sidebar follow-up tracking ───────────────────────────────────────────────
+// Follow-up queries update the existing shared thread entry rather than
+// creating new sidebar items. The count badge shows how deep the exchange is.
 
 var _sidebarQueryCount = 0;
+var _lastFollowUpEl    = null; // reference to most recent follow-up block
 
 function addQueryToSidebar(queryText, targetEl) {
   _sidebarQueryCount++;
-  var threads = document.getElementById('sidebarThreads');
-  if (!threads) return;
+  _lastFollowUpEl = targetEl;
 
-  var item = document.createElement('div');
-  item.className = 'thread-item';
-  item.style.cursor = 'pointer';
+  // Update the existing shared entry — don't create a new one
+  var entry = document.getElementById('sidebarSharedEntry');
+  if (!entry) return;
 
-  var title = queryText.length > 52 ? queryText.slice(0, 52) + '…' : queryText;
-  var now = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  // Update the onclick to scroll to the latest follow-up
+  entry.onclick = function() {
+    var el = _lastFollowUpEl || document.getElementById('shareResult');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
-  item.innerHTML = '<div class="thread-title">' + escHtml(title) + '</div>' +
-    '<div class="thread-meta"><span class="thread-date">Today · ' + now + '</span>' +
-    '<span class="thread-badge">Q' + _sidebarQueryCount + '</span></div>';
+  // Update badge to show follow-up count
+  var badge = entry.querySelector('.thread-badge');
+  if (badge) {
+    badge.textContent = _sidebarQueryCount + ' follow-up' + (_sidebarQueryCount > 1 ? 's' : '');
+  }
 
-  item.addEventListener('click', function() {
-    if (targetEl) targetEl.scrollIntoView({behavior:'smooth', block:'start'});
-  });
-
-  threads.appendChild(item);
+  // Update date
+  var dateEl = entry.querySelector('.thread-date');
+  if (dateEl) {
+    var now = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+    dateEl.textContent = 'Today · ' + now;
+  }
 }
 
 // ── Live thread polling ──────────────────────────────────────────────────────
@@ -1113,73 +1156,122 @@ function addQueryToSidebar(queryText, targetEl) {
 // Renders new sender follow-ups into #liveThreadContent.
 // Also saves recipient contributions back to the thread via /api/followups.
 
-var _liveThreadPollInterval = null;
-var _renderedFollowUpIds    = new Set();
-var _threadId               = null; // populated from share.thread_id
+var _renderedFollowUpIds = new Set();
+var _threadId            = null;
+var _shareRealtimeChannel  = null;
+var _sharePollingInterval  = null;
+
+function startSharePolling(threadId) {
+  if (_sharePollingInterval) clearInterval(_sharePollingInterval);
+  _sharePollingInterval = setInterval(function() {
+    fetch('/api/followups?threadId=' + encodeURIComponent(threadId), {
+      headers: { 'x-share-id': shareId || '' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderLiveFollowUps(data.followUps || []); })
+    .catch(function() {});
+  }, 8000);
+}
 
 function startLiveThreadPolling(threadId) {
   _threadId = threadId;
   if (!threadId) return;
-  pollLiveThread(); // immediate first poll
-  _liveThreadPollInterval = setInterval(pollLiveThread, 15000);
+
+  // Fetch existing follow-ups immediately
+  fetch('/api/followups?threadId=' + encodeURIComponent(threadId), {
+    headers: { 'x-share-id': shareId || '' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) { renderLiveFollowUps(data.followUps || []); })
+  .catch(function() {});
+
+  // Subscribe via Realtime
+  startShareRealtime(threadId);
 }
 
-async function pollLiveThread() {
-  if (!_threadId) return;
-  try {
-    var res = await fetch('/api/followups?threadId=' + encodeURIComponent(_threadId), {
-      headers: { 'x-share-id': shareId || '' }
-    });
-    if (!res.ok) return;
-    var data = await res.json();
-    var followUps = data.followUps || [];
-    if (followUps.length === 0) return;
+function renderLiveFollowUps(followUps) {
+  // Render into resultContent so sender follow-ups appear inline
+  // in the same flow as the recipient's own queries
+  var container = document.getElementById('resultContent');
+  if (!container) return;
 
-    var section  = document.getElementById('liveThreadSection');
-    var container = document.getElementById('liveThreadContent');
-    if (!section || !container) return;
+  followUps.forEach(function(fu) {
+    var fuId = fu.id || (fu.query + fu.created_at);
+    if (_renderedFollowUpIds.has(fuId)) return;
+    _renderedFollowUpIds.add(fuId);
 
-    var hasNew = false;
-    followUps.forEach(function(fu) {
-      var fuId = fu.id || (fu.query + fu.created_at);
-      if (_renderedFollowUpIds.has(fuId)) return;
-      _renderedFollowUpIds.add(fuId);
-      hasNew = true;
+    var isRecipient = fu.source === 'recipient';
+    // Skip recipient entries — those are rendered locally by runQuery()
+    if (isRecipient) return;
 
-      var isRecipient = fu.source === 'recipient';
-      var block = document.createElement('div');
-      block.className = 'fu-block ' + (isRecipient ? 'recipient' : 'sender');
+    var block = document.createElement('div');
+    block.className = 'fu-block sender';
 
-      var response = fu.response || {};
-      var bodyText = '';
-      if (typeof response === 'string') {
-        bodyText = response;
-      } else if (response.recognition) {
-        bodyText = [response.recognition, response.core_insight, response.kingdom_implication]
-          .filter(Boolean).join('\n\n');
-      }
-
-      var paras = bodyText.split(/\n\n/).filter(Boolean).map(function(p) {
-        return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
-      }).join('');
-
-      block.innerHTML =
-        '<div class="fu-question">' + escHtml(fu.query || '') + '</div>' +
-        '<div class="fu-body">' + (paras || '<p style="color:var(--text-muted);font-style:italic;">Interpretation rendered</p>') + '</div>';
-
-      container.appendChild(block);
-    });
-
-    if (hasNew) {
-      section.style.display = 'block';
+    var response = fu.response || {};
+    var bodyText = '';
+    if (typeof response === 'string') { bodyText = response; }
+    else if (response.text) { bodyText = response.text; }
+    else if (response.recognition) {
+      bodyText = [response.recognition, response.core_insight, response.kingdom_implication]
+        .filter(Boolean).join('\n\n');
     }
-  } catch(e) {}
+
+    var paras = bodyText.split(/\n\n/).filter(Boolean).map(function(p) {
+      return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
+    }).join('');
+
+    block.innerHTML =
+      '<div class="fu-question">' + escHtml(fu.query || '') + '</div>' +
+      '<div class="fu-body">' + (paras || '') + '</div>';
+
+    container.appendChild(block);
+    block.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+
+function startShareRealtime(threadId) {
+  if (_shareRealtimeChannel) {
+    _shareRealtimeChannel.unsubscribe();
+    _shareRealtimeChannel = null;
+  }
+  if (!window.supabase) {
+    console.warn('[Realtime] supabase not loaded — using polling fallback');
+    startSharePolling(threadId);
+    return;
+  }
+  try {
+    var client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    _shareRealtimeChannel = client
+      .channel('share_fu_' + threadId)
+      .on('postgres_changes', {
+        event:  'INSERT',
+        schema: 'public',
+        table:  'follow_ups',
+        filter: 'thread_id=eq.' + threadId
+      }, function(payload) {
+        console.log('[Realtime share] received payload:', payload.new?.source, payload.new?.query?.slice(0,30));
+        if (!payload.new) return;
+        // Recipient sees sender's follow-ups appear in real time
+        if (payload.new.source === 'owner') {
+          renderLiveFollowUps([payload.new]);
+        }
+      })
+      .subscribe(function(status) {
+        console.log('[Realtime share] status:', status);
+      });
+  } catch(err) {
+    console.warn('[Realtime share] failed:', err.message);
+  }
 }
 
 async function saveRecipientFollowUp(input, responseText) {
-  if (!_threadId || !shareId) return;
+  console.log('[recipient followup] _threadId:', _threadId, 'shareId:', shareId);
+  if (!_threadId || !shareId) {
+    console.warn('[recipient followup] BLOCKED — missing _threadId or shareId');
+    return;
+  }
   try {
-    await fetch('/api/followups', {
+    var res = await fetch('/api/followups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1190,7 +1282,371 @@ async function saveRecipientFollowUp(input, responseText) {
         source:    'recipient'
       })
     });
+    var data = await res.json();
+    console.log('[recipient followup] response:', res.status, data);
+  } catch(e) {
+    console.error('[recipient followup] error:', e.message);
+  }
+}
+
+// ── PDF Download ─────────────────────────────────────────────────────────────
+
+function stripHebrew(text) {
+  // Remove Hebrew Unicode block characters (U+0590–U+05FF) and any trailing whitespace
+  return (text || '').replace(/[\u0590-\u05FF]+/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function downloadPDF(mode) {
+  if (!window.jspdf) {
+    alert('PDF export is not available right now. Please try again.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const isDark = mode !== 'light';
+  const pageW = 210;
+  const pageH = 297;
+  const margin = 18;
+  const contentW = pageW - margin * 2;
+  let y = margin;
+
+  // Color schemes
+  const bg       = isDark ? [6, 6, 10]       : [255, 255, 255];
+  const bgSection= isDark ? [20, 20, 40]      : [240, 240, 248];
+  const gold     = isDark ? [201, 168, 76]    : [120, 90, 20];
+  const goldDim  = isDark ? [122, 98, 46]     : [150, 120, 50];
+  const bodyText = isDark ? [212, 212, 216]   : [30, 30, 40];
+  const dimText  = isDark ? [120, 120, 144]   : [90, 90, 110];
+  const footerBg = isDark ? [6, 6, 10]        : [245, 245, 250];
+
+  doc.setFillColor(...bg);
+  doc.rect(0, 0, pageW, pageH, 'F');
+
+  function checkPage(needed) {
+    if (y + needed > pageH - 18) {
+      doc.addPage();
+      doc.setFillColor(...bg);
+      doc.rect(0, 0, pageW, pageH, 'F');
+      y = margin;
+    }
+  }
+
+  function drawRule() {
+    doc.setDrawColor(...goldDim);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageW - margin, y);
+    y += 5;
+  }
+
+  function addBody(text, color, size) {
+    const cleaned = stripHebrew(text);
+    if (!cleaned) return;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(size || 10);
+    doc.setTextColor(...(color || bodyText));
+    const lines = doc.splitTextToSize(cleaned, contentW - 8);
+    checkPage(lines.length * 5 + 4);
+    doc.text(lines, margin + 4, y);
+    y += lines.length * 5 + 4;
+  }
+
+  // Paragraph-aware body renderer — splits on \n\n, adds gap between paragraphs
+  function addBodyParagraphs(text, color, size) {
+    const cleaned = stripHebrew(text);
+    if (!cleaned) return;
+    const lineH = (size || 10) === 10 ? 5 : (size / 2);
+    const paragraphs = cleaned.split(/\n{2,}/).map(p => p.replace(/\n/g, ' ').trim()).filter(p => p.length > 0);
+    paragraphs.forEach((para, i) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(size || 10);
+      doc.setTextColor(...(color || bodyText));
+      const lines = doc.splitTextToSize(para, contentW - 8);
+      checkPage(lines.length * lineH + 4);
+      doc.text(lines, margin + 4, y);
+      y += lines.length * lineH + (i < paragraphs.length - 1 ? 6 : 4); // 6pt gap between paragraphs
+    });
+  }
+
+  // Logo
+  const logoImg = document.querySelector('header img');
+  if (logoImg) {
+    try {
+      const logoData = logoImg.src; // already base64
+      const logoSize = 28;
+      doc.addImage(logoData, 'PNG', (pageW - logoSize) / 2, y, logoSize, logoSize);
+      y += logoSize + 6;
+    } catch(e) {
+      y += 4;
+    }
+  }
+
+  // HEADER
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.setTextColor(...gold);
+  doc.text('THE PRISM', pageW / 2, y + 8, { align: 'center' });
+  y += 14;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...goldDim);
+  doc.text('FRAMEWORK INTERPRETATION', pageW / 2, y, { align: 'center' });
+  y += 6;
+  doc.setFontSize(7);
+  doc.text('OPNX LLC  ·  © 2026 All Rights Reserved', pageW / 2, y, { align: 'center' });
+  y += 8;
+  drawRule();
+
+  // Subject
+  const subject = stripHebrew(document.getElementById('subjectText').textContent);
+  if (subject) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(11);
+    doc.setTextColor(...dimText);
+    const sl = doc.splitTextToSize(`Subject: ${subject}`, contentW);
+    doc.text(sl, margin, y);
+    y += sl.length * 6 + 5;
+  }
+
+  // Verse banner
+  const verseRef = document.querySelector('.verse-ref');
+  const verseText = document.querySelector('.verse-text');
+  if (verseRef && verseText) {
+    checkPage(24);
+    doc.setFillColor(...bgSection);
+    const vLines = doc.splitTextToSize(stripHebrew(verseText.innerText), contentW - 12);
+    const vHeight = vLines.length * 6 + 18;
+    doc.rect(margin, y - 2, contentW, vHeight, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...goldDim);
+    doc.text(stripHebrew(verseRef.innerText).toUpperCase(), margin + 4, y + 4);
+    y += 9;
+    doc.setFont('helvetica', 'bolditalic');
+    doc.setFontSize(10);
+    doc.setTextColor(...gold);
+    doc.text(vLines, margin + 4, y);
+    y += vLines.length * 6 + 8;
+  }
+
+  // Recognition threshold
+  const recognitionEl = document.querySelector('.qt-recognition p');
+  if (recognitionEl) {
+    checkPage(20);
+    y += 4;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(10);
+    doc.setTextColor(...dimText);
+    const rLines = doc.splitTextToSize(recognitionEl.innerText.trim(), contentW);
+    checkPage(rLines.length * 5 + 14);
+    doc.text(rLines, margin, y);
+    y += rLines.length * 5 + 10;
+  }
+
+  // Core insight
+  const coreInsightEl = document.querySelector('.qt-core-insight p');
+  if (coreInsightEl) {
+    checkPage(16);
+    y += 2;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...bodyText);
+    const ciLines = doc.splitTextToSize(coreInsightEl.innerText.trim(), contentW);
+    checkPage(ciLines.length * 5 + 10);
+    doc.text(ciLines, margin, y);
+    y += ciLines.length * 5 + 10;
+  }
+
+  // Kingdom Implication — immediately after the encounter
+  const kingdomEl = document.querySelector('.kingdom-text');
+  if (kingdomEl) {
+    checkPage(32);
+    y += 4;
+    drawRule();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...goldDim);
+    doc.text('KINGDOM IMPLICATION', pageW / 2, y, { align: 'center' });
+    y += 7;
+    doc.setFont('helvetica', 'bolditalic');
+    doc.setFontSize(11);
+    doc.setTextColor(...gold);
+    const kl = doc.splitTextToSize(stripHebrew(kingdomEl.innerText), contentW);
+    doc.text(kl, pageW / 2, y, { align: 'center' });
+    y += kl.length * 6 + 8;
+    drawRule();
+  }
+
+  // Suggested threads — listed as plain text
+  const threadBtns = document.querySelectorAll('.qt-thread-btn');
+  if (threadBtns.length > 0) {
+    checkPage(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...goldDim);
+    doc.text('CONTINUE THE EXPLORATION', margin, y);
+    y += 6;
+    threadBtns.forEach(btn => {
+      const threadText = btn.innerText.replace(/^→\s*/, '').trim();
+      if (!threadText) return;
+      checkPage(10);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor(...dimText);
+      const tl = doc.splitTextToSize('— ' + threadText, contentW - 4);
+      doc.text(tl, margin + 4, y);
+      y += tl.length * 5 + 3;
+    });
+    y += 6;
+    drawRule();
+  }
+
+
+  // Follow-up exchanges — wrapped, with section header per exchange
+  const followUps = document.querySelectorAll('#resultContent .fu-block');
+  if (followUps.length > 0) {
+    checkPage(20);
+    drawRule();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...goldDim);
+    doc.text('CONTINUED EXPLORATION', margin, y);
+    y += 8;
+    followUps.forEach(el => {
+      const questionEl = el.querySelector('.fu-question');
+      const bodyEl = el.querySelector('.fu-body');
+      if (questionEl) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        const qLines = doc.splitTextToSize(stripHebrew(questionEl.innerText), contentW);
+        const qHeight = qLines.length * 5 + 4;
+        checkPage(qHeight + 14);
+        doc.setTextColor(...gold);
+        doc.text(qLines, margin, y);
+        y += qHeight;
+      }
+      if (bodyEl) {
+        const paras = Array.from(bodyEl.querySelectorAll('p')).map(p => p.innerText.trim()).filter(t => t);
+        if (paras.length > 0) {
+          addBodyParagraphs(paras.join('\n\n'), dimText);
+        } else {
+          addBodyParagraphs(stripHebrew(bodyEl.innerText), dimText);
+        }
+      }
+      y += 6;
+    });
+  }
+
+  // Footer on every page
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFillColor(...footerBg);
+    doc.rect(0, pageH - 14, pageW, 14, 'F');
+    doc.setDrawColor(...goldDim);
+    doc.setLineWidth(0.3);
+    doc.line(margin, pageH - 14, pageW - margin, pageH - 14);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...goldDim);
+    doc.text('OPNX LLC  ·  © 2026 All Rights Reserved  ·  The Prism Framework', pageW / 2, pageH - 7, { align: 'center' });
+    doc.text(`${p} / ${totalPages}`, pageW - margin, pageH - 7, { align: 'right' });
+  }
+
+  const filename = `Prism_${subject.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)}_${new Date().toISOString().slice(0,10)}_${isDark ? 'dark' : 'print'}.pdf`;
+  doc.save(filename);
+}
+
+// ── Recipient share + credit ──────────────────────────────────────────────────
+
+window._recipientShared = false;
+
+async function handleRecipientShare() {
+  // Copy the current share URL
+  var url = window.location.href;
+  try { await navigator.clipboard.writeText(url); } catch(e) {}
+
+  window._recipientShared = true;
+  var btn = event.currentTarget || document.querySelector('[onclick="handleRecipientShare()"]');
+  if (btn) { btn.textContent = 'Shared ✓'; btn.style.borderColor = 'rgba(80,180,120,0.5)'; btn.style.color = 'rgba(80,180,120,0.9)'; }
+
+  // If email already known, credit immediately
+  var email = localStorage.getItem('qt_user_email');
+  if (email) {
+    triggerRecipientCredit(email);
+    showCopyToast('Link copied — you\'ll earn a query when someone explores it');
+    return;
+  }
+
+  // No email — show notice and capture
+  var notice = document.getElementById('recipientShareNotice');
+  var capture = document.getElementById('recipientEmailCapture');
+  if (notice) notice.style.display = 'block';
+  if (capture) { capture.style.display = 'flex'; setTimeout(function(){ var inp = document.getElementById('recipientCreditEmail'); if(inp) inp.focus(); }, 100); }
+  showCopyToast('Link copied');
+}
+
+async function saveRecipientEmail() {
+  var inp = document.getElementById('recipientCreditEmail');
+  if (!inp) return;
+  var email = inp.value.trim();
+  var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!re.test(email)) { inp.style.borderColor = '#b85c5c'; return; }
+
+  localStorage.setItem('qt_user_email', email);
+  // Store password if provided alongside email in action bar capture
+  var passInp = document.getElementById('sidebarPasswordInput');
+  if (passInp && passInp.value.trim().length >= 6) {
+    localStorage.setItem('qt_user_password', btoa(passInp.value.trim()));
+  }
+
+  // Register in Supabase
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/subscribers', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
+      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+    });
   } catch(e) {}
+
+  triggerRecipientCredit(email);
+
+  var notice = document.getElementById('recipientShareNotice');
+  var capture = document.getElementById('recipientEmailCapture');
+  if (notice) notice.textContent = 'Saved. You\'ll earn a query when someone explores your share.';
+  if (capture) capture.style.display = 'none';
+
+  // Also hide the sidebar save prompt since email is now known
+  var warn = document.getElementById('anonWarning');
+  var bar = document.getElementById('saveProfileBar');
+  if (warn) warn.style.display = 'none';
+  if (bar) bar.style.display = 'none';
+}
+
+async function triggerRecipientCredit(email) {
+  // Credits are awarded when their shared link is first visited — handled by share-presence.js
+  // Here we just ensure the email is registered so the credit has somewhere to land
+  // The actual +1 fires via the heartbeat on the recipient's share page
+  try {
+    await fetch('/api/share-presence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: shareToken, recipientEmail: email })
+    });
+  } catch(e) {}
+}
+
+// ── New Subject ──────────────────────────────────────────────────────────────
+// Stores the current share URL so the return bar appears on qt.html,
+// then navigates to a fresh Prism session.
+
+function goNewSubject() {
+  // Store share URL and title for the sidebar entry in qt.html
+  if (shareToken) {
+    sessionStorage.setItem('prism_shared_thread', '/share.html?t=' + shareToken);
+    sessionStorage.setItem('prism_shared_thread_title', currentSubject || 'Shared interpretation');
+  }
+  window.location.href = 'https://theprism.io/qt.html';
 }
 
 // ── Presence heartbeat ────────────────────────────────────────────────────────
