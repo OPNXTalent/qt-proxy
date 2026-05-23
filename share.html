@@ -570,7 +570,7 @@
       <div class="limit-wall-title">Today's queries have been used</div>
       <div class="limit-wall-body" style="margin-bottom:28px;">The conversation is still here. Come back tomorrow to continue — or purchase more queries to keep going now.</div>
       <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
-        <a href="https://theprism.io/purchase.html" class="limit-option-cta solid" style="padding:13px 28px; font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; text-decoration:none;">Purchase Queries →</a>
+        <a id="purchaseLink" href="https://theprism.io/purchase.html" class="limit-option-cta solid" style="padding:13px 28px; font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; text-decoration:none;">Purchase Queries →</a>
         <a href="https://theprism.io/share.html?t=" id="returnTomorrowLink" class="limit-option-cta" style="padding:13px 28px; font-family:var(--cinzel); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; text-decoration:none;">Return Tomorrow</a>
       </div>
     </div>
@@ -921,6 +921,13 @@ function showLimitWall(msg) {
   // Point return link back to this shared thread
   var retLink = document.getElementById('returnTomorrowLink');
   if (retLink && shareToken) retLink.href = '/share.html?t=' + shareToken;
+
+  // Point purchase link to purchase page with return destination
+  var purLink = document.getElementById('purchaseLink');
+  if (purLink && shareToken) {
+    purLink.href = 'https://theprism.io/purchase.html?return=' + encodeURIComponent('/share.html?t=' + shareToken);
+  }
+
   wall.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
