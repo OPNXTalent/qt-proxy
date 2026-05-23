@@ -2646,6 +2646,8 @@ function selectThread(id) {
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     // Stop any existing follow-up polling
     if (window._qtFollowUpPoll) { clearInterval(window._qtFollowUpPoll); window._qtFollowUpPoll = null; }
+    // Reset rendered ID tracker for new thread
+    _renderedFuIds = new Set();
 
     // Reset share state for this thread — will be restored below if share exists
     window._shareActive = false;
@@ -2780,15 +2782,28 @@ function restoreFollowUps(id) {
 
 // RENDER FOLLOW-UPS WITH SOURCE AWARENESS
 // Shows sender's own follow-ups normally, recipient contributions with distinct styling
+// Track rendered follow-up IDs to prevent duplicates on repeated polls
+var _renderedFuIds = new Set();
+
 function renderFUWithSource(list) {
   if (!list || !list.length) return;
-  var fuSec = document.getElementById('followUpSection');
-  if (fuSec) fuSec.style.display = 'block';
-  list.forEach(function(fu) {
-    var isRecipient = fu.source === 'recipient';
-    var el = document.createElement('div');
-    el.className = 'follow-up-block' + (isRecipient ? ' from-recipient' : '');
 
+  var fuSec = document.getElementById('followUpSection');
+  if (!fuSec) return;
+  fuSec.style.display = 'block';
+
+  // Find resultContent — follow-ups render there alongside streamed ones
+  var container = document.getElementById('resultContent') || fuSec;
+
+  list.forEach(function(fu) {
+    // Skip already-rendered entries
+    var fuId = fu.id || (fu.query + '_' + fu.created_at);
+    if (_renderedFuIds.has(fuId)) return;
+    _renderedFuIds.add(fuId);
+
+    var isRecipient = fu.source === 'recipient';
+
+    // Extract response text
     var response = fu.response || {};
     var bodyText = '';
     if (typeof response === 'string') {
@@ -2800,16 +2815,21 @@ function renderFUWithSource(list) {
         .filter(Boolean).join('\n\n');
     }
 
-    var label = isRecipient
-      ? '<div class="fu-label-recipient">From the person you shared with</div>'
-      : '';
+    // Use same CSS classes as the streamed follow-up renderer
+    var el = document.createElement('div');
+    el.className = 'fu-block' + (isRecipient ? ' from-recipient' : '');
 
-    el.innerHTML = label +
-      '<div class="fu-q">' + escHtml(fu.query || '') + '</div>' +
-      '<div class="fu-a">' + escHtml(bodyText) + '</div>';
+    var paras = bodyText.split(/\n\n/).filter(Boolean).map(function(p) {
+      return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
+    }).join('');
 
-    var fuSec = document.getElementById('followUpSection');
-    if (fuSec) fuSec.appendChild(el);
+    el.innerHTML =
+      (isRecipient ? '<div class="fu-label-recipient">From the person you shared with</div>' : '') +
+      '<div class="fu-question">' + escHtml(fu.query || '') + '</div>' +
+      '<div class="fu-body">' + (paras || '<p>' + escHtml(bodyText) + '</p>') + '</div>';
+
+    container.appendChild(el);
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 }
 
