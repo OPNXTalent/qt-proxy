@@ -589,6 +589,7 @@
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
 var shareToken      = null;
+var conversationHistory = []; // tracks full exchange for multi-turn context
 var shareId         = null;
 var channelId       = null;
 var collabOpen      = false;
@@ -780,7 +781,7 @@ async function runQuery() {
 
   // Build follow-up prompt — anchored to the shared subject, stays within Prism framework
   var subject = currentSubject || 'the shared interpretation';
-  var followUpPrompt = 'RESPONSE FORMAT: Plain prose only. No JSON, no field labels, no headers. This is a live follow-up conversation.\n\nAPPLY THE FULL GOVERNING COHERENCE FRAMEWORK: Follow the evidence wherever it leads. Engage real tension directly. Confirm correct positions without hedging. Honor Hebrew lexical precision — words chosen carry weight, words not chosen carry equal weight. Never defend the framework. Never protect a tradition the text does not establish.\n\nDELIVERY METHOD — SOCRATIC CHUNKING:\nBefore responding, mentally construct the complete answer to this question in full. Then deliver only the first meaningful piece of it — enough to establish real traction, not enough to close the question. 2-4 sentences maximum.\n\nEnd every response with a single question that:\n- arises directly from what was just said\n- is the natural next step in the full answer you are holding\n- feels like genuine curiosity, not a quiz\n- is specific enough that answering it moves the conversation forward\n- does not telegraph the full answer — it opens the next door\n\nThe user should feel they are discovering something, not being walked through a syllabus. Each exchange reveals one more layer. The complete answer unfolds across the conversation, not within a single response.\n\nNever deliver the full answer in one response regardless of how direct the question is. The constraint is always length. The exchange is the architecture.\n\nCRITICAL — READ THE USER\'S ACTUAL POSITION: Before responding, identify precisely what the user said and what they did not say. Do not defend against a challenge they did not make. Do not correct a position they did not take. If the user has identified something correctly, confirm it directly and build forward from there. Misreading the user and defending against a phantom objection is the primary failure mode to avoid.\n\n' +
+  var followUpPrompt = 'RESPONSE FORMAT: Plain prose only. No JSON, no field labels, no headers. This is a live follow-up conversation.\n\nAPPLY THE FULL GOVERNING COHERENCE FRAMEWORK: Follow the evidence wherever it leads. Engage real tension directly. Confirm correct positions without hedging. Honor Hebrew lexical precision — words chosen carry weight, words not chosen carry equal weight. Never defend the framework. Never protect a tradition the text does not establish.\n\nDELIVERY METHOD — SOCRATIC CHUNKING:\nBefore responding, mentally construct the complete answer to this question in full. Then deliver only the first meaningful piece of it — enough to establish real traction, not enough to close the question. 2-4 sentences maximum.\n\nEnd every response with a single question that:\n- arises directly from what was just said\n- is the natural next step in the full answer you are holding\n- feels like genuine curiosity, not a quiz\n- is specific enough that answering it moves the conversation forward\n- does not telegraph the full answer — it opens the next door\n\nThe user should feel they are discovering something, not being walked through a syllabus. Each exchange reveals one more layer. The complete answer unfolds across the conversation, not within a single response.\n\nNever deliver the full answer in one response regardless of how direct the question is. The constraint is always length. The exchange is the architecture.\n\nTONE — NON-NEGOTIABLE: Never comment on the quality of the question. Never say \'sharp observation,\' \'great question,\' \'you\'re right to notice,\' or any variation. Do not acknowledge the user\'s intelligence or perceptiveness. Simply respond to the substance. The Prism does not evaluate the questioner — it engages the question. The machine does not comment on the pod. It makes the coffee.\n\nCRITICAL — READ THE USER\'S ACTUAL POSITION: Before responding, identify precisely what the user said and what they did not say. Do not defend against a challenge they did not make. Do not correct a position they did not take. If the user has identified something correctly, confirm it directly and build forward from there. Misreading the user and defending against a phantom objection is the primary failure mode to avoid.\n\n' +
     'RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER\n' +
     'These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.\n\n' +
     'First Movement: Recognition Before Terminology\n' +
@@ -806,11 +807,14 @@ async function runQuery() {
   fuEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
+    // Build messages array with full conversation history
+    var messages = conversationHistory.concat([{ role: 'user', content: followUpPrompt }]);
+
     var res = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        messages: [{ role: 'user', content: followUpPrompt }],
+        messages: messages,
         email: localStorage.getItem('qt_user_email') || null,
         rawQuery: input,
         isFollowUp: true
@@ -860,6 +864,10 @@ async function runQuery() {
     var _completedInput = input;
     document.getElementById('userInput').value = '';
     sessionQueries++;
+
+    // Add this exchange to conversation history for next turn
+    conversationHistory.push({ role: 'user', content: followUpPrompt });
+    conversationHistory.push({ role: 'assistant', content: fullText });
 
     // Save as recipient follow-up on the shared thread
     saveRecipientFollowUp(_completedInput, fullText);
@@ -1021,6 +1029,16 @@ async function loadShare() {
     var subject  = share.subject || snapshot._subject || '';
 
     renderSnapshot(snapshot, subject);
+
+    // Seed conversation history with the original interpretation
+    var originalText = '';
+    if (snapshot.recognition) originalText += snapshot.recognition + '\n\n';
+    if (snapshot.core_insight) originalText += snapshot.core_insight + '\n\n';
+    if (snapshot.kingdom_implication) originalText += snapshot.kingdom_implication;
+    if (originalText.trim()) {
+      conversationHistory.push({ role: 'user', content: subject || 'Initial query' });
+      conversationHistory.push({ role: 'assistant', content: originalText.trim() });
+    }
 
     // Start live thread polling if this share has a thread_id
     if (share.thread_id) {
