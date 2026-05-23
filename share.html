@@ -457,9 +457,14 @@
     <button class="save-profile-btn" onclick="openEmailCapture()">Save my work →</button>
   </div>
 
-  <!-- Inline email capture -->
+  <!-- Inline email + password capture -->
   <div class="email-capture-inline" id="emailCaptureInline">
     <input type="email" id="sidebarEmailInput" placeholder="your@email.com" autocomplete="email"
+      style="margin-bottom:8px;"
+      onkeydown="if(event.key==='Enter') document.getElementById('sidebarPasswordInput').focus()" />
+    <input type="password" id="sidebarPasswordInput" placeholder="Create a password"
+      style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:15px;padding:9px 12px;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin-bottom:10px;"
+      onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
       onkeydown="if(event.key==='Enter') saveEmail()" />
     <button onclick="saveEmail()">Keep this interpretation →</button>
     <div class="email-capture-status" id="emailCaptureStatus"></div>
@@ -1585,6 +1590,11 @@ async function saveRecipientEmail() {
   if (!re.test(email)) { inp.style.borderColor = '#b85c5c'; return; }
 
   localStorage.setItem('qt_user_email', email);
+  // Store password if provided alongside email in action bar capture
+  var passInp = document.getElementById('sidebarPasswordInput');
+  if (passInp && passInp.value.trim().length >= 6) {
+    localStorage.setItem('qt_user_password', btoa(passInp.value.trim()));
+  }
 
   // Register in Supabase
   try {
