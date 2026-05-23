@@ -466,7 +466,7 @@
   <div class="sidebar-section-label">This Session</div>
 
   <div class="sidebar-threads" id="sidebarThreads">
-    <div id="sidebarSharedEntry" style="display:none;" class="thread-item shared-origin active">
+    <div id="sidebarSharedEntry" style="display:none; cursor:pointer;" class="thread-item shared-origin active" onclick="var el=document.getElementById('shareResult'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'});">
       <div class="thread-title" id="sidebarSharedTitle">Shared interpretation</div>
       <div class="thread-meta">
         <span class="thread-date" id="sidebarSharedDate"></span>
@@ -856,8 +856,12 @@ async function runQuery() {
       }
     }
 
+    var _completedInput = input;
     document.getElementById('userInput').value = '';
     sessionQueries++;
+
+    // Add this query to the sidebar
+    addQueryToSidebar(_completedInput, fuEl);
 
     // Open sidebar after first query to surface the save prompt
     if (sessionQueries === 1) {
@@ -1056,6 +1060,34 @@ function showError(msg) {
   document.getElementById('loadingState').style.display = 'none';
   document.getElementById('errorState').style.display = 'block';
   document.getElementById('errorText').textContent = msg;
+}
+
+// ── Sidebar query tracking ───────────────────────────────────────────────────
+// Each recipient query gets a sidebar entry so they can navigate back to it.
+
+var _sidebarQueryCount = 0;
+
+function addQueryToSidebar(queryText, targetEl) {
+  _sidebarQueryCount++;
+  var threads = document.getElementById('sidebarThreads');
+  if (!threads) return;
+
+  var item = document.createElement('div');
+  item.className = 'thread-item';
+  item.style.cursor = 'pointer';
+
+  var title = queryText.length > 52 ? queryText.slice(0, 52) + '…' : queryText;
+  var now = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+
+  item.innerHTML = '<div class="thread-title">' + escHtml(title) + '</div>' +
+    '<div class="thread-meta"><span class="thread-date">Today · ' + now + '</span>' +
+    '<span class="thread-badge">Q' + _sidebarQueryCount + '</span></div>';
+
+  item.addEventListener('click', function() {
+    if (targetEl) targetEl.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+
+  threads.appendChild(item);
 }
 
 // ── Presence heartbeat ────────────────────────────────────────────────────────
