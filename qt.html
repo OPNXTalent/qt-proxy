@@ -913,15 +913,14 @@
   </div>
 
   <!-- Free user upgrade prompt (shown for free tier) -->
-  <!-- Anonymous save block — shown when no email registered -->
-  <div id="freeUpgradePrompt" style="display:none; margin:12px 16px 0;" data-anon-only="true">
+  <div id="freeUpgradePrompt" style="display:none; margin:12px 16px;">
     <div style="border:1px solid rgba(201,168,76,0.2); background:rgba(201,168,76,0.03); padding:16px;">
       <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:#b85c5c; margin-bottom:8px;">SESSION NOT SAVED</div>
       <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:12px;">Closing this browser will erase your work. Save your email to keep it for 30 days.</div>
-      <input id="anonEmailInput" type="email" placeholder="your@email.com" autocomplete="email"
+      <input id="anonEmailInput" type="email" placeholder="your@email.com"
         style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:9px 12px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:8px;"
         onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
-        onkeydown="if(event.key==='Enter') document.getElementById('anonPasswordInput').focus()" />
+        onkeydown="if(event.key==='Enter') submitAnonSave()" />
       <input id="anonPasswordInput" type="password" placeholder="Create a password"
         style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:9px 12px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:10px;"
         onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
@@ -971,7 +970,7 @@
   <!-- Anonymous back link — shown only to non-subscribers -->
   <div id="anonBackLink" style="display:none; margin-bottom:20px; display:flex; flex-direction:row; justify-content:space-between; align-items:center; width:100%;">
     <a href="/index.html" style="font-family:var(--mono); font-size:13.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">← Learn more</a>
-    <a href="#" onclick="interceptExpandAccess(); return false;" style="font-family:var(--mono); font-size:13.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gold-dim)'">Expand Your Access →</a>
+    <a href="/purchase.html" style="font-family:var(--mono); font-size:13.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gold-dim)'">Expand Your Access →</a>
   </div>
 
   <!-- INPUT FORM -->
@@ -3185,7 +3184,7 @@ function initSidebar() {
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
 
-  // Anonymous / free users — show sidebar with save prompt, no thread history
+  // Anonymous / free users still get the sidebar — show it with upgrade prompt, no thread history
   if (!email || CURRENT_TIER === 'free') {
     allThreads = [];
     renderThreads(allThreads);
@@ -3193,7 +3192,7 @@ function initSidebar() {
     if (toggle) toggle.classList.add('visible');
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
+    if (freePrompt) freePrompt.style.display = 'block';
     loadSidebarCreditsAnon();
     return;
   }
@@ -3923,6 +3922,44 @@ function formatNow() {
   return month + ' ' + day + ' \u00b7 ' + hours + ':' + mins + ' ' + ampm;
 }
 
+async function submitAnonSave() {
+  var emailInp = document.getElementById('anonEmailInput');
+  var passInp  = document.getElementById('anonPasswordInput');
+  var statusEl = document.getElementById('anonSaveStatus');
+  var email    = emailInp ? emailInp.value.trim() : '';
+  var password = passInp  ? passInp.value.trim()  : '';
+  var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!re.test(email)) {
+    if (statusEl) { statusEl.textContent = 'Please enter a valid email.'; statusEl.style.display = 'block'; }
+    return;
+  }
+  if (password.length < 6) {
+    if (statusEl) { statusEl.textContent = 'Password must be at least 6 characters.'; statusEl.style.display = 'block'; }
+    return;
+  }
+  try {
+    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    await fetch(sbUrl + '/rest/v1/subscribers', {
+      method: 'POST',
+      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
+      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+    });
+    localStorage.setItem('qt_user_email', email);
+    localStorage.setItem('qt_user_password', btoa(password));
+    var block = document.getElementById('freeUpgradePrompt');
+    if (block) {
+      block.innerHTML = '<div style="border:1px solid rgba(80,180,120,0.3);background:rgba(80,180,120,0.03);padding:16px;">' +
+        '<div style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(80,180,120,0.8);margin-bottom:6px;">SESSION SAVED</div>' +
+        '<div style="font-family:var(--crimson);font-style:italic;font-size:13px;color:var(--text-dim);line-height:1.6;">Your work is saved for 30 days.</div>' +
+        '</div>';
+    }
+    if (typeof loadUserThreads === 'function') loadUserThreads();
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
+  }
+}
+
 async function runPreflightCheck() {
   var userEmail = localStorage.getItem('qt_user_email');
   var _anonMode = sessionStorage.getItem('qt_anon_mode') === '1';
@@ -3946,200 +3983,6 @@ async function runPreflightCheck() {
       applyQueryLock(msg, hrs, secs);
     }
   } catch(e) {}
-}
-
-// ── ANONYMOUS SAVE ───────────────────────────────────────────────────────────
-// Captures email + password from sidebar block, registers in Supabase,
-// stores email in localStorage so session persists.
-
-async function submitAnonSave() {
-  var emailInp  = document.getElementById('anonEmailInput');
-  var passInp   = document.getElementById('anonPasswordInput');
-  var statusEl  = document.getElementById('anonSaveStatus');
-  if (!emailInp || !passInp) return;
-
-  var email    = emailInp.value.trim();
-  var password = passInp.value.trim();
-  var emailRe  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  if (!emailRe.test(email)) {
-    if (statusEl) { statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; }
-    return;
-  }
-  if (password.length < 6) {
-    if (statusEl) { statusEl.textContent = 'Password must be at least 6 characters.'; statusEl.style.display = 'block'; }
-    return;
-  }
-
-  if (statusEl) statusEl.style.display = 'none';
-
-  try {
-    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-
-    // Register subscriber
-    await fetch(sbUrl + '/rest/v1/subscribers', {
-      method: 'POST',
-      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
-      body: JSON.stringify({ email: email, tier: 'free', status: 'active', password_hash: btoa(password) })
-    });
-
-    localStorage.setItem('qt_user_email', email);
-    localStorage.setItem('qt_user_password', btoa(password));
-
-    // Hide the save block, show confirmation
-    var block = document.getElementById('freeUpgradePrompt');
-    if (block) {
-      block.innerHTML = '<div style="border:1px solid rgba(80,180,120,0.3); background:rgba(80,180,120,0.03); padding:16px; margin:0;">' +
-        '<div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:rgba(80,180,120,0.8); margin-bottom:6px;">SESSION SAVED</div>' +
-        '<div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6;">Your work is saved for 30 days. Return any time with your email and password.</div>' +
-        '</div>';
-    }
-
-    // Load threads now that email is set
-    if (typeof loadUserThreads === 'function') loadUserThreads();
-
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
-  }
-}
-
-// ── EXPAND YOUR ACCESS INTERCEPT ─────────────────────────────────────────────
-// Before going to purchase, ensure the user has an email + password registered
-// so query credits have somewhere to land.
-
-function buildExpandAccessModal(modal) {
-  var box = document.createElement('div');
-  box.style.cssText = 'background:var(--deep);border:1px solid var(--border);padding:44px 40px;max-width:420px;width:90%;position:relative;';
-
-  var closeBtn = document.createElement('button');
-  closeBtn.textContent = '✕';
-  closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;background:transparent;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;';
-  closeBtn.onclick = closeExpandModal;
-
-  var title = document.createElement('div');
-  title.style.cssText = 'font-family:var(--cinzel);font-size:14px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-pale);margin-bottom:10px;';
-  title.textContent = 'Before You Continue';
-
-  var desc = document.createElement('div');
-  desc.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:17px;color:var(--text-dim);line-height:1.7;margin-bottom:24px;';
-  desc.textContent = 'Create your account so your queries are credited to you the moment payment clears.';
-
-  var emailInp = document.createElement('input');
-  emailInp.id = 'expandEmailInput';
-  emailInp.type = 'email';
-  emailInp.placeholder = 'your@email.com';
-  emailInp.autocomplete = 'email';
-  emailInp.style.cssText = 'width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:16px;padding:13px 16px;outline:none;transition:border-color 0.2s;margin-bottom:10px;box-sizing:border-box;';
-  emailInp.onfocus = function() { this.style.borderColor = 'var(--gold-dim)'; };
-  emailInp.onblur  = function() { this.style.borderColor = 'var(--border)'; };
-  emailInp.onkeydown = function(e) { if (e.key === 'Enter') document.getElementById('expandPasswordInput').focus(); };
-
-  var passInp = document.createElement('input');
-  passInp.id = 'expandPasswordInput';
-  passInp.type = 'password';
-  passInp.placeholder = 'Create a password (min 6 characters)';
-  passInp.style.cssText = 'width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:16px;padding:13px 16px;outline:none;transition:border-color 0.2s;margin-bottom:10px;box-sizing:border-box;';
-  passInp.onfocus = function() { this.style.borderColor = 'var(--gold-dim)'; };
-  passInp.onblur  = function() { this.style.borderColor = 'var(--border)'; };
-  passInp.onkeydown = function(e) { if (e.key === 'Enter') submitExpandAccess(); };
-
-  var statusEl = document.createElement('div');
-  statusEl.id = 'expandAccessStatus';
-  statusEl.style.cssText = 'display:none;font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:#b85c5c;margin-bottom:12px;';
-
-  var btnRow = document.createElement('div');
-  btnRow.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;';
-
-  var laterBtn = document.createElement('button');
-  laterBtn.textContent = 'Later';
-  laterBtn.style.cssText = 'font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;padding:10px 18px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;';
-  laterBtn.onclick = closeExpandModal;
-
-  var continueBtn = document.createElement('button');
-  continueBtn.textContent = 'Continue →';
-  continueBtn.style.cssText = 'font-family:var(--cinzel);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;padding:10px 24px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;';
-  continueBtn.onclick = submitExpandAccess;
-
-  btnRow.appendChild(laterBtn);
-  btnRow.appendChild(continueBtn);
-  box.appendChild(closeBtn);
-  box.appendChild(title);
-  box.appendChild(desc);
-  box.appendChild(emailInp);
-  box.appendChild(passInp);
-  box.appendChild(statusEl);
-  box.appendChild(btnRow);
-  modal.appendChild(box);
-}
-
-function interceptExpandAccess() {
-  // If email already registered, go straight to purchase
-  if (localStorage.getItem('qt_user_email')) {
-    window.location.href = '/purchase.html';
-    return;
-  }
-
-  // Show auth modal first
-  var modal = document.getElementById('expandAccessModal');
-  if (modal) { modal.style.display = 'flex'; return; }
-
-  modal = document.createElement('div');
-  modal.id = 'expandAccessModal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(6,6,10,0.92);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);';
-
-  buildExpandAccessModal(modal);
-
-  document.body.appendChild(modal);
-  setTimeout(function() {
-    var inp = document.getElementById('expandEmailInput');
-    if (inp) inp.focus();
-  }, 100);
-}
-
-function closeExpandModal() {
-  var m = document.getElementById('expandAccessModal');
-  if (m) m.style.display = 'none';
-}
-
-async function submitExpandAccess() {
-  var emailInp  = document.getElementById('expandEmailInput');
-  var passInp   = document.getElementById('expandPasswordInput');
-  var statusEl  = document.getElementById('expandAccessStatus');
-  if (!emailInp || !passInp) return;
-
-  var email    = emailInp.value.trim();
-  var password = passInp.value.trim();
-  var emailRe  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  if (!emailRe.test(email)) {
-    if (statusEl) { statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; }
-    return;
-  }
-  if (password.length < 6) {
-    if (statusEl) { statusEl.textContent = 'Password must be at least 6 characters.'; statusEl.style.display = 'block'; }
-    return;
-  }
-
-  try {
-    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-
-    await fetch(sbUrl + '/rest/v1/subscribers', {
-      method: 'POST',
-      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
-      body: JSON.stringify({ email: email, tier: 'free', status: 'active', password_hash: btoa(password) })
-    });
-
-    localStorage.setItem('qt_user_email', email);
-    localStorage.setItem('qt_user_password', btoa(password));
-
-    // Navigate to purchase with email prefilled
-    window.location.href = '/purchase.html?email=' + encodeURIComponent(email);
-
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
-  }
 }
 
 // ── SIGNAL SESSIONS POST-PURCHASE HANDLER ────────────────────────────────────
