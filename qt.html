@@ -913,21 +913,9 @@
   </div>
 
   <!-- Free user upgrade prompt (shown for free tier) -->
-  <div id="freeUpgradePrompt" style="display:none; margin:12px 16px;">
-    <div style="border:1px solid rgba(201,168,76,0.2); background:rgba(201,168,76,0.03); padding:16px;">
-      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:#b85c5c; margin-bottom:8px;">SESSION NOT SAVED</div>
-      <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:12px;">Closing this browser will erase your work. Save your email to keep it for 30 days.</div>
-      <input id="anonEmailInput" type="email" placeholder="your@email.com"
-        style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:9px 12px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:8px;"
-        onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
-        onkeydown="if(event.key==='Enter') submitAnonSave()" />
-      <input id="anonPasswordInput" type="password" placeholder="Create a password"
-        style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:9px 12px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:10px;"
-        onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
-        onkeydown="if(event.key==='Enter') submitAnonSave()" />
-      <div id="anonSaveStatus" style="display:none; font-family:var(--mono); font-size:9px; letter-spacing:0.12em; color:#b85c5c; margin-bottom:8px;"></div>
-      <button onclick="submitAnonSave()" style="width:100%; font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; padding:10px 16px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.2s;">KEEP THIS INTERPRETATION →</button>
-    </div>
+  <div class="sidebar-upgrade-prompt" id="freeUpgradePrompt" style="display:none;">
+    Your interpretations are saved and organized when you subscribe. Start your archive.
+    <a href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" target="_blank">Subscribe → Refraction</a>
   </div>
 
   <!-- New Subject button in sidebar -->
@@ -2793,35 +2781,9 @@ function restoreFollowUps(id) {
   }
 }
 
-// RENDER FOLLOW-UPS WITH SOURCE AWARENESS
-// Shows sender's own follow-ups normally, recipient contributions with distinct styling
-// ── Supabase Realtime ────────────────────────────────────────────────────────
+// ── Supabase Realtime — see /realtime.js ────────────────────────────────────────
 
-var _supabaseClient     = null;
-var _renderedFuIds      = new Set();
-var _qtPollInterval     = null;
-
-function startFollowUpPolling(threadId) {
-  if (_qtPollInterval) clearInterval(_qtPollInterval);
-  _qtPollInterval = setInterval(function() {
-    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
-      headers: { 'x-user-email': userEmail() }
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
-    })
-    .catch(function() {});
-  }, 8000);
-}
-
-function getSupabaseClient() {
-  if (_supabaseClient) return _supabaseClient;
-  var url  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  var anon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-  _supabaseClient = window.supabase.createClient(url, anon);
-  return _supabaseClient;
-}
+// Realtime functions loaded from /realtime.js (defer) to avoid security extension conflicts
 
 function startFollowUpRealtime(threadId) {
   if (window._qtRealtimeChannel) {
@@ -3920,44 +3882,6 @@ function formatNow() {
   var ampm  = hours >= 12 ? 'pm' : 'am';
   hours = hours % 12 || 12;
   return month + ' ' + day + ' \u00b7 ' + hours + ':' + mins + ' ' + ampm;
-}
-
-async function submitAnonSave() {
-  var emailInp = document.getElementById('anonEmailInput');
-  var passInp  = document.getElementById('anonPasswordInput');
-  var statusEl = document.getElementById('anonSaveStatus');
-  var email    = emailInp ? emailInp.value.trim() : '';
-  var password = passInp  ? passInp.value.trim()  : '';
-  var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!re.test(email)) {
-    if (statusEl) { statusEl.textContent = 'Please enter a valid email.'; statusEl.style.display = 'block'; }
-    return;
-  }
-  if (password.length < 6) {
-    if (statusEl) { statusEl.textContent = 'Password must be at least 6 characters.'; statusEl.style.display = 'block'; }
-    return;
-  }
-  try {
-    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-    await fetch(sbUrl + '/rest/v1/subscribers', {
-      method: 'POST',
-      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
-      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
-    });
-    localStorage.setItem('qt_user_email', email);
-    localStorage.setItem('qt_user_password', btoa(password));
-    var block = document.getElementById('freeUpgradePrompt');
-    if (block) {
-      block.innerHTML = '<div style="border:1px solid rgba(80,180,120,0.3);background:rgba(80,180,120,0.03);padding:16px;">' +
-        '<div style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(80,180,120,0.8);margin-bottom:6px;">SESSION SAVED</div>' +
-        '<div style="font-family:var(--crimson);font-style:italic;font-size:13px;color:var(--text-dim);line-height:1.6;">Your work is saved for 30 days.</div>' +
-        '</div>';
-    }
-    if (typeof loadUserThreads === 'function') loadUserThreads();
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
-  }
 }
 
 async function runPreflightCheck() {
