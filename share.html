@@ -688,6 +688,10 @@ async function saveEmail() {
     var data = await res.json();
     if (data.success || res.ok) {
       localStorage.setItem('qt_user_email', email);
+      var passInp = document.getElementById('sidebarPasswordInput');
+      if (passInp && passInp.value.trim().length >= 6) {
+        localStorage.setItem('qt_user_password', btoa(passInp.value.trim()));
+      }
       statusEl.textContent = 'Saved. Your session is held for 30 days.';
       statusEl.style.color = 'var(--gold-dim)';
       statusEl.style.display = 'block';
