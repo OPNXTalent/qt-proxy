@@ -778,6 +778,21 @@
     box-shadow: 0 0 8px rgba(220,60,60,0.4);
     animation: micPulse 1.2s ease-in-out infinite;
   }
+  /* Recipient contribution styling in sender's thread */
+  .follow-up-block.from-recipient {
+    border-left: 2px solid rgba(80,180,120,0.4);
+    padding-left: 16px;
+    margin-top: 32px;
+  }
+  .fu-label-recipient {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(80,180,120,0.6);
+    margin-bottom: 8px;
+  }
+
   @keyframes micPulse {
     0%, 100% { box-shadow: 0 0 6px rgba(220,60,60,0.3); }
     50% { box-shadow: 0 0 14px rgba(220,60,60,0.6); }
@@ -2625,6 +2640,25 @@ function selectThread(id) {
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
     var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
+    // Stop any existing follow-up polling
+    if (window._qtFollowUpPoll) { clearInterval(window._qtFollowUpPoll); window._qtFollowUpPoll = null; }
+
+    // If this thread has an active share, poll for recipient contributions every 15s
+    if (window._shareActive && _currentSharedSessionId) {
+      window._qtFollowUpPoll = setInterval(function() {
+        fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), {
+          headers: { 'x-user-email': userEmail() }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.followUps && data.followUps.length > 0) {
+            renderFUWithSource(data.followUps);
+          }
+        })
+        .catch(function() {});
+      }, 15000);
+    }
+
     // Reset share state for this thread
     window._shareActive = false;
     _currentSharedSessionId = null;
@@ -2684,9 +2718,44 @@ function restoreFollowUps(id) {
   if (!id.startsWith('pending-') && userEmail()) {
     fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-user-email': userEmail() } })
     .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFU(data.followUps); })
+    .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps); })
     .catch(function() {});
   }
+}
+
+// RENDER FOLLOW-UPS WITH SOURCE AWARENESS
+// Shows sender's own follow-ups normally, recipient contributions with distinct styling
+function renderFUWithSource(list) {
+  if (!list || !list.length) return;
+  var fuSec = document.getElementById('followUpSection');
+  if (fuSec) fuSec.style.display = 'block';
+  list.forEach(function(fu) {
+    var isRecipient = fu.source === 'recipient';
+    var el = document.createElement('div');
+    el.className = 'follow-up-block' + (isRecipient ? ' from-recipient' : '');
+
+    var response = fu.response || {};
+    var bodyText = '';
+    if (typeof response === 'string') {
+      bodyText = response;
+    } else if (response.text) {
+      bodyText = response.text;
+    } else if (response.recognition) {
+      bodyText = [response.recognition, response.core_insight, response.kingdom_implication]
+        .filter(Boolean).join('\n\n');
+    }
+
+    var label = isRecipient
+      ? '<div class="fu-label-recipient">From the person you shared with</div>'
+      : '';
+
+    el.innerHTML = label +
+      '<div class="fu-q">' + escHtml(fu.query || '') + '</div>' +
+      '<div class="fu-a">' + escHtml(bodyText) + '</div>';
+
+    var fuSec = document.getElementById('followUpSection');
+    if (fuSec) fuSec.appendChild(el);
+  });
 }
 
 // SAVE FOLLOW-UP
