@@ -795,48 +795,66 @@ async function runQuery() {
   document.getElementById('loadingBlock').style.display = 'block';
   document.getElementById('loadingBlock').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-  var prompt = buildPrompt(input);
+  // Build follow-up prompt — anchored to the shared subject, stays within Prism framework
+  var subject = currentSubject || 'the shared interpretation';
+  var followUpPrompt = 'OVERRIDE: This is a follow-up in a shared thread. Plain prose only — no JSON, no field labels, no headers. Respond as if continuing a conversation.\n\nLENGTH RULE: 1-3 short paragraphs. Compression over coverage. If you have said the essential thing, conclude.\n\nIF the question carries genuine depth that cannot be fully resolved in 3 paragraphs: deliver the most important layer clearly, then end with a single italicized suggestion — a natural follow-up question the person could ask to go deeper. The suggestion should feel like an open door, not an assignment. It must arise from the content of what was just said, not from a generic template. Format it exactly as: *If you want to go further: "[suggested follow-up question]"*\n\nNever truncate mid-thought. Either complete the insight or hand it forward.\n\n' +
+    'RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER\n' +
+    'These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.\n\n' +
+    'First Movement: Recognition Before Terminology\n' +
+    'Every response begins by locating the human tension inside the question. Name what the visitor is actually carrying before introducing any framework category.\n\n' +
+    'Second Movement: Ordinary Language Before Framework Language\n' +
+    'Articulate the underlying tension in plain language before introducing Prism terminology. Terminology introduced after recognition feels inevitable.\n\n' +
+    'Third Movement: One Door At A Time\n' +
+    'Open one door fully rather than gesturing at six doors simultaneously. The visitor should leave each response with one thing newly visible.\n\n' +
+    'End Open, Not Closed\n' +
+    'Every response should leave one thread slightly unresolved — not as manipulation, but as honest invitation.\n\n' +
+    'You are The Prism framework interpreter. The user previously received a full Prism interpretation of: "' + subject + '"\n\n' +
+    'Their follow-up question is: "' + input + '"\n\n' +
+    'Respond within the Prism framework — grounded in Echad b\'Emet, relational ontology, entanglement/coherence/decoherence, telos, and Hebrew two-world cosmology where relevant. Be direct and precise. Plain prose, no JSON, no markdown headers.';
+
+  // Create follow-up element to stream into
+  var fuEl = document.createElement('div');
+  fuEl.className = 'fu-block recipient';
+  fuEl.innerHTML = '<div class="fu-question">' + escHtml(input) + '</div>';
+  var bodyEl = document.createElement('div');
+  bodyEl.className = 'fu-body';
+  fuEl.appendChild(bodyEl);
+  document.getElementById('resultContent').appendChild(fuEl);
+  fuEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
     var res = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: followUpPrompt }],
         email: localStorage.getItem('qt_user_email') || null,
         rawQuery: input,
-        isFollowUp: false
+        isFollowUp: true
       })
     });
 
     if (res.status === 429) {
       var limitData = {};
-      try { limitData = await res.json(); } catch {}
+      try { limitData = await res.json(); } catch(e) {}
       showLimitWall(limitData.message);
+      fuEl.remove();
       return;
     }
 
     if (!res.ok) throw new Error('SERVER_ERROR');
 
     // Stream the response
-    var fuEl = document.createElement('div');
-    fuEl.className = 'fu-block';
-    fuEl.innerHTML = '<div class="fu-question">' + escHtml(input) + '</div>';
-    var bodyEl = document.createElement('div');
-    bodyEl.className = 'fu-body';
-    fuEl.appendChild(bodyEl);
-    document.getElementById('resultContent').appendChild(fuEl);
-
     var reader  = res.body.getReader();
     var decoder = new TextDecoder();
     var buffer  = '';
     var fullText = '';
-    bodyEl.innerHTML = '<span style="opacity:0.4;font-family:var(--mono);font-size:11px;letter-spacing:0.12em;">interpreting…</span>';
+    bodyEl.innerHTML = '<span style="opacity:0.4;font-family:var(--mono);font-size:11px;letter-spacing:0.12em;">following the thread…</span>';
 
     while (true) {
-      var _ref = await reader.read();
-      if (_ref.done) break;
-      buffer += decoder.decode(_ref.value, { stream: true });
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
       var lines = buffer.split('\n');
       buffer = lines.pop();
       for (var i = 0; i < lines.length; i++) {
@@ -847,11 +865,11 @@ async function runQuery() {
             if (parsed.type === 'delta' && parsed.text) {
               fullText += parsed.text;
               var paras = fullText.split(/\n\n/);
-              bodyEl.innerHTML = paras.map(function(p, idx) {
-                return '<p>' + escHtml(p.replace(/\n/g,' ')) + '</p>';
+              bodyEl.innerHTML = paras.map(function(p) {
+                return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
               }).join('');
             }
-          } catch {}
+          } catch(e) {}
         }
       }
     }
@@ -860,20 +878,19 @@ async function runQuery() {
     document.getElementById('userInput').value = '';
     sessionQueries++;
 
-    // Save recipient contribution back to shared thread
+    // Make any suggested follow-up question tappable
+    injectSuggestion(bodyEl, fullText);
+
+    // Save as recipient follow-up on the shared thread
     saveRecipientFollowUp(_completedInput, fullText);
 
-    // Add this query to the sidebar
+    // Add to sidebar
     addQueryToSidebar(_completedInput, fuEl);
 
-    // Open sidebar after first query to surface the save prompt
-    if (sessionQueries === 1) {
-      openSidebar();
-    }
+    // Open sidebar after first follow-up
+    if (sessionQueries === 1) openSidebar();
 
-    if (sessionQueries >= QUERY_LIMIT) {
-      showLimitWall();
-    }
+    if (sessionQueries >= QUERY_LIMIT) showLimitWall();
 
   } catch (err) {
     var errEl = document.createElement('div');
@@ -884,33 +901,6 @@ async function runQuery() {
     document.getElementById('loadingBlock').style.display = 'none';
     document.getElementById('submitBtn').disabled = false;
   }
-}
-
-function buildPrompt(input) {
-  return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. START WITH { END WITH }.
-
-You are The Prism framework interpreter. The user has submitted: "${input}"
-
-Infer the query type from the content — verse reference, phrase, theme, or open question. Apply the complete Prism framework regardless of input type.
-
-Prism Framework: Echad b'Emet (God's unified relational truth), Entanglement (God's initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
-
-Return this exact JSON:
-{
-  "recognition": "2-4 sentences of plain-language recognition. No framework vocabulary.",
-  "core_insight": "The single most important thing the framework sees. One paragraph.",
-  "suggested_threads": ["specific door 1", "specific door 2"],
-  "verse_identified": "Most relevant Scripture",
-  "verse_text": "Verse quoted accurately",
-  "prism_summary": "Two sharp sentences — Section 00 Echad b'Emet",
-  "entanglement": "God's initiation here",
-  "coherence_alignment": "How this calls toward alignment",
-  "noise_decoherence": "What distortions this exposes",
-  "telos_insight": "Christ-form being called toward",
-  "olam_haba": "Time-transcendent view",
-  "kingdom_implication": "One crisp Kingdom punchline",
-  "key_terms": [{"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"}]
-}`;
 }
 
 function showLimitWall(msg) {
@@ -1068,6 +1058,43 @@ function showError(msg) {
   document.getElementById('loadingState').style.display = 'none';
   document.getElementById('errorState').style.display = 'block';
   document.getElementById('errorText').textContent = msg;
+}
+
+// ── Suggestion injection ─────────────────────────────────────────────────────
+// When Claude ends a response with "If you want to go further: [question]"
+// we replace that line with a tappable prompt that pre-fills the input field.
+
+function injectSuggestion(bodyEl, fullText) {
+  var pattern = /If you want to go further:\s*[\u201c\u201d"']([^\u201c\u201d"']+)[\u201c\u201d"']/i;
+  var match = fullText.match(pattern);
+  if (!match || !match[1]) return;
+
+  var suggText = match[1].trim();
+
+  // Find and replace the suggestion line in the rendered HTML
+  var html = bodyEl.innerHTML;
+  // Remove the last paragraph if it contains the suggestion
+  html = html.replace(/<p>[^<]*[Ii]f you want to go further[^<]*<\/p>/, '');
+  bodyEl.innerHTML = html;
+
+  // Append tappable suggestion block
+  var btn = document.createElement('div');
+  btn.className = 'fu-suggestion';
+  btn.setAttribute('data-q', suggText);
+  btn.style.cssText = 'margin-top:16px;padding:12px 16px;border:1px solid rgba(201,168,76,0.2);background:rgba(201,168,76,0.03);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold-dim);transition:all 0.2s;';
+  btn.innerHTML = '&#8594; ' + escHtml(suggText);
+  btn.onmouseover = function() { this.style.borderColor = 'rgba(201,168,76,0.5)'; this.style.color = 'var(--gold)'; };
+  btn.onmouseout  = function() { this.style.borderColor = 'rgba(201,168,76,0.2)'; this.style.color = 'var(--gold-dim)'; };
+  btn.onclick     = function() { prefillQuestion(this.getAttribute('data-q')); };
+  bodyEl.appendChild(btn);
+}
+
+function prefillQuestion(text) {
+  var inp = document.getElementById('userInput');
+  if (!inp) return;
+  inp.value = text;
+  inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  inp.focus();
 }
 
 // ── Sidebar query tracking ───────────────────────────────────────────────────
