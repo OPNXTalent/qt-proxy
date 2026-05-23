@@ -1055,21 +1055,29 @@
     <!-- DOWNLOAD -->
     <div id="downloadRow" style="display:none; margin-top:36px; padding:24px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
 
-      <!-- PDF downloads + Share button row -->
-      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:0;">
+      <!-- PDF downloads + Share button row — Dark | Share | Light -->
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:0; align-items:center;">
         <button onclick="downloadPDF('dark')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">↓ Dark Version</button>
-        <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Print Version</button>
 
-        <!-- Share button — single action, no modal pre-step -->
+        <!-- Share button — centre -->
         <div style="position:relative; display:inline-flex; align-items:center; gap:10px;">
           <button id="shareBtn" onclick="handleShareBtn()" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;"
             onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'"
             onmouseout="if(!window._shareActive)this.style.borderColor='var(--border-lit)';if(!window._shareActive)this.style.color='var(--text-dim)'">
-            Share this reflection →
+            Share
           </button>
-          <!-- Presence dot — hidden until share exists -->
           <div id="presenceDot" style="display:none; width:10px; height:10px; border-radius:50%; background:rgba(80,180,120,0.3); transition:background 0.5s;" title="Viewing status"></div>
         </div>
+
+        <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Light Version</button>
+      </div>
+
+      <!-- Share URL — revealed inline after share created -->
+      <div id="shareUrlRow" style="display:none; margin-top:16px; justify-content:center; align-items:center; gap:10px;">
+        <div id="shareUrlDisplay" style="font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:360px;"></div>
+        <button onclick="shareViaCopy()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
+          onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Copy</button>
       </div>
 
       <!-- Discussion button — appears after share created -->
