@@ -1119,9 +1119,84 @@ footer {
   .tiers { grid-template-columns: 1fr; }
   .hero { padding: 100px 24px 80px; }
 }
+
+
+/* ── SHARE RETURN BAR ── */
+#shareReturnBar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 200;
+  background: rgba(13,13,20,0.96);
+  border-top: 1px solid rgba(201,168,76,0.2);
+  backdrop-filter: blur(12px);
+  padding: 14px 28px;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+#shareReturnBar a.return-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+#shareReturnBar a.return-link:hover { color: var(--gold-pale, #e8d5a0); }
+#shareReturnBar button.dismiss-btn {
+  background: transparent;
+  border: none;
+  color: rgba(201,168,76,0.4);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+#shareReturnBar button.dismiss-btn:hover { color: var(--gold); }
 </style>
 </head>
 <body>
+
+<!-- ── SHARE RETURN BAR ── -->
+<div id="shareReturnBar">
+  <a class="return-link" id="shareReturnLink" href="#">← Return to the interpretation shared with you</a>
+  <button class="dismiss-btn" onclick="dismissReturnBar()" title="Dismiss">✕</button>
+</div>
+
+<script>
+(function() {
+  var token = sessionStorage.getItem('prism_shared_thread');
+  if (!token) return;
+  var bar  = document.getElementById('shareReturnBar');
+  var link = document.getElementById('shareReturnLink');
+  if (!bar || !link) return;
+  link.href = '/share.html?t=' + encodeURIComponent(token);
+  bar.style.display = 'flex';
+
+  // Redirect all "Open the Interpreter" CTAs back to the shared interpretation
+  var shareUrl = '/share.html?t=' + encodeURIComponent(token);
+  document.querySelectorAll('a[href="/qt-gateway.html"]').forEach(function(el) {
+    el.href = shareUrl;
+    // Update label on nav CTA only
+    if (el.classList.contains('nav-cta')) {
+      el.textContent = '← Return to Interpretation';
+    }
+  });
+  // Push nav down so it doesn't overlap
+
+})();
+
+function dismissReturnBar() {
+  sessionStorage.removeItem('prism_shared_thread');
+  var bar = document.getElementById('shareReturnBar');
+  if (bar) bar.style.display = 'none';
+
+}
+</script>
 
 <!-- ── NAV ── -->
 <nav>
