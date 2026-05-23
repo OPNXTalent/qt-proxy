@@ -1087,32 +1087,39 @@ function showError(msg) {
   document.getElementById('errorText').textContent = msg;
 }
 
-// ── Sidebar query tracking ───────────────────────────────────────────────────
-// Each recipient query gets a sidebar entry so they can navigate back to it.
+// ── Sidebar follow-up tracking ───────────────────────────────────────────────
+// Follow-up queries update the existing shared thread entry rather than
+// creating new sidebar items. The count badge shows how deep the exchange is.
 
 var _sidebarQueryCount = 0;
+var _lastFollowUpEl    = null; // reference to most recent follow-up block
 
 function addQueryToSidebar(queryText, targetEl) {
   _sidebarQueryCount++;
-  var threads = document.getElementById('sidebarThreads');
-  if (!threads) return;
+  _lastFollowUpEl = targetEl;
 
-  var item = document.createElement('div');
-  item.className = 'thread-item';
-  item.style.cursor = 'pointer';
+  // Update the existing shared entry — don't create a new one
+  var entry = document.getElementById('sidebarSharedEntry');
+  if (!entry) return;
 
-  var title = queryText.length > 52 ? queryText.slice(0, 52) + '…' : queryText;
-  var now = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  // Update the onclick to scroll to the latest follow-up
+  entry.onclick = function() {
+    var el = _lastFollowUpEl || document.getElementById('shareResult');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
-  item.innerHTML = '<div class="thread-title">' + escHtml(title) + '</div>' +
-    '<div class="thread-meta"><span class="thread-date">Today · ' + now + '</span>' +
-    '<span class="thread-badge">Q' + _sidebarQueryCount + '</span></div>';
+  // Update badge to show follow-up count
+  var badge = entry.querySelector('.thread-badge');
+  if (badge) {
+    badge.textContent = _sidebarQueryCount + ' follow-up' + (_sidebarQueryCount > 1 ? 's' : '');
+  }
 
-  item.addEventListener('click', function() {
-    if (targetEl) targetEl.scrollIntoView({behavior:'smooth', block:'start'});
-  });
-
-  threads.appendChild(item);
+  // Update date
+  var dateEl = entry.querySelector('.thread-date');
+  if (dateEl) {
+    var now = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+    dateEl.textContent = 'Today · ' + now;
+  }
 }
 
 // ── Live thread polling ──────────────────────────────────────────────────────
