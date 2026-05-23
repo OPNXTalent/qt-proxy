@@ -2786,6 +2786,21 @@ function restoreFollowUps(id) {
 
 var _supabaseClient     = null;
 var _renderedFuIds      = new Set();
+var _qtPollInterval     = null;
+
+function startFollowUpPolling(threadId) {
+  if (_qtPollInterval) clearInterval(_qtPollInterval);
+  _qtPollInterval = setInterval(function() {
+    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
+      headers: { 'x-user-email': userEmail() }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
+    })
+    .catch(function() {});
+  }, 8000);
+}
 
 function getSupabaseClient() {
   if (_supabaseClient) return _supabaseClient;
@@ -2796,12 +2811,15 @@ function getSupabaseClient() {
 }
 
 function startFollowUpRealtime(threadId) {
-  // Clean up any existing channel
   if (window._qtRealtimeChannel) {
     window._qtRealtimeChannel.unsubscribe();
     window._qtRealtimeChannel = null;
   }
-
+  if (!window.supabase) {
+    console.warn('[Realtime] supabase not loaded — using polling fallback');
+    startFollowUpPolling(threadId);
+    return;
+  }
   try {
     var client = getSupabaseClient();
     window._qtRealtimeChannel = client
