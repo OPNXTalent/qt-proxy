@@ -1239,6 +1239,7 @@ function startShareRealtime(threadId) {
         table:  'follow_ups',
         filter: 'thread_id=eq.' + threadId
       }, function(payload) {
+        console.log('[Realtime share] received payload:', payload.new?.source, payload.new?.query?.slice(0,30));
         if (!payload.new) return;
         // Recipient sees sender's follow-ups appear in real time
         if (payload.new.source === 'owner') {
