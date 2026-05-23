@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/realtime.js" defer></script>
 <style>
   :root {
     --void: #06060a;
@@ -2714,22 +2715,8 @@ function selectThread(id) {
         })
         .catch(function() {});
 
-        // Subscribe via Realtime — wait for supabase client if needed
-        if (window.supabase) {
-          startFollowUpRealtime(threadId);
-        } else {
-          var _realtimeRetry = 0;
-          var _realtimeWait = setInterval(function() {
-            _realtimeRetry++;
-            if (window.supabase) {
-              clearInterval(_realtimeWait);
-              startFollowUpRealtime(threadId);
-            } else if (_realtimeRetry > 20) {
-              clearInterval(_realtimeWait);
-              startFollowUpPolling(threadId);
-            }
-          }, 250);
-        }
+        // Subscribe via Realtime for instant updates
+        startFollowUpRealtime(threadId);
       })
       .catch(function() {});
     })(id);
@@ -2794,35 +2781,9 @@ function restoreFollowUps(id) {
   }
 }
 
-// RENDER FOLLOW-UPS WITH SOURCE AWARENESS
-// Shows sender's own follow-ups normally, recipient contributions with distinct styling
-// ── Supabase Realtime ────────────────────────────────────────────────────────
+// ── Supabase Realtime — see /realtime.js ────────────────────────────────────────
 
-var _supabaseClient     = null;
-var _renderedFuIds      = new Set();
-var _qtPollInterval     = null;
-
-function startFollowUpPolling(threadId) {
-  if (_qtPollInterval) clearInterval(_qtPollInterval);
-  _qtPollInterval = setInterval(function() {
-    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
-      headers: { 'x-user-email': userEmail() }
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
-    })
-    .catch(function() {});
-  }, 8000);
-}
-
-function getSupabaseClient() {
-  if (_supabaseClient) return _supabaseClient;
-  var url  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  var anon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-  _supabaseClient = window.supabase.createClient(url, anon);
-  return _supabaseClient;
-}
+// Realtime functions loaded from /realtime.js (defer) to avoid security extension conflicts
 
 function startFollowUpRealtime(threadId) {
   if (window._qtRealtimeChannel) {
