@@ -3164,10 +3164,19 @@ function decrementSidebarCounter() {
   if (!match) return;
   const current = parseInt(match[1]);
   const updated = Math.max(0, current - 1);
-  countEl.textContent = updated === 1 ? '1 query remaining' : `${updated} queries remaining`;
+  setQueryCount(countEl, updated);
 }
 
 function toggleSessionsPanel() { /* sessionsPanel replaced by keepQuestioningBox */ }
+
+// ── QUERY COUNT COLOR HELPER ─────────────────────────────────────────────────
+function setQueryCount(el, n) {
+  if (!el) return;
+  el.textContent = n === 1 ? '1 query remaining' : n + ' queries remaining';
+  el.style.color = n <= 5  ? '#c0392b'               // red
+                 : n <= 10 ? 'var(--gold)'            // gold
+                 : 'rgba(80,200,130,0.9)';            // green
+}
 
 async function loadSidebarCreditsAnon() {
   // Show IP-based query count for anonymous/free users
@@ -3178,11 +3187,11 @@ async function loadSidebarCreditsAnon() {
     const wrapEl  = document.getElementById('sidebarCredits');
     if (!countEl || !wrapEl) return;
     if (data.locked) {
-      countEl.textContent = '0 queries remaining';
+      setQueryCount(countEl, 0);
     } else {
       const used = data.queriesUsed || 0;
       const remaining = Math.max(0, 3 - used);
-      countEl.textContent = remaining === 1 ? '1 query remaining' : `${remaining} queries remaining`;
+      setQueryCount(countEl, remaining);
     }
     wrapEl.style.display = 'flex';
   } catch {}
@@ -3222,7 +3231,7 @@ async function loadSidebarCredits() {
     const hoverEl   = document.getElementById('sidebarQueryCount');
     if (!countEl || !wrapEl) return;
 
-    countEl.textContent = total === 1 ? '1 query remaining' : `${total} queries remaining`;
+    setQueryCount(countEl, total);
 
     if (tooltipEl) {
       tooltipEl.textContent = `${monthly} monthly  ·  ${credits} Signal Bank`;
@@ -3246,7 +3255,7 @@ function updateSidebarCredits(newCredits) {
   const match = countEl.textContent.match(/(\d+)/);
   const current = match ? parseInt(match[1]) : 0;
   const updated = current + newCredits;
-  countEl.textContent = updated === 1 ? '1 query remaining' : `${updated} queries remaining`;
+  setQueryCount(countEl, updated);
   wrapEl.style.display = 'flex';
 }
 
@@ -3559,7 +3568,7 @@ function incrementSidebarCounter() {
   var match = countEl.textContent.match(/(\d+)/);
   if (!match) return;
   var updated = parseInt(match[1]) + 1;
-  countEl.textContent = updated === 1 ? '1 query remaining' : updated + ' queries remaining';
+  setQueryCount(countEl, updated);
 }
 
 /* ── SHARE MODAL ── */
