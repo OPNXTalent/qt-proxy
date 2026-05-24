@@ -902,11 +902,6 @@
     Your session history is now read-only. Conversations will be permanently deleted in <strong id="cancelDaysLeft">90</strong> days unless you resubscribe.
   </div>
 
-  <!-- Logged-in email display — populated by JS, never shown to anonymous users -->
-  <div id="sidebarEmailDisplay" style="display:none; padding:6px 20px 10px; flex-shrink:0; border-bottom:1px solid var(--border);">
-    <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="sidebarEmailText"></div>
-  </div>
-
   <div class="sidebar-search">
     <input type="text" id="sidebarSearch" placeholder="Search sessions…" oninput="filterThreads(this.value)" />
   </div>
@@ -4350,21 +4345,9 @@ async function handleCreditsAdded() {
 (function() {
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  function showSidebarEmail(email) {
-    var wrap = document.getElementById('sidebarEmailDisplay');
-    var text = document.getElementById('sidebarEmailText');
-    if (!wrap || !text) return;
-    if (email && email.trim()) {
-      text.textContent = email.trim();
-      wrap.style.display = 'block';
-    } else {
-      wrap.style.display = 'none';
-    }
-  }
+  function showSidebarEmail() { /* suppressed — email intentionally not shown in sidebar */ }
 
   document.addEventListener('DOMContentLoaded', function() {
-    // Populate email display from localStorage on load
-    showSidebarEmail(localStorage.getItem('qt_user_email'));
 
     // Intercept sidebarSearch value setter after element exists
     var searchEl = document.getElementById('sidebarSearch');
