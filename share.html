@@ -462,10 +462,14 @@
           style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:8px 10px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:6px;"
           onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
           onkeydown="if(event.key==='Enter') document.getElementById('sidebarPasswordInput').focus()" />
-        <input type="password" id="sidebarPasswordInput" placeholder="Password (new or existing)"
-          style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:8px 10px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:8px;"
-          onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
-          onkeydown="if(event.key==='Enter') saveEmail()" />
+        <div style="position:relative; margin-bottom:8px;">
+          <input type="password" id="sidebarPasswordInput" placeholder="Password (new or existing)"
+            style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:8px 36px 8px 10px; outline:none; transition:border-color 0.2s; box-sizing:border-box;"
+            onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
+            onkeydown="if(event.key==='Enter') saveEmail()" />
+          <button type="button" onclick="(function(){var i=document.getElementById('sidebarPasswordInput');var b=document.getElementById('pwToggleBtn');i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'◉':'◎';})()" id="pwToggleBtn"
+            style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:13px; padding:0; line-height:1;">◉</button>
+        </div>
         <div id="emailCaptureStatus" style="display:none; font-family:var(--mono); font-size:9px; margin-bottom:6px;"></div>
         <div style="display:flex; gap:8px;">
           <button onclick="toggleExplorerCapture()"
@@ -732,64 +736,89 @@ async function saveEmail() {
     statusEl.style.display = 'block';
     return;
   }
+
+  var sbUrl  = SUPABASE_URL;
+  var sbAnon = SUPABASE_ANON;
+
   statusEl.textContent = 'Connecting…';
   statusEl.style.color = 'var(--gold-dim)';
   statusEl.style.display = 'block';
 
+  function showUpgradeBox(tier) {
+    var banner = document.getElementById('explorerBanner');
+    if (banner) banner.style.display = 'none';
+    var box    = document.getElementById('upgradeBox');
+    var tierEl = document.getElementById('upgradeBoxTier');
+    if (tierEl) tierEl.textContent = tier || 'Explorer';
+    if (box)    box.style.display  = 'block';
+  }
+
   try {
-    // Try login first — if the account exists, sign them in
-    var loginRes = await fetch('/api/login', {
+    // ── Try sign-in first (existing account) ──
+    var loginRes = await fetch(sbUrl + '/auth/v1/token?grant_type=password', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      headers: { 'apikey': sbAnon, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password })
     });
     var loginData = await loginRes.json();
 
-    if (loginData.success || loginRes.ok) {
-      // Existing user — signed in, show their tier then redirect
+    if (loginRes.ok && loginData.access_token) {
+      // Existing user authenticated
       localStorage.setItem('qt_user_email', email);
       localStorage.setItem('qt_user_password', btoa(password));
-      var tier = loginData.tier || localStorage.getItem('qt_user_tier') || 'Explorer';
-      if (loginData.tier) localStorage.setItem('qt_user_tier', loginData.tier);
-      statusEl.textContent = 'Signed in as ' + tier + '. Redirecting…';
+      // Fetch their tier from subscribers table
+      var tier = 'Explorer';
+      try {
+        var subRes = await fetch(sbUrl + '/rest/v1/subscribers?email=eq.' + encodeURIComponent(email) + '&select=tier', {
+          headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + loginData.access_token }
+        });
+        var subData = await subRes.json();
+        if (subData && subData[0] && subData[0].tier) {
+          tier = subData[0].tier.charAt(0).toUpperCase() + subData[0].tier.slice(1);
+          localStorage.setItem('qt_user_tier', subData[0].tier);
+        }
+      } catch(e) {}
+      statusEl.textContent = 'Signed in as ' + tier + '. Redirecting to your sessions…';
       statusEl.style.color = 'rgba(160,220,180,0.95)';
-      // Briefly show upgrade box with their tier before redirect
-      var banner = document.getElementById('explorerBanner');
-      if (banner) banner.style.display = 'none';
-      var box = document.getElementById('upgradeBox');
-      var tierEl = document.getElementById('upgradeBoxTier');
-      if (tierEl) tierEl.textContent = tier;
-      if (box) box.style.display = 'block';
+      showUpgradeBox(tier);
       setTimeout(function() { window.location.href = 'https://theprism.io/qt.html'; }, 1800);
       return;
     }
 
-    // Login failed — try registering as new user
-    var regRes = await fetch('/api/register-email', {
+    // ── Sign-in failed — try sign-up (new account) ──
+    var signupRes = await fetch(sbUrl + '/auth/v1/signup', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, sharedToken: shareToken })
+      headers: { 'apikey': sbAnon, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password })
     });
-    var regData = await regRes.json();
+    var signupData = await signupRes.json();
 
-    if (regData.success || regRes.ok) {
+    if (signupRes.ok && (signupData.id || signupData.user)) {
+      // New account created — also upsert into subscribers
       localStorage.setItem('qt_user_email', email);
       localStorage.setItem('qt_user_password', btoa(password));
+      localStorage.setItem('qt_user_tier', 'free');
+      await fetch(sbUrl + '/rest/v1/subscribers', {
+        method: 'POST',
+        headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
+        body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+      });
+      fetch('/api/welcome', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) }).catch(function(){});
       statusEl.textContent = 'Saved. Welcome to The Prism.';
       statusEl.style.color = 'rgba(160,220,180,0.95)';
-      setTimeout(function() {
-        var banner = document.getElementById('explorerBanner');
-        if (banner) banner.style.display = 'none';
-        var box = document.getElementById('upgradeBox');
-        var tierEl = document.getElementById('upgradeBoxTier');
-        if (tierEl) tierEl.textContent = 'Explorer';
-        if (box) box.style.display = 'block';
-      }, 1600);
-    } else {
-      // Both failed — likely wrong password for existing account
-      statusEl.textContent = regData.error || 'Check your password and try again.';
-      statusEl.style.color = '#b85c5c';
+      setTimeout(function() { showUpgradeBox('Explorer'); }, 1600);
+      return;
     }
+
+    // ── Both failed — wrong password for existing account ──
+    var errMsg = (loginData.error_description || signupData.error_description || signupData.msg || '');
+    if (errMsg.toLowerCase().includes('already registered') || errMsg.toLowerCase().includes('user already')) {
+      statusEl.textContent = 'Account exists — check your password and try again.';
+    } else {
+      statusEl.textContent = errMsg || 'Could not connect. Please try again.';
+    }
+    statusEl.style.color = '#b85c5c';
+
   } catch (err) {
     statusEl.textContent = 'Could not connect. Please try again.';
     statusEl.style.color = '#b85c5c';
