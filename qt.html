@@ -3172,6 +3172,19 @@ function initSidebar() {
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
 
+  // R1 new session — start fresh, don't load S1's thread history
+  if (sessionStorage.getItem('prism_r1_session')) {
+    sessionStorage.removeItem('prism_r1_session');
+    allThreads = [];
+    renderThreads(allThreads);
+    if (sidebar) sidebar.classList.add('visible');
+    if (toggle)  toggle.classList.add('visible');
+    sidebarHasAppeared = true;
+    var freePrompt = document.getElementById('freeUpgradePrompt');
+    if (freePrompt) freePrompt.style.display = 'block';
+    return;
+  }
+
   // Anonymous / free users still get the sidebar — show it with upgrade prompt, no thread history
   if (!email || CURRENT_TIER === 'free') {
     allThreads = [];
