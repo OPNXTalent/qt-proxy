@@ -1020,6 +1020,7 @@
             <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); line-height:1.6; margin-bottom:12px;">3 queries reset every 24 hours.</div>
             <div id="resetTicker" style="font-family:var(--mono); font-size:20px; letter-spacing:0.18em; color:var(--gold-dim); margin-bottom:20px; display:none;">--:--:--</div>
           </div>
+          <button onclick="showFreeAccountModal()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); border:1px solid var(--gold-dim); background:transparent; padding:9px 16px; width:100%; text-align:center; cursor:pointer; transition:all 0.25s; margin-bottom:8px;" onmouseover="this.style.background='rgba(201,168,76,0.08)';" onmouseout="this.style.background='transparent';">Create Free Account →</button>
           <a href="/" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--border-lit)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
         </div>
 
@@ -3934,6 +3935,128 @@ function formatNow() {
   var ampm  = hours >= 12 ? 'pm' : 'am';
   hours = hours % 12 || 12;
   return month + ' ' + day + ' \u00b7 ' + hours + ':' + mins + ' ' + ampm;
+}
+
+function showFreeAccountModal() {
+  var existing = document.getElementById('freeAccountModal');
+  if (existing) { existing.style.display = 'flex'; return; }
+
+  var modal = document.createElement('div');
+  modal.id = 'freeAccountModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(6,6,10,0.92);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);';
+
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--deep);border:1px solid var(--border);padding:44px 40px;max-width:440px;width:90%;position:relative;';
+
+  var closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;background:transparent;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;';
+  closeBtn.onclick = function() { modal.style.display = 'none'; };
+
+  var badge = document.createElement('div');
+  badge.style.cssText = 'font-family:var(--mono);font-size:9px;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:10px;';
+  badge.textContent = 'Always Free · No Subscription Required';
+
+  var title = document.createElement('div');
+  title.style.cssText = 'font-family:var(--cinzel);font-size:20px;letter-spacing:0.1em;color:var(--gold-pale);margin-bottom:10px;';
+  title.textContent = 'Create Your Free Account';
+
+  var desc = document.createElement('div');
+  desc.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:16px;color:var(--text-dim);line-height:1.7;margin-bottom:6px;';
+  desc.textContent = '3 queries every 24 hours, always. Your session history saved for 30 days. Need more? Purchase query bundles any time — no plan required.';
+
+  var perks = document.createElement('ul');
+  perks.style.cssText = 'font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:var(--text-muted);margin:12px 0 20px 16px;line-height:2;';
+  ['3 free queries · resets every 24 hours', 'Session history saved · 30 days', 'Query bundles available · no subscription', 'Cancel nothing · ever'].forEach(function(t) {
+    var li = document.createElement('li'); li.textContent = t; perks.appendChild(li);
+  });
+
+  var emailInp = document.createElement('input');
+  emailInp.id = 'freeAcctEmail'; emailInp.type = 'email'; emailInp.placeholder = 'your@email.com';
+  emailInp.style.cssText = 'width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:16px;padding:12px 16px;outline:none;transition:border-color 0.2s;margin-bottom:10px;box-sizing:border-box;';
+  emailInp.onfocus = function() { this.style.borderColor = 'var(--gold-dim)'; };
+  emailInp.onblur  = function() { this.style.borderColor = 'var(--border)'; };
+  emailInp.onkeydown = function(e) { if (e.key === 'Enter') document.getElementById('freeAcctPassword').focus(); };
+
+  var passInp = document.createElement('input');
+  passInp.id = 'freeAcctPassword'; passInp.type = 'password'; passInp.placeholder = 'Create a password';
+  passInp.style.cssText = 'width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--crimson);font-size:16px;padding:12px 16px;outline:none;transition:border-color 0.2s;margin-bottom:10px;box-sizing:border-box;';
+  passInp.onfocus = function() { this.style.borderColor = 'var(--gold-dim)'; };
+  passInp.onblur  = function() { this.style.borderColor = 'var(--border)'; };
+  passInp.onkeydown = function(e) { if (e.key === 'Enter') submitFreeAccount(); };
+
+  var statusEl = document.createElement('div');
+  statusEl.id = 'freeAcctStatus';
+  statusEl.style.cssText = 'display:none;font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:#b85c5c;margin-bottom:10px;';
+
+  var submitBtn = document.createElement('button');
+  submitBtn.textContent = 'Start Free →';
+  submitBtn.style.cssText = 'width:100%;font-family:var(--cinzel);font-size:13px;letter-spacing:0.2em;text-transform:uppercase;padding:14px 24px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;transition:all 0.25s;';
+  submitBtn.onmouseover = function() { this.style.background = 'rgba(201,168,76,0.08)'; };
+  submitBtn.onmouseout  = function() { this.style.background = 'transparent'; };
+  submitBtn.onclick = submitFreeAccount;
+
+  box.appendChild(closeBtn); box.appendChild(badge); box.appendChild(title);
+  box.appendChild(desc); box.appendChild(perks);
+  box.appendChild(emailInp); box.appendChild(passInp);
+  box.appendChild(statusEl); box.appendChild(submitBtn);
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+  setTimeout(function() { emailInp.focus(); }, 100);
+}
+
+async function submitFreeAccount() {
+  var email    = (document.getElementById('freeAcctEmail')    || {}).value || '';
+  var password = (document.getElementById('freeAcctPassword') || {}).value || '';
+  var statusEl = document.getElementById('freeAcctStatus');
+  var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  email = email.trim(); password = password.trim();
+
+  if (!re.test(email)) {
+    if (statusEl) { statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; } return;
+  }
+  if (password.length < 6) {
+    if (statusEl) { statusEl.textContent = 'Password must be at least 6 characters.'; statusEl.style.display = 'block'; } return;
+  }
+  if (statusEl) statusEl.style.display = 'none';
+
+  try {
+    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    await fetch(sbUrl + '/rest/v1/subscribers', {
+      method: 'POST',
+      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
+      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+    });
+    localStorage.setItem('qt_user_email', email);
+    localStorage.setItem('qt_user_password', btoa(password));
+
+    // Gift 3 bonus queries for creating a free account
+    try {
+      await fetch(sbUrl + '/rest/v1/rpc/add_signup_bonus', {
+        method: 'POST',
+        headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_email: email, p_credits: 3 })
+      });
+    } catch(e) {}
+
+    var modal = document.getElementById('freeAccountModal');
+    if (modal) {
+      modal.innerHTML = '';
+      var box2 = document.createElement('div');
+      box2.style.cssText = 'background:var(--deep);border:1px solid rgba(80,180,120,0.3);padding:44px 40px;max-width:440px;width:90%;text-align:center;';
+      var t1 = document.createElement('div'); t1.style.cssText = 'font-family:var(--mono);font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(80,180,120,0.8);margin-bottom:12px;'; t1.textContent = 'Account Created';
+      var t2 = document.createElement('div'); t2.style.cssText = 'font-family:var(--cinzel);font-size:20px;color:var(--gold-pale);margin-bottom:16px;'; t2.textContent = 'You are set.';
+      var t3 = document.createElement('div'); t3.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:16px;color:var(--text-dim);line-height:1.7;margin-bottom:24px;'; t3.textContent = 'Your session is saved and 3 bonus queries have been added. Come back any time — your history will be here.';
+      var btn2 = document.createElement('button'); btn2.textContent = 'Continue →'; btn2.style.cssText = 'font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:10px 24px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;'; btn2.onclick = function() { modal.style.display = 'none'; };
+      box2.appendChild(t1); box2.appendChild(t2); box2.appendChild(t3); box2.appendChild(btn2);
+      modal.appendChild(box2);
+    }
+    if (typeof loadUserThreads === 'function') loadUserThreads();
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
+  }
 }
 
 async function runPreflightCheck() {
