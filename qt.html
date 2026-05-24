@@ -3273,7 +3273,7 @@ function initSidebar() {
     if (toggle)  toggle.classList.add('visible');
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt) freePrompt.style.display = 'block';
+    if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
     return;
   }
 
@@ -3285,7 +3285,7 @@ function initSidebar() {
     if (toggle) toggle.classList.add('visible');
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt) freePrompt.style.display = 'block';
+    if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
     loadSidebarCreditsAnon();
     return;
   }
