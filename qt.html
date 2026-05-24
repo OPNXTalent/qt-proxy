@@ -4336,36 +4336,52 @@ async function handleCreditsAdded() {
   }
 }
 
-// ── SIDEBAR EMAIL DISPLAY + SEARCH GUARD ──────────────────────────────────────
-// realtime.js was setting the user's email as the sidebarSearch input value,
-// causing two bugs: (1) email displayed in the search box, and (2) filterThreads
-// firing on the email string and returning 0 matches, clearing the session list.
-// Fix: intercept the value setter so email strings route to the display element.
-
+// ── SEARCH BOX EMAIL SUPPRESSOR ───────────────────────────────────────────────
+// realtime.js writes the user email into #sidebarSearch — this kills it dead
+// using every available mechanism: property intercept, MutationObserver, and
+// a polling interval as a final fallback.
 (function() {
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  function showSidebarEmail() { /* suppressed — email intentionally not shown in sidebar */ }
-
-  document.addEventListener('DOMContentLoaded', function() {
-
-    // Intercept sidebarSearch value setter after element exists
-    var searchEl = document.getElementById('sidebarSearch');
-    if (searchEl) {
-      var _orig = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-      Object.defineProperty(searchEl, 'value', {
-        get: function() { return _orig.get.call(this); },
-        set: function(v) {
-          if (EMAIL_RE.test((v || '').trim())) {
-            showSidebarEmail(v.trim());
-            return; // do NOT write email into the search box
-          }
-          _orig.set.call(this, v);
-        },
-        configurable: true
-      });
+  function killEmailInSearch() {
+    var el = document.getElementById('sidebarSearch');
+    if (!el) return;
+    if (EMAIL_RE.test((el.value || '').trim())) {
+      // Bypass any setter by using the native prototype directly
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '');
     }
-  });
+  }
+
+  function armSearchInput() {
+    var el = document.getElementById('sidebarSearch');
+    if (!el || el._emailKilled) return;
+    el._emailKilled = true;
+
+    var _orig = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+
+    // 1. Intercept .value = setter
+    Object.defineProperty(el, 'value', {
+      get: function() { return _orig.get.call(this); },
+      set: function(v) {
+        if (EMAIL_RE.test((v || '').trim())) return; // silently drop it
+        _orig.set.call(this, v);
+      },
+      configurable: true
+    });
+
+    // 2. MutationObserver catches setAttribute('value', ...) changes
+    var obs = new MutationObserver(function() { killEmailInSearch(); });
+    obs.observe(el, { attributes: true, attributeFilter: ['value'] });
+
+    // 3. Polling fallback — catches anything that slips through
+    setInterval(killEmailInSearch, 300);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', armSearchInput);
+  } else {
+    armSearchInput();
+  }
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
