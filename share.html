@@ -462,14 +462,15 @@
           style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:8px 10px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:6px;"
           onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
           onkeydown="if(event.key==='Enter') document.getElementById('sidebarPasswordInput').focus()" />
-        <input type="password" id="sidebarPasswordInput" placeholder="Create a password"
+        <input type="password" id="sidebarPasswordInput" placeholder="Password (new or existing)"
           style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:8px 10px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:8px;"
           onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
           onkeydown="if(event.key==='Enter') saveEmail()" />
         <div id="emailCaptureStatus" style="display:none; font-family:var(--mono); font-size:9px; margin-bottom:6px;"></div>
         <div style="display:flex; gap:8px;">
           <button onclick="toggleExplorerCapture()"
-            style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; flex-shrink:0;">✕</button>
+            style="font-family:var(--mono); font-size:13px; padding:9px 14px; border:1px solid rgba(80,180,120,0.5); background:rgba(80,180,120,0.1); color:rgba(160,220,180,0.95); cursor:pointer; flex-shrink:0; line-height:1; transition:all 0.2s;"
+            onmouseover="this.style.background='rgba(80,180,120,0.2)'" onmouseout="this.style.background='rgba(80,180,120,0.1)'">↑</button>
           <button onclick="saveEmail()"
             style="flex:1; font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; padding:9px 16px; border:1px solid rgba(80,180,120,0.5); background:rgba(80,180,120,0.1); color:rgba(160,220,180,0.95); cursor:pointer; transition:all 0.2s;">Keep Access →</button>
         </div>
@@ -477,36 +478,6 @@
     </div>
   </div>
 
-  <!-- ── RETURNING USER SIGN-IN ── -->
-  <div id="returningUserPanel" style="display:none; margin:10px 14px; flex-shrink:0;">
-    <div style="border:1px solid rgba(201,168,76,0.25); background:rgba(201,168,76,0.04); padding:14px 16px;">
-      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Your Account</div>
-      <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">Sign in to access your session history and continue where you left off.</div>
-      <button onclick="toggleSignIn()" id="signInBtn"
-        style="width:100%; font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.2s;"
-        onmouseover="this.style.background='rgba(201,168,76,0.08)'"
-        onmouseout="this.style.background='transparent'">
-        Sign In →
-      </button>
-      <div id="signInForm" style="display:none; margin-top:12px;">
-        <input type="email" id="signInEmailInput" placeholder="your@email.com" autocomplete="email"
-          style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:8px 10px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:6px;"
-          onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
-          onkeydown="if(event.key==='Enter') document.getElementById('signInPasswordInput').focus()" />
-        <input type="password" id="signInPasswordInput" placeholder="Password"
-          style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:8px 10px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:8px;"
-          onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
-          onkeydown="if(event.key==='Enter') submitSignIn()" />
-        <div id="signInStatus" style="display:none; font-family:var(--mono); font-size:9px; margin-bottom:6px;"></div>
-        <div style="display:flex; gap:8px;">
-          <button onclick="toggleSignIn()"
-            style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; flex-shrink:0;">✕</button>
-          <button onclick="submitSignIn()"
-            style="flex:1; font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; padding:9px 16px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.2s;">Sign In →</button>
-        </div>
-      </div>
-    </div>
-  </div>
   </div>
 
   <div class="sidebar-section-label">This Session</div>
@@ -699,15 +670,14 @@ function openSidebar() {
 // Shows the Explorer signup banner for new visitors, or the Sign In panel
 // for users whose email is already in localStorage.
 function initSidebarPanels() {
-  var hasEmail = !!localStorage.getItem('qt_user_email');
-  var explorer  = document.getElementById('explorerBanner');
-  var returning = document.getElementById('returningUserPanel');
-  if (hasEmail) {
-    if (returning) returning.style.display = 'block';
-    if (explorer)  explorer.style.display  = 'none';
-  } else {
-    if (explorer)  explorer.style.display  = 'block';
-    if (returning) returning.style.display = 'none';
+  // Single green banner handles both new and returning users
+  var explorer = document.getElementById('explorerBanner');
+  if (explorer) explorer.style.display = 'block';
+  // Pre-fill email if returning user
+  var stored = localStorage.getItem('qt_user_email');
+  if (stored) {
+    var inp = document.getElementById('sidebarEmailInput');
+    if (inp) inp.value = stored;
   }
 }
 
@@ -722,24 +692,18 @@ function toggleExplorerCapture() {
   }
 }
 
-function toggleSignIn() {
-  var form = document.getElementById('signInForm');
-  if (!form) return;
-  var open = form.style.display === 'block';
-  form.style.display = open ? 'none' : 'block';
-  if (!open) {
-    var inp = document.getElementById('signInEmailInput');
-    if (inp) setTimeout(function(){ inp.focus(); }, 80);
-  }
-}
+// toggleSignIn and submitSignIn removed — saveEmail handles both flows
 
-async function submitSignIn() {
-  var emailInp  = document.getElementById('signInEmailInput');
-  var passInp   = document.getElementById('signInPasswordInput');
-  var statusEl  = document.getElementById('signInStatus');
-  if (!emailInp || !passInp) return;
-  var email    = emailInp.value.trim();
-  var password = passInp.value.trim();
+// Legacy — kept so any remaining internal refs don't break
+function openEmailCapture() { toggleExplorerCapture(); openSidebar(); }
+
+async function saveEmail() {
+  var inp      = document.getElementById('sidebarEmailInput');
+  var passInp  = document.getElementById('sidebarPasswordInput');
+  var statusEl = document.getElementById('emailCaptureStatus');
+  if (!inp) return;
+  var email    = inp.value.trim();
+  var password = passInp ? passInp.value.trim() : '';
   var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!re.test(email)) {
     statusEl.textContent = 'Please enter a valid email address.';
@@ -753,75 +717,53 @@ async function submitSignIn() {
     statusEl.style.display = 'block';
     return;
   }
-  statusEl.textContent = 'Signing in…';
+  statusEl.textContent = 'Connecting…';
   statusEl.style.color = 'var(--gold-dim)';
   statusEl.style.display = 'block';
+
   try {
-    var res = await fetch('/api/login', {
+    // Try login first — if the account exists, sign them in
+    var loginRes = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    var data = await res.json();
-    if (data.success || res.ok) {
+    var loginData = await loginRes.json();
+
+    if (loginData.success || loginRes.ok) {
+      // Existing user — signed in
       localStorage.setItem('qt_user_email', email);
       localStorage.setItem('qt_user_password', btoa(password));
-      if (data.tier) localStorage.setItem('qt_user_tier', data.tier);
-      statusEl.textContent = 'Signed in. Redirecting…';
-      statusEl.style.color = 'var(--gold-dim)';
-      setTimeout(function() {
-        window.location.href = 'https://theprism.io/qt.html';
-      }, 1200);
+      if (loginData.tier) localStorage.setItem('qt_user_tier', loginData.tier);
+      statusEl.textContent = 'Signed in. Redirecting to your sessions…';
+      statusEl.style.color = 'rgba(160,220,180,0.95)';
+      setTimeout(function() { window.location.href = 'https://theprism.io/qt.html'; }, 1400);
+      return;
+    }
+
+    // Login failed — try registering as new user
+    var regRes = await fetch('/api/register-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, sharedToken: shareToken })
+    });
+    var regData = await regRes.json();
+
+    if (regData.success || regRes.ok) {
+      localStorage.setItem('qt_user_email', email);
+      localStorage.setItem('qt_user_password', btoa(password));
+      statusEl.textContent = 'Access saved. Your session is held for 30 days.';
+      statusEl.style.color = 'rgba(160,220,180,0.95)';
+      var banner = document.getElementById('explorerBanner');
+      if (banner) setTimeout(function() { banner.style.display = 'none'; }, 2500);
     } else {
-      statusEl.textContent = data.error || 'Incorrect email or password.';
+      // Both failed — likely wrong password for existing account
+      statusEl.textContent = regData.error || 'Check your password and try again.';
       statusEl.style.color = '#b85c5c';
     }
   } catch (err) {
-    statusEl.textContent = 'Could not sign in. Please try again.';
+    statusEl.textContent = 'Could not connect. Please try again.';
     statusEl.style.color = '#b85c5c';
-  }
-}
-
-// Legacy — kept so any remaining internal refs don't break
-function openEmailCapture() { toggleExplorerCapture(); openSidebar(); }
-
-async function saveEmail() {
-  var inp      = document.getElementById('sidebarEmailInput');
-  var statusEl = document.getElementById('emailCaptureStatus');
-  if (!inp) return;
-  var email = inp.value.trim();
-  var re    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!re.test(email)) {
-    statusEl.textContent = 'Please enter a valid email address.';
-    statusEl.style.color = '#b85c5c';
-    statusEl.style.display = 'block';
-    return;
-  }
-
-  try {
-    var res = await fetch('/api/register-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, sharedToken: shareToken })
-    });
-    var data = await res.json();
-    if (data.success || res.ok) {
-      localStorage.setItem('qt_user_email', email);
-      var passInp = document.getElementById('sidebarPasswordInput');
-      if (passInp && passInp.value.trim().length >= 6) {
-        localStorage.setItem('qt_user_password', btoa(passInp.value.trim()));
-      }
-      statusEl.textContent = 'Saved. Your session is held for 30 days.';
-      statusEl.style.color = 'var(--gold-dim)';
-      statusEl.style.display = 'block';
-      // Hide explorer banner after successful signup
-      var banner = document.getElementById('explorerBanner');
-      if (banner) setTimeout(function() { banner.style.display = 'none'; }, 2500);
-    }
-  } catch (err) {
-    statusEl.textContent = 'Could not save. Please try again.';
-    statusEl.style.color = '#b85c5c';
-    statusEl.style.display = 'block';
   }
 }
 
