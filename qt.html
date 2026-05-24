@@ -3290,7 +3290,7 @@ function initSidebar() {
     sidebarOpen = true;
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
+    if (freePrompt) freePrompt.style.display = 'block';
     return;
   }
 
@@ -3305,7 +3305,7 @@ function initSidebar() {
     sidebarOpen = true;
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
+    if (freePrompt) freePrompt.style.display = 'block';
     loadSidebarCreditsAnon();
     return;
   }
@@ -4235,6 +4235,7 @@ async function submitAnonSave() {
         '<div style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(80,180,120,0.8);margin-bottom:6px;">SESSION SAVED</div>' +
         '<div style="font-family:var(--crimson);font-style:italic;font-size:13px;color:var(--text-dim);line-height:1.5;">Your work is saved for 30 days. 3 bonus queries added.</div>' +
         '</div>';
+      setTimeout(function() { block.style.display = 'none'; }, 3000);
     }
     if (typeof loadUserThreads === 'function') loadUserThreads();
   } catch(e) {
