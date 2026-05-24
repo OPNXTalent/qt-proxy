@@ -3175,6 +3175,12 @@ function initSidebar() {
   // R1 new session — start fresh, don't load S1's thread history
   if (sessionStorage.getItem('prism_r1_session')) {
     sessionStorage.removeItem('prism_r1_session');
+    // Store S1's email temporarily and clear it so R1 starts anonymous
+    var s1Email = localStorage.getItem('qt_user_email');
+    if (s1Email) {
+      sessionStorage.setItem('prism_s1_email_backup', s1Email);
+      localStorage.removeItem('qt_user_email');
+    }
     allThreads = [];
     renderThreads(allThreads);
     if (sidebar) sidebar.classList.add('visible');
