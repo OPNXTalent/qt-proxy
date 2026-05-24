@@ -916,7 +916,7 @@
   <div id="freeUpgradePrompt" style="display:none; margin:10px 14px; flex-shrink:0;">
     <div style="border:1px solid rgba(80,160,100,0.35); background:rgba(80,160,100,0.06); padding:14px 16px;">
       <!-- Header label -->
-      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(80,180,120,0.85); margin-bottom:8px;">Session Not Saved</div>
+      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(80,180,120,0.85); margin-bottom:8px;">Save Explorer Sessions</div>
       <!-- Supporting copy -->
       <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">Your session is temporary unless connected to an email. Keep access and continue where you left off.</div>
       <!-- CTA button -->
@@ -3282,20 +3282,26 @@ function initSidebar() {
     sessionStorage.setItem('prism_r1_active', '1');
     allThreads = [];
     renderThreads(allThreads);
-    if (sidebar) sidebar.classList.add('visible');
-    if (toggle)  toggle.classList.add('visible');
+    if (sidebar) { sidebar.classList.add('visible'); sidebar.classList.add('open'); }
+    if (toggle)  { toggle.classList.add('visible'); toggle.textContent = '‹'; }
+    var mc = document.getElementById('mainContent');
+    if (mc) mc.classList.add('sidebar-open');
+    sidebarOpen = true;
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
     if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
     return;
   }
 
-  // Anonymous / free users still get the sidebar — show it with upgrade prompt, no thread history
+  // Anonymous / free users — show sidebar open with the banner visible immediately
   if (!email || CURRENT_TIER === 'free') {
     allThreads = [];
     renderThreads(allThreads);
-    if (sidebar) sidebar.classList.add('visible');
-    if (toggle) toggle.classList.add('visible');
+    if (sidebar) { sidebar.classList.add('visible'); sidebar.classList.add('open'); }
+    if (toggle)  { toggle.classList.add('visible'); toggle.textContent = '‹'; }
+    var mc = document.getElementById('mainContent');
+    if (mc) mc.classList.add('sidebar-open');
+    sidebarOpen = true;
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
     if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
