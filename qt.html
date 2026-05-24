@@ -1942,7 +1942,19 @@ function stripHebrew(text) {
   return (text || '').replace(/[\u0590-\u05FF]+/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function downloadPDF(mode) {
+async function downloadPDF(mode) {
+  // Fetch latest follow-ups before generating PDF to ensure R1 contributions are included
+  if (activeThreadId && !activeThreadId.startsWith('pending-') && typeof userEmail === 'function' && userEmail()) {
+    try {
+      var fuRes = await fetch((window.API_BASE || '') + '/api/followups?threadId=' + encodeURIComponent(activeThreadId), {
+        headers: { 'x-user-email': userEmail() }
+      });
+      var fuData = await fuRes.json();
+      if (fuData.followUps && fuData.followUps.length > 0 && typeof renderFUWithSource === 'function') {
+        renderFUWithSource(fuData.followUps);
+      }
+    } catch(e) {}
+  }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
@@ -2157,7 +2169,16 @@ function downloadPDF(mode) {
     followUps.forEach(el => {
       const questionEl = el.querySelector('.fu-question');
       const bodyEl = el.querySelector('.fu-body');
+      const isRecipient = el.classList.contains('from-recipient');
       if (questionEl) {
+        // Label recipient contributions
+        if (isRecipient) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(7);
+          doc.setTextColor(...dimText);
+          doc.text('FROM THE PERSON YOU SHARED WITH', margin, y);
+          y += 6;
+        }
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         const qLines = doc.splitTextToSize(stripHebrew(questionEl.innerText), contentW);
@@ -2432,6 +2453,16 @@ function getActualTier() {
   if (tierParam && TIER_RETENTION[tierParam]) return tierParam;
   if (stored && TIER_RETENTION[stored]) return stored;
   return 'free';
+}
+
+// Clear S1 credentials before tier is resolved if this is an R1 session
+if (sessionStorage.getItem('prism_r1_session')) {
+  var _s1e = localStorage.getItem('qt_user_email');
+  var _s1t = localStorage.getItem('qt_user_tier');
+  if (_s1e) sessionStorage.setItem('prism_s1_email_backup', _s1e);
+  if (_s1t) sessionStorage.setItem('prism_s1_tier_backup', _s1t);
+  localStorage.removeItem('qt_user_email');
+  localStorage.removeItem('qt_user_tier');
 }
 
 var CURRENT_TIER = getActualTier();
@@ -4380,6 +4411,13 @@ function injectSharedThreadEntry() {
   item.appendChild(title);
   item.appendChild(meta);
   item.addEventListener('click', function() {
+    // If R1 has unsaved work, prompt to save before navigating away
+    var hasWork = allThreads && allThreads.length > 0;
+    var hasEmail = !!localStorage.getItem('qt_user_email');
+    if (hasWork && !hasEmail) {
+      var go = confirm('Your new query will not be saved when you return to the shared thread. Add your email first to keep it — or press OK to continue without saving.');
+      if (!go) return;
+    }
     window.location.href = window._sharedThreadUrl;
   });
 
