@@ -902,6 +902,11 @@
     Your session history is now read-only. Conversations will be permanently deleted in <strong id="cancelDaysLeft">90</strong> days unless you resubscribe.
   </div>
 
+  <!-- Logged-in email display — populated by JS, never shown to anonymous users -->
+  <div id="sidebarEmailDisplay" style="display:none; padding:6px 20px 10px; flex-shrink:0; border-bottom:1px solid var(--border);">
+    <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="sidebarEmailText"></div>
+  </div>
+
   <div class="sidebar-search">
     <input type="text" id="sidebarSearch" placeholder="Search sessions…" oninput="filterThreads(this.value)" />
   </div>
@@ -3026,6 +3031,8 @@ function saveRename(id) {
 // SEARCH
 function filterThreads(query) {
   if (!query.trim()) { renderThreads(allThreads); return; }
+  // Guard: if the query looks like an email address, it got here by mistake — ignore it
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query.trim())) return;
   var q = query.toLowerCase();
   renderThreads(allThreads.filter(function(t) {
     return getThreadTitle(t).toLowerCase().includes(q) || (t.query || '').toLowerCase().includes(q);
@@ -4322,6 +4329,50 @@ async function handleCreditsAdded() {
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 5000);
   }
 }
+
+// ── SIDEBAR EMAIL DISPLAY + SEARCH GUARD ──────────────────────────────────────
+// realtime.js was setting the user's email as the sidebarSearch input value,
+// causing two bugs: (1) email displayed in the search box, and (2) filterThreads
+// firing on the email string and returning 0 matches, clearing the session list.
+// Fix: intercept the value setter so email strings route to the display element.
+
+(function() {
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function showSidebarEmail(email) {
+    var wrap = document.getElementById('sidebarEmailDisplay');
+    var text = document.getElementById('sidebarEmailText');
+    if (!wrap || !text) return;
+    if (email && email.trim()) {
+      text.textContent = email.trim();
+      wrap.style.display = 'block';
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // Populate email display from localStorage on load
+    showSidebarEmail(localStorage.getItem('qt_user_email'));
+
+    // Intercept sidebarSearch value setter after element exists
+    var searchEl = document.getElementById('sidebarSearch');
+    if (searchEl) {
+      var _orig = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      Object.defineProperty(searchEl, 'value', {
+        get: function() { return _orig.get.call(this); },
+        set: function(v) {
+          if (EMAIL_RE.test((v || '').trim())) {
+            showSidebarEmail(v.trim());
+            return; // do NOT write email into the search box
+          }
+          _orig.set.call(this, v);
+        },
+        configurable: true
+      });
+    }
+  });
+})();
 
 document.addEventListener('DOMContentLoaded', function() {
   initSidebar();
