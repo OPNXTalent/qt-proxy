@@ -4404,6 +4404,13 @@ async function handleCreditsAdded() {
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
+  // If returning from gateway after viewing a shared link — go back to it
+  var returnShare = sessionStorage.getItem('prism_return_share');
+  if (returnShare) {
+    sessionStorage.removeItem('prism_return_share');
+    window.location.href = 'https://theprism.io/share.html?t=' + encodeURIComponent(returnShare);
+    return;
+  }
   initSidebar();
   runPreflightCheck();
   handleCreditsAdded();
