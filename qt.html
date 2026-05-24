@@ -863,11 +863,9 @@
   <div class="sidebar-header">
     <div class="sidebar-logo">The Prism</div>
     <div class="sidebar-tier" id="sidebarTierLabel"></div>
-    <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
-      <span id="sidebarQueryCount" style="position:relative; cursor:default;">
-        <span id="sidebarQueryCountText">— queries remaining</span>
-        <span id="sidebarQueryTooltip" style="display:none; position:absolute; left:0; top:18px; background:var(--surface-2); border:1px solid var(--border-lit); padding:6px 10px; font-size:9px; letter-spacing:0.12em; color:var(--text-dim); white-space:nowrap; z-index:100; pointer-events:none;"></span>
-      </span>
+    <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; display:flex; flex-direction:column; gap:3px;">
+      <span id="sidebarQueryCountText" style="transition:color 0.4s;">— queries remaining</span>
+      <span id="sidebarQueryCreditsText" style="display:none; color:var(--text-muted);">— credits remaining</span>
     </div>
   </div>
 
@@ -3174,8 +3172,16 @@ function setQueryCount(el, n) {
   if (!el) return;
   el.textContent = n === 1 ? '1 query remaining' : n + ' queries remaining';
   el.style.color = n <= 5  ? '#c0392b'               // red
-                 : n <= 10 ? 'var(--gold)'            // gold
+                 : n <= 10 ? 'var(--gold-pale)'       // gold
                  : 'rgba(80,200,130,0.9)';            // green
+}
+
+function setQueryCredits(n) {
+  var el = document.getElementById('sidebarQueryCreditsText');
+  if (!el) return;
+  var count = n || 0;
+  el.textContent = count === 1 ? '1 credit remaining' : count + ' credits remaining';
+  el.style.display = 'inline';
 }
 
 async function loadSidebarCreditsAnon() {
@@ -3232,14 +3238,7 @@ async function loadSidebarCredits() {
     if (!countEl || !wrapEl) return;
 
     setQueryCount(countEl, total);
-
-    if (tooltipEl) {
-      tooltipEl.textContent = `${monthly} monthly  ·  ${credits} Signal Bank`;
-    }
-    if (hoverEl && tooltipEl) {
-      hoverEl.addEventListener('mouseenter', () => tooltipEl.style.display = 'block');
-      hoverEl.addEventListener('mouseleave', () => tooltipEl.style.display = 'none');
-    }
+    setQueryCredits(credits);
     wrapEl.style.display = 'flex';
 
     // Show Keep Questioning box for all logged-in users
