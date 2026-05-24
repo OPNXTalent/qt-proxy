@@ -464,16 +464,23 @@
 
   <!-- ── POST-AUTH UPGRADE BOX ── -->
   <div id="upgradeBox" style="display:none; margin:10px 14px; flex-shrink:0;">
-    <div style="border:1px solid rgba(201,168,76,0.25); background:rgba(201,168,76,0.04); padding:14px 16px;">
-      <div id="upgradeBoxTier" style="font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Explorer</div>
-      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:8px;">Continue the Exploration</div>
-      <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">Your sessions are saved to your profile. Add more queries when you're ready to go deeper.</div>
-      <a href="https://theprism.io/purchase.html"
-        style="display:block; width:100%; font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.2s; text-decoration:none; text-align:center; box-sizing:border-box;"
-        onmouseover="this.style.background='rgba(201,168,76,0.08)';this.style.borderColor='var(--gold)'"
-        onmouseout="this.style.background='transparent';this.style.borderColor='var(--gold-dim)'">
-        Add More Queries →
-      </a>
+    <div style="border:1px solid rgba(80,160,100,0.35); background:rgba(80,160,100,0.06); padding:14px 16px;">
+      <!-- Header row with collapse toggle -->
+      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleKeepQuestioning()">
+        <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(80,180,120,0.85);">Keep Questioning</div>
+        <button id="keepQuestioningToggle" style="background:none; border:none; color:rgba(80,180,120,0.85); font-size:13px; cursor:pointer; padding:0; line-height:1;">↑</button>
+      </div>
+      <!-- Collapsible body -->
+      <div id="keepQuestioningBody" style="margin-top:12px;">
+        <div id="upgradeBoxTier" style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:rgba(80,180,120,0.6); margin-bottom:8px;">Explorer</div>
+        <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">Purchase additional queries or subscribe and save while continuing your exploration through The Prism.</div>
+        <a href="https://theprism.io/purchase.html"
+          style="display:block; width:100%; font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid rgba(80,180,120,0.5); background:rgba(80,180,120,0.1); color:rgba(160,220,180,0.95); cursor:pointer; transition:all 0.2s; text-decoration:none; text-align:center; box-sizing:border-box;"
+          onmouseover="this.style.background='rgba(80,180,120,0.18)';this.style.borderColor='rgba(80,180,120,0.8)'"
+          onmouseout="this.style.background='rgba(80,180,120,0.1)';this.style.borderColor='rgba(80,180,120,0.5)'">
+          Explore Options →
+        </a>
+      </div>
     </div>
   </div>
 
@@ -667,15 +674,30 @@ function openSidebar() {
 // Shows the Explorer signup banner for new visitors, or the Sign In panel
 // for users whose email is already in localStorage.
 function initSidebarPanels() {
-  // Single green banner handles both new and returning users
-  var explorer = document.getElementById('explorerBanner');
-  if (explorer) explorer.style.display = 'block';
-  // Pre-fill email if returning user
-  var stored = localStorage.getItem('qt_user_email');
-  if (stored) {
-    var inp = document.getElementById('sidebarEmailInput');
-    if (inp) inp.value = stored;
+  var hasEmail  = !!localStorage.getItem('qt_user_email');
+  var explorer  = document.getElementById('explorerBanner');
+  var upgrade   = document.getElementById('upgradeBox');
+  var tier      = localStorage.getItem('qt_user_tier') || 'Explorer';
+  var tierEl    = document.getElementById('upgradeBoxTier');
+  if (hasEmail) {
+    // Logged-in — show Keep Questioning box with their tier
+    if (explorer) explorer.style.display = 'none';
+    if (tierEl)   tierEl.textContent = tier.charAt(0).toUpperCase() + tier.slice(1);
+    if (upgrade)  upgrade.style.display = 'block';
+  } else {
+    // Anonymous — show Save Your Sessions banner
+    if (upgrade)  upgrade.style.display = 'none';
+    if (explorer) explorer.style.display = 'block';
   }
+}
+
+function toggleKeepQuestioning() {
+  var body = document.getElementById('keepQuestioningBody');
+  var btn  = document.getElementById('keepQuestioningToggle');
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (btn) btn.textContent = open ? '↓' : '↑';
 }
 
 function goToGateway() {
