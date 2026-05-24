@@ -1646,6 +1646,8 @@ function goNewSubject() {
     sessionStorage.setItem('prism_shared_thread', '/share.html?t=' + shareToken);
     sessionStorage.setItem('prism_shared_thread_title', currentSubject || 'Shared interpretation');
   }
+  // Flag this as an R1 new session so qt.html starts fresh
+  sessionStorage.setItem('prism_r1_session', '1');
   window.location.href = 'https://theprism.io/qt.html';
 }
 
