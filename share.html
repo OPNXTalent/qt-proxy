@@ -782,6 +782,7 @@ async function saveEmail() {
       statusEl.style.color = 'rgba(160,220,180,0.95)';
       showUpgradeBox(tier);
       setTimeout(function() {
+        if (shareToken) sessionStorage.setItem('prism_return_share', shareToken);
         window.location.href = 'https://quantumtheology.app/qt-gateway.html?email=' + encodeURIComponent(email) + '&flow=returning';
       }, 1600);
       return;
@@ -810,6 +811,7 @@ async function saveEmail() {
       statusEl.style.color = 'rgba(160,220,180,0.95)';
       showUpgradeBox('Explorer');
       setTimeout(function() {
+        if (shareToken) sessionStorage.setItem('prism_return_share', shareToken);
         window.location.href = 'https://quantumtheology.app/qt-gateway.html?email=' + encodeURIComponent(email) + '&flow=new-user';
       }, 1800);
       return;
