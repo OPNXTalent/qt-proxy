@@ -451,34 +451,12 @@
     <div style="border:1px solid rgba(80,160,100,0.35); background:rgba(80,160,100,0.06); padding:14px 16px;">
       <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(80,180,120,0.85); margin-bottom:8px;">Save Your Sessions</div>
       <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">Your session is temporary unless connected to an email. Keep access and continue where you left off.</div>
-      <button onclick="toggleExplorerCapture()" id="keepAccessBtn"
+      <button onclick="goToGateway()" id="keepAccessBtn"
         style="width:100%; font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid rgba(80,180,120,0.5); background:rgba(80,180,120,0.1); color:rgba(160,220,180,0.95); cursor:pointer; transition:all 0.2s;"
         onmouseover="this.style.background='rgba(80,180,120,0.18)';this.style.borderColor='rgba(80,180,120,0.8)'"
         onmouseout="this.style.background='rgba(80,180,120,0.1)';this.style.borderColor='rgba(80,180,120,0.5)'">
         Keep Access →
       </button>
-      <div id="explorerCaptureForm" style="display:none; margin-top:12px;">
-        <input type="email" id="sidebarEmailInput" placeholder="your@email.com" autocomplete="email"
-          style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:8px 10px; outline:none; transition:border-color 0.2s; box-sizing:border-box; margin-bottom:6px;"
-          onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
-          onkeydown="if(event.key==='Enter') document.getElementById('sidebarPasswordInput').focus()" />
-        <div style="position:relative; margin-bottom:8px;">
-          <input type="password" id="sidebarPasswordInput" placeholder="Password (new or existing)"
-            style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:14px; padding:8px 36px 8px 10px; outline:none; transition:border-color 0.2s; box-sizing:border-box;"
-            onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
-            onkeydown="if(event.key==='Enter') saveEmail()" />
-          <button type="button" onclick="(function(){var i=document.getElementById('sidebarPasswordInput');var b=document.getElementById('pwToggleBtn');i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'◉':'◎';})()" id="pwToggleBtn"
-            style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:13px; padding:0; line-height:1;">◉</button>
-        </div>
-        <div id="emailCaptureStatus" style="display:none; font-family:var(--mono); font-size:9px; margin-bottom:6px;"></div>
-        <div style="display:flex; gap:8px;">
-          <button onclick="toggleExplorerCapture()"
-            style="font-family:var(--mono); font-size:13px; padding:9px 14px; border:1px solid rgba(80,180,120,0.5); background:rgba(80,180,120,0.1); color:rgba(160,220,180,0.95); cursor:pointer; flex-shrink:0; line-height:1; transition:all 0.2s;"
-            onmouseover="this.style.background='rgba(80,180,120,0.2)'" onmouseout="this.style.background='rgba(80,180,120,0.1)'">↑</button>
-          <button onclick="saveEmail()"
-            style="flex:1; font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; padding:9px 16px; border:1px solid rgba(80,180,120,0.5); background:rgba(80,180,120,0.1); color:rgba(160,220,180,0.95); cursor:pointer; transition:all 0.2s;">Save →</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -700,21 +678,14 @@ function initSidebarPanels() {
   }
 }
 
-function toggleExplorerCapture() {
-  var form = document.getElementById('explorerCaptureForm');
-  if (!form) return;
-  var open = form.style.display === 'block';
-  form.style.display = open ? 'none' : 'block';
-  if (!open) {
-    var inp = document.getElementById('sidebarEmailInput');
-    if (inp) setTimeout(function(){ inp.focus(); }, 80);
-  }
+function goToGateway() {
+  if (shareToken) sessionStorage.setItem('prism_return_share', shareToken);
+  window.location.href = 'https://quantumtheology.app/qt-gateway.html';
 }
 
-// toggleSignIn and submitSignIn removed — saveEmail handles both flows
-
-// Legacy — kept so any remaining internal refs don't break
-function openEmailCapture() { toggleExplorerCapture(); openSidebar(); }
+// Legacy no-ops kept so any stale references don't throw
+function toggleExplorerCapture() {}
+function openEmailCapture() {}
 
 async function saveEmail() {
   var inp      = document.getElementById('sidebarEmailInput');
