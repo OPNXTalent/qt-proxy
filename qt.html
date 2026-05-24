@@ -873,14 +873,21 @@
   <!-- Keep Questioning box — shown for logged-in users -->
   <div id="keepQuestioningBox" style="display:none; margin:10px 14px; flex-shrink:0;">
     <div style="border:1px solid rgba(80,160,100,0.35); background:rgba(80,160,100,0.06); padding:14px 16px;">
-      <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(80,180,120,0.85); margin-bottom:8px;">Keep Questioning</div>
-      <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">Purchase additional queries or subscribe and save while continuing your exploration through The Prism.</div>
-      <a href="https://theprism.io/purchase.html"
-        style="display:block; width:100%; font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid rgba(80,180,120,0.5); background:rgba(80,180,120,0.1); color:rgba(160,220,180,0.95); cursor:pointer; transition:all 0.2s; text-decoration:none; text-align:center; box-sizing:border-box;"
-        onmouseover="this.style.background='rgba(80,180,120,0.18)';this.style.borderColor='rgba(80,180,120,0.8)'"
-        onmouseout="this.style.background='rgba(80,180,120,0.1)';this.style.borderColor='rgba(80,180,120,0.5)'">
-        Explore Options →
-      </a>
+      <!-- Header row with collapse toggle -->
+      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom:0;" onclick="toggleKeepQuestioning()">
+        <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(80,180,120,0.85);">Keep Questioning</div>
+        <button id="keepQuestioningToggle" style="background:none; border:none; color:rgba(80,180,120,0.85); font-size:13px; cursor:pointer; padding:0; line-height:1; transition:transform 0.2s;">↑</button>
+      </div>
+      <!-- Collapsible body -->
+      <div id="keepQuestioningBody" style="margin-top:12px;">
+        <div style="font-family:var(--crimson); font-style:italic; font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">Purchase additional queries or subscribe and save while continuing your exploration through The Prism.</div>
+        <a href="https://theprism.io/purchase.html"
+          style="display:block; width:100%; font-family:var(--mono); font-size:9px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid rgba(80,180,120,0.5); background:rgba(80,180,120,0.1); color:rgba(160,220,180,0.95); cursor:pointer; transition:all 0.2s; text-decoration:none; text-align:center; box-sizing:border-box;"
+          onmouseover="this.style.background='rgba(80,180,120,0.18)';this.style.borderColor='rgba(80,180,120,0.8)'"
+          onmouseout="this.style.background='rgba(80,180,120,0.1)';this.style.borderColor='rgba(80,180,120,0.5)'">
+          Explore Options →
+        </a>
+      </div>
     </div>
   </div>
 
@@ -3167,6 +3174,15 @@ function decrementSidebarCounter() {
 }
 
 function toggleSessionsPanel() { /* sessionsPanel replaced by keepQuestioningBox */ }
+
+function toggleKeepQuestioning() {
+  var body   = document.getElementById('keepQuestioningBody');
+  var btn    = document.getElementById('keepQuestioningToggle');
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (btn) btn.textContent = open ? '↓' : '↑';
+}
 
 // ── QUERY COUNT COLOR HELPER ─────────────────────────────────────────────────
 function setQueryCount(el, n) {
