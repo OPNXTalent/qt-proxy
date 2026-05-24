@@ -862,7 +862,7 @@
 
   <div class="sidebar-header">
     <div class="sidebar-logo">The Prism</div>
-    <div class="sidebar-tier" id="sidebarTierLabel">Observer &nbsp;·&nbsp; Free Access</div>
+    <div class="sidebar-tier" id="sidebarTierLabel"></div>
     <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
       <span id="sidebarQueryCount" style="position:relative; cursor:default;">
         <span id="sidebarQueryCountText">— queries remaining</span>
@@ -2434,6 +2434,20 @@ function getActualTier() {
 var CURRENT_TIER = getActualTier();
 // Persist tier to localStorage so it survives navigation
 if (CURRENT_TIER !== 'free') localStorage.setItem('qt_user_tier', CURRENT_TIER);
+
+// Set tier label immediately so it never shows the wrong value
+(function() {
+  var tierLabels = {
+    refraction:    'Refraction · 60 Day Archive',
+    full_spectrum: 'Full Spectrum · 90 Day Archive',
+    scholar:       'Refraction · 60 Day Archive',
+    theologian:    'Full Spectrum · 90 Day Archive',
+    companion:     'Full Spectrum · 90 Day Archive',
+    free:          'Observer · Free Access'
+  };
+  var labelEl = document.getElementById('sidebarTierLabel');
+  if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || tierLabels['free'];
+})();
 
 // ── EMAIL PROMPT FOR TIER ACCESS ──────────────────────────────────────────────
 function promptEmailForTier(tier) {
