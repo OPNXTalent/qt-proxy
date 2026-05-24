@@ -778,10 +778,12 @@ async function saveEmail() {
           localStorage.setItem('qt_user_tier', subData[0].tier);
         }
       } catch(e) {}
-      statusEl.textContent = 'Signed in as ' + tier + '. Redirecting to your sessions…';
+      statusEl.textContent = 'Signed in as ' + tier + '. Redirecting…';
       statusEl.style.color = 'rgba(160,220,180,0.95)';
       showUpgradeBox(tier);
-      setTimeout(function() { window.location.href = 'https://theprism.io/qt.html'; }, 1800);
+      setTimeout(function() {
+        window.location.href = 'https://quantumtheology.app/qt-gateway.html?email=' + encodeURIComponent(email) + '&flow=returning';
+      }, 1600);
       return;
     }
 
@@ -804,9 +806,12 @@ async function saveEmail() {
         body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
       });
       fetch('/api/welcome', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) }).catch(function(){});
-      statusEl.textContent = 'Saved. Welcome to The Prism.';
+      statusEl.textContent = 'Account created. Taking you to The Prism…';
       statusEl.style.color = 'rgba(160,220,180,0.95)';
-      setTimeout(function() { showUpgradeBox('Explorer'); }, 1600);
+      showUpgradeBox('Explorer');
+      setTimeout(function() {
+        window.location.href = 'https://quantumtheology.app/qt-gateway.html?email=' + encodeURIComponent(email) + '&flow=new-user';
+      }, 1800);
       return;
     }
 
