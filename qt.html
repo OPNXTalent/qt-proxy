@@ -865,7 +865,8 @@
     <div class="sidebar-tier" id="sidebarTierLabel"></div>
     <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; display:flex; flex-direction:column; gap:3px;">
       <span id="sidebarQueryCountText" style="transition:color 0.4s;">— queries remaining</span>
-      <span id="sidebarQueryCreditsText" style="display:none; color:#9b59b6;">— credits remaining</span>
+      <span id="sidebarQueryCreditsText" style="display:none; color:var(--gold-dim);">— Signal Bank</span>
+      <span id="sidebarQueryCreditsSubText" style="display:none; color:var(--gold-dim); font-size:9px; letter-spacing:0.1em;">(Non-Expiring / Giftable Queries)</span>
     </div>
   </div>
 
@@ -3177,11 +3178,13 @@ function setQueryCount(el, n) {
 }
 
 function setQueryCredits(n) {
-  var el = document.getElementById('sidebarQueryCreditsText');
+  var el  = document.getElementById('sidebarQueryCreditsText');
+  var sub = document.getElementById('sidebarQueryCreditsSubText');
   if (!el) return;
   var count = n || 0;
-  el.textContent = count + ' Signal Bank (Non-Expiring / Giftable Queries)';
+  el.textContent  = count + ' Signal Bank';
   el.style.display = 'inline';
+  if (sub) sub.style.display = 'inline';
 }
 
 async function loadSidebarCreditsAnon() {
