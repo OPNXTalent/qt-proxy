@@ -1093,21 +1093,24 @@
       </div>
 
       <!-- Share URL — revealed inline after share created -->
-      <div id="shareUrlRow" style="display:none; margin-top:16px; justify-content:center; align-items:center; gap:10px;">
-        <div id="shareUrlDisplay" style="font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:360px;"></div>
+      <!-- Live Sync + URL + Copy + Open Discussion — all in one row -->
+      <div id="shareUrlRow" style="display:none; margin-top:16px; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;">
+        <button id="liveSyncBtn" onclick="startLiveSync()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; padding:9px 16px; border:1px solid rgba(80,180,120,0.5); background:transparent; color:rgba(80,180,120,0.9); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
+          onmouseover="this.style.background='rgba(80,180,120,0.08)'"
+          onmouseout="this.style.background='transparent'">⟳ Live Sync</button>
+        <div id="shareUrlDisplay" style="font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:260px; flex:1;"></div>
         <button onclick="shareViaCopy()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
           onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
           onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Copy</button>
-      </div>
-
-      <!-- Discussion button — appears after share created -->
-      <div id="discussionRow" style="display:none; margin-top:18px; text-align:center;">
-        <button id="collabToggleBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; padding:10px 24px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;"
+        <button id="collabToggleBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; padding:9px 16px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
           onmouseover="this.style.borderColor='rgba(80,180,120,0.5)';this.style.color='rgba(80,180,120,0.8)'"
           onmouseout="if(!_collabOpen){this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'}">
           Open Discussion
         </button>
       </div>
+
+      <!-- Hidden legacy discussionRow — kept for JS compatibility -->
+      <div id="discussionRow" style="display:none;"></div>
 
       <!-- Hidden legacy collabToggleRow — kept for JS compatibility -->
       <div id="collabToggleRow" style="display:none;"></div>
@@ -3635,6 +3638,31 @@ function goToShareManage() {
 function getShareText() {
   var subject = currentSubject || 'An interpretation';
   return 'An interpretation of "' + subject + '" from The Prism — ' + (window._currentShareUrl || '');
+}
+
+function startLiveSync() {
+  if (!activeThreadId || activeThreadId.startsWith('pending-')) return;
+  var btn = document.getElementById('liveSyncBtn');
+  if (btn) { btn.textContent = '● Syncing'; btn.style.color = 'rgba(80,180,120,1)'; btn.style.borderColor = 'rgba(80,180,120,0.8)'; }
+  if (typeof startFollowUpRealtime === 'function') {
+    startFollowUpRealtime(activeThreadId);
+  } else if (typeof selectThread === 'function') {
+    selectThread(activeThreadId);
+  }
+  // Immediate fetch to surface any existing recipient contributions
+  var email = typeof userEmail === 'function' ? userEmail() : localStorage.getItem('qt_user_email');
+  if (email && activeThreadId) {
+    fetch((window.API_BASE || '') + '/api/followups?threadId=' + encodeURIComponent(activeThreadId), {
+      headers: { 'x-user-email': email }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.followUps && data.followUps.length > 0 && typeof renderFUWithSource === 'function') {
+        renderFUWithSource(data.followUps);
+      }
+    })
+    .catch(function() {});
+  }
 }
 
 function copyShareLink() {
