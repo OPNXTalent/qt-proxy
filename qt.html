@@ -3874,13 +3874,13 @@ async function sendChatMessage() {
     var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
     var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
     try {
-      await fetch(SUPA_URL + '/rest/v1/share_chat_messages', {
+      var sendRes = await fetch(SUPA_URL + '/rest/v1/share_chat_messages', {
         method: 'POST',
         headers: {
           'apikey': SUPA_ANON,
           'Authorization': 'Bearer ' + SUPA_ANON,
           'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
+          'Prefer': 'return=representation'
         },
         body: JSON.stringify({
           share_id:     _currentChannelId,
@@ -3889,6 +3889,13 @@ async function sendChatMessage() {
           display_name: name
         })
       });
+      // Mark the inserted row ID as already rendered so Realtime skips it
+      if (sendRes.ok) {
+        var rows = await sendRes.json();
+        if (rows && rows[0] && rows[0].id) {
+          _renderedChatIds.add(rows[0].id);
+        }
+      }
     } catch(e) { console.error('Chat send error:', e); }
   }
 
@@ -3902,7 +3909,7 @@ async function loadChatMessages() {
   var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
   try {
     var res = await fetch(
-      SUPA_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(_currentChannelId) + '&order=created_at.asc&select=id,content,message_type,display_name,created_at',
+      SUPA_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(_currentChannelId) + '&order=created_at.asc&select=id,content,message_type,display_name,session_token,created_at',
       { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON } }
     );
     var messages = await res.json();
@@ -4017,20 +4024,18 @@ function startChatRealtime(shareId) {
         if (msg.share_id !== shareId) return;
         if (_renderedChatIds.has(msg.id)) return;
         _renderedChatIds.add(msg.id);
+        // Skip messages already rendered (our own sends are pre-marked)
+        if (_renderedChatIds.has(msg.id)) return;
+        _renderedChatIds.add(msg.id);
         var myName = getChatParticipantName();
-        var fingerprint = (msg.display_name || myName) + '::' + msg.content;
-        // Skip our own messages — already rendered optimistically
-        if (msg.message_type === 'sender' && _sentByMe.has(fingerprint)) {
-          _sentByMe.delete(fingerprint);
-          return;
-        }
         var isMine = msg.message_type === 'sender' && msg.display_name === myName;
         renderChatMessage({
           id:          msg.id,
-          name:        msg.display_name || 'Participant',
+          name:        msg.display_name || (isMine ? myName : 'Participant'),
           text:        msg.content,
           mine:        isMine,
-          messageType: msg.message_type
+          messageType: msg.message_type,
+          sessionToken: msg.session_token
         });
         updateChatBarUI();
       })
