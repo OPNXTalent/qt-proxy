@@ -3939,10 +3939,16 @@ var _chatRealtimeChannel = null;
 var _chatSupabaseClient  = null;
 
 function startChatRealtime(shareId) {
+  // Already subscribed to this share — don't restart
+  if (_chatRealtimeChannel && _chatCurrentShareId === shareId) {
+    console.log('[Chat Realtime] already subscribed, skipping');
+    return;
+  }
   if (_chatRealtimeChannel) {
     try { _chatRealtimeChannel.unsubscribe(); } catch(e) {}
     _chatRealtimeChannel = null;
   }
+  window._chatCurrentShareId = shareId;
   if (!window.supabase) {
     console.warn('[Chat Realtime] supabase not available');
     return;
@@ -3989,6 +3995,7 @@ function stopChatRealtime() {
     try { _chatRealtimeChannel.unsubscribe(); } catch(e) {}
     _chatRealtimeChannel = null;
   }
+  window._chatCurrentShareId = null;
 }
 window.startChatRealtime = startChatRealtime;
 window.stopChatRealtime  = stopChatRealtime;
