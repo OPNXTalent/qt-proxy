@@ -3888,6 +3888,7 @@ async function loadChatMessages() {
     var empty  = document.getElementById('chatEmpty');
     if (!stream) return;
     stream.innerHTML = '';
+    _renderedChatIds.clear();
     if (messages.length === 0) {
       stream.innerHTML = '<div class="chat-empty">No messages yet. Start the discussion.</div>';
       return;
@@ -3959,6 +3960,9 @@ function startChatRealtime(shareId) {
   var client = window._supabaseClient || 
                (window._supabaseClient = window.supabase.createClient(SUPA_URL, SUPA_ANON));
   _chatSupabaseClient = client;
+  // Stop polling — Realtime takes over
+  stopChatPolling();
+
   try {
     _chatRealtimeChannel = client
       .channel('qt_share_chat_' + shareId)
