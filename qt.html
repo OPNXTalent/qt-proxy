@@ -3785,9 +3785,8 @@ function openChatPanel() {
   if (!panel) return;
   panel.style.display = 'block';
   updateChatBarUI();
-  // Auto-expand and start polling
+  // Auto-expand — polling starts after channelId confirmed from PATCH response
   if (!_chatOpen) toggleChatBody();
-  if (_currentChannelId) startChatPolling();
 }
 
 function closeChatPanel() {
@@ -4222,6 +4221,15 @@ async function toggleCollaboration() {
       body: JSON.stringify({ shareId: _currentSharedSessionId, collaborationOpen: _collabOpen })
     });
     if (!res.ok) throw new Error('patch failed');
+    var data = await res.json();
+    // Capture channelId returned when collab opens — this connects qt.html to room_messages
+    if (_collabOpen && data.channelId) {
+      _currentChannelId = data.channelId;
+      startChatPolling();
+    } else if (!_collabOpen) {
+      _currentChannelId = null;
+      stopChatPolling();
+    }
   } catch (err) {
     console.error('Collab toggle error:', err);
     _collabOpen = prev; // revert
