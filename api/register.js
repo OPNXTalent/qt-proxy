@@ -18,12 +18,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let email, tier, status;
+  let email, display_name, tier, status;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    email  = body?.email?.trim().toLowerCase();
-    tier   = body?.tier   || 'free';
-    status = body?.status || 'active';
+    email        = body?.email?.trim().toLowerCase();
+    display_name = body?.display_name?.trim();
+    tier         = body?.tier   || 'free';
+    status       = body?.status || 'active';
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
   }
@@ -35,6 +36,14 @@ export default async function handler(req, res) {
   // Basic email format guard
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'Invalid email format' });
+  }
+
+  // Validate display_name
+  if (!display_name || display_name.length < 3 || display_name.length > 30) {
+    return res.status(400).json({ error: 'Display name must be 3–30 characters' });
+  }
+  if (!/^[a-zA-Z0-9_.\- ]{3,30}$/.test(display_name)) {
+    return res.status(400).json({ error: 'Display name contains invalid characters' });
   }
 
   // Whitelist allowed tiers — callers cannot self-promote to paid tiers
@@ -53,7 +62,7 @@ export default async function handler(req, res) {
         'Content-Type':  'application/json',
         'Prefer':        'resolution=merge-duplicates,return=representation'
       },
-      body: JSON.stringify({ email, tier, status })
+      body: JSON.stringify({ email, display_name, tier, status })
     });
 
     if (!supaRes.ok) {
