@@ -846,7 +846,6 @@
   /* ── Per-Query Chat Panel ──────────────────────────────────────────── */
   #chatPanel {
     display: none;
-    margin-top: 40px;
     border: 1px solid var(--border);
     background: var(--surface);
   }
@@ -1296,6 +1295,29 @@
       <!-- Hidden legacy collabToggleRow — kept for JS compatibility -->
       <div id="collabToggleRow" style="display:none;"></div>
 
+      <!-- PER-QUERY CHAT PANEL -->
+      <div id="chatPanel" style="display:none; margin-top:16px;">
+        <div class="chat-bar" onclick="toggleChatBody()">
+          <div class="chat-bar-left">
+            <div class="chat-bar-dot" id="chatBarDot"></div>
+            <span>Discussion</span>
+            <span class="chat-bar-count" id="chatBarCount"></span>
+          </div>
+          <span class="chat-bar-toggle" id="chatBarToggle">▾ Open</span>
+        </div>
+        <div class="chat-body" id="chatBody">
+          <div class="chat-stream" id="chatStream">
+            <div class="chat-empty" id="chatEmpty">No messages yet. Start the discussion.</div>
+          </div>
+          <div class="chat-compose">
+            <textarea class="chat-input" id="chatInput" placeholder="Add to the discussion…" rows="1"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
+              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+            <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- FOLLOW-UP -->
@@ -1313,29 +1335,6 @@
       <div id="followUpLoading" style="display:none; text-align:center; padding:32px 0;">
         <div style="font-family:var(--cinzel); font-size:24px; color:var(--gold-dim); animation: pulse 2s ease-in-out infinite;">✦</div>
         <div style="font-family:var(--mono); font-size: 17px; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); margin-top:12px;">Reading the relational field…</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PER-QUERY CHAT PANEL -->
-  <div id="chatPanel">
-    <div class="chat-bar" onclick="toggleChatBody()">
-      <div class="chat-bar-left">
-        <div class="chat-bar-dot" id="chatBarDot"></div>
-        <span>Discussion</span>
-        <span class="chat-bar-count" id="chatBarCount"></span>
-      </div>
-      <span class="chat-bar-toggle" id="chatBarToggle">▾ Open</span>
-    </div>
-    <div class="chat-body" id="chatBody">
-      <div class="chat-stream" id="chatStream">
-        <div class="chat-empty" id="chatEmpty">No messages yet. Start the discussion.</div>
-      </div>
-      <div class="chat-compose">
-        <textarea class="chat-input" id="chatInput" placeholder="Add to the discussion…" rows="1"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
-          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
-        <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
       </div>
     </div>
   </div>
