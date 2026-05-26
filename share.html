@@ -1076,10 +1076,10 @@ function showLimitWall(msg) {
 
 // ── Collaboration ─────────────────────────────────────────────────────────────
 async function loadCollabMessages() {
-  if (!channelId) return;
+  if (!shareId) return;
   try {
     var res = await fetch(
-      SUPABASE_URL + '/rest/v1/room_messages?channel_id=eq.' + encodeURIComponent(channelId) + '&order=created_at.asc&select=id,content,message_type,display_name,created_at',
+      SUPABASE_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(shareId) + '&order=created_at.asc&select=id,content,message_type,display_name,created_at',
       { headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON } }
     );
     var messages = await res.json();
@@ -1116,7 +1116,7 @@ async function sendCollabMessage() {
   input.disabled = true;
 
   try {
-    await fetch(SUPABASE_URL + '/rest/v1/room_messages', {
+    await fetch(SUPABASE_URL + '/rest/v1/share_chat_messages', {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_ANON,
@@ -1125,12 +1125,10 @@ async function sendCollabMessage() {
         'Prefer': 'return=minimal'
       },
       body: JSON.stringify({
-        channel_id:   channelId,
-        user_id:      '00000000-0000-0000-0000-000000000000', // anonymous recipient
+        share_id:     shareId,
         content:      content,
         message_type: 'recipient',
-        display_name: localStorage.getItem('qt_display_name') || null,
-        prism_thread_id: shareId || null
+        display_name: localStorage.getItem('qt_display_name') || null
       })
     });
     await loadCollabMessages();
@@ -1197,16 +1195,12 @@ async function loadShare() {
       startLiveThreadPolling(share.thread_id);
     }
 
-    // Show collaboration panel if open
-    if (collabOpen && channelId) {
+    // Show collaboration panel if open — shareId is now the channel identifier
+    if (collabOpen) {
       var panel = document.getElementById('collabPanel');
       if (panel) panel.style.display = 'block';
       await loadCollabMessages();
       startCollabPolling();
-    } else if (collabOpen && !channelId) {
-      // Collab open but no channel yet — show panel without input
-      var panel = document.getElementById('collabPanel');
-      if (panel) panel.style.display = 'block';
     }
 
     // Hide loading, show content
