@@ -634,7 +634,8 @@ var collabOpen      = false;
 var sessionQueries  = 0;
 var QUERY_LIMIT     = 3;
 var currentSubject  = '';
-var collabPollInterval = null;
+var collabPollInterval  = null;
+var _renderedChatIds    = new Set();
 var lastMessageCount   = 0;
 
 var SUPABASE_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
@@ -1094,7 +1095,9 @@ function renderCollabMessages(messages) {
   var container = document.getElementById('collabMessages');
   if (!container) return;
   container.innerHTML = '';
+  _renderedChatIds.clear();
   messages.forEach(function(msg) {
+    _renderedChatIds.add(msg.id);
     var isOwn = msg.message_type === 'recipient';
     var el = document.createElement('div');
     el.className = 'collab-msg' + (isOwn ? ' own' : '');
@@ -1167,11 +1170,11 @@ function startChatRealtime(sid) {
       }, function(payload) {
         if (!payload.new) return;
         var msg = payload.new;
+        if (_renderedChatIds.has(msg.id)) return;
+        _renderedChatIds.add(msg.id);
         var isOwn = msg.message_type === 'recipient';
         var container = document.getElementById('collabMessages');
         if (!container) return;
-        var empty = container.querySelector('.collab-empty');
-        if (empty) empty.remove();
         var el = document.createElement('div');
         el.className = 'collab-msg' + (isOwn ? ' own' : '');
         var time = new Date(msg.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
