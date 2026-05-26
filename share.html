@@ -1079,7 +1079,7 @@ async function loadCollabMessages() {
   if (!channelId) return;
   try {
     var res = await fetch(
-      SUPABASE_URL + '/rest/v1/room_messages?channel_id=eq.' + encodeURIComponent(channelId) + '&order=created_at.asc&select=id,content,message_type,created_at',
+      SUPABASE_URL + '/rest/v1/room_messages?channel_id=eq.' + encodeURIComponent(channelId) + '&order=created_at.asc&select=id,content,message_type,display_name,created_at',
       { headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON } }
     );
     var messages = await res.json();
@@ -1099,7 +1099,8 @@ function renderCollabMessages(messages) {
     var el = document.createElement('div');
     el.className = 'collab-msg' + (isOwn ? ' own' : '');
     var time = new Date(msg.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    el.innerHTML = '<div class="collab-msg-meta">' + (isOwn ? 'You' : 'Sender') + ' · ' + time + '</div><div class="collab-msg-body">' + escHtml(msg.content) + '</div>';
+    var label = msg.display_name || (isOwn ? 'You' : 'Sender');
+    el.innerHTML = '<div class="collab-msg-meta">' + escHtml(label) + ' · ' + time + '</div><div class="collab-msg-body">' + escHtml(msg.content) + '</div>';
     container.appendChild(el);
   });
   container.scrollTop = container.scrollHeight;
@@ -1128,6 +1129,7 @@ async function sendCollabMessage() {
         user_id:      '00000000-0000-0000-0000-000000000000', // anonymous recipient
         content:      content,
         message_type: 'recipient',
+        display_name: localStorage.getItem('qt_display_name') || null,
         prism_thread_id: shareId || null
       })
     });
