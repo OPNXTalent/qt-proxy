@@ -1139,8 +1139,58 @@ async function sendCollabMessage() {
 }
 
 function startCollabPolling() {
+  // Replaced by Realtime — kept for fallback
   if (collabPollInterval) clearInterval(collabPollInterval);
-  collabPollInterval = setInterval(loadCollabMessages, 4000);
+  collabPollInterval = setInterval(loadCollabMessages, 8000);
+}
+
+var _shareRealtimeClient  = null;
+var _shareRealtimeChannel = null;
+
+function startChatRealtime(sid) {
+  if (_shareRealtimeChannel) {
+    try { _shareRealtimeChannel.unsubscribe(); } catch(e) {}
+    _shareRealtimeChannel = null;
+  }
+  if (!window.supabase) { startCollabPolling(); return; }
+  if (!_shareRealtimeClient) {
+    _shareRealtimeClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  }
+  try {
+    _shareRealtimeChannel = _shareRealtimeClient
+      .channel('share_chat_recipient_' + sid)
+      .on('postgres_changes', {
+        event:  'INSERT',
+        schema: 'public',
+        table:  'share_chat_messages',
+        filter: 'share_id=eq.' + sid
+      }, function(payload) {
+        if (!payload.new) return;
+        var msg = payload.new;
+        var isOwn = msg.message_type === 'recipient';
+        var container = document.getElementById('collabMessages');
+        if (!container) return;
+        var empty = container.querySelector('.collab-empty');
+        if (empty) empty.remove();
+        var el = document.createElement('div');
+        el.className = 'collab-msg' + (isOwn ? ' own' : '');
+        var time = new Date(msg.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+        var label = msg.display_name || (isOwn ? 'You' : 'Sender');
+        el.innerHTML = '<div class="collab-msg-meta">' + escHtml(label) + ' · ' + time + '</div>' +
+                       '<div class="collab-msg-body">' + escHtml(msg.content) + '</div>';
+        container.appendChild(el);
+        container.scrollTop = container.scrollHeight;
+      })
+      .subscribe(function(status) {
+        console.log('[Realtime] share chat status:', status);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          startCollabPolling();
+        }
+      });
+  } catch(err) {
+    console.warn('[Realtime] share chat failed:', err.message);
+    startCollabPolling();
+  }
 }
 
 // ── Load share ────────────────────────────────────────────────────────────────
@@ -1200,7 +1250,7 @@ async function loadShare() {
       var panel = document.getElementById('collabPanel');
       if (panel) panel.style.display = 'block';
       await loadCollabMessages();
-      startCollabPolling();
+      startChatRealtime(shareId);
     }
 
     // Hide loading, show content
