@@ -366,7 +366,7 @@
   .collab-messages { padding: 20px; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
   .collab-messages::-webkit-scrollbar { width: 3px; }
   .collab-messages::-webkit-scrollbar-thumb { background: var(--border); }
-  .collab-msg { padding: 12px 16px; border: 1px solid var(--border); background: var(--surface); }
+  .collab-msg { padding: 12px 16px; border: 1px solid var(--border); border-left-width: 3px; background: var(--surface); }
   .collab-msg.own { border-color: var(--collab-dim); background: rgba(80,180,120,0.03); }
   .collab-msg-meta { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
   .collab-msg.own .collab-msg-meta { color: rgba(80,180,120,0.6); }
@@ -636,6 +636,28 @@ var QUERY_LIMIT     = 3;
 var currentSubject  = '';
 var collabPollInterval  = null;
 var _renderedChatIds    = new Set();
+
+// ── Participant color identity ─────────────────────────────────────────────
+var _participantColors = [
+  'rgba(100,160,255,0.7)',
+  'rgba(255,140,100,0.7)',
+  'rgba(180,120,255,0.7)',
+  'rgba(80,200,180,0.7)',
+  'rgba(255,100,140,0.7)',
+  'rgba(200,200,80,0.7)',
+  'rgba(120,200,120,0.7)',
+  'rgba(255,160,60,0.7)',
+];
+var _colorMap = {};
+var _colorIndex = 0;
+function getParticipantColor(name) {
+  if (!name) return 'var(--border)';
+  if (!_colorMap[name]) {
+    _colorMap[name] = _participantColors[_colorIndex % _participantColors.length];
+    _colorIndex++;
+  }
+  return _colorMap[name];
+}
 var lastMessageCount   = 0;
 
 var SUPABASE_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
@@ -1103,6 +1125,7 @@ function renderCollabMessages(messages) {
     el.className = 'collab-msg' + (isOwn ? ' own' : '');
     var time = new Date(msg.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
     var label = msg.display_name || (isOwn ? 'You' : 'Sender');
+    if (!isOwn) el.style.borderLeftColor = getParticipantColor(label);
     el.innerHTML = '<div class="collab-msg-meta">' + escHtml(label) + ' · ' + time + '</div><div class="collab-msg-body">' + escHtml(msg.content) + '</div>';
     container.appendChild(el);
   });
@@ -1180,6 +1203,7 @@ function startChatRealtime(sid) {
         el.className = 'collab-msg' + (isOwn ? ' own' : '');
         var time = new Date(msg.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
         var label = msg.display_name || (isOwn ? 'You' : 'Sender');
+        if (!isOwn) el.style.borderLeftColor = getParticipantColor(label);
         el.innerHTML = '<div class="collab-msg-meta">' + escHtml(label) + ' · ' + time + '</div>' +
                        '<div class="collab-msg-body">' + escHtml(msg.content) + '</div>';
         container.appendChild(el);
