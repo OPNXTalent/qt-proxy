@@ -3953,13 +3953,14 @@ function startChatRealtime(shareId) {
     console.warn('[Chat Realtime] supabase not available');
     return;
   }
+  // Reuse existing client to avoid multiple GoTrueClient instances
   var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
   var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-  if (!_chatSupabaseClient) {
-    _chatSupabaseClient = window.supabase.createClient(SUPA_URL, SUPA_ANON);
-  }
+  var client = window._supabaseClient || 
+               (window._supabaseClient = window.supabase.createClient(SUPA_URL, SUPA_ANON));
+  _chatSupabaseClient = client;
   try {
-    _chatRealtimeChannel = _chatSupabaseClient
+    _chatRealtimeChannel = client
       .channel('qt_share_chat_' + shareId)
       .on('postgres_changes', {
         event:  'INSERT',
