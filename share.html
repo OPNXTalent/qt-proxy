@@ -650,13 +650,14 @@ var _participantColors = [
 ];
 var _colorMap = {};
 var _colorIndex = 0;
-function getParticipantColor(name) {
+function getParticipantColor(name, messageType) {
   if (!name) return 'var(--border)';
-  if (!_colorMap[name]) {
-    _colorMap[name] = _participantColors[_colorIndex % _participantColors.length];
+  var key = (messageType || '') + ':' + name;
+  if (!_colorMap[key]) {
+    _colorMap[key] = _participantColors[_colorIndex % _participantColors.length];
     _colorIndex++;
   }
-  return _colorMap[name];
+  return _colorMap[key];
 }
 var lastMessageCount   = 0;
 
@@ -1125,7 +1126,7 @@ function renderCollabMessages(messages) {
     el.className = 'collab-msg' + (isOwn ? ' own' : '');
     var time = new Date(msg.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
     var label = msg.display_name || (isOwn ? 'You' : 'Sender');
-    if (!isOwn) el.style.borderLeftColor = getParticipantColor(label);
+    if (!isOwn) el.style.borderLeftColor = getParticipantColor(label, msg.message_type);
     el.innerHTML = '<div class="collab-msg-meta">' + escHtml(label) + ' · ' + time + '</div><div class="collab-msg-body">' + escHtml(msg.content) + '</div>';
     container.appendChild(el);
   });
@@ -1203,7 +1204,7 @@ function startChatRealtime(sid) {
         el.className = 'collab-msg' + (isOwn ? ' own' : '');
         var time = new Date(msg.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
         var label = msg.display_name || (isOwn ? 'You' : 'Sender');
-        if (!isOwn) el.style.borderLeftColor = getParticipantColor(label);
+        if (!isOwn) el.style.borderLeftColor = getParticipantColor(label, msg.message_type);
         el.innerHTML = '<div class="collab-msg-meta">' + escHtml(label) + ' · ' + time + '</div>' +
                        '<div class="collab-msg-body">' + escHtml(msg.content) + '</div>';
         container.appendChild(el);
