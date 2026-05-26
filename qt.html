@@ -3894,11 +3894,21 @@ async function loadChatMessages() {
       return;
     }
     var senderName = getChatParticipantName();
+    // Render directly — do NOT use renderChatMessage here so _renderedChatIds
+    // stays clean for Realtime dedup only
     messages.forEach(function(m) {
       var isMine = m.message_type === 'sender';
       var name   = m.display_name || (isMine ? senderName : 'Participant');
-      renderChatMessage({ id: m.id, name: name, text: m.content, mine: isMine });
+      // Track ID so Realtime won't re-add it
+      _renderedChatIds.add(m.id);
+      var div = document.createElement('div');
+      div.className = 'chat-msg ' + (isMine ? 'mine' : 'theirs');
+      div.innerHTML =
+        '<div class="chat-msg-name">' + escapeHtml(name) + '</div>' +
+        '<div class="chat-msg-bubble">' + escapeHtml(m.content) + '</div>';
+      stream.appendChild(div);
     });
+    stream.scrollTop = stream.scrollHeight;
     updateChatBarUI();
   } catch(e) { console.error('Chat poll error:', e); }
 }
