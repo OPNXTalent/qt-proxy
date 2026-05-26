@@ -1103,7 +1103,7 @@ async function loadCollabMessages() {
   if (!shareId) return;
   try {
     var res = await fetch(
-      SUPABASE_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(shareId) + '&order=created_at.asc&select=id,content,message_type,display_name,created_at',
+      SUPABASE_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(shareId) + '&order=created_at.asc&select=id,content,message_type,display_name,session_token,created_at',
       { headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON } }
     );
     var messages = await res.json();
