@@ -3847,7 +3847,7 @@ async function sendChatMessage() {
     var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
     var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
     try {
-      await fetch(SUPA_URL + '/rest/v1/room_messages', {
+      await fetch(SUPA_URL + '/rest/v1/share_chat_messages', {
         method: 'POST',
         headers: {
           'apikey': SUPA_ANON,
@@ -3856,7 +3856,7 @@ async function sendChatMessage() {
           'Prefer': 'return=minimal'
         },
         body: JSON.stringify({
-          channel_id:   _currentChannelId,
+          share_id:     _currentChannelId,
           content:      text,
           message_type: 'sender',
           display_name: name
@@ -3875,7 +3875,7 @@ async function loadChatMessages() {
   var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
   try {
     var res = await fetch(
-      SUPA_URL + '/rest/v1/room_messages?channel_id=eq.' + encodeURIComponent(_currentChannelId) + '&order=created_at.asc&select=id,content,message_type,display_name,created_at',
+      SUPA_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(_currentChannelId) + '&order=created_at.asc&select=id,content,message_type,display_name,created_at',
       { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON } }
     );
     var messages = await res.json();
