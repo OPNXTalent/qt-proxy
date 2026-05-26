@@ -3925,8 +3925,6 @@ function stopChatPolling() {
 }
 
 function renderChatMessage(msg) {
-  if (msg.id && _renderedChatIds.has(msg.id)) return;
-  if (msg.id) _renderedChatIds.add(msg.id);
   var stream = document.getElementById('chatStream');
   var empty = document.getElementById('chatEmpty');
   if (!stream) return;
