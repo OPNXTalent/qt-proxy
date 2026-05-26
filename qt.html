@@ -3958,11 +3958,12 @@ function startChatRealtime(shareId) {
       .on('postgres_changes', {
         event:  'INSERT',
         schema: 'public',
-        table:  'share_chat_messages',
-        filter: 'share_id=eq.' + shareId
+        table:  'share_chat_messages'
       }, function(payload) {
         if (!payload.new) return;
         var msg = payload.new;
+        // Client-side filter — only process messages for this share
+        if (msg.share_id !== shareId) return;
         if (_renderedChatIds.has(msg.id)) return;
         _renderedChatIds.add(msg.id);
         var myName = getChatParticipantName();
