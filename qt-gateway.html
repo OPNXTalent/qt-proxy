@@ -860,11 +860,19 @@ var flowCopies = {
       return;
     }
 
-await fetch('/api/register', {
+const regRes = await fetch('/api/register', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ email: email, display_name: displayName, tier: 'free', status: 'active' })
 });
+    const regData = await regRes.json();
+    if (!regRes.ok) {
+      setBtnLoading(btn, false);
+      var dnErr = document.getElementById('nu-displayname-error');
+      dnErr.textContent = regData.error || 'Display name already taken';
+      dnErr.style.display = 'block';
+      return;
+    }
 
     await fireReferralCredit(email);
     routeAfterAuth(email);
