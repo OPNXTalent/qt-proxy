@@ -3767,6 +3767,7 @@ var _chatMessages       = [];   // { id, name, text, mine }
 var _chatParticipantName = null;
 var _explorerCount      = 0;
 var _renderedChatIds    = new Set();
+var _sentByMe           = new Set();  // fingerprints of messages we sent
 
 // ── Participant color identity ─────────────────────────────────────────────
 var _participantColors = [
@@ -3863,6 +3864,8 @@ async function sendChatMessage() {
   // Optimistic render
   var msg = { id: Date.now(), name: name, text: text, mine: true };
   _chatMessages.push(msg);
+  // Track fingerprint so Realtime skips re-rendering our own send
+  _sentByMe.add(name + '::' + text);
   renderChatMessage(msg);
   updateChatBarUI();
 
@@ -4015,14 +4018,18 @@ function startChatRealtime(shareId) {
         if (_renderedChatIds.has(msg.id)) return;
         _renderedChatIds.add(msg.id);
         var myName = getChatParticipantName();
+        var fingerprint = (msg.display_name || myName) + '::' + msg.content;
+        // Skip our own messages — already rendered optimistically
+        if (msg.message_type === 'sender' && _sentByMe.has(fingerprint)) {
+          _sentByMe.delete(fingerprint);
+          return;
+        }
         var isMine = msg.message_type === 'sender' && msg.display_name === myName;
-        // Skip own messages — already rendered optimistically on send
-        if (isMine) return;
         renderChatMessage({
           id:          msg.id,
           name:        msg.display_name || 'Participant',
           text:        msg.content,
-          mine:        false,
+          mine:        isMine,
           messageType: msg.message_type
         });
         updateChatBarUI();
