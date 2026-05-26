@@ -3928,7 +3928,7 @@ async function loadChatMessages() {
     var senderName = getChatParticipantName();
     messages.forEach(function(m) {
       var isMine = m.message_type === 'sender';
-      var name   = m.display_name || (isMine ? senderName : 'Participant');
+      var name   = m.display_name || (isMine ? senderName : ('Explorer ' + (m.session_token || 'anon').slice(0,4)));
       var div = document.createElement('div');
       div.className = 'chat-msg ' + (isMine ? 'mine' : 'theirs');
       if (!isMine) div.style.borderLeftColor = getParticipantColor(name, m.message_type, m.session_token);
@@ -4024,7 +4024,7 @@ function startChatRealtime(shareId) {
         var isMine = msg.message_type === 'sender' && msg.display_name === myName;
         renderChatMessage({
           id:          msg.id,
-          name:        msg.display_name || (isMine ? myName : 'Participant'),
+          name:        msg.display_name || (isMine ? myName : ('Explorer ' + (msg.session_token || 'anon').slice(0,4))),
           text:        msg.content,
           mine:        isMine,
           messageType: msg.message_type,
