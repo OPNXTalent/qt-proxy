@@ -237,15 +237,21 @@ async function openCollabChannel(shareId, senderEmail) {
     const existing = await getCollabChannelId(shareId);
     if (existing) return existing;
 
+    // Require a valid ownerId — created_by has FK to subscribers
+    if (!ownerId) {
+      console.error('openCollabChannel: no ownerId resolved, cannot create channel');
+      return null;
+    }
+
     // Create a new room_channel anchored to this share via share_id
     const createRes = await sbFetch('/room_channels', {
       method: 'POST',
       headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
       body: JSON.stringify({
-        room_id:      '00000000-0000-0000-0000-000000000000', // placeholder — required not null
+        room_id:      null,
         share_id:     shareId,
         channel_type: 'share',
-        created_by:   ownerId || '00000000-0000-0000-0000-000000000000',
+        created_by:   ownerId,
         is_active:    true
       })
     });
