@@ -3763,10 +3763,11 @@ function incrementSidebarCounter() {
 // _shareStatus: 'off' | 'on'  — whether the share link is active at all
 // _shareMode:   'personal' | 'collab' — reflection-only vs live discussion
 // ── Chat Panel ────────────────────────────────────────────────────────────────
-var _chatOpen       = false;
-var _chatMessages   = [];   // { id, name, text, mine }
+var _chatOpen           = false;
+var _chatMessages       = [];   // { id, name, text, mine }
 var _chatParticipantName = null;
-var _explorerCount  = 0;
+var _explorerCount      = 0;
+var _renderedChatIds    = new Set();
 
 function getChatParticipantName() {
   if (_chatParticipantName) return _chatParticipantName;
@@ -3913,6 +3914,8 @@ function stopChatPolling() {
 }
 
 function renderChatMessage(msg) {
+  if (msg.id && _renderedChatIds.has(msg.id)) return;
+  if (msg.id) _renderedChatIds.add(msg.id);
   var stream = document.getElementById('chatStream');
   var empty = document.getElementById('chatEmpty');
   if (!stream) return;
@@ -4230,9 +4233,15 @@ async function toggleCollaboration() {
     // Capture channelId returned when collab opens — this connects qt.html to room_messages
     if (_collabOpen && data.channelId) {
       _currentChannelId = data.channelId;
-      if (typeof window.startChatRealtime === 'function') {
-        window.startChatRealtime(_currentChannelId);
-      }
+      // realtime.js loads with defer — wait for it if needed
+      var _startChat = function() {
+        if (typeof window.startChatRealtime === 'function') {
+          window.startChatRealtime(_currentChannelId);
+        } else {
+          setTimeout(_startChat, 200);
+        }
+      };
+      _startChat();
     } else if (!_collabOpen) {
       _currentChannelId = null;
       if (typeof window.stopChatRealtime === 'function') window.stopChatRealtime();
