@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/realtime.js" defer></script>
+<script src="/api/realtime.js" defer></script>
 <style>
   :root {
     --void: #06060a;
@@ -3926,6 +3926,11 @@ function renderChatMessage(msg) {
   stream.scrollTop = stream.scrollHeight;
 }
 
+// Expose chat functions for realtime.js
+window.renderChatMessage      = renderChatMessage;
+window.updateChatBarUI        = updateChatBarUI;
+window.getChatParticipantName = getChatParticipantName;
+
 function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -4225,10 +4230,12 @@ async function toggleCollaboration() {
     // Capture channelId returned when collab opens — this connects qt.html to room_messages
     if (_collabOpen && data.channelId) {
       _currentChannelId = data.channelId;
-      startChatPolling();
+      if (typeof window.startChatRealtime === 'function') {
+        window.startChatRealtime(_currentChannelId);
+      }
     } else if (!_collabOpen) {
       _currentChannelId = null;
-      stopChatPolling();
+      if (typeof window.stopChatRealtime === 'function') window.stopChatRealtime();
     }
   } catch (err) {
     console.error('Collab toggle error:', err);
