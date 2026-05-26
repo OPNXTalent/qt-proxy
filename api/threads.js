@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     try {
       // Look up subscriber id by email
       const subRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id,tier&limit=1`,
+        `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id,tier,display_name&limit=1`,
         {
           headers: {
             'apikey':        SUPABASE_SERVICE_ROLE_KEY,
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       const subs = await subRes.json();
       if (!subs?.length) return res.status(404).json({ error: 'Subscriber not found' });
 
-      const { id: userId, tier } = subs[0];
+      const { id: userId, tier, display_name } = subs[0];
 
       // Fetch threads — exclude hard-deleted (past grace_ends_at handled by cron)
       const threadsRes = await fetch(
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
         };
       });
 
-      return res.status(200).json({ threads: mapped, tier, userId });
+      return res.status(200).json({ threads: mapped, tier, userId, display_name: display_name || null });
     } catch (err) {
       console.error('threads GET error:', err.message);
       return res.status(500).json({ error: 'Internal server error' });
