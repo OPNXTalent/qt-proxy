@@ -146,3 +146,60 @@
   console.log('[Realtime] realtime.js loaded');
 
 })();
+
+// ── Chat Realtime subscription ─────────────────────────────────────────────
+var _chatRealtimeChannel = null;
+
+function startChatRealtime(shareId) {
+  if (_chatRealtimeChannel) {
+    try { _chatRealtimeChannel.unsubscribe(); } catch(e) {}
+    _chatRealtimeChannel = null;
+  }
+
+  var client = getSupabaseClient();
+  if (!client) return;
+
+  try {
+    _chatRealtimeChannel = client
+      .channel('share_chat_' + shareId)
+      .on('postgres_changes', {
+        event:  'INSERT',
+        schema: 'public',
+        table:  'share_chat_messages',
+        filter: 'share_id=eq.' + shareId
+      }, function(payload) {
+        if (!payload.new) return;
+        var msg = payload.new;
+        var senderName = typeof window.getChatParticipantName === 'function'
+          ? window.getChatParticipantName() : 'You';
+        var isMine = msg.message_type === 'sender' &&
+          msg.display_name === senderName;
+        if (typeof window.renderChatMessage === 'function') {
+          window.renderChatMessage({
+            id:   msg.id,
+            name: msg.display_name || (isMine ? senderName : 'Participant'),
+            text: msg.content,
+            mine: isMine
+          });
+        }
+        if (typeof window.updateChatBarUI === 'function') {
+          window.updateChatBarUI();
+        }
+      })
+      .subscribe(function(status) {
+        console.log('[Realtime] chat status:', status, 'share:', shareId);
+      });
+  } catch(err) {
+    console.warn('[Realtime] chat subscribe failed:', err.message);
+  }
+}
+
+function stopChatRealtime() {
+  if (_chatRealtimeChannel) {
+    try { _chatRealtimeChannel.unsubscribe(); } catch(e) {}
+    _chatRealtimeChannel = null;
+  }
+}
+
+window.startChatRealtime = startChatRealtime;
+window.stopChatRealtime  = stopChatRealtime;
