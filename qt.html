@@ -3921,19 +3921,14 @@ async function loadChatMessages() {
     var empty  = document.getElementById('chatEmpty');
     if (!stream) return;
     stream.innerHTML = '';
-    _renderedChatIds.clear();
     if (messages.length === 0) {
       stream.innerHTML = '<div class="chat-empty">No messages yet. Start the discussion.</div>';
       return;
     }
     var senderName = getChatParticipantName();
-    // Render directly — do NOT use renderChatMessage here so _renderedChatIds
-    // stays clean for Realtime dedup only
     messages.forEach(function(m) {
       var isMine = m.message_type === 'sender';
       var name   = m.display_name || (isMine ? senderName : 'Participant');
-      // Track ID so Realtime won't re-add it
-      _renderedChatIds.add(m.id);
       var div = document.createElement('div');
       div.className = 'chat-msg ' + (isMine ? 'mine' : 'theirs');
       if (!isMine) div.style.borderLeftColor = getParticipantColor(name, m.message_type, m.session_token);
@@ -4022,9 +4017,7 @@ function startChatRealtime(shareId) {
         var msg = payload.new;
         // Client-side filter — only process messages for this share
         if (msg.share_id !== shareId) return;
-        if (_renderedChatIds.has(msg.id)) return;
-        _renderedChatIds.add(msg.id);
-        // Skip messages already rendered (our own sends are pre-marked)
+        // Skip messages already rendered (our own sends are pre-marked via sendRes)
         if (_renderedChatIds.has(msg.id)) return;
         _renderedChatIds.add(msg.id);
         var myName = getChatParticipantName();
