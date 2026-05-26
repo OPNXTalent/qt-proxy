@@ -3781,13 +3781,16 @@ var _participantColors = [
 ];
 var _colorMap = {};
 var _colorIndex = 0;
-function getParticipantColor(name) {
+// Color key includes message_type to distinguish sender instances with same display name
+function getParticipantColor(name, messageType) {
   if (!name) return 'var(--border)';
-  if (!_colorMap[name]) {
-    _colorMap[name] = _participantColors[_colorIndex % _participantColors.length];
+  // Use name+type as key so two "Explorer 1" from different sessions differ
+  var key = (messageType || '') + ':' + name;
+  if (!_colorMap[key]) {
+    _colorMap[key] = _participantColors[_colorIndex % _participantColors.length];
     _colorIndex++;
   }
-  return _colorMap[name];
+  return _colorMap[key];
 }
 
 function getChatParticipantName() {
@@ -3924,8 +3927,10 @@ async function loadChatMessages() {
       _renderedChatIds.add(m.id);
       var div = document.createElement('div');
       div.className = 'chat-msg ' + (isMine ? 'mine' : 'theirs');
+      if (!isMine) div.style.borderLeftColor = getParticipantColor(name, m.message_type);
+      var time = new Date(m.created_at).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
       div.innerHTML =
-        '<div class="chat-msg-name">' + escapeHtml(name) + '</div>' +
+        '<div class="chat-msg-name">' + escapeHtml(name) + ' · ' + time + '</div>' +
         '<div class="chat-msg-bubble">' + escapeHtml(m.content) + '</div>';
       stream.appendChild(div);
     });
@@ -3953,7 +3958,7 @@ function renderChatMessage(msg) {
   var div = document.createElement('div');
   div.className = 'chat-msg ' + (msg.mine ? 'mine' : 'theirs');
   if (!msg.mine) {
-    div.style.borderLeftColor = getParticipantColor(msg.name);
+    div.style.borderLeftColor = getParticipantColor(msg.name, msg.messageType || 'recipient');
   }
   var time = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
   div.innerHTML =
@@ -4013,10 +4018,11 @@ function startChatRealtime(shareId) {
         var myName = getChatParticipantName();
         var isMine = msg.message_type === 'sender' && msg.display_name === myName;
         renderChatMessage({
-          id:   msg.id,
-          name: msg.display_name || (isMine ? myName : 'Participant'),
-          text: msg.content,
-          mine: isMine
+          id:          msg.id,
+          name:        msg.display_name || (isMine ? myName : 'Participant'),
+          text:        msg.content,
+          mine:        isMine,
+          messageType: msg.message_type
         });
         updateChatBarUI();
       })
