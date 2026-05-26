@@ -166,13 +166,14 @@ async function handlePatch(req, res) {
   const rows = await patchRes.json();
   const updated = rows?.[0];
 
-  // If collaboration just opened, ensure a room channel exists
+  // If collaboration just opened, ensure a room channel exists and return its id
+  let channelId = null;
   if (collaborationOpen === true && updated?.id) {
     const senderEmail = req.headers['x-user-email'] || updated.sender_email;
-    await openCollabChannel(updated.id, senderEmail);
+    channelId = await openCollabChannel(updated.id, senderEmail);
   }
 
-  return res.status(200).json({ success: true, share: updated });
+  return res.status(200).json({ success: true, share: updated, channelId });
 }
 
 // ── GET — Fetch share by token ────────────────────────────────────────────────
@@ -236,13 +237,13 @@ async function openCollabChannel(shareId, senderEmail) {
     const existing = await getCollabChannelId(shareId);
     if (existing) return existing;
 
-    // Create a new room_channel anchored to this share
-    // channel_type 'share' distinguishes from room/direct/small_group
+    // Create a new room_channel anchored to this share via share_id
     const createRes = await sbFetch('/room_channels', {
       method: 'POST',
       headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
       body: JSON.stringify({
-        room_id:      shareId,        // repurposing room_id as share anchor
+        room_id:      '00000000-0000-0000-0000-000000000000', // placeholder — required not null
+        share_id:     shareId,
         channel_type: 'share',
         created_by:   ownerId || '00000000-0000-0000-0000-000000000000',
         is_active:    true
@@ -266,7 +267,7 @@ async function openCollabChannel(shareId, senderEmail) {
 async function getCollabChannelId(shareId) {
   try {
     const res = await sbFetch(
-      `/room_channels?room_id=eq.${encodeURIComponent(shareId)}&channel_type=eq.share&is_active=eq.true&select=id&limit=1`,
+      `/room_channels?share_id=eq.${encodeURIComponent(shareId)}&channel_type=eq.share&is_active=eq.true&select=id&limit=1`,
       { headers: sbHeaders(true) }
     );
     if (!res.ok) return null;
