@@ -843,6 +843,145 @@
     margin-left: auto;
     margin-right: auto;
   }
+  /* ── Per-Query Chat Panel ──────────────────────────────────────────── */
+  #chatPanel {
+    display: none;
+    margin-top: 40px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .chat-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+    user-select: none;
+  }
+  .chat-bar:hover { border-bottom-color: var(--border); }
+  .chat-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .chat-bar-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(80,180,120,0.5);
+    flex-shrink: 0;
+  }
+  .chat-bar-dot.active { background: rgba(80,180,120,0.9); }
+  .chat-bar-count {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
+  .chat-bar-toggle {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: color 0.2s;
+  }
+  .chat-bar:hover .chat-bar-toggle { color: var(--text-dim); }
+  .chat-body {
+    display: none;
+    flex-direction: column;
+    height: 320px;
+  }
+  .chat-body.open { display: flex; }
+  .chat-stream {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .chat-stream::-webkit-scrollbar { width: 3px; }
+  .chat-stream::-webkit-scrollbar-thumb { background: var(--border); }
+  .chat-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 88%;
+  }
+  .chat-msg.mine { align-self: flex-end; align-items: flex-end; }
+  .chat-msg.theirs { align-self: flex-start; align-items: flex-start; }
+  .chat-msg-name {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .chat-msg-bubble {
+    font-family: var(--crimson);
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+  }
+  .chat-msg.mine .chat-msg-bubble {
+    background: rgba(201,168,76,0.06);
+    border-color: rgba(201,168,76,0.2);
+  }
+  .chat-compose {
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    align-items: flex-end;
+  }
+  .chat-input {
+    flex: 1;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--crimson);
+    font-size: 15px;
+    padding: 8px 12px;
+    resize: none;
+    outline: none;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+    min-height: 38px;
+    max-height: 100px;
+  }
+  .chat-input:focus { border-color: var(--gold-dim); }
+  .chat-send-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    align-self: flex-end;
+  }
+  .chat-send-btn:hover { border-color: var(--gold-dim); color: var(--gold-dim); }
+  .chat-empty {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 40px 20px;
+  }
 
   /* Responsive */
   @media (max-width: 600px) {
@@ -1178,7 +1317,30 @@
     </div>
   </div>
 
-  <div class="disclaimer">
+  <!-- PER-QUERY CHAT PANEL -->
+  <div id="chatPanel">
+    <div class="chat-bar" onclick="toggleChatBody()">
+      <div class="chat-bar-left">
+        <div class="chat-bar-dot" id="chatBarDot"></div>
+        <span>Discussion</span>
+        <span class="chat-bar-count" id="chatBarCount"></span>
+      </div>
+      <span class="chat-bar-toggle" id="chatBarToggle">▾ Open</span>
+    </div>
+    <div class="chat-body" id="chatBody">
+      <div class="chat-stream" id="chatStream">
+        <div class="chat-empty" id="chatEmpty">No messages yet. Start the discussion.</div>
+      </div>
+      <div class="chat-compose">
+        <textarea class="chat-input" id="chatInput" placeholder="Add to the discussion…" rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+        <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
+      </div>
+    </div>
+  </div>
+
+    <div class="disclaimer">
     The Prism is a lens, not an authority. It surfaces relational architecture already present within the text and the questions surrounding it — it does not think for you, conclude for you, or require agreement in order to engage.<br><br>
     Its purpose is not to replace judgment, tradition, skepticism, faith, or personal inquiry, but to provide a structured way of examining difficult ideas without reducing them to slogans, tribal reflexes, or inherited assumptions.<br><br>
     The Prism is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
@@ -3339,6 +3501,10 @@ function initSidebar() {
   .then(function(data) {
     if (!data.threads) return;
     allThreads = data.threads;
+    // Cache display_name for chat attribution
+    if (data.display_name) {
+      localStorage.setItem('qt_display_name', data.display_name);
+    }
     if (!localStorage.getItem('qt_migration_done')) {
       var raw = localStorage.getItem('qt_threads');
       var local = [];
@@ -3596,6 +3762,99 @@ function incrementSidebarCounter() {
 // Share state
 // _shareStatus: 'off' | 'on'  — whether the share link is active at all
 // _shareMode:   'personal' | 'collab' — reflection-only vs live discussion
+// ── Chat Panel ────────────────────────────────────────────────────────────────
+var _chatOpen       = false;
+var _chatMessages   = [];   // { id, name, text, mine }
+var _chatParticipantName = null;
+var _explorerCount  = 0;
+
+function getChatParticipantName() {
+  if (_chatParticipantName) return _chatParticipantName;
+  var stored = localStorage.getItem('qt_display_name');
+  if (stored) { _chatParticipantName = stored; return stored; }
+  // Anonymous — assign Explorer N
+  _explorerCount++;
+  var name = 'Explorer ' + _explorerCount;
+  _chatParticipantName = name;
+  sessionStorage.setItem('qt_chat_name', name);
+  return name;
+}
+
+function openChatPanel() {
+  var panel = document.getElementById('chatPanel');
+  if (!panel) return;
+  panel.style.display = 'block';
+  updateChatBarUI();
+}
+
+function closeChatPanel() {
+  var panel = document.getElementById('chatPanel');
+  if (!panel) return;
+  panel.style.display = 'none';
+  _chatOpen = false;
+  _chatMessages = [];
+  _chatParticipantName = null;
+}
+
+function toggleChatBody() {
+  _chatOpen = !_chatOpen;
+  var body = document.getElementById('chatBody');
+  var toggle = document.getElementById('chatBarToggle');
+  var dot = document.getElementById('chatBarDot');
+  if (!body) return;
+  if (_chatOpen) {
+    body.classList.add('open');
+    toggle.textContent = '▴ Close';
+    dot.classList.add('active');
+    var stream = document.getElementById('chatStream');
+    if (stream) stream.scrollTop = stream.scrollHeight;
+  } else {
+    body.classList.remove('open');
+    toggle.textContent = '▾ Open';
+    dot.classList.remove('active');
+  }
+}
+
+function updateChatBarUI() {
+  var count = document.getElementById('chatBarCount');
+  if (!count) return;
+  var n = _chatMessages.length;
+  count.textContent = n > 0 ? '(' + n + (n === 1 ? ' message' : ' messages') + ')' : '';
+}
+
+function sendChatMessage() {
+  var input = document.getElementById('chatInput');
+  if (!input) return;
+  var text = input.value.trim();
+  if (!text) return;
+  var name = getChatParticipantName();
+  var msg = { id: Date.now(), name: name, text: text, mine: true };
+  _chatMessages.push(msg);
+  renderChatMessage(msg);
+  updateChatBarUI();
+  input.value = '';
+  input.style.height = 'auto';
+  // TODO Phase 2b: persist via Supabase Realtime
+}
+
+function renderChatMessage(msg) {
+  var stream = document.getElementById('chatStream');
+  var empty = document.getElementById('chatEmpty');
+  if (!stream) return;
+  if (empty) empty.style.display = 'none';
+  var div = document.createElement('div');
+  div.className = 'chat-msg ' + (msg.mine ? 'mine' : 'theirs');
+  div.innerHTML =
+    '<div class="chat-msg-name">' + escapeHtml(msg.name) + '</div>' +
+    '<div class="chat-msg-bubble">' + escapeHtml(msg.text) + '</div>';
+  stream.appendChild(div);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // _collabOpen:  bool — current collaboration state
 var _shareStatus           = 'off';
 var _shareMode             = 'personal';
@@ -3861,6 +4120,12 @@ async function toggleCollaboration() {
   var prev = _collabOpen;
   _collabOpen = !_collabOpen;
   updateShareManageUI();
+  // Show or hide the chat panel alongside collaboration state
+  if (_collabOpen) {
+    openChatPanel();
+  } else {
+    closeChatPanel();
+  }
 
   // Update sidebar thread item
   if (activeThreadId) {
