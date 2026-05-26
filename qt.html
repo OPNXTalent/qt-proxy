@@ -3628,6 +3628,7 @@ async function handleShareBtn() {
     if (!res.ok || !data.shareId) throw new Error('share failed');
 
     _currentSharedSessionId = data.shareId;
+    _currentChannelId       = data.channelId || null;
     _shareStatus            = 'on';
     window._shareActive     = true;
     window._currentShareUrl = data.shareUrl;
@@ -3784,6 +3785,9 @@ function openChatPanel() {
   if (!panel) return;
   panel.style.display = 'block';
   updateChatBarUI();
+  // Auto-expand and start polling
+  if (!_chatOpen) toggleChatBody();
+  if (_currentChannelId) startChatPolling();
 }
 
 function closeChatPanel() {
@@ -3793,6 +3797,7 @@ function closeChatPanel() {
   _chatOpen = false;
   _chatMessages = [];
   _chatParticipantName = null;
+  stopChatPolling();
 }
 
 function toggleChatBody() {
@@ -3821,19 +3826,91 @@ function updateChatBarUI() {
   count.textContent = n > 0 ? '(' + n + (n === 1 ? ' message' : ' messages') + ')' : '';
 }
 
-function sendChatMessage() {
+async function sendChatMessage() {
   var input = document.getElementById('chatInput');
   if (!input) return;
   var text = input.value.trim();
   if (!text) return;
+  input.value = '';
+  input.style.height = 'auto';
+  input.disabled = true;
+
   var name = getChatParticipantName();
+
+  // Optimistic render
   var msg = { id: Date.now(), name: name, text: text, mine: true };
   _chatMessages.push(msg);
   renderChatMessage(msg);
   updateChatBarUI();
-  input.value = '';
-  input.style.height = 'auto';
-  // TODO Phase 2b: persist via Supabase Realtime
+
+  // Persist to Supabase if channel exists
+  if (_currentChannelId) {
+    var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    try {
+      await fetch(SUPA_URL + '/rest/v1/room_messages', {
+        method: 'POST',
+        headers: {
+          'apikey': SUPA_ANON,
+          'Authorization': 'Bearer ' + SUPA_ANON,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          channel_id:   _currentChannelId,
+          content:      text,
+          message_type: 'sender',
+          display_name: name
+        })
+      });
+    } catch(e) { console.error('Chat send error:', e); }
+  }
+
+  input.disabled = false;
+  input.focus();
+}
+
+async function loadChatMessages() {
+  if (!_currentChannelId) return;
+  var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+  var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  try {
+    var res = await fetch(
+      SUPA_URL + '/rest/v1/room_messages?channel_id=eq.' + encodeURIComponent(_currentChannelId) + '&order=created_at.asc&select=id,content,message_type,display_name,created_at',
+      { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON } }
+    );
+    var messages = await res.json();
+    if (!Array.isArray(messages)) return;
+    if (messages.length === _chatLastCount) return;
+    _chatLastCount = messages.length;
+    // Re-render all messages
+    var stream = document.getElementById('chatStream');
+    var empty  = document.getElementById('chatEmpty');
+    if (!stream) return;
+    stream.innerHTML = '';
+    if (messages.length === 0) {
+      stream.innerHTML = '<div class="chat-empty">No messages yet. Start the discussion.</div>';
+      return;
+    }
+    var senderName = getChatParticipantName();
+    messages.forEach(function(m) {
+      var isMine = m.message_type === 'sender';
+      var name   = m.display_name || (isMine ? senderName : 'Participant');
+      renderChatMessage({ id: m.id, name: name, text: m.content, mine: isMine });
+    });
+    updateChatBarUI();
+  } catch(e) { console.error('Chat poll error:', e); }
+}
+
+function startChatPolling() {
+  if (_chatPollInterval) clearInterval(_chatPollInterval);
+  loadChatMessages();
+  _chatPollInterval = setInterval(loadChatMessages, 4000);
+}
+
+function stopChatPolling() {
+  if (_chatPollInterval) { clearInterval(_chatPollInterval); _chatPollInterval = null; }
+  _chatLastCount = 0;
 }
 
 function renderChatMessage(msg) {
@@ -3858,7 +3935,10 @@ function escapeHtml(str) {
 var _shareStatus           = 'off';
 var _shareMode             = 'personal';
 var _currentSharedSessionId = null;
+var _currentChannelId      = null;
 var _collabOpen            = false;
+var _chatPollInterval      = null;
+var _chatLastCount         = 0;
 
 function openShareModal() {
   if (!window._lastParsedResult) return;
