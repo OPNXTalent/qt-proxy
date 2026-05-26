@@ -478,6 +478,11 @@
             <input class="field-input" id="nu-email" type="email" placeholder="your@email.com" autocomplete="email" />
           </div>
           <div class="field-wrap">
+            <label class="field-label" for="nu-display-name">Display Name</label>
+            <input class="field-input" id="nu-display-name" type="text" placeholder="How you'll appear to others" autocomplete="username" maxlength="30" />
+            <div class="field-error" id="nu-displayname-error">Display name must be 3–30 characters.</div>
+          </div>
+          <div class="field-wrap">
             <label class="field-label" for="nu-password">Password</label>
             <div class="pw-wrap"><input class="field-input" id="nu-password" type="password" placeholder="8 characters minimum" autocomplete="new-password" /><button type="button" class="pw-toggle" onclick="togglePw('nu-password', this)">👁</button></div>
           </div>
@@ -833,12 +838,18 @@ var flowCopies = {
   }
   /* ── New User ── */
   async function handleRegister(btn) {
-    var email    = document.getElementById('nu-email').value.trim();
-    var password = document.getElementById('nu-password').value;
-    var confirm  = document.getElementById('nu-confirm').value;
+    var email       = document.getElementById('nu-email').value.trim();
+    var displayName = document.getElementById('nu-display-name').value.trim();
+    var password    = document.getElementById('nu-password').value;
+    var confirm     = document.getElementById('nu-confirm').value;
     clearErrors([['nu-confirm', 'nu-mismatch']]);
     if (!email || !password) return;
     if (password !== confirm) { setError('nu-confirm', 'nu-mismatch', true); return; }
+    if (!displayName || displayName.length < 3) {
+      var dnErr = document.getElementById('nu-displayname-error');
+      dnErr.style.display = 'block';
+      return;
+    }
     setBtnLoading(btn, true);
     var { data, error } = await sb.auth.signUp({ email, password });
     setBtnLoading(btn, false);
@@ -852,7 +863,7 @@ var flowCopies = {
 await fetch('/api/register', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+  body: JSON.stringify({ email: email, display_name: displayName, tier: 'free', status: 'active' })
 });
 
     await fireReferralCredit(email);
