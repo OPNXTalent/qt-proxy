@@ -218,70 +218,14 @@ async function handleGet(req, res) {
 
 // ── Collaboration channel helpers ─────────────────────────────────────────────
 
+// openCollabChannel — now simply returns the shareId itself as the channel identifier
+// Messages are stored in share_chat_messages keyed by share_id directly
 async function openCollabChannel(shareId, senderEmail) {
-  try {
-    // Look up sender's user_id from subscribers
-    let ownerId = null;
-    if (senderEmail) {
-      const subRes = await sbFetch(
-        `/subscribers?email=eq.${encodeURIComponent(senderEmail)}&select=id&limit=1`,
-        { headers: sbHeaders(true) }
-      );
-      if (subRes.ok) {
-        const subs = await subRes.json();
-        ownerId = subs?.[0]?.id || null;
-      }
-    }
-
-    // Check if a channel already exists for this share
-    const existing = await getCollabChannelId(shareId);
-    if (existing) return existing;
-
-    // Require a valid ownerId — created_by has FK to subscribers
-    if (!ownerId) {
-      console.error('openCollabChannel: no ownerId resolved, cannot create channel');
-      return null;
-    }
-
-    // Create a new room_channel anchored to this share via share_id
-    const createRes = await sbFetch('/room_channels', {
-      method: 'POST',
-      headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
-      body: JSON.stringify({
-        room_id:      null,
-        share_id:     shareId,
-        channel_type: 'share',
-        created_by:   ownerId,
-        is_active:    true
-      })
-    });
-
-    if (!createRes.ok) {
-      console.error('Channel create failed:', await createRes.text());
-      return null;
-    }
-
-    const rows = await createRes.json();
-    return rows?.[0]?.id || null;
-
-  } catch (err) {
-    console.error('openCollabChannel error:', err.message);
-    return null;
-  }
+  return shareId;
 }
 
 async function getCollabChannelId(shareId) {
-  try {
-    const res = await sbFetch(
-      `/room_channels?share_id=eq.${encodeURIComponent(shareId)}&channel_type=eq.share&is_active=eq.true&select=id&limit=1`,
-      { headers: sbHeaders(true) }
-    );
-    if (!res.ok) return null;
-    const rows = await res.json();
-    return rows?.[0]?.id || null;
-  } catch {
-    return null;
-  }
+  return shareId;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
