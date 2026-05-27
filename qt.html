@@ -1726,6 +1726,7 @@ async function runInterpretation() {
     // Save full response to localStorage keyed by thread id
     // activeThreadId is set by showSidebarAfterQuery/addThreadToSidebar
     if (activeThreadId && parsed) {
+        localStorage.setItem('qt_last_thread_id', activeThreadId);
       try {
         localStorage.setItem('qt_response_' + activeThreadId, JSON.stringify(parsed));
         localStorage.setItem('qt_input_' + activeThreadId, queryText);
@@ -2995,6 +2996,7 @@ function selectThread(id) {
   var thread = allThreads.find(function(t) { return t.id === id; });
   if (!thread) return;
   activeThreadId = id;
+  localStorage.setItem('qt_last_thread_id', id);
   renderThreads(allThreads);
 
   var savedInput = localStorage.getItem('qt_input_' + id) || thread.query || '';
@@ -3098,32 +3100,37 @@ function selectThread(id) {
         // Subscribe via Realtime for instant updates
         startFollowUpRealtime(threadId);
 
-        // Restore chat panel if collaboration is open
+        // Restore refractions state silently — do NOT open panel automatically
         _currentChannelId = share.id;
+        _activeNodeId = 'root';
+        _renderedChatIds = new Set();
+        _chatLastCount = 0;
+        // Pre-load root refractions into memory (panel stays hidden until user opens it)
         if (share.collaboration_open) {
-          openChatPanel();
-          // Clear previous messages and reload for this thread
-          var stream = document.getElementById('chatStream');
-          if (stream) stream.innerHTML = '<div class="chat-empty" id="chatEmpty">No refractions yet. Begin the conversation.</div>';
-          _renderedChatIds = new Set();
-          _chatLastCount = 0;
-          loadChatMessages();
+          // Start realtime subscription to receive new refractions
           if (typeof window.startChatRealtime === 'function') {
             window.startChatRealtime(share.id);
           }
-        } else {
-          closeChatPanel();
+          // Load into background — panel shows loaded data when user opens it
+          loadChatMessages();
         }
       })
       .catch(function() {});
     })(id);
 
-    // Reset chat state when switching threads
-    closeChatPanel();
+    // Full reset when switching threads — destroy all chat state
+    closeDiscussionPanel();
     _currentChannelId = null;
+    _activeNodeId = 'root';
+    _chatMessages = [];
+    _chatParticipantName = null;
     _renderedChatIds = new Set();
     _chatLastCount = 0;
+    stopChatPolling();
     if (typeof window.stopChatRealtime === 'function') window.stopChatRealtime();
+    syncRefractionButtons(null);
+    var stream = document.getElementById('chatStream');
+    if (stream) stream.innerHTML = '<div class="chat-empty">No refractions yet. Begin the conversation.</div>';
 
     _shareStatus = 'off';
     _collabOpen = false;
@@ -3696,6 +3703,15 @@ function initSidebar() {
       }
     }
     renderThreads(allThreads);
+
+    // Auto-restore last active thread on page load
+    var lastId = localStorage.getItem('qt_last_thread_id');
+    if (lastId && allThreads.find(function(t) { return t.id === lastId; })) {
+      selectThread(lastId);
+    } else if (allThreads.length > 0) {
+      // Fall back to most recent thread
+      selectThread(allThreads[0].id);
+    }
   })
   .catch(function(err) {
     console.error('initSidebar error:', err.message);
@@ -3795,8 +3811,12 @@ async function deactivateShare() {
   var collabBtn = document.getElementById('collabToggleBtn');
   if (collabBtn) collabBtn.style.display = 'none';
 
-  // Close Refractions panel if open
-  closeChatPanel();
+  // Hide Refractions panel if open (preserve state)
+  closeDiscussionPanel();
+  stopChatPolling();
+  if (typeof window.stopChatRealtime === 'function') window.stopChatRealtime();
+  // Clear channel but preserve active node and messages for if re-shared
+  _currentChannelId = null;
 
   // Toast
   var toast = document.createElement('div');
@@ -4063,10 +4083,10 @@ function closeDiscussionPanel() {
 }
 
 function closeChatPanel() {
+  // Hide only — do not destroy node discussion state
   closeDiscussionPanel();
-  _chatMessages = [];
-  _chatParticipantName = null;
-  stopChatPolling();
+  // Do NOT clear _chatMessages, _chatParticipantName, or _activeNodeId
+  // Do NOT stop polling — keep subscription alive
 }
 
 function toggleChatBody() {
@@ -4253,7 +4273,6 @@ function focusRefractionNode(nodeId, queryText) {
   // Different node or panel closed → switch/open
   var changed = !isSameNode;
   _activeNodeId = nodeId;
-  if (changed) _chatLastCount = 0;
 
   // Update panel context
   var ctxEl = document.getElementById('discContextQuery');
@@ -4263,10 +4282,12 @@ function focusRefractionNode(nodeId, queryText) {
   var dbgEl = document.getElementById('discDebugNode');
   if (dbgEl) dbgEl.textContent = 'Active node: ' + nodeId;
 
-  // Clear stream on node switch
+  // Clear stream only on actual node switch — preserve on same-node reopen
   if (changed) {
     var stream = document.getElementById('chatStream');
     if (stream) stream.innerHTML = '<div class="chat-empty">No refractions yet. Begin the conversation.</div>';
+    // Reset count so we force a reload for the new node
+    _chatLastCount = 0;
   }
 
   // Highlight active refraction button
