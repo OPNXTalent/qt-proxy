@@ -135,16 +135,17 @@
   .disc-close-btn {
     background: transparent;
     border: none;
-    color: rgba(120,118,140,0.4);
+    color: rgba(80,78,100,0.3);
     cursor: pointer;
-    font-size: 20px;
+    font-size: 16px;
     line-height: 1;
     padding: 4px 8px;
-    transition: color 0.25s;
+    transition: color 0.3s;
     font-family: var(--crimson);
     font-style: italic;
+    opacity: 0.5;
   }
-  .disc-close-btn:hover { color: rgba(201,168,76,0.4); }
+  .disc-close-btn:hover { color: rgba(120,118,140,0.5); opacity: 1; }
 
   body {
     background: var(--void);
@@ -4043,9 +4044,9 @@ function openChatPanel() {
     }
     // Non-root nodes set their label via focusRefractionNode
   }
-  // Debug label
+  // Debug label — always reflects current _activeNodeId
   var dbgEl = document.getElementById('discDebugNode');
-  if (dbgEl) dbgEl.textContent = 'Active node: ' + _activeNodeId;
+  if (dbgEl) dbgEl.textContent = 'Active node: ' + (_activeNodeId || 'root');
   panel.classList.add('open');
   _chatOpen = true;
   var dot = document.getElementById('discHeaderDot');
@@ -4058,6 +4059,7 @@ function closeDiscussionPanel() {
   if (!panel) return;
   panel.classList.remove('open');
   _chatOpen = false;
+  syncRefractionButtons(null);
 }
 
 function closeChatPanel() {
@@ -4237,30 +4239,63 @@ function syncNodeShareButtons() {
 }
 
 function focusRefractionNode(nodeId, queryText) {
-  if (_activeNodeId === nodeId) {
-    // Already focused — just open the panel
-    if (_currentChannelId) openChatPanel();
+  var panel = document.getElementById('discussionPanel');
+  var isOpen = panel && panel.classList.contains('open');
+  var isSameNode = (_activeNodeId === nodeId);
+
+  // Toggle: same node + panel open → close
+  if (isOpen && isSameNode) {
+    closeDiscussionPanel();
+    syncRefractionButtons(null); // deactivate all buttons
     return;
   }
-  _activeNodeId = nodeId;
-  _chatLastCount = 0; // force reload
 
-  // Update panel context label
+  // Different node or panel closed → switch/open
+  var changed = !isSameNode;
+  _activeNodeId = nodeId;
+  if (changed) _chatLastCount = 0;
+
+  // Update panel context
   var ctxEl = document.getElementById('discContextQuery');
   if (ctxEl) ctxEl.textContent = queryText ? (queryText.length > 80 ? queryText.slice(0, 80) + '…' : queryText) : '';
 
-  // Debug label — shows active node_id to confirm per-node scoping
+  // Debug label
   var dbgEl = document.getElementById('discDebugNode');
   if (dbgEl) dbgEl.textContent = 'Active node: ' + nodeId;
 
-  // Open panel and reload
-  if (_currentChannelId) {
-    openChatPanel();
-    loadChatMessages();
+  // Clear stream on node switch
+  if (changed) {
+    var stream = document.getElementById('chatStream');
+    if (stream) stream.innerHTML = '<div class="chat-empty">No refractions yet. Begin the conversation.</div>';
   }
+
+  // Highlight active refraction button
+  syncRefractionButtons(nodeId);
+
+  // Open panel
+  openChatPanel();
+
+  if (_currentChannelId) loadChatMessages();
 }
 
 // Focus root node (original interpretation)
+// Highlight the active refraction button, dim others
+function syncRefractionButtons(activeNodeId) {
+  document.querySelectorAll('.node-refraction-btn').forEach(function(btn) {
+    var wrap = btn.closest('.node-controls');
+    var nid = wrap ? wrap.dataset.nodeId : null;
+    if (activeNodeId && nid === activeNodeId) {
+      btn.classList.add('refractions-active');
+      btn.style.color = 'rgba(201,168,76,0.75)';
+      btn.style.borderColor = 'rgba(201,168,76,0.3)';
+    } else {
+      btn.classList.remove('refractions-active');
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }
+  });
+}
+
 function focusRootNode() {
   focusRefractionNode('root', currentSubject || '');
 }
