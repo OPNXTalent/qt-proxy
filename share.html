@@ -1364,7 +1364,7 @@ function renderCollabMessages(messages) {
 
 async function sendCollabMessage() {
   var input = document.getElementById('collabInput');
-  if (!input || !channelId) return;
+  if (!input || !shareId) return;
   var content = input.value.trim();
   if (!content) return;
 
