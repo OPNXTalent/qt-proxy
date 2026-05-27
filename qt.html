@@ -2972,6 +2972,9 @@ function selectThread(id) {
     var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     window._shareHandlingFollowUps = false;
+    // Reset to root node when a new interpretation loads
+    _activeNodeId = 'root';
+    _chatLastCount = 0;
     // Stop any existing Realtime subscription
     if (window._qtRealtimeChannel) {
       window._qtRealtimeChannel.unsubscribe();
@@ -3240,6 +3243,15 @@ function renderFUWithSource(list) {
     // Use same CSS classes as the streamed follow-up renderer
     var el = document.createElement('div');
     el.className = 'fu-block' + (isRecipient ? ' from-recipient' : '');
+    // Node ID — use follow-up's own id for node-scoped refractions
+    var nodeId = fu.id || ('fu-' + Date.now());
+    el.dataset.nodeId = nodeId;
+    // Subtle click affordance to focus this node's refractions
+    el.style.cursor = 'pointer';
+    el.title = 'Focus refractions for this response';
+    el.addEventListener('click', (function(nid, query) {
+      return function() { focusRefractionNode(nid, query); };
+    })(nodeId, fu.query || ''));
 
     var paras = bodyText.split(/\n\n/).filter(Boolean).map(function(p) {
       return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
@@ -3879,6 +3891,7 @@ var _chatParticipantName = null;
 var _explorerCount      = 0;
 var _renderedChatIds    = new Set();
 var _sentByMe           = new Set();  // fingerprints of messages we sent
+var _activeNodeId       = 'root';     // currently focused interpretation node
 
 // ── Participant color identity ─────────────────────────────────────────────
 var _participantColors = [
@@ -3919,9 +3932,14 @@ function getChatParticipantName() {
 function openChatPanel() {
   var panel = document.getElementById('discussionPanel');
   if (!panel) return;
-  // Set context query label
+  // Set context query label based on active node
   var ctxEl = document.getElementById('discContextQuery');
-  if (ctxEl) ctxEl.textContent = currentSubject || '';
+  if (ctxEl) {
+    if (_activeNodeId === 'root') {
+      ctxEl.textContent = currentSubject || '';
+    }
+    // Non-root nodes set their label via focusRefractionNode
+  }
   panel.classList.add('open');
   _chatOpen = true;
   var dot = document.getElementById('discHeaderDot');
@@ -3997,7 +4015,8 @@ async function sendChatMessage() {
           share_id:     _currentChannelId,
           content:      text,
           message_type: 'sender',
-          display_name: name
+          display_name: name,
+          node_id:      _activeNodeId
         })
       });
       // Mark the inserted row ID as already rendered so Realtime skips it
@@ -4020,24 +4039,28 @@ async function loadChatMessages() {
   var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
   try {
     var res = await fetch(
-      SUPA_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(_currentChannelId) + '&order=created_at.asc&select=id,content,message_type,display_name,session_token,created_at',
+      SUPA_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(_currentChannelId) + '&order=created_at.asc&select=id,content,message_type,display_name,session_token,node_id,created_at',
       { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON } }
     );
     var messages = await res.json();
     if (!Array.isArray(messages)) return;
-    if (messages.length === _chatLastCount) return;
-    _chatLastCount = messages.length;
-    // Re-render all messages
+    // Client-side filter by active node
+    var filtered = messages.filter(function(m) {
+      return (m.node_id || 'root') === _activeNodeId;
+    });
+    if (filtered.length === _chatLastCount) return;
+    _chatLastCount = filtered.length;
+    // Re-render all messages for this node
     var stream = document.getElementById('chatStream');
     var empty  = document.getElementById('chatEmpty');
     if (!stream) return;
     stream.innerHTML = '';
-    if (messages.length === 0) {
+    if (filtered.length === 0) {
       stream.innerHTML = '<div class="chat-empty">No refractions yet. Begin the conversation.</div>';
       return;
     }
     var senderName = getChatParticipantName();
-    messages.forEach(function(m) {
+    filtered.forEach(function(m) {
       var isMine = m.message_type === 'sender';
       var name   = m.display_name || (isMine ? senderName : ('Explorer ' + (m.session_token || 'anon').slice(0,4)));
       var div = document.createElement('div');
@@ -4052,6 +4075,32 @@ async function loadChatMessages() {
     stream.scrollTop = stream.scrollHeight;
     updateChatBarUI();
   } catch(e) { console.error('Chat poll error:', e); }
+}
+
+// Focus a specific interpretation node — updates panel and reloads refractions
+function focusRefractionNode(nodeId, queryText) {
+  if (_activeNodeId === nodeId) {
+    // Already focused — just open the panel
+    if (_currentChannelId) openChatPanel();
+    return;
+  }
+  _activeNodeId = nodeId;
+  _chatLastCount = 0; // force reload
+
+  // Update panel context label
+  var ctxEl = document.getElementById('discContextQuery');
+  if (ctxEl) ctxEl.textContent = queryText ? (queryText.length > 80 ? queryText.slice(0, 80) + '…' : queryText) : '';
+
+  // Open panel and reload
+  if (_currentChannelId) {
+    openChatPanel();
+    loadChatMessages();
+  }
+}
+
+// Focus root node (original interpretation)
+function focusRootNode() {
+  focusRefractionNode('root', currentSubject || '');
 }
 
 function startChatPolling() {
@@ -4130,6 +4179,8 @@ function startChatRealtime(shareId) {
         if (msg.share_id !== shareId) return;
         // Skip messages already rendered (our own sends are pre-marked via sendRes)
         if (_renderedChatIds.has(msg.id)) return;
+        // Client-side node filter — only render if for active node
+        if ((msg.node_id || 'root') !== _activeNodeId) return;
         _renderedChatIds.add(msg.id);
         var myName = getChatParticipantName();
         var isMine = msg.message_type === 'sender' && msg.display_name === myName;
