@@ -1391,6 +1391,7 @@
     </div>
     <div class="disc-context">
       <div class="disc-context-query" id="discContextQuery"></div>
+      <div id="discDebugNode" style="font-family:monospace;font-size:10px;color:rgba(80,180,120,0.7);margin-top:6px;padding:3px 0;border-top:1px solid rgba(80,180,120,0.15);">Active node: root</div>
     </div>
     <div class="chat-stream" id="chatStream" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
       <div class="chat-empty" id="chatEmpty">No refractions yet. Begin the conversation.</div>
@@ -3940,6 +3941,9 @@ function openChatPanel() {
     }
     // Non-root nodes set their label via focusRefractionNode
   }
+  // Debug label
+  var dbgEl = document.getElementById('discDebugNode');
+  if (dbgEl) dbgEl.textContent = 'Active node: ' + _activeNodeId;
   panel.classList.add('open');
   _chatOpen = true;
   var dot = document.getElementById('discHeaderDot');
@@ -4090,6 +4094,10 @@ function focusRefractionNode(nodeId, queryText) {
   // Update panel context label
   var ctxEl = document.getElementById('discContextQuery');
   if (ctxEl) ctxEl.textContent = queryText ? (queryText.length > 80 ? queryText.slice(0, 80) + '…' : queryText) : '';
+
+  // Debug label — shows active node_id to confirm per-node scoping
+  var dbgEl = document.getElementById('discDebugNode');
+  if (dbgEl) dbgEl.textContent = 'Active node: ' + nodeId;
 
   // Open panel and reload
   if (_currentChannelId) {
