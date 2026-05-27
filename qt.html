@@ -3627,7 +3627,7 @@ async function handleShareBtn() {
     if (!res.ok || !data.shareId) throw new Error('share failed');
 
     _currentSharedSessionId = data.shareId;
-    _currentChannelId       = data.channelId || null;
+    _currentChannelId       = data.channelId || data.shareId;
     _shareStatus            = 'on';
     window._shareActive     = true;
     window._currentShareUrl = data.shareUrl;
@@ -4347,8 +4347,9 @@ async function toggleCollaboration() {
     if (!res.ok) throw new Error('patch failed');
     var data = await res.json();
     // Capture channelId returned when collab opens — this connects qt.html to room_messages
-    if (_collabOpen && data.channelId) {
-      _currentChannelId = data.channelId;
+    if (_collabOpen) {
+      // channelId == shareId in current architecture
+      _currentChannelId = data.channelId || _currentSharedSessionId;
       // realtime.js loads with defer — wait for it if needed
       var _startChat = function() {
         if (typeof window.startChatRealtime === 'function') {
