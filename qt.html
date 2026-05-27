@@ -2968,9 +2968,34 @@ function selectThread(id) {
 
         // Subscribe via Realtime for instant updates
         startFollowUpRealtime(threadId);
+
+        // Restore chat panel if collaboration is open
+        _currentChannelId = share.id;
+        if (share.collaboration_open) {
+          openChatPanel();
+          // Clear previous messages and reload for this thread
+          var stream = document.getElementById('chatStream');
+          if (stream) stream.innerHTML = '<div class="chat-empty" id="chatEmpty">No messages yet. Start the discussion.</div>';
+          _renderedChatIds = new Set();
+          _chatLastCount = 0;
+          loadChatMessages();
+          if (typeof window.startChatRealtime === 'function') {
+            window.startChatRealtime(share.id);
+          }
+        } else {
+          closeChatPanel();
+        }
       })
       .catch(function() {});
     })(id);
+
+    // Reset chat state when switching threads
+    closeChatPanel();
+    _currentChannelId = null;
+    _renderedChatIds = new Set();
+    _chatLastCount = 0;
+    if (typeof window.stopChatRealtime === 'function') window.stopChatRealtime();
+
     _shareStatus = 'off';
     _collabOpen = false;
     var shareBtn = document.getElementById('shareBtn');
@@ -3627,7 +3652,7 @@ async function handleShareBtn() {
     if (!res.ok || !data.shareId) throw new Error('share failed');
 
     _currentSharedSessionId = data.shareId;
-    _currentChannelId       = data.channelId || data.shareId;
+    _currentChannelId       = data.channelId || null;
     _shareStatus            = 'on';
     window._shareActive     = true;
     window._currentShareUrl = data.shareUrl;
@@ -4347,9 +4372,8 @@ async function toggleCollaboration() {
     if (!res.ok) throw new Error('patch failed');
     var data = await res.json();
     // Capture channelId returned when collab opens — this connects qt.html to room_messages
-    if (_collabOpen) {
-      // channelId == shareId in current architecture
-      _currentChannelId = data.channelId || _currentSharedSessionId;
+    if (_collabOpen && data.channelId) {
+      _currentChannelId = data.channelId;
       // realtime.js loads with defer — wait for it if needed
       var _startChat = function() {
         if (typeof window.startChatRealtime === 'function') {
