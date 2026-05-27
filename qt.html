@@ -86,6 +86,32 @@
     position: relative;
     z-index: 2;
   }
+  /* ── Node Control Row ───────────────────────────────────────────────── */
+  .node-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0 0;
+    margin-top: 20px;
+    border-top: 1px solid rgba(42,42,64,0.35);
+    flex-wrap: wrap;
+  }
+  .node-ctrl-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border: 1px solid rgba(42,42,64,0.6);
+    background: transparent;
+    color: rgba(120,118,140,0.6);
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .node-ctrl-btn:hover { color: var(--text-muted); border-color: rgba(80,80,100,0.8); }
+  .node-ctrl-btn.share-active { color: rgba(80,180,120,0.8); border-color: rgba(80,180,120,0.35); }
+
   #discussionPanel {
     position: fixed;
     top: 0;
@@ -1680,7 +1706,8 @@ async function runInterpretation() {
     document.getElementById('subjectText').textContent = input;
     document.getElementById('subjectBanner').style.display = 'block';
     document.getElementById('followUpSection').style.display = 'block';
-    document.getElementById('downloadRow').style.display = 'block';
+    // downloadRow hidden — controls rendered per-node
+    document.getElementById('downloadRow').style.display = 'none';
 
     sessionQueryCount++;
     decrementSidebarCounter();
@@ -1830,6 +1857,19 @@ DELIVERY — SOCRATIC CHUNKING: Before responding, construct the complete answer
     if (activeThreadId) {
       saveFollowUp(activeThreadId, input, responseText);
     }
+
+    // Append node controls to this streamed follow-up
+    // nodeId will be assigned by saveFollowUp/Supabase; use a temp ID for now
+    var tempNodeId = 'fu-' + Date.now();
+    followUpEl.dataset.nodeId = tempNodeId;
+    followUpEl.style.cursor = 'pointer';
+    followUpEl.addEventListener('click', (function(nid, q) {
+      return function(e) {
+        if (e.target.closest('.node-controls')) return; // let controls handle their own clicks
+        focusRefractionNode(nid, q);
+      };
+    })(tempNodeId, input));
+    followUpEl.appendChild(buildNodeControls(tempNodeId, input));
 
   } catch (err) {
     if (err.message === 'RATE_LIMITED') return;
@@ -2180,6 +2220,10 @@ function renderResult(d) {
   }
 
   document.getElementById('resultContent').innerHTML = html;
+
+  // Append root node controls directly into resultContent
+  var rootControls = buildNodeControls('root', currentSubject || '');
+  document.getElementById('resultContent').appendChild(rootControls);
 }
 
 
@@ -3251,7 +3295,10 @@ function renderFUWithSource(list) {
     el.style.cursor = 'pointer';
     el.title = 'Focus refractions for this response';
     el.addEventListener('click', (function(nid, query) {
-      return function() { focusRefractionNode(nid, query); };
+      return function(e) {
+        if (e.target.closest('.node-controls')) return;
+        focusRefractionNode(nid, query);
+      };
     })(nodeId, fu.query || ''));
 
     var paras = bodyText.split(/\n\n/).filter(Boolean).map(function(p) {
@@ -3262,6 +3309,9 @@ function renderFUWithSource(list) {
       (isRecipient ? '<div class="fu-label-recipient">From the person you shared with</div>' : '') +
       '<div class="fu-question">' + escHtml(fu.query || '') + '</div>' +
       '<div class="fu-body">' + (paras || '<p>' + escHtml(bodyText) + '</p>') + '</div>';
+
+    // Append local node controls to this follow-up
+    el.appendChild(buildNodeControls(nodeId, fu.query || ''));
 
     container.appendChild(el);
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -3723,6 +3773,9 @@ async function deactivateShare() {
   _shareStatus = 'off';
   window._currentShareUrl = null;
 
+  // Sync all node share buttons
+  syncNodeShareButtons();
+
   // Reset Share button
   var btn = document.getElementById('shareBtn');
   if (btn) {
@@ -3801,6 +3854,9 @@ async function handleShareBtn() {
     // Show Discussion button
     var collabBtn = document.getElementById('collabToggleBtn');
     if (collabBtn) collabBtn.style.display = 'inline-block';
+
+    // Sync all node share buttons
+    syncNodeShareButtons();
 
     // Update share button appearance
     if (btn) {
@@ -4128,6 +4184,58 @@ async function loadChatMessages() {
 }
 
 // Focus a specific interpretation node — updates panel and reloads refractions
+// Build the local control row for any interpretation node
+function buildNodeControls(nodeId, queryText) {
+  var wrap = document.createElement('div');
+  wrap.className = 'node-controls';
+  wrap.dataset.nodeId = nodeId;
+
+  // Archive
+  var archBtn = document.createElement('button');
+  archBtn.className = 'node-ctrl-btn';
+  archBtn.textContent = '↓ Archive';
+  archBtn.title = 'Export as archival PDF';
+  archBtn.addEventListener('click', function(e) { e.stopPropagation(); downloadPDF('dark'); });
+  wrap.appendChild(archBtn);
+
+  // Share
+  var shareBtn = document.createElement('button');
+  shareBtn.className = 'node-ctrl-btn node-share-btn';
+  shareBtn.textContent = window._shareActive ? 'Shared ✓' : 'Share';
+  if (window._shareActive) shareBtn.classList.add('share-active');
+  shareBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    handleShareBtn();
+  });
+  wrap.appendChild(shareBtn);
+
+  // Refractions
+  var refBtn = document.createElement('button');
+  refBtn.className = 'node-ctrl-btn node-refraction-btn';
+  refBtn.textContent = 'Refractions';
+  refBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    focusRefractionNode(nodeId, queryText);
+  });
+  wrap.appendChild(refBtn);
+
+  return wrap;
+}
+
+// Update all node Share buttons when share state changes
+function syncNodeShareButtons() {
+  var btns = document.querySelectorAll('.node-share-btn');
+  btns.forEach(function(btn) {
+    if (window._shareActive) {
+      btn.textContent = 'Shared ✓';
+      btn.classList.add('share-active');
+    } else {
+      btn.textContent = 'Share';
+      btn.classList.remove('share-active');
+    }
+  });
+}
+
 function focusRefractionNode(nodeId, queryText) {
   if (_activeNodeId === nodeId) {
     // Already focused — just open the panel
