@@ -3706,10 +3706,56 @@ var _presencePollInterval = null;
 // Called when user taps "Share"
 // First tap: creates share + starts delivery flow
 // Subsequent taps: opens management modal (step 3)
+async function deactivateShare() {
+  if (!_currentSharedSessionId) return;
+  try {
+    await fetch('/api/share', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': localStorage.getItem('qt_user_email') || '' },
+      body: JSON.stringify({ shareId: _currentSharedSessionId, status: 'inactive' })
+    });
+  } catch(e) {}
+
+  // Reset share state
+  window._shareActive = false;
+  _currentSharedSessionId = null;
+  _currentChannelId = null;
+  _shareStatus = 'off';
+  window._currentShareUrl = null;
+
+  // Reset Share button
+  var btn = document.getElementById('shareBtn');
+  if (btn) {
+    btn.textContent = 'Share';
+    btn.style.borderColor = 'var(--border-lit)';
+    btn.style.color = 'var(--text-dim)';
+    btn.onmouseover = function() { btn.style.borderColor='var(--gold-dim)'; btn.style.color='var(--gold-pale)'; };
+    btn.onmouseout  = function() { btn.style.borderColor='var(--border-lit)'; btn.style.color='var(--text-dim)'; };
+  }
+
+  // Hide URL row, presence dot, Refractions button
+  var urlRow = document.getElementById('shareUrlRow');
+  if (urlRow) urlRow.style.display = 'none';
+  var dot = document.getElementById('presenceDot');
+  if (dot) dot.style.display = 'none';
+  var collabBtn = document.getElementById('collabToggleBtn');
+  if (collabBtn) collabBtn.style.display = 'none';
+
+  // Close Refractions panel if open
+  closeChatPanel();
+
+  // Toast
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);padding:12px 24px;font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);z-index:999;transition:opacity 0.5s;white-space:nowrap;';
+  toast.textContent = 'Sharing turned off';
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.style.opacity='0'; setTimeout(function(){ toast.remove(); }, 500); }, 2500);
+}
+
 async function handleShareBtn() {
   if (window._shareActive) {
-    // Already shared — open management
-    openShareModal();
+    // Already shared — toggle off (deactivate share)
+    await deactivateShare();
     return;
   }
 
@@ -3796,7 +3842,7 @@ async function handleShareBtn() {
 function showCopyToast(url) {
   var toast = document.createElement('div');
   toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--gold-dim);padding:12px 24px;font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--gold);z-index:999;transition:opacity 0.5s;white-space:nowrap;';
-  toast.textContent = 'Link copied — ready to send';
+  toast.textContent = 'Share link copied';
   document.body.appendChild(toast);
   setTimeout(function() {
     toast.style.opacity = '0';
