@@ -62,6 +62,34 @@
     .site-footer { flex-direction: column; gap: 16px; text-align: center; padding: 28px; }
   }
 
+  #prism-starfield {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .prism-star {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,1);
+  }
+  /* Page content sits above the starfield */
+  .page-wrap {
+    position: relative;
+    z-index: 1;
+  }
+  aside {
+    position: relative;
+    z-index: 2;
+  }
+  #discussionPanel {
+    z-index: 500;
+  }
+
   body {
     background: var(--void);
     color: var(--text);
@@ -1251,71 +1279,59 @@
     <div id="resultContent"></div>
 
     <!-- DOWNLOAD -->
-    <div id="downloadRow" style="display:none; margin-top:36px; padding:24px 0; border-top:1px solid var(--border);">
+    <div id="downloadRow" style="display:none; margin-top:36px; padding:20px 0; border-top:1px solid var(--border);">
 
-      <!-- PDF downloads + Share button row — Dark | Share | Light -->
-      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:0; align-items:center;">
-        <button onclick="downloadPDF('dark')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; transition:all 0.25s;">↓ Dark Version</button>
+      <!-- Minimal utility cluster -->
+      <div style="display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap;">
 
-        <!-- Share button — centre position -->
-        <div style="position:relative; display:inline-flex; align-items:center; gap:10px;">
-          <button id="shareBtn" onclick="handleShareBtn()" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;"
+        <!-- Save -->
+        <div style="position:relative; display:inline-flex; align-items:center; gap:6px;"
+             title="Save a copy">
+          <button onclick="downloadPDF('dark')"
+            style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;"
+            onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">↓ Save</button>
+          <button onclick="downloadPDF('light')"
+            style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;"
+            onmouseover="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Light</button>
+        </div>
+
+        <!-- Share -->
+        <div style="position:relative; display:inline-flex; align-items:center; gap:6px;">
+          <button id="shareBtn" onclick="handleShareBtn()"
+            style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 16px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;"
             onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'"
-            onmouseout="if(!window._shareActive)this.style.borderColor='var(--border-lit)';if(!window._shareActive)this.style.color='var(--text-dim)'">
+            onmouseout="if(!window._shareActive){this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'}">
             Share
           </button>
-          <!-- Presence dot — hidden until share exists -->
-          <div id="presenceDot" style="display:none; width:10px; height:10px; border-radius:50%; background:rgba(80,180,120,0.3); transition:background 0.5s;" title="Viewing status"></div>
+          <div id="presenceDot" style="display:none; width:7px; height:7px; border-radius:50%; background:rgba(80,180,120,0.5); transition:background 0.5s;" title="Live"></div>
         </div>
 
-        <button onclick="downloadPDF('light')" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.18em; text-transform:uppercase; padding:13px 28px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;">↓ Light Version</button>
-      </div>
-
-      <!-- Share URL — revealed inline after share created -->
-      <!-- Live Sync + URL + Copy + Open Discussion — all in one row -->
-      <div id="shareUrlRow" style="display:none; margin-top:16px; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;">
-        <button id="liveSyncBtn" onclick="startLiveSync()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; padding:9px 16px; border:1px solid rgba(80,180,120,0.5); background:transparent; color:rgba(80,180,120,0.9); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
-          onmouseover="this.style.background='rgba(80,180,120,0.08)'"
-          onmouseout="this.style.background='transparent'">⟳ Live Sync</button>
-        <div id="shareUrlDisplay" style="font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:260px; flex:1;"></div>
-        <button onclick="shareViaCopy()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
-          onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
-          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Copy</button>
-        <button id="collabToggleBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; padding:9px 16px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;"
+        <!-- Discussion trigger — only visible when shared -->
+        <button id="collabToggleBtn" onclick="toggleCollaboration()"
+          style="display:none; font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;"
           onmouseover="this.style.borderColor='rgba(80,180,120,0.5)';this.style.color='rgba(80,180,120,0.8)'"
           onmouseout="if(!_collabOpen){this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'}">
-          Open Discussion
+          Discussion
         </button>
+
       </div>
 
-      <!-- Hidden legacy discussionRow — kept for JS compatibility -->
+      <!-- Share URL row — minimal, collapsed by default -->
+      <div id="shareUrlRow" style="display:none; margin-top:12px; justify-content:center; align-items:center; gap:8px;">
+        <div id="shareUrlDisplay" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px;"></div>
+        <button onclick="shareViaCopy()"
+          style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; padding:6px 12px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s; flex-shrink:0;"
+          onmouseover="this.style.color='var(--text-dim)'" onmouseout="this.style.color='var(--text-muted)'">Copy</button>
+        <button id="liveSyncBtn" onclick="startLiveSync()"
+          style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; padding:6px 12px; border:1px solid rgba(80,180,120,0.3); background:transparent; color:rgba(80,180,120,0.6); cursor:pointer; transition:all 0.2s; flex-shrink:0;">Sync</button>
+      </div>
+
+      <!-- Hidden legacy elements — kept for JS compatibility -->
       <div id="discussionRow" style="display:none;"></div>
-
-      <!-- Hidden legacy collabToggleRow — kept for JS compatibility -->
       <div id="collabToggleRow" style="display:none;"></div>
-
-      <!-- PER-QUERY CHAT PANEL -->
-      <div id="chatPanel" style="display:none; margin-top:16px;">
-        <div class="chat-bar" onclick="toggleChatBody()">
-          <div class="chat-bar-left">
-            <div class="chat-bar-dot" id="chatBarDot"></div>
-            <span>Discussion</span>
-            <span class="chat-bar-count" id="chatBarCount"></span>
-          </div>
-          <span class="chat-bar-toggle" id="chatBarToggle">▾ Open</span>
-        </div>
-        <div class="chat-body" id="chatBody">
-          <div class="chat-stream" id="chatStream">
-            <div class="chat-empty" id="chatEmpty">No messages yet. Start the discussion.</div>
-          </div>
-          <div class="chat-compose">
-            <textarea class="chat-input" id="chatInput" placeholder="Add to the discussion…" rows="1"
-              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
-              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
-            <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
-          </div>
-        </div>
-      </div>
+      <div id="chatPanel" style="display:none;"></div>
 
     </div>
 
@@ -1338,7 +1354,31 @@
     </div>
   </div>
 
-    <div class="disclaimer">
+    <!-- ── DISCUSSION SLIDE-OVER PANEL ── -->
+  <div id="discussionPanel">
+    <div class="disc-header">
+      <div class="disc-header-left">
+        <div class="disc-header-dot" id="discHeaderDot"></div>
+        <span class="disc-header-title">Discussion</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-left:6px;" id="chatBarCount"></span>
+      </div>
+      <button class="disc-close-btn" onclick="closeDiscussionPanel()">✕</button>
+    </div>
+    <div class="disc-context">
+      <div class="disc-context-query" id="discContextQuery"></div>
+    </div>
+    <div class="chat-stream" id="chatStream" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
+      <div class="chat-empty" id="chatEmpty">No messages yet. Start the discussion.</div>
+    </div>
+    <div class="chat-compose" style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;">
+      <textarea class="chat-input" id="chatInput" placeholder="Add to the discussion…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+      <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
+    </div>
+  </div>
+
+  <div class="disclaimer">
     The Prism is a lens, not an authority. It surfaces relational architecture already present within the text and the questions surrounding it — it does not think for you, conclude for you, or require agreement in order to engage.<br><br>
     Its purpose is not to replace judgment, tradition, skepticism, faith, or personal inquiry, but to provide a structured way of examining difficult ideas without reducing them to slogans, tribal reflexes, or inherited assumptions.<br><br>
     The Prism is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
@@ -2903,8 +2943,10 @@ function selectThread(id) {
       window._qtRealtimeChannel.unsubscribe();
       window._qtRealtimeChannel = null;
     }
-    // Reset rendered ID tracker for new thread
+    // Reset rendered ID tracker and clear existing follow-up blocks for new thread
     _renderedFuIds = new Set();
+    var existingFus = document.querySelectorAll('#resultContent .fu-block');
+    existingFus.forEach(function(el) { el.remove(); });
 
     // Reset share state for this thread — will be restored below if share exists
     window._shareActive = false;
@@ -2943,6 +2985,10 @@ function selectThread(id) {
         var urlDisp = document.getElementById('shareUrlDisplay');
         if (urlRow)  urlRow.style.display = 'flex';
         if (urlDisp) urlDisp.textContent  = window._currentShareUrl;
+
+        // Show Discussion button
+        var collabBtn = document.getElementById('collabToggleBtn');
+        if (collabBtn) collabBtn.style.display = 'inline-block';
 
         // Restore presence dot
         var dot = document.getElementById('presenceDot');
@@ -2998,6 +3044,8 @@ function selectThread(id) {
 
     _shareStatus = 'off';
     _collabOpen = false;
+    var collabBtn = document.getElementById('collabToggleBtn');
+    if (collabBtn) collabBtn.style.display = 'none';
     var shareBtn = document.getElementById('shareBtn');
     if (shareBtn) {
       shareBtn.disabled = false;
@@ -3652,10 +3700,14 @@ async function handleShareBtn() {
     if (!res.ok || !data.shareId) throw new Error('share failed');
 
     _currentSharedSessionId = data.shareId;
-    _currentChannelId       = data.channelId || null;
+    _currentChannelId       = data.channelId || data.shareId;
     _shareStatus            = 'on';
     window._shareActive     = true;
     window._currentShareUrl = data.shareUrl;
+
+    // Show Discussion button
+    var collabBtn = document.getElementById('collabToggleBtn');
+    if (collabBtn) collabBtn.style.display = 'inline-block';
 
     // Update share button appearance
     if (btn) {
@@ -3831,40 +3883,40 @@ function getChatParticipantName() {
 }
 
 function openChatPanel() {
-  var panel = document.getElementById('chatPanel');
+  var panel = document.getElementById('discussionPanel');
   if (!panel) return;
-  panel.style.display = 'block';
+  // Set context query label
+  var ctxEl = document.getElementById('discContextQuery');
+  if (ctxEl) ctxEl.textContent = currentSubject || '';
+  panel.classList.add('open');
+  _chatOpen = true;
+  var dot = document.getElementById('discHeaderDot');
+  if (dot) dot.style.background = 'rgba(80,180,120,0.9)';
   updateChatBarUI();
-  // Auto-expand — polling starts after channelId confirmed from PATCH response
-  if (!_chatOpen) toggleChatBody();
+}
+
+function closeDiscussionPanel() {
+  var panel = document.getElementById('discussionPanel');
+  if (!panel) return;
+  panel.classList.remove('open');
+  _chatOpen = false;
 }
 
 function closeChatPanel() {
-  var panel = document.getElementById('chatPanel');
-  if (!panel) return;
-  panel.style.display = 'none';
-  _chatOpen = false;
+  closeDiscussionPanel();
   _chatMessages = [];
   _chatParticipantName = null;
   stopChatPolling();
 }
 
 function toggleChatBody() {
-  _chatOpen = !_chatOpen;
-  var body = document.getElementById('chatBody');
-  var toggle = document.getElementById('chatBarToggle');
-  var dot = document.getElementById('chatBarDot');
-  if (!body) return;
-  if (_chatOpen) {
-    body.classList.add('open');
-    toggle.textContent = '▴ Close';
-    dot.classList.add('active');
-    var stream = document.getElementById('chatStream');
-    if (stream) stream.scrollTop = stream.scrollHeight;
+  // Now opens/closes the slide-over panel
+  var panel = document.getElementById('discussionPanel');
+  if (!panel) return;
+  if (panel.classList.contains('open')) {
+    closeDiscussionPanel();
   } else {
-    body.classList.remove('open');
-    toggle.textContent = '▾ Open';
-    dot.classList.remove('active');
+    openChatPanel();
   }
 }
 
@@ -3872,7 +3924,7 @@ function updateChatBarUI() {
   var count = document.getElementById('chatBarCount');
   if (!count) return;
   var n = _chatMessages.length;
-  count.textContent = n > 0 ? '(' + n + (n === 1 ? ' message' : ' messages') + ')' : '';
+  count.textContent = n > 0 ? n + (n === 1 ? ' message' : ' messages') : '';
 }
 
 async function sendChatMessage() {
@@ -4395,11 +4447,12 @@ async function toggleCollaboration() {
 }
 
 function updateCollabToggleUI() {
-  // downloadRow collab toggle (visible beneath the result)
+  // Discussion button visibility
   var btn = document.getElementById('collabToggleBtn');
   var row = document.getElementById('collabToggleRow');
-  if (!btn || !row) return;
-  row.style.display = _currentSharedSessionId ? 'block' : 'none';
+  if (btn) btn.style.display = _currentSharedSessionId ? 'inline-block' : 'none';
+  if (row) row.style.display = 'none'; // legacy hidden
+  if (!btn) return;
   if (_collabOpen) {
     btn.textContent       = 'Discussion Open';
     btn.style.borderColor = 'rgba(80,180,120,0.6)';
@@ -5113,5 +5166,148 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+<div id="prism-starfield" aria-hidden="true"></div>
+
+<script>
+// ── Prism Starfield — atmospheric, contemplative, imperceptible ───────────────
+(function() {
+  'use strict';
+
+  var container = document.getElementById('prism-starfield');
+  if (!container) return;
+
+  // Configuration — tuned for stillness
+  var CONFIG = {
+    count:        55,      // sparse population
+    minSize:      0.4,     // px — near-invisible
+    maxSize:      1.6,     // px — still very small
+    minOpacity:   0.04,    // barely there
+    maxOpacity:   0.18,    // never bright
+    edgeBias:     0.68,    // probability star starts near edges
+    // Drift — measured in pixels per minute
+    minDrift:     0.4,     // px/min — almost nothing
+    maxDrift:     3.2,     // px/min — very slow
+    // Twinkle — opacity oscillation over many seconds
+    twinklePeriod: [90000, 240000],  // ms — 1.5 to 4 minutes
+    twinkleDepth:  0.06,   // max opacity change from twinkle
+  };
+
+  var stars = [];
+  var lastTime = null;
+  var raf = null;
+  var W = window.innerWidth;
+  var H = window.innerHeight;
+
+  function rand(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function edgeBiasedPosition(edge) {
+    // Returns a value in [0,1] biased toward 0 or 1
+    if (Math.random() < edge) {
+      return Math.random() < 0.5
+        ? rand(0, 0.15)
+        : rand(0.85, 1.0);
+    }
+    return Math.random();
+  }
+
+  function createStar() {
+    var size    = rand(CONFIG.minSize, CONFIG.maxSize);
+    var baseOp  = rand(CONFIG.minOpacity, CONFIG.maxOpacity);
+    var x       = edgeBiasedPosition(CONFIG.edgeBias) * W;
+    var y       = edgeBiasedPosition(CONFIG.edgeBias) * H;
+    // Drift direction — random angle, very slow speed
+    var speed   = rand(CONFIG.minDrift, CONFIG.maxDrift) / 60000; // px/ms
+    var angle   = rand(0, Math.PI * 2);
+    var vx      = Math.cos(angle) * speed;
+    var vy      = Math.sin(angle) * speed;
+    // Twinkle — sine wave over a long period
+    var period  = rand(CONFIG.twinklePeriod[0], CONFIG.twinklePeriod[1]);
+    var phase   = rand(0, Math.PI * 2);
+
+    var el = document.createElement('div');
+    el.className = 'prism-star';
+    el.style.width  = size + 'px';
+    el.style.height = size + 'px';
+    el.style.left   = x + 'px';
+    el.style.top    = y + 'px';
+    el.style.opacity = baseOp;
+    container.appendChild(el);
+
+    return { el, x, y, vx, vy, baseOp, period, phase, size };
+  }
+
+  function init() {
+    container.innerHTML = '';
+    stars = [];
+    W = window.innerWidth;
+    H = window.innerHeight;
+    for (var i = 0; i < CONFIG.count; i++) {
+      stars.push(createStar());
+    }
+  }
+
+  function tick(ts) {
+    if (!lastTime) { lastTime = ts; raf = requestAnimationFrame(tick); return; }
+    var dt = ts - lastTime;
+    lastTime = ts;
+
+    // Cap dt to prevent jumps after tab switch
+    if (dt > 5000) { raf = requestAnimationFrame(tick); return; }
+
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+
+      // Drift
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+
+      // Wrap at edges with a margin so wrapping is invisible
+      var margin = 10;
+      if (s.x < -margin) s.x = W + margin;
+      if (s.x > W + margin) s.x = -margin;
+      if (s.y < -margin) s.y = H + margin;
+      if (s.y > H + margin) s.y = -margin;
+
+      // Twinkle — slow sine oscillation
+      var twinkle = Math.sin((ts / s.period) * Math.PI * 2 + s.phase) * CONFIG.twinkleDepth;
+      var op = Math.max(0, Math.min(1, s.baseOp + twinkle));
+
+      s.el.style.left    = s.x + 'px';
+      s.el.style.top     = s.y + 'px';
+      s.el.style.opacity = op;
+    }
+
+    raf = requestAnimationFrame(tick);
+  }
+
+  // Pause when tab is hidden — no wasted cycles
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      if (raf) { cancelAnimationFrame(raf); raf = null; lastTime = null; }
+    } else {
+      if (!raf) raf = requestAnimationFrame(tick);
+    }
+  });
+
+  // Reinit on resize — debounced
+  var resizeTimer;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() {
+      if (raf) { cancelAnimationFrame(raf); raf = null; lastTime = null; }
+      init();
+      raf = requestAnimationFrame(tick);
+    }, 400);
+  });
+
+  // Start
+  init();
+  raf = requestAnimationFrame(tick);
+
+})();
+</script>
+
 </body>
 </html>
