@@ -843,6 +843,18 @@ function onAuthGateSuccess(email, displayName) {
   var gate = document.getElementById('recipientAuthGate');
   if (gate) gate.style.display = 'none';
   initSidebarPanels();
+  // Restore input section — registered users get more queries
+  var inputSec = document.getElementById('inputSection');
+  if (inputSec) inputSec.style.display = 'block';
+  var submitBtn = document.getElementById('submitBtn');
+  if (submitBtn) submitBtn.style.display = 'block';
+  // Hide limit wall if shown
+  var wall = document.getElementById('limitWall');
+  if (wall) wall.style.display = 'none';
+  var notice = document.getElementById('limitNotice');
+  if (notice) notice.style.display = 'none';
+  // Reset query count — registered users get fresh queries
+  sessionQueries = 0;
   // Reload collab messages with correct identity
   if (typeof loadCollabMessages === 'function') loadCollabMessages();
 }
@@ -1290,7 +1302,22 @@ async function runQuery() {
   }
 }
 
+function showQueryLimitAuthPrompt() {
+  var gate = document.getElementById('recipientAuthGate');
+  if (!gate) return;
+  // Update copy to reflect limit context
+  var desc = gate.querySelector('.auth-gate-desc');
+  if (desc) desc.textContent = "You’ve used your 3 free queries for today. Create a free account to save this session and continue your exploration — or sign in if you already have one. Your progress is saved.";
+  gate.style.display = 'flex';
+}
+
 function showLimitWall(msg) {
+  // If unauthenticated — show auth pop-up instead of hard wall
+  if (!localStorage.getItem('qt_user_email')) {
+    showQueryLimitAuthPrompt();
+    return;
+  }
+
   // Hide the input section and replace with a quiet notice
   var inputSec = document.getElementById('inputSection');
   if (inputSec) inputSec.style.display = 'none';
@@ -2152,7 +2179,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <div id="recipientAuthGate" style="display:none; position:fixed; inset:0; background:rgba(6,6,10,0.92); z-index:2000; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
   <div style="background:var(--deep); border:1px solid var(--border); padding:40px 36px; max-width:420px; width:90%; position:relative;">
     <div style="font-family:var(--cinzel); font-size:13px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:6px;">The Prism</div>
-    <div style="font-family:var(--crimson); font-style:italic; font-size:17px; color:var(--text-dim); line-height:1.6; margin-bottom:28px;">Someone has shared an interpretation with you. Sign in or create a free account to join the discussion.</div>
+    <div class="auth-gate-desc" style="font-family:var(--crimson); font-style:italic; font-size:17px; color:var(--text-dim); line-height:1.6; margin-bottom:28px;">Someone has shared an interpretation with you. Sign in or create a free account to join the discussion.</div>
 
     <!-- Tab toggle -->
     <div style="display:flex; gap:0; margin-bottom:24px; border:1px solid var(--border);">
