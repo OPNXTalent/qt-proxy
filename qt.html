@@ -445,6 +445,16 @@
     padding-bottom: 24px;
     border-bottom: 1px solid rgba(42,42,64,0.18);
   }
+  /* Governance transitions — opacity only, no layout shift */
+  .query-state-label,
+  .query-state-dot,
+  .query-toggle-btn,
+  .query-url-text,
+  .query-sync-btn,
+  .query-secondary-btn,
+  .query-close-btn {
+    transition: opacity 0.35s ease, color 0.25s ease, border-color 0.25s ease;
+  }
 
   /* State row: label + dot + toggle + secondary actions */
   .query-state-row {
@@ -469,11 +479,12 @@
     border-radius: 50%;
     background: rgba(80,180,120,0.7);
     box-shadow: 0 0 5px rgba(80,180,120,0.25);
-    display: none;
     flex-shrink: 0;
     margin-left: -6px;
+    opacity: 0;
+    transition: opacity 0.4s ease;
   }
-  .query-state-dot.visible { display: block; }
+  .query-state-dot.visible { opacity: 1; }
 
   /* Primary toggle: Open Query / Close Query */
   .query-toggle-btn {
@@ -511,17 +522,23 @@
   }
   .query-secondary-btn:hover { color: rgba(160,155,140,0.6); }
 
-  /* URL address row — open state only */
+  /* URL address layer — always mounted, opacity-driven */
   .query-address-layer {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 12px;
     margin-top: 14px;
     padding-top: 14px;
-    border-top: 1px solid rgba(42,42,64,0.18);
+    border-top: 1px solid rgba(42,42,64,0.12);
     flex-wrap: wrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
   }
-  .query-address-layer.visible { display: flex; }
+  .query-address-layer.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
   .query-url-text {
     font-family: var(--mono);
     font-size: 13px;
@@ -1712,20 +1729,26 @@
     <div id="sessionGovernance" style="display:none;">
 
       <!-- Single governance row: [ Open Query ] ········ Archive | Print -->
+      <!-- State row — stable height, opacity-driven state swaps -->
       <div class="query-state-row">
-        <!-- Left: state label (hidden when private) + Open Query trigger -->
-        <span class="query-state-label" id="sessionShareState"></span>
-        <span class="query-state-dot" id="queryStateDot"></span>
-        <button class="query-toggle-btn" id="queryOpenTrigger" onclick="handleShareBtn()">Open Query</button>
-        <!-- Right: artifact governance -->
-        <div style="margin-left:auto;display:flex;align-items:center;gap:0;">
+        <!-- Left: Open Query (private) XOR Query Open + dot (open) — same space -->
+        <div style="position:relative;display:flex;align-items:center;gap:8px;flex:1;">
+          <button class="query-toggle-btn" id="queryOpenTrigger"
+            onclick="handleShareBtn()" style="opacity:1;transition:opacity 0.35s ease;">Open Query</button>
+          <span class="query-state-label" id="sessionShareState"
+            style="position:absolute;left:0;opacity:0;transition:opacity 0.35s ease;white-space:nowrap;pointer-events:none;">Query Open</span>
+          <span class="query-state-dot" id="queryStateDot"
+            style="position:absolute;left:calc(5.5em + 10px);"></span>
+        </div>
+        <!-- Right: artifact governance — anchored, never moves -->
+        <div style="display:flex;align-items:center;gap:0;flex-shrink:0;">
           <button class="query-artifact-btn" onclick="downloadPDF('dark')" id="sessionArchiveBtn">Archive</button>
-          <span style="color:rgba(80,78,100,0.35);padding:0 10px;font-size:12px;">|</span>
+          <span style="color:rgba(80,78,100,0.3);padding:0 12px;font-size:11px;">|</span>
           <button class="query-artifact-btn" onclick="window.print()">Print</button>
         </div>
       </div>
 
-      <!-- URL address row — visible when Query is open -->
+      <!-- URL address layer — always mounted, fades in/out -->
       <div class="query-address-layer" id="queryUrlRow">
         <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Copy link">—</span>
         <div style="display:flex;gap:20px;align-items:center;flex-shrink:0;">
@@ -4226,27 +4249,30 @@ function updateSessionGovernanceUI() {
   if (!stateEl) return;
 
   if (window._shareActive) {
-    stateEl.textContent = 'Query Open';
+    // Fade in Query Open label, fade out Open Query button
+    stateEl.style.opacity = '1';
+    stateEl.style.pointerEvents = 'none';
     stateEl.className = 'query-state-label open';
-    stateEl.style.visibility = 'visible';
+    if (openTrig) openTrig.style.opacity = '0';
+    if (openTrig) openTrig.style.pointerEvents = 'none';
     if (stateDot) stateDot.classList.add('visible');
+    // Fade in URL layer
     if (urlRow)   urlRow.classList.add('visible');
     if (urlText && window._currentShareUrl) {
       urlText.textContent = window._currentShareUrl;
       urlText.classList.add('active');
     }
     if (typeof setGovState === 'function') setGovState('copy');
-    // Hide Open Query button when open
-    if (openTrig) openTrig.style.display = 'none';
   } else {
-    stateEl.textContent = '';
+    // Fade in Open Query button, fade out Query Open label
+    stateEl.style.opacity = '0';
     stateEl.className = 'query-state-label';
-    stateEl.style.visibility = 'hidden';
+    if (openTrig) openTrig.style.opacity = '1';
+    if (openTrig) openTrig.style.pointerEvents = 'auto';
     if (stateDot) stateDot.classList.remove('visible');
+    // Fade out URL layer (stays mounted)
     if (urlRow)   urlRow.classList.remove('visible');
     if (urlText)  { urlText.textContent = '—'; urlText.classList.remove('active'); }
-    // Show Open Query button when private
-    if (openTrig) openTrig.style.display = 'inline-block';
   }
 }
 
