@@ -436,43 +436,137 @@
     flex-shrink: 0;
   }
   /* Session governance bar */
-  /* ── Query governance area ─────────────────────────────────── */
+  /* ── Query governance — four atmospheric layers ─────────────── */
   #sessionGovernance {
     display: none;
     flex-direction: column;
     gap: 0;
-    margin-bottom: 28px;
-    border: 1px solid rgba(42,42,64,0.35);
-    background: rgba(13,13,20,0.6);
+    margin-bottom: 32px;
   }
 
-  /* Top row: state + action buttons */
-  .query-stewardship-row {
+  /* Layer 1 — Query state: QUERY OPEN ● */
+  .query-state-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    border-bottom: 1px solid rgba(42,42,64,0.3);
-    flex-wrap: wrap;
+    gap: 10px;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(42,42,64,0.2);
   }
   .query-state-label {
     font-family: var(--mono);
-    font-size: 8px;
-    letter-spacing: 0.24em;
+    font-size: 8.5px;
+    letter-spacing: 0.26em;
     text-transform: uppercase;
-    color: rgba(120,118,140,0.35);
-    flex: 1;
-    min-width: 80px;
+    color: rgba(120,118,140,0.3);
   }
-  .query-state-label.open {
-    color: rgba(80,180,120,0.65);
+  .query-state-label.open { color: rgba(80,180,120,0.55); }
+  .query-state-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(80,180,120,0.65);
+    box-shadow: 0 0 5px rgba(80,180,120,0.25);
+    display: none;
+    flex-shrink: 0;
   }
-  .query-gov-btn {
+  .query-state-dot.visible { display: block; }
+  /* Lifecycle governance — quiet, upper right */
+  .query-lifecycle-cluster {
+    margin-left: auto;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+  .query-lifecycle-btn {
     font-family: var(--mono);
     font-size: 8px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    padding: 5px 11px;
+    background: transparent;
+    border: none;
+    color: rgba(100,98,120,0.4);
+    cursor: pointer;
+    transition: color 0.22s;
+    padding: 0;
+    white-space: nowrap;
+  }
+  .query-lifecycle-btn:hover { color: rgba(160,155,140,0.65); }
+  .query-lifecycle-btn.close-btn { color: rgba(120,118,140,0.35); }
+  .query-lifecycle-btn.close-btn:hover { color: rgba(200,80,80,0.5); }
+
+  /* Layer 2 — Relational address bar */
+  .query-address-layer {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 16px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(42,42,64,0.15);
+  }
+  .query-address-layer.visible { display: flex; }
+  .query-url-text {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: rgba(190,185,168,0.6);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: color 0.22s;
+    line-height: 1;
+  }
+  .query-url-text:hover { color: rgba(201,168,76,0.65); }
+  .query-url-text.synced { color: rgba(190,185,168,0.72); }
+
+  /* Layer 3 — Accessibility actions */
+  .query-access-actions {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .query-access-primary {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid rgba(80,180,120,0.3);
+    background: rgba(80,180,120,0.04);
+    color: rgba(80,180,120,0.7);
+    cursor: pointer;
+    transition: all 0.22s;
+    white-space: nowrap;
+  }
+  .query-access-primary:hover { border-color: rgba(80,180,120,0.6); color: rgba(80,180,120,0.95); background: rgba(80,180,120,0.07); }
+  .query-access-secondary {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: transparent;
+    border: none;
+    color: rgba(120,118,140,0.4);
+    cursor: pointer;
+    transition: color 0.22s;
+    padding: 0;
+    white-space: nowrap;
+  }
+  .query-access-secondary:hover { color: rgba(180,175,160,0.65); }
+
+  /* Layer 4 — Share trigger (private state) */
+  .query-share-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .query-share-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 6px 14px;
     border: 1px solid rgba(42,42,64,0.5);
     background: transparent;
     color: rgba(120,118,140,0.45);
@@ -480,63 +574,10 @@
     transition: all 0.22s;
     white-space: nowrap;
   }
-  .query-gov-btn:hover { border-color: rgba(201,168,76,0.3); color: rgba(201,168,76,0.65); }
-  .query-gov-btn.open-query { border-color: rgba(80,180,120,0.3); color: rgba(80,180,120,0.65); }
-  .query-gov-btn.open-query:hover { border-color: rgba(80,180,120,0.6); color: rgba(80,180,120,0.9); }
-  .query-gov-btn.active-state { border-color: rgba(80,180,120,0.25); color: rgba(80,180,120,0.6); }
+  .query-share-btn:hover { border-color: rgba(80,180,120,0.35); color: rgba(80,180,120,0.7); }
 
-  /* URL bar row */
-  .query-url-row {
-    display: none;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-  }
-  .query-url-row.visible { display: flex; }
-  .query-url-label {
-    font-family: var(--mono);
-    font-size: 8px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: rgba(80,180,120,0.4);
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .query-url-text {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: rgba(180,175,160,0.6);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    transition: color 0.2s;
-  }
-  .query-url-text:hover { color: rgba(201,168,76,0.7); }
-  .query-url-text.synced { color: rgba(180,175,160,0.75); }
-  .query-url-actions {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-  .query-url-btn {
-    font-family: var(--mono);
-    font-size: 8px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    padding: 4px 10px;
-    border: 1px solid rgba(42,42,64,0.5);
-    background: transparent;
-    color: rgba(120,118,140,0.45);
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-  }
-  .query-url-btn:hover { border-color: rgba(201,168,76,0.3); color: rgba(201,168,76,0.65); }
-  .query-url-btn.sync-btn { border-color: rgba(80,180,120,0.25); color: rgba(80,180,120,0.55); }
-  .query-url-btn.sync-btn:hover { border-color: rgba(80,180,120,0.55); color: rgba(80,180,120,0.9); }
+  /* Legacy compat */
+  .query-gov-btn { display: none; }
 
   .thread-item { padding: 10px 20px; border-bottom: 1px solid rgba(42,42,64,0.25); cursor: pointer; transition: background 0.2s; position: relative; }
   .thread-item:hover { background: rgba(255,255,255,0.015); }
@@ -1651,30 +1692,34 @@
   <!-- RESULT ---->
   <div class="result" id="resultBlock">
     <!-- Query governance area — stewardship + URL bar -->
+    <!-- Query governance — four atmospheric layers -->
     <div id="sessionGovernance" style="display:none;">
 
-      <!-- Stewardship row -->
-      <div class="query-stewardship-row">
+      <!-- Layer 1: Query state + lifecycle governance -->
+      <div class="query-state-row">
         <span class="query-state-label" id="sessionShareState">Private Query</span>
-        <button class="query-gov-btn open-query" id="sessionShareBtn" onclick="handleShareBtn()" title="Open this Query to collaborators">
-          Share
-        </button>
-        <button class="query-gov-btn" id="sessionPrintBtn" onclick="window.print()" title="Print or save this Query">
-          Print
-        </button>
-        <button class="query-gov-btn" id="sessionArchiveBtn" onclick="downloadPDF('dark')" title="Export as archival PDF">
-          Archive
-        </button>
+        <span class="query-state-dot" id="queryStateDot"></span>
+        <div class="query-lifecycle-cluster">
+          <button class="query-lifecycle-btn" onclick="downloadPDF('dark')" title="Export archival PDF" id="sessionArchiveBtn">Archive</button>
+          <button class="query-lifecycle-btn close-btn" id="sessionShareBtn" onclick="handleShareBtn()" style="display:none;" title="Close relational access">Close Query</button>
+        </div>
       </div>
 
-      <!-- URL bar — visible only when Query is open -->
-      <div class="query-url-row" id="queryUrlRow">
-        <span class="query-url-label">Query URL</span>
-        <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Click to copy">—</span>
-        <div class="query-url-actions">
-          <button class="query-url-btn" onclick="copyQueryLink()" id="queryCopyBtn" title="Copy share link">Copy Link</button>
-          <button class="query-url-btn sync-btn" onclick="startLiveSync()" id="querySyncBtn" title="Synchronize Query accessibility">Sync</button>
+      <!-- Layers 2+3: Relational address + accessibility (open state only) -->
+      <div class="query-address-layer" id="queryUrlRow">
+        <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Click to copy link">—</span>
+        <div class="query-access-actions">
+          <button class="query-access-primary" onclick="startLiveSync()" id="querySyncBtn" title="Synchronize Query accessibility">Sync</button>
+          <button class="query-access-secondary" onclick="copyQueryLink()" id="queryCopyBtn">Copy Link</button>
+          <button class="query-access-secondary" onclick="window.print()">Print</button>
         </div>
+      </div>
+
+      <!-- Layer 4: Share trigger (private state only) -->
+      <div class="query-share-trigger" id="queryShareTrigger">
+        <button class="query-share-btn" onclick="handleShareBtn()" title="Open this Query to collaborators" id="sessionShareTrigger">Share Query</button>
+        <button class="query-access-secondary" onclick="window.print()" style="margin-left:4px;">Print</button>
+        <button class="query-access-secondary" onclick="downloadPDF('dark')" style="margin-left:4px;">Archive</button>
       </div>
 
     </div>
@@ -4160,33 +4205,39 @@ var _presencePollInterval = null;
 // First tap: creates share + starts delivery flow
 // Subsequent taps: opens management modal (step 3)
 function updateSessionGovernanceUI() {
-  var stateEl  = document.getElementById('sessionShareState');
-  var shareBtn = document.getElementById('sessionShareBtn');
-  var urlRow   = document.getElementById('queryUrlRow');
-  var urlText  = document.getElementById('queryUrlText');
-  if (!stateEl || !shareBtn) return;
+  var stateEl    = document.getElementById('sessionShareState');
+  var stateDot   = document.getElementById('queryStateDot');
+  var closeBtn   = document.getElementById('sessionShareBtn');
+  var urlRow     = document.getElementById('queryUrlRow');
+  var urlText    = document.getElementById('queryUrlText');
+  var shareTrig  = document.getElementById('queryShareTrigger');
+  if (!stateEl) return;
 
   if (window._shareActive) {
+    // Layer 1: state
     stateEl.textContent = 'Query Open';
     stateEl.className = 'query-state-label open';
-    shareBtn.textContent = 'Close Query';
-    shareBtn.className = 'query-gov-btn active-state';
-    shareBtn.title = 'Close relational access to this Query';
-    // Show and populate URL bar
+    if (stateDot) stateDot.classList.add('visible');
+    if (closeBtn) closeBtn.style.display = 'inline-block';
+    // Layer 2+3: address + actions
     if (urlRow) urlRow.classList.add('visible');
     if (urlText && window._currentShareUrl) {
       urlText.textContent = window._currentShareUrl;
       urlText.classList.add('synced');
     }
+    // Layer 4: hide share trigger
+    if (shareTrig) shareTrig.style.display = 'none';
   } else {
+    // Layer 1: state
     stateEl.textContent = 'Private Query';
     stateEl.className = 'query-state-label';
-    shareBtn.textContent = 'Share';
-    shareBtn.className = 'query-gov-btn open-query';
-    shareBtn.title = 'Open this Query to collaborators';
-    // Hide URL bar
+    if (stateDot) stateDot.classList.remove('visible');
+    if (closeBtn) closeBtn.style.display = 'none';
+    // Layer 2+3: hide address
     if (urlRow) urlRow.classList.remove('visible');
     if (urlText) { urlText.textContent = '—'; urlText.classList.remove('synced'); }
+    // Layer 4: show share trigger
+    if (shareTrig) shareTrig.style.display = 'flex';
   }
 }
 
