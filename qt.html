@@ -425,15 +425,16 @@
 
   /* Shared inquiry dot */
   .thread-shared-dot {
-    display: inline-block;
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
     width: 5px;
     height: 5px;
     border-radius: 50%;
     background: rgba(80,180,120,0.7);
     box-shadow: 0 0 4px rgba(80,180,120,0.3);
-    margin-left: 7px;
-    vertical-align: middle;
-    flex-shrink: 0;
+    pointer-events: none;
   }
   /* Session governance bar */
   /* ── Query governance — two clean relational states ────────── */
@@ -640,7 +641,7 @@
   .thread-item.collab-open { border-left: 1px solid rgba(80,180,120,0.4); background: rgba(80,180,120,0.02); padding-left: 19px; }
   .thread-item.collab-open.active { border-left: 1px solid rgba(80,180,120,0.6); background: rgba(80,180,120,0.04); }
   .thread-item.locked { cursor: default; }
-  .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text-dim); line-height: 1.4; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 44px; }
+  .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text-dim); line-height: 1.4; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px; }
   .thread-item.active .thread-title { color: var(--text); }
   .thread-item.locked .thread-title { color: var(--text-muted); }
   .thread-subtitle { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3394,15 +3395,15 @@ function renderThreads(threads) {
       titleEl.appendChild(inp);
     } else {
       titleEl.textContent = title;
-      // Add shared dot if query is open (from server flag or live tracking)
-      if (collabOpen || _openThreadIds.has(thread.id)) {
-        var dot = document.createElement('span');
-        dot.className = 'thread-shared-dot';
-        dot.title = 'Query open';
-        titleEl.appendChild(dot);
-      }
     }
     item.appendChild(titleEl);
+    // Dot appended to item (not titleEl) so it's never clipped by text overflow
+    if (collabOpen || _openThreadIds.has(thread.id)) {
+      var dot = document.createElement('span');
+      dot.className = 'thread-shared-dot';
+      dot.title = 'Query open';
+      item.appendChild(dot);
+    }
 
     // Only show subtitle if different from title
     if (preview && preview !== title) {
@@ -4373,9 +4374,7 @@ function updateSidebarSharedDot(threadId, isShared) {
     var dot = document.createElement('span');
     dot.className = 'thread-shared-dot';
     dot.title = 'Query open';
-    // Insert after the title element
-    var titleEl = item.querySelector('.thread-title');
-    if (titleEl) titleEl.appendChild(dot);
+    item.appendChild(dot); // on item, not title — never clipped
   } else if (!isShared && existing) {
     existing.remove();
   }
