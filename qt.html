@@ -640,6 +640,7 @@
   .thread-item.locked .thread-title { color: var(--text-muted); }
   .thread-subtitle { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .thread-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 3px; }
+  .thread-shared-label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(80,180,120,0.7); flex-shrink: 0; }
   .thread-date { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.06em; color: rgba(120,118,140,0.6); }
   .thread-badge { font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; border: none; white-space: nowrap; font-weight: 400; }
   .badge-ok     { background: rgba(201,168,76,0.25); }
@@ -3431,6 +3432,13 @@ function renderThreads(threads) {
       badge.textContent = ''; // no badge when plenty of time
     }
     metaEl.appendChild(badge);
+    // Shared indicator — inline in meta row, reliable across all title lengths
+    if (collabOpen) {
+      var sharedLabel = document.createElement('span');
+      sharedLabel.className = 'thread-shared-label';
+      sharedLabel.textContent = 'shared';
+      metaEl.appendChild(sharedLabel);
+    }
     item.appendChild(metaEl);
 
     // Action buttons container — appears on hover, top right
@@ -4384,8 +4392,17 @@ function updateSidebarSharedDot(threadId, isShared) {
   if (!item) return;
   if (isShared) {
     item.classList.add('collab-open');
+    var meta = item.querySelector('.thread-meta');
+    if (meta && !meta.querySelector('.thread-shared-label')) {
+      var lbl = document.createElement('span');
+      lbl.className = 'thread-shared-label';
+      lbl.textContent = 'shared';
+      meta.appendChild(lbl);
+    }
   } else {
     item.classList.remove('collab-open');
+    var existing = item.querySelector('.thread-shared-label');
+    if (existing) existing.remove();
   }
 }
 
