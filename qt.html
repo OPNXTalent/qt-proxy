@@ -423,14 +423,7 @@
   .sidebar-threads::-webkit-scrollbar { width: 3px; }
   .sidebar-threads::-webkit-scrollbar-thumb { background: var(--border); }
 
-  /* Shared inquiry dot */
-  /* Open/shared query row — green frame, no dot */
-  .thread-item.collab-open {
-    box-shadow: inset 0 0 0 1px rgba(80,180,120,0.22);
-  }
-  .thread-item.collab-open.active {
-    box-shadow: inset 0 0 0 1px rgba(80,180,120,0.35);
-  }
+  /* Open/shared query row — handled in main thread-item block below */
   /* Session governance bar */
   /* ── Query governance — two clean relational states ────────── */
   #sessionGovernance {
@@ -633,8 +626,14 @@
   .thread-item { padding: 10px 20px; border-bottom: 1px solid rgba(42,42,64,0.25); cursor: pointer; transition: background 0.2s; position: relative; }
   .thread-item:hover { background: rgba(255,255,255,0.015); }
   .thread-item.active { background: rgba(201,168,76,0.04); border-left: 1px solid rgba(201,168,76,0.3); padding-left: 19px; }
-  .thread-item.collab-open { background: rgba(80,180,120,0.018); }
-  .thread-item.collab-open.active { background: rgba(80,180,120,0.035); }
+  .thread-item.collab-open {
+    background: rgba(80,180,120,0.025);
+    box-shadow: inset 0 0 0 1px rgba(80,180,120,0.5);
+  }
+  .thread-item.collab-open.active {
+    background: rgba(80,180,120,0.045);
+    box-shadow: inset 0 0 0 1px rgba(80,180,120,0.65);
+  }
   .thread-item.locked { cursor: default; }
   .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text-dim); line-height: 1.4; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .thread-item.active .thread-title { color: var(--text); }
