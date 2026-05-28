@@ -804,13 +804,13 @@
     line-height: 1.55;
   }
   .fu-question::before {
-    content: 'Follow-up — ';
+    content: attr(data-label);
     font-family: var(--mono);
     font-size: 10px;
     font-style: normal;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--text-muted);
+    color: rgba(120,118,140,0.45);
     display: block;
     margin-bottom: 6px;
   }
@@ -1882,7 +1882,9 @@ DELIVERY — SOCRATIC CHUNKING: Before responding, construct the complete answer
   // Create follow-up element immediately so we can stream into it
   const followUpEl = document.createElement('div');
   followUpEl.className = 'fu-block';
-  followUpEl.innerHTML = `<div class="fu-question">${escHtml(input)}</div>`;
+  var _streamTempId = 'fu-' + Date.now();
+  var _streamLabel = assignNodeLabel(_streamTempId);
+  followUpEl.innerHTML = `<div class="fu-question" data-label="${_streamLabel} — ">${escHtml(input)}</div>`;
   const followUpTextEl = document.createElement('div');
   followUpTextEl.className = 'fu-body';
   followUpEl.appendChild(followUpTextEl);
@@ -1915,7 +1917,7 @@ DELIVERY — SOCRATIC CHUNKING: Before responding, construct the complete answer
 
     // Append node controls to this streamed follow-up
     // nodeId will be assigned by saveFollowUp/Supabase; use a temp ID for now
-    var tempNodeId = 'fu-' + Date.now();
+    var tempNodeId = _streamTempId;
     followUpEl.dataset.nodeId = tempNodeId;
     followUpEl.style.cursor = 'pointer';
     followUpEl.addEventListener('click', (function(nid, q) {
@@ -3175,6 +3177,8 @@ function selectThread(id) {
     closeDiscussionPanel();
     _currentChannelId = null;
     _activeNodeId = 'root';
+    _nodeLabels = {};
+    _nodeCounter = 0;
     _chatMessages = [];
     _chatParticipantName = null;
     _renderedChatIds = new Set();
@@ -3366,9 +3370,10 @@ function renderFUWithSource(list) {
       return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
     }).join('');
 
+    var label = assignNodeLabel(nodeId);
     el.innerHTML =
       (isRecipient ? '<div class="fu-label-recipient">From the person you shared with</div>' : '') +
-      '<div class="fu-question">' + escHtml(fu.query || '') + '</div>' +
+      '<div class="fu-question" data-label="' + label + ' — ">' + escHtml(fu.query || '') + '</div>' +
       '<div class="fu-body">' + (paras || '<p>' + escHtml(bodyText) + '</p>') + '</div>';
 
     // Append local node controls to this follow-up
@@ -4069,6 +4074,21 @@ var _explorerCount      = 0;
 var _renderedChatIds    = new Set();
 var _sentByMe           = new Set();  // fingerprints of messages we sent
 var _activeNodeId       = 'root';     // currently focused interpretation node
+var _nodeLabels         = {};         // nodeId → 'R1', 'R2' etc.
+var _nodeCounter        = 0;          // increments per follow-up rendered
+
+function assignNodeLabel(nodeId) {
+  if (nodeId === 'root') return 'Query';
+  if (_nodeLabels[nodeId]) return _nodeLabels[nodeId];
+  _nodeCounter++;
+  _nodeLabels[nodeId] = 'R' + _nodeCounter;
+  return _nodeLabels[nodeId];
+}
+
+function getNodeLabel(nodeId) {
+  if (!nodeId || nodeId === 'root') return 'Query';
+  return _nodeLabels[nodeId] || nodeId;
+}
 
 // ── Participant color identity ─────────────────────────────────────────────
 var _participantColors = [
@@ -4113,6 +4133,12 @@ function openChatPanel() {
   var ctxEl = document.getElementById('discContextQuery');
   if (ctxEl && _activeNodeId === 'root') {
     ctxEl.textContent = currentSubject || 'The original interpretation';
+  }
+  // Panel title
+  var anchorLabel = document.querySelector('#discAnchor .disc-anchor-label');
+  if (anchorLabel) {
+    var lbl = getNodeLabel(_activeNodeId || 'root');
+    anchorLabel.textContent = lbl === 'Query' ? 'Query Refractions' : lbl + ' Refractions';
   }
   highlightRefractionNode(_activeNodeId || 'root');
   panel.classList.add('open');
@@ -4288,7 +4314,8 @@ function buildNodeControls(nodeId, queryText) {
   // Refractions
   var refBtn = document.createElement('button');
   refBtn.className = 'node-ctrl-btn node-refraction-btn';
-  refBtn.textContent = 'Refractions';
+  var _btnLabel = getNodeLabel(nodeId);
+  refBtn.textContent = _btnLabel === 'Query' ? 'Refractions' : _btnLabel + ' Refractions';
   refBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     focusRefractionNode(nodeId, queryText);
@@ -4331,6 +4358,14 @@ function focusRefractionNode(nodeId, queryText) {
   // Update contextual anchor
   var ctxEl = document.getElementById('discContextQuery');
   if (ctxEl) ctxEl.textContent = queryText ? (queryText.length > 120 ? queryText.slice(0, 120) + '…' : queryText) : 'The original interpretation';
+
+  // Update panel title with R-label
+  var rLabel = getNodeLabel(nodeId);
+  var anchorLabel = document.querySelector('#discAnchor .disc-anchor-label');
+  if (anchorLabel) anchorLabel.textContent = rLabel === 'Query' ? 'Query Refractions' : rLabel + ' Refractions';
+
+  // Update message count label prefix
+  updateChatBarUI();
 
   // Highlight originating node, dim others
   highlightRefractionNode(nodeId);
