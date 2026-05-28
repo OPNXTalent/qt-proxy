@@ -3589,9 +3589,12 @@ function selectThread(id) {
         window._shareActive     = true;
         window._currentShareToken = share.token;
         window._currentShareUrl = 'https://theprism.io/share.html?t=' + share.token;
-        // Stamp BEFORE renderThreads so collabOpen check sees it immediately
+        // Stamp both _openThreadIds and allThreads before re-render
         _openThreadIds.add(threadId);
-        renderThreads(allThreads); // re-render with correct shared state now visible
+        allThreads = allThreads.map(function(t) {
+          return t.id === threadId ? Object.assign({}, t, { collaboration_open: true }) : t;
+        });
+        renderThreads(allThreads);
         updateSidebarSharedDot(threadId, true);
 
         // Restore share button state
@@ -3702,13 +3705,25 @@ function selectThread(id) {
   }
   var mc = document.getElementById('mainContent');
   if (mc) mc.scrollTop = 0;
-  // Scroll after two animation frames — ensures DOM and layout are complete
+  // Scroll to top — try all candidate scroll containers
   requestAnimationFrame(function() {
     requestAnimationFrame(function() {
-      var mc2 = document.getElementById('mainContent');
-      if (mc2) mc2.scrollTo({ top: 0, behavior: 'smooth' });
-      // Belt-and-suspenders: also reset window scroll
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Find the actual scrolling ancestor of the result block
+      var target = document.getElementById('resultBlock') || document.getElementById('mainContent');
+      var el = target;
+      while (el) {
+        var style = window.getComputedStyle(el);
+        if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) {
+          el.scrollTop = 0;
+          break;
+        }
+        el = el.parentElement;
+      }
+      // Also try the canonical candidates
+      var mc = document.getElementById('mainContent');
+      if (mc) mc.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
     });
   });
 }
@@ -4269,7 +4284,13 @@ function initSidebar() {
       .then(function(rows) {
         if (!rows || !rows.length) return;
         rows.forEach(function(row) {
-          if (row.thread_id) _openThreadIds.add(row.thread_id);
+          if (row.thread_id) {
+            _openThreadIds.add(row.thread_id);
+            // Stamp collaboration_open on allThreads so renderThreads always sees it
+            allThreads = allThreads.map(function(t) {
+              return t.id === row.thread_id ? Object.assign({}, t, { collaboration_open: true }) : t;
+            });
+          }
         });
         // Re-render sidebar with correct dots
         renderThreads(allThreads);
@@ -4489,8 +4510,11 @@ async function deactivateShare() {
   _shareStatus = 'off';
   window._currentShareUrl = null;
 
-  // Remove from open set — this thread is now closed
+  // Remove from open set and clear allThreads flag
   _openThreadIds.delete(activeThreadId);
+  allThreads = allThreads.map(function(t) {
+    return t.id === activeThreadId ? Object.assign({}, t, { collaboration_open: false }) : t;
+  });
   syncNodeShareButtons();
   updateSessionGovernanceUI();
   updateSidebarSharedDot(activeThreadId, false);
