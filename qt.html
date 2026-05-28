@@ -115,86 +115,241 @@
   #discussionPanel {
     position: fixed;
     top: 0;
-    right: -420px;
-    width: 400px;
+    right: -440px;
+    width: 420px;
     height: 100vh;
-    background: rgba(10,10,16,0.98);
-    border-left: 1px solid rgba(42,42,64,0.4);
+    background: rgba(8,8,14,0.99);
+    border-left: 1px solid rgba(201,168,76,0.12);
     z-index: 500;
     display: flex;
     flex-direction: column;
     transition: right 0.48s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 opacity 0.38s ease;
-    box-shadow: -20px 0 60px rgba(0,0,0,0.55);
+    box-shadow: -24px 0 64px rgba(0,0,0,0.6);
     opacity: 0;
   }
   #discussionPanel.open {
     right: 0;
     opacity: 1;
   }
-  /* Contextual anchor capsule */
-  .disc-anchor {
-    padding: 20px 24px 0;
-    flex-shrink: 0;
-  }
-  .disc-anchor-label {
-    font-family: var(--mono);
-    font-size: 8px;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: rgba(120,118,140,0.45);
-    margin-bottom: 8px;
-  }
-  .disc-anchor-text {
-    font-family: var(--crimson);
-    font-style: italic;
-    font-size: 15px;
-    line-height: 1.55;
-    color: rgba(220,215,200,0.55);
-    border-left: 1px solid rgba(201,168,76,0.2);
-    padding-left: 12px;
-    margin-bottom: 0;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-  }
-  .disc-anchor-rule {
-    height: 1px;
-    background: linear-gradient(to right, rgba(201,168,76,0.12), transparent);
-    margin: 16px 0 0;
-  }
-  /* Node highlight when refractions open */
-  .fu-block.refraction-active,
-  #resultContent.refraction-active-root {
-    border-left: 2px solid rgba(201,168,76,0.22);
-    padding-left: 14px;
-    transition: border-color 0.4s, padding-left 0.4s;
-  }
-  /* Breadcrumb placeholder — structure only, not rendered yet */
+
+  /* ── Breadcrumb — future sprint ── */
   .disc-breadcrumb {
-    display: none; /* enable in future sprint */
+    display: none;
     font-family: var(--mono);
     font-size: 8px;
     letter-spacing: 0.18em;
     color: rgba(120,118,140,0.3);
-    padding: 8px 24px 0;
+    padding: 10px 24px 0;
     flex-shrink: 0;
+  }
+
+  /* ── Top bar — REFRACTIONS label + close ── */
+  .disc-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px 0;
+    flex-shrink: 0;
+  }
+  .disc-topbar-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(120,118,140,0.3);
+  }
+  .disc-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   .disc-close-btn {
     background: transparent;
     border: none;
-    color: rgba(80,78,100,0.3);
+    color: rgba(80,78,100,0.25);
     cursor: pointer;
-    font-size: 16px;
+    font-size: 18px;
     line-height: 1;
-    padding: 4px 8px;
+    padding: 2px 6px;
     transition: color 0.3s;
     font-family: var(--crimson);
     font-style: italic;
-    opacity: 0.5;
+    opacity: 0.6;
   }
-  .disc-close-btn:hover { color: rgba(120,118,140,0.5); opacity: 1; }
+  .disc-close-btn:hover { color: rgba(201,168,76,0.4); opacity: 1; }
+
+  /* ── Chamber header: R1 sigil + Refractions title ── */
+  .disc-chamber-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px 0;
+    flex-shrink: 0;
+  }
+  .disc-sigil {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    height: 52px;
+    border: 1px solid rgba(201,168,76,0.35);
+    background: rgba(201,168,76,0.04);
+    font-family: var(--mono);
+    font-size: 20px;
+    letter-spacing: 0.06em;
+    color: rgba(201,168,76,0.85);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .disc-sigil::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 1px solid rgba(201,168,76,0.08);
+    pointer-events: none;
+  }
+  .disc-chamber-title {
+    font-family: var(--cinzel);
+    font-size: 22px;
+    letter-spacing: 0.12em;
+    color: rgba(220,210,190,0.75);
+    font-weight: 400;
+  }
+  .disc-chamber-divider {
+    width: 1px;
+    height: 36px;
+    background: rgba(201,168,76,0.2);
+    flex-shrink: 0;
+  }
+
+  /* ── Diamond ornament ── */
+  .disc-ornament {
+    text-align: center;
+    padding: 14px 0 0;
+    font-size: 11px;
+    color: rgba(201,168,76,0.3);
+    flex-shrink: 0;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Attached-to context ── */
+  .disc-attached-label {
+    font-family: var(--crimson);
+    font-size: 13px;
+    color: rgba(201,168,76,0.55);
+    padding: 14px 24px 6px;
+    flex-shrink: 0;
+    font-style: normal;
+    letter-spacing: 0.02em;
+  }
+  .disc-anchor-text {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 16px;
+    line-height: 1.65;
+    color: rgba(230,225,210,0.72);
+    padding: 0 24px 16px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    flex-shrink: 0;
+  }
+  .disc-anchor-rule {
+    height: 1px;
+    margin: 0 24px;
+    background: linear-gradient(to right, rgba(201,168,76,0.18), rgba(201,168,76,0.04), transparent);
+    flex-shrink: 0;
+  }
+
+  /* ── Node highlight when refractions open ── */
+  .fu-block.refraction-active,
+  #resultContent.refraction-active-root {
+    border-left: 2px solid rgba(201,168,76,0.28);
+    padding-left: 14px;
+    transition: border-color 0.5s, padding-left 0.5s;
+  }
+
+  /* ── Chat stream ── */
+  #chatStream {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(42,42,64,0.6) transparent;
+  }
+  #chatStream::-webkit-scrollbar { width: 3px; }
+  #chatStream::-webkit-scrollbar-thumb { background: rgba(42,42,64,0.6); }
+
+  .chat-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(120,118,140,0.4);
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  /* ── Chat message cards ── */
+  .chat-msg {
+    padding: 12px 16px;
+    border: 1px solid rgba(42,42,64,0.5);
+    border-left-width: 3px;
+    background: rgba(255,255,255,0.015);
+  }
+  .chat-msg.mine {
+    background: rgba(80,180,120,0.03);
+    border-color: rgba(80,180,120,0.25);
+    border-left-color: rgba(80,180,120,0.5);
+  }
+  .chat-msg-name {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    color: rgba(140,138,160,0.55);
+  }
+  .chat-msg.mine .chat-msg-name { color: rgba(80,180,120,0.55); }
+  .chat-msg-bubble {
+    font-family: var(--crimson);
+    font-size: 16px;
+    color: rgba(220,215,200,0.8);
+    line-height: 1.65;
+  }
+
+  /* ── Compose area ── */
+  .chat-input {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(42,42,64,0.6);
+    color: rgba(220,215,200,0.85);
+    font-family: var(--crimson);
+    font-size: 16px;
+    padding: 10px 14px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.25s;
+    line-height: 1.5;
+    flex: 1;
+    min-height: 42px;
+    max-height: 120px;
+  }
+  .chat-input:focus { border-color: rgba(201,168,76,0.25); }
+  .chat-input::placeholder { color: rgba(120,118,140,0.4); }
+  .chat-send-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 10px 14px;
+    border: 1px solid rgba(42,42,64,0.7);
+    background: transparent;
+    color: rgba(120,118,140,0.55);
+    cursor: pointer;
+    transition: all 0.25s;
+    white-space: nowrap;
+    align-self: flex-end;
+  }
+  .chat-send-btn:hover { border-color: rgba(201,168,76,0.3); color: rgba(201,168,76,0.7); }
 
   body {
     background: var(--void);
@@ -1457,29 +1612,43 @@
 
     <!-- ── DISCUSSION SLIDE-OVER PANEL ── -->
   <div id="discussionPanel">
-    <!-- Breadcrumb — hidden until future sprint -->
+    <!-- Breadcrumb — future sprint -->
     <div class="disc-breadcrumb" id="discBreadcrumb"></div>
 
-    <!-- Contextual anchor capsule -->
-    <div class="disc-anchor" id="discAnchor">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.28em;text-transform:uppercase;color:rgba(120,118,140,0.35);padding-top:2px;">Refractions</div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-family:var(--mono);font-size:8px;color:rgba(120,118,140,0.3);" id="chatBarCount"></span>
-          <button class="disc-close-btn" onclick="closeDiscussionPanel()" title="Close">‹</button>
-        </div>
+    <!-- Top bar: REFRACTIONS label + count + close -->
+    <div class="disc-topbar">
+      <span class="disc-topbar-label">Refractions</span>
+      <div class="disc-topbar-right">
+        <span style="font-family:var(--mono);font-size:8px;color:rgba(120,118,140,0.25);" id="chatBarCount"></span>
+        <button class="disc-close-btn" onclick="closeDiscussionPanel()" title="Close">‹</button>
       </div>
-      <div class="disc-anchor-label">Attached to</div>
-      <div class="disc-anchor-text" id="discContextQuery">The original interpretation</div>
-      <div class="disc-anchor-rule"></div>
     </div>
-    <div class="chat-stream" id="chatStream" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
-      <div class="chat-empty" id="chatEmpty">No refractions yet. Begin the conversation.</div>
+
+    <!-- Chamber header: sigil + title -->
+    <div class="disc-chamber-header" id="discAnchor">
+      <div class="disc-sigil" id="discSigil">Q</div>
+      <div class="disc-chamber-divider"></div>
+      <div class="disc-chamber-title">Refractions</div>
     </div>
-    <div class="chat-compose" style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;">
+
+    <!-- Diamond ornament -->
+    <div class="disc-ornament">✦</div>
+
+    <!-- Attached-to context -->
+    <div class="disc-attached-label">Attached to:</div>
+    <div class="disc-anchor-text" id="discContextQuery">The original interpretation</div>
+    <div class="disc-anchor-rule"></div>
+
+    <!-- Message stream -->
+    <div class="chat-stream" id="chatStream" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
+      <div class="chat-empty" id="chatEmpty">No refractions yet.<br>Begin the conversation.</div>
+    </div>
+
+    <!-- Compose -->
+    <div class="chat-compose" style="padding:12px 16px;border-top:1px solid rgba(42,42,64,0.5);display:flex;gap:8px;align-items:flex-end;">
       <textarea class="chat-input" id="chatInput" placeholder="Add your refraction…" rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
-        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
       <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
     </div>
   </div>
@@ -4132,13 +4301,13 @@ function openChatPanel() {
   // Set context query label based on active node
   var ctxEl = document.getElementById('discContextQuery');
   if (ctxEl && _activeNodeId === 'root') {
-    ctxEl.textContent = currentSubject || 'The original interpretation';
+    var subject = currentSubject || 'The original interpretation';
+    ctxEl.textContent = '“' + subject + '”';
   }
-  // Panel title
-  var anchorLabel = document.querySelector('#discAnchor .disc-anchor-label');
-  if (anchorLabel) {
+  var sigilEl = document.getElementById('discSigil');
+  if (sigilEl) {
     var lbl = getNodeLabel(_activeNodeId || 'root');
-    anchorLabel.textContent = lbl === 'Query' ? 'Query Refractions' : lbl + ' Refractions';
+    sigilEl.textContent = lbl === 'Query' ? 'Q' : lbl;
   }
   highlightRefractionNode(_activeNodeId || 'root');
   panel.classList.add('open');
@@ -4355,19 +4524,16 @@ function focusRefractionNode(nodeId, queryText) {
   var changed = !isSameNode;
   _activeNodeId = nodeId;
 
-  // Update contextual anchor
+  // Update contextual anchor text
   var ctxEl = document.getElementById('discContextQuery');
-  if (ctxEl) ctxEl.textContent = queryText ? (queryText.length > 120 ? queryText.slice(0, 120) + '…' : queryText) : 'The original interpretation';
+  if (ctxEl) ctxEl.textContent = queryText ? ('“' + (queryText.length > 140 ? queryText.slice(0, 140) + '…' : queryText) + '”') : 'The original interpretation';
 
-  // Update panel title with R-label
+  // Update sigil with R-label
   var rLabel = getNodeLabel(nodeId);
-  var anchorLabel = document.querySelector('#discAnchor .disc-anchor-label');
-  if (anchorLabel) anchorLabel.textContent = rLabel === 'Query' ? 'Query Refractions' : rLabel + ' Refractions';
+  var sigilEl = document.getElementById('discSigil');
+  if (sigilEl) sigilEl.textContent = rLabel === 'Query' ? 'Q' : rLabel;
 
-  // Update message count label prefix
   updateChatBarUI();
-
-  // Highlight originating node, dim others
   highlightRefractionNode(nodeId);
 
   // Clear stream only on actual node switch — preserve on same-node reopen
