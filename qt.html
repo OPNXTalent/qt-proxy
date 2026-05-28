@@ -3589,8 +3589,9 @@ function selectThread(id) {
         window._shareActive     = true;
         window._currentShareToken = share.token;
         window._currentShareUrl = 'https://theprism.io/share.html?t=' + share.token;
-        // Track as open — sidebar dot will reflect this
+        // Stamp BEFORE renderThreads so collabOpen check sees it immediately
         _openThreadIds.add(threadId);
+        renderThreads(allThreads); // re-render with correct shared state now visible
         updateSidebarSharedDot(threadId, true);
 
         // Restore share button state
@@ -3701,11 +3702,15 @@ function selectThread(id) {
   }
   var mc = document.getElementById('mainContent');
   if (mc) mc.scrollTop = 0;
-  // Scroll to top again after render completes — content load can push scroll down
-  setTimeout(function() {
-    var mc2 = document.getElementById('mainContent');
-    if (mc2) mc2.scrollTo({ top: 0, behavior: 'smooth' });
-  }, 80);
+  // Scroll after two animation frames — ensures DOM and layout are complete
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      var mc2 = document.getElementById('mainContent');
+      if (mc2) mc2.scrollTo({ top: 0, behavior: 'smooth' });
+      // Belt-and-suspenders: also reset window scroll
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
 }
 
 // RESTORE FOLLOW-UPS
