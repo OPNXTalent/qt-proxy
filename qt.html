@@ -423,6 +423,55 @@
   .sidebar-threads::-webkit-scrollbar { width: 3px; }
   .sidebar-threads::-webkit-scrollbar-thumb { background: var(--border); }
 
+  /* Shared inquiry dot */
+  .thread-shared-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(80,180,120,0.7);
+    box-shadow: 0 0 4px rgba(80,180,120,0.3);
+    margin-left: 7px;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+  /* Session governance bar */
+  #sessionGovernance {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(42,42,64,0.3);
+  }
+  .session-share-state {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(120,118,140,0.4);
+    flex: 1;
+  }
+  .session-share-state.open {
+    color: rgba(80,180,120,0.65);
+  }
+  .session-gov-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border: 1px solid rgba(42,42,64,0.6);
+    background: transparent;
+    color: rgba(120,118,140,0.5);
+    cursor: pointer;
+    transition: all 0.22s;
+    white-space: nowrap;
+  }
+  .session-gov-btn:hover { border-color: rgba(201,168,76,0.3); color: rgba(201,168,76,0.65); }
+  .session-gov-btn.open-inquiry { border-color: rgba(80,180,120,0.3); color: rgba(80,180,120,0.65); }
+  .session-gov-btn.open-inquiry:hover { border-color: rgba(80,180,120,0.6); color: rgba(80,180,120,0.9); }
+
   .thread-item { padding: 10px 20px; border-bottom: 1px solid rgba(42,42,64,0.25); cursor: pointer; transition: background 0.2s; position: relative; }
   .thread-item:hover { background: rgba(255,255,255,0.015); }
   .thread-item.active { background: rgba(201,168,76,0.04); border-left: 1px solid rgba(201,168,76,0.3); padding-left: 19px; }
@@ -1535,6 +1584,17 @@
 
   <!-- RESULT ---->
   <div class="result" id="resultBlock">
+    <!-- Session governance bar — top-level share controls -->
+    <div id="sessionGovernance">
+      <span class="session-share-state" id="sessionShareState">Private Inquiry</span>
+      <button class="session-gov-btn" id="sessionShareBtn" onclick="handleShareBtn()" title="Open this inquiry to collaborators">
+        Open Inquiry
+      </button>
+      <button class="session-gov-btn" id="sessionArchiveBtn" onclick="downloadPDF('dark')" title="Export archival PDF">
+        ↓ Archive
+      </button>
+    </div>
+
     <div id="subjectBanner" style="display:none; margin-bottom:28px;">
       <div style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Current Subject</div>
       <div id="subjectText" style="font-size:17px; color:var(--text-dim); font-style:italic;"></div>
@@ -1931,6 +1991,10 @@ async function runInterpretation() {
     document.getElementById('followUpSection').style.display = 'block';
     // downloadRow hidden — controls rendered per-node
     document.getElementById('downloadRow').style.display = 'none';
+    // Show session governance bar
+    var govBar = document.getElementById('sessionGovernance');
+    if (govBar) govBar.style.display = 'flex';
+    updateSessionGovernanceUI();
 
     sessionQueryCount++;
     decrementSidebarCounter();
@@ -3143,6 +3207,13 @@ function renderThreads(threads) {
       titleEl.appendChild(inp);
     } else {
       titleEl.textContent = title;
+      // Add shared dot if inquiry is open
+      if (collabOpen) {
+        var dot = document.createElement('span');
+        dot.className = 'thread-shared-dot';
+        dot.title = 'Inquiry open';
+        titleEl.appendChild(dot);
+      }
     }
     item.appendChild(titleEl);
 
@@ -3241,6 +3312,7 @@ function selectThread(id) {
     showResult();
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
+    var govBar = document.getElementById('sessionGovernance'); if (govBar) { govBar.style.display = 'flex'; updateSessionGovernanceUI(); }
     var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     window._shareHandlingFollowUps = false;
@@ -4000,6 +4072,42 @@ var _presencePollInterval = null;
 // Called when user taps "Share"
 // First tap: creates share + starts delivery flow
 // Subsequent taps: opens management modal (step 3)
+function updateSessionGovernanceUI() {
+  var stateEl  = document.getElementById('sessionShareState');
+  var shareBtn = document.getElementById('sessionShareBtn');
+  if (!stateEl || !shareBtn) return;
+
+  if (window._shareActive) {
+    stateEl.textContent = 'Inquiry Open';
+    stateEl.className = 'session-share-state open';
+    shareBtn.textContent = 'Close Inquiry';
+    shareBtn.className = 'session-gov-btn';
+    shareBtn.title = 'Close relational access to this inquiry';
+  } else {
+    stateEl.textContent = 'Private Inquiry';
+    stateEl.className = 'session-share-state';
+    shareBtn.textContent = 'Open Inquiry';
+    shareBtn.className = 'session-gov-btn open-inquiry';
+    shareBtn.title = 'Open this inquiry to collaborators';
+  }
+}
+
+function updateSidebarSharedDot(threadId, isShared) {
+  var item = document.getElementById('ti-' + threadId);
+  if (!item) return;
+  var existing = item.querySelector('.thread-shared-dot');
+  if (isShared && !existing) {
+    var dot = document.createElement('span');
+    dot.className = 'thread-shared-dot';
+    dot.title = 'Inquiry open';
+    // Insert after the title element
+    var titleEl = item.querySelector('.thread-title');
+    if (titleEl) titleEl.appendChild(dot);
+  } else if (!isShared && existing) {
+    existing.remove();
+  }
+}
+
 async function deactivateShare() {
   if (!_currentSharedSessionId) return;
   try {
@@ -4019,6 +4127,10 @@ async function deactivateShare() {
 
   // Sync all node share buttons
   syncNodeShareButtons();
+  // Update session governance UI
+  updateSessionGovernanceUI();
+  // Remove sidebar dot
+  updateSidebarSharedDot(activeThreadId, false);
 
   // Reset Share button
   var btn = document.getElementById('shareBtn');
@@ -4105,6 +4217,10 @@ async function handleShareBtn() {
 
     // Sync all node share buttons
     syncNodeShareButtons();
+    // Update session governance UI
+    updateSessionGovernanceUI();
+    // Update sidebar dot
+    if (_currentSharedSessionId) updateSidebarSharedDot(activeThreadId, true);
 
     // Update share button appearance
     if (btn) {
