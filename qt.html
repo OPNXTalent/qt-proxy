@@ -1709,8 +1709,8 @@
       <div class="query-address-layer" id="queryUrlRow">
         <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Copy link">—</span>
         <div style="display:flex;gap:20px;align-items:center;flex-shrink:0;">
-          <button class="query-sync-btn" onclick="startLiveSync()" id="querySyncBtn">Sync</button>
-          <button class="query-secondary-btn" onclick="copyQueryLink()" id="queryCopyBtn">Copy Link</button>
+          <button class="query-sync-btn" id="queryCopyBtn" onclick="copyQueryLink()">Copy Link</button>
+          <button class="query-secondary-btn" id="querySyncBtn" onclick="govSync()" style="opacity:0.45;">Sync</button>
           <button class="query-close-btn" id="queryToggleBtn" onclick="handleShareBtn()">Close Query</button>
         </div>
       </div>
@@ -4219,6 +4219,8 @@ function updateSessionGovernanceUI() {
       urlText.textContent = window._currentShareUrl;
       urlText.classList.add('active');
     }
+    // Reset governance flow to default (Copy Link primary)
+    if (typeof setGovState === 'function') setGovState('copy');
     if (openTrig) openTrig.style.display = 'none';
   } else {
     stateEl.textContent = 'Private Query';
@@ -4230,14 +4232,47 @@ function updateSessionGovernanceUI() {
   }
 }
 
+// Governance flow: Copy Link → Sync → Copy Link (cyclical)
+var _govState = 'copy'; // 'copy' | 'sync'
+
+function setGovState(state) {
+  _govState = state;
+  var copyBtn = document.getElementById('queryCopyBtn');
+  var syncBtn = document.getElementById('querySyncBtn');
+  if (!copyBtn || !syncBtn) return;
+  if (state === 'copy') {
+    // Copy Link is primary
+    copyBtn.textContent = 'Copy Link';
+    copyBtn.onclick = copyQueryLink;
+    copyBtn.className = 'query-sync-btn'; // green primary style
+    copyBtn.style.opacity = '1';
+    syncBtn.className = 'query-secondary-btn';
+    syncBtn.style.opacity = '0.45';
+  } else {
+    // Sync is primary
+    syncBtn.textContent = 'Sync';
+    syncBtn.className = 'query-sync-btn'; // green primary style
+    syncBtn.style.opacity = '1';
+    copyBtn.textContent = 'Copy Link';
+    copyBtn.className = 'query-secondary-btn';
+    copyBtn.style.opacity = '0.55';
+  }
+}
+
+function govSync() {
+  startLiveSync();
+  // After sync: return to Copy Link as primary
+  setTimeout(function() { setGovState('copy'); }, 800);
+}
+
 function copyQueryLink() {
   var url = window._currentShareUrl;
   if (!url) return;
   var doCopy = function() {
-    var btn = document.getElementById('queryCopyBtn');
     var txt = document.getElementById('queryUrlText');
-    if (btn) { var orig = btn.textContent.trim(); btn.textContent = 'Copied'; setTimeout(function() { btn.textContent = orig; }, 2000); }
-    if (txt) { txt.style.color = 'rgba(80,180,120,0.7)'; setTimeout(function() { txt.style.color = ''; }, 1500); }
+    if (txt) { txt.style.color = 'rgba(80,180,120,0.7)'; setTimeout(function() { txt.style.color = ''; }, 1200); }
+    // After copy: Sync becomes primary
+    setGovState('sync');
   };
   if (navigator.clipboard) {
     navigator.clipboard.writeText(url).then(doCopy).catch(function() {
