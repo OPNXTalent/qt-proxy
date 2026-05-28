@@ -439,38 +439,41 @@
   #sessionGovernance {
     display: none;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 8px;
+    margin-bottom: 24px;
     padding-bottom: 16px;
-    border-bottom: 1px solid rgba(42,42,64,0.3);
+    border-bottom: 1px solid rgba(42,42,64,0.25);
+    flex-wrap: wrap;
   }
-  .session-share-state {
+  .query-state-label {
     font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.2em;
+    font-size: 8.5px;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: rgba(120,118,140,0.4);
+    color: rgba(120,118,140,0.35);
     flex: 1;
+    min-width: 80px;
   }
-  .session-share-state.open {
-    color: rgba(80,180,120,0.65);
+  .query-state-label.open {
+    color: rgba(80,180,120,0.6);
   }
-  .session-gov-btn {
+  .query-gov-btn {
     font-family: var(--mono);
-    font-size: 9px;
+    font-size: 8.5px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    padding: 5px 12px;
-    border: 1px solid rgba(42,42,64,0.6);
+    padding: 5px 11px;
+    border: 1px solid rgba(42,42,64,0.55);
     background: transparent;
-    color: rgba(120,118,140,0.5);
+    color: rgba(120,118,140,0.45);
     cursor: pointer;
     transition: all 0.22s;
     white-space: nowrap;
   }
-  .session-gov-btn:hover { border-color: rgba(201,168,76,0.3); color: rgba(201,168,76,0.65); }
-  .session-gov-btn.open-inquiry { border-color: rgba(80,180,120,0.3); color: rgba(80,180,120,0.65); }
-  .session-gov-btn.open-inquiry:hover { border-color: rgba(80,180,120,0.6); color: rgba(80,180,120,0.9); }
+  .query-gov-btn:hover { border-color: rgba(201,168,76,0.28); color: rgba(201,168,76,0.6); }
+  .query-gov-btn.open-query { border-color: rgba(80,180,120,0.28); color: rgba(80,180,120,0.6); }
+  .query-gov-btn.open-query:hover { border-color: rgba(80,180,120,0.55); color: rgba(80,180,120,0.85); }
+  .query-gov-btn.active-state { border-color: rgba(80,180,120,0.22); color: rgba(80,180,120,0.55); }
 
   .thread-item { padding: 10px 20px; border-bottom: 1px solid rgba(42,42,64,0.25); cursor: pointer; transition: background 0.2s; position: relative; }
   .thread-item:hover { background: rgba(255,255,255,0.015); }
@@ -1584,14 +1587,20 @@
 
   <!-- RESULT ---->
   <div class="result" id="resultBlock">
-    <!-- Session governance bar — top-level share controls -->
+    <!-- Query governance bar — top-level stewardship controls -->
     <div id="sessionGovernance">
-      <span class="session-share-state" id="sessionShareState">Private Inquiry</span>
-      <button class="session-gov-btn" id="sessionShareBtn" onclick="handleShareBtn()" title="Open this inquiry to collaborators">
-        Open Inquiry
+      <span class="query-state-label" id="sessionShareState">Private Query</span>
+      <button class="query-gov-btn open-query" id="sessionShareBtn" onclick="handleShareBtn()" title="Open this Query to collaborators">
+        Open Query
       </button>
-      <button class="session-gov-btn" id="sessionArchiveBtn" onclick="downloadPDF('dark')" title="Export archival PDF">
-        ↓ Archive
+      <button class="query-gov-btn" id="sessionCopyLinkBtn" onclick="copyQueryLink()" style="display:none;" title="Copy share link">
+        Copy Link
+      </button>
+      <button class="query-gov-btn" id="sessionPrintBtn" onclick="window.print()" title="Print or save as PDF">
+        Print
+      </button>
+      <button class="query-gov-btn" id="sessionArchiveBtn" onclick="downloadPDF('dark')" title="Export archival PDF">
+        Archive
       </button>
     </div>
 
@@ -3211,7 +3220,7 @@ function renderThreads(threads) {
       if (collabOpen) {
         var dot = document.createElement('span');
         dot.className = 'thread-shared-dot';
-        dot.title = 'Inquiry open';
+        dot.title = 'Query open';
         titleEl.appendChild(dot);
       }
     }
@@ -4073,23 +4082,47 @@ var _presencePollInterval = null;
 // First tap: creates share + starts delivery flow
 // Subsequent taps: opens management modal (step 3)
 function updateSessionGovernanceUI() {
-  var stateEl  = document.getElementById('sessionShareState');
-  var shareBtn = document.getElementById('sessionShareBtn');
+  var stateEl   = document.getElementById('sessionShareState');
+  var shareBtn  = document.getElementById('sessionShareBtn');
+  var copyBtn   = document.getElementById('sessionCopyLinkBtn');
   if (!stateEl || !shareBtn) return;
 
   if (window._shareActive) {
-    stateEl.textContent = 'Inquiry Open';
-    stateEl.className = 'session-share-state open';
-    shareBtn.textContent = 'Close Inquiry';
-    shareBtn.className = 'session-gov-btn';
-    shareBtn.title = 'Close relational access to this inquiry';
+    stateEl.textContent = 'Query Open';
+    stateEl.className = 'query-state-label open';
+    shareBtn.textContent = 'Close Query';
+    shareBtn.className = 'query-gov-btn active-state';
+    shareBtn.title = 'Close relational access to this Query';
+    if (copyBtn) copyBtn.style.display = 'inline-block';
   } else {
-    stateEl.textContent = 'Private Inquiry';
-    stateEl.className = 'session-share-state';
-    shareBtn.textContent = 'Open Inquiry';
-    shareBtn.className = 'session-gov-btn open-inquiry';
-    shareBtn.title = 'Open this inquiry to collaborators';
+    stateEl.textContent = 'Private Query';
+    stateEl.className = 'query-state-label';
+    shareBtn.textContent = 'Open Query';
+    shareBtn.className = 'query-gov-btn open-query';
+    shareBtn.title = 'Open this Query to collaborators';
+    if (copyBtn) copyBtn.style.display = 'none';
   }
+}
+
+function copyQueryLink() {
+  var url = window._currentShareUrl;
+  if (!url) return;
+  navigator.clipboard.writeText(url).then(function() {
+    var btn = document.getElementById('sessionCopyLinkBtn');
+    if (btn) {
+      var orig = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(function() { btn.textContent = orig; }, 2000);
+    }
+  }).catch(function() {
+    // Fallback
+    var el = document.createElement('textarea');
+    el.value = url;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+  });
 }
 
 function updateSidebarSharedDot(threadId, isShared) {
@@ -4099,7 +4132,7 @@ function updateSidebarSharedDot(threadId, isShared) {
   if (isShared && !existing) {
     var dot = document.createElement('span');
     dot.className = 'thread-shared-dot';
-    dot.title = 'Inquiry open';
+    dot.title = 'Query open';
     // Insert after the title element
     var titleEl = item.querySelector('.thread-title');
     if (titleEl) titleEl.appendChild(dot);
