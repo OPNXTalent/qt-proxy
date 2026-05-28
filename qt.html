@@ -4213,6 +4213,7 @@ function updateSessionGovernanceUI() {
   if (window._shareActive) {
     stateEl.textContent = 'Query Open';
     stateEl.className = 'query-state-label open';
+    stateEl.style.visibility = 'visible';
     if (stateDot) stateDot.classList.add('visible');
     if (urlRow)   urlRow.classList.add('visible');
     if (urlText && window._currentShareUrl) {
@@ -4223,8 +4224,9 @@ function updateSessionGovernanceUI() {
     if (typeof setGovState === 'function') setGovState('copy');
     if (openTrig) openTrig.style.display = 'none';
   } else {
-    stateEl.textContent = 'Private Query';
+    stateEl.textContent = '';
     stateEl.className = 'query-state-label';
+    stateEl.style.visibility = 'hidden';
     if (stateDot) stateDot.classList.remove('visible');
     if (urlRow)   urlRow.classList.remove('visible');
     if (urlText)  { urlText.textContent = '—'; urlText.classList.remove('active'); }
