@@ -519,12 +519,13 @@
     margin-top: 14px;
     padding-top: 14px;
     border-top: 1px solid rgba(42,42,64,0.18);
+    flex-wrap: wrap;
   }
   .query-address-layer.visible { display: flex; }
   .query-url-text {
     font-family: var(--mono);
-    font-size: 11.5px;
-    color: rgba(185,180,165,0.6);
+    font-size: 13px;
+    color: rgba(185,180,165,0.65);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -532,9 +533,47 @@
     cursor: pointer;
     transition: color 0.22s;
     flex: 1;
+    min-width: 0;
   }
   .query-url-text:hover { color: rgba(201,168,76,0.65); }
-  .query-url-text.active { color: rgba(185,180,165,0.75); }
+  .query-url-text.active { color: rgba(185,180,165,0.8); }
+
+  /* Sync — green primary */
+  .query-sync-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border: 1px solid rgba(80,180,120,0.35);
+    background: transparent;
+    color: rgba(80,180,120,0.7);
+    cursor: pointer;
+    transition: all 0.22s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .query-sync-btn:hover { border-color: rgba(80,180,120,0.65); color: rgba(80,180,120,0.95); }
+
+  /* Close Query — red/reductive */
+  .query-close-btn {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: transparent;
+    border: none;
+    color: rgba(180,80,80,0.5);
+    cursor: pointer;
+    transition: color 0.22s;
+    padding: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .query-close-btn:hover { color: rgba(200,100,100,0.8); }
+
+  /* Open Query trigger — private state */
+  .query-open-trigger { display: flex; align-items: center; margin-top: 10px; }
 
   /* Legacy compat */
   .query-gov-btn { display: none; }
@@ -1656,19 +1695,29 @@
     <!-- Query governance — two relational states -->
     <div id="sessionGovernance" style="display:none;">
 
-      <!-- State row: label · dot · Open/Close toggle · secondary actions -->
+      <!-- State row: QUERY OPEN ●  ·  Archive  Print -->
       <div class="query-state-row">
         <span class="query-state-label" id="sessionShareState">Private Query</span>
         <span class="query-state-dot" id="queryStateDot"></span>
-        <button class="query-toggle-btn" id="queryToggleBtn" onclick="handleShareBtn()">Open Query</button>
-        <button class="query-secondary-btn" onclick="window.print()">Print</button>
-        <button class="query-secondary-btn" onclick="downloadPDF('dark')" id="sessionArchiveBtn">Archive</button>
+        <div style="margin-left:auto;display:flex;gap:20px;align-items:center;">
+          <button class="query-secondary-btn" onclick="downloadPDF('dark')" id="sessionArchiveBtn">Archive</button>
+          <button class="query-secondary-btn" onclick="window.print()">Print</button>
+        </div>
       </div>
 
       <!-- URL address row — visible when Query is open -->
       <div class="query-address-layer" id="queryUrlRow">
         <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Copy link">—</span>
-        <button class="query-secondary-btn" onclick="copyQueryLink()" id="queryCopyBtn">Copy Link</button>
+        <div style="display:flex;gap:20px;align-items:center;flex-shrink:0;">
+          <button class="query-sync-btn" onclick="startLiveSync()" id="querySyncBtn">Sync</button>
+          <button class="query-secondary-btn" onclick="copyQueryLink()" id="queryCopyBtn">Copy Link</button>
+          <button class="query-close-btn" id="queryToggleBtn" onclick="handleShareBtn()">Close Query</button>
+        </div>
+      </div>
+
+      <!-- Open Query trigger — private state only -->
+      <div class="query-open-trigger" id="queryOpenTrigger" style="display:flex;">
+        <button class="query-toggle-btn" onclick="handleShareBtn()">Open Query</button>
       </div>
 
     </div>
@@ -4156,28 +4205,28 @@ var _presencePollInterval = null;
 function updateSessionGovernanceUI() {
   var stateEl   = document.getElementById('sessionShareState');
   var stateDot  = document.getElementById('queryStateDot');
-  var toggleBtn = document.getElementById('queryToggleBtn');
   var urlRow    = document.getElementById('queryUrlRow');
   var urlText   = document.getElementById('queryUrlText');
+  var openTrig  = document.getElementById('queryOpenTrigger');
   if (!stateEl) return;
 
   if (window._shareActive) {
     stateEl.textContent = 'Query Open';
     stateEl.className = 'query-state-label open';
-    if (stateDot)  stateDot.classList.add('visible');
-    if (toggleBtn) { toggleBtn.textContent = 'Close Query'; toggleBtn.className = 'query-toggle-btn close'; }
-    if (urlRow)    urlRow.classList.add('visible');
+    if (stateDot) stateDot.classList.add('visible');
+    if (urlRow)   urlRow.classList.add('visible');
     if (urlText && window._currentShareUrl) {
       urlText.textContent = window._currentShareUrl;
       urlText.classList.add('active');
     }
+    if (openTrig) openTrig.style.display = 'none';
   } else {
     stateEl.textContent = 'Private Query';
     stateEl.className = 'query-state-label';
-    if (stateDot)  stateDot.classList.remove('visible');
-    if (toggleBtn) { toggleBtn.textContent = 'Open Query'; toggleBtn.className = 'query-toggle-btn'; }
-    if (urlRow)    urlRow.classList.remove('visible');
-    if (urlText)   { urlText.textContent = '—'; urlText.classList.remove('active'); }
+    if (stateDot) stateDot.classList.remove('visible');
+    if (urlRow)   urlRow.classList.remove('visible');
+    if (urlText)  { urlText.textContent = '—'; urlText.classList.remove('active'); }
+    if (openTrig) openTrig.style.display = 'flex';
   }
 }
 
