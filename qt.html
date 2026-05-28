@@ -555,6 +555,22 @@
   }
   .query-sync-btn:hover { border-color: rgba(80,180,120,0.65); color: rgba(80,180,120,0.95); }
 
+  /* Artifact governance buttons — Archive, Print */
+  .query-artifact-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    background: transparent;
+    border: none;
+    color: rgba(160,155,145,0.6);
+    cursor: pointer;
+    transition: color 0.22s;
+    padding: 0;
+    white-space: nowrap;
+  }
+  .query-artifact-btn:hover { color: rgba(200,195,180,0.85); }
+
   /* Close Query — red/reductive */
   .query-close-btn {
     font-family: var(--mono);
@@ -1695,13 +1711,17 @@
     <!-- Query governance — two relational states -->
     <div id="sessionGovernance" style="display:none;">
 
-      <!-- State row: QUERY OPEN ●  ·  Archive  Print -->
+      <!-- Single governance row: [ Open Query ] ········ Archive | Print -->
       <div class="query-state-row">
-        <span class="query-state-label" id="sessionShareState">Private Query</span>
+        <!-- Left: state label (hidden when private) + Open Query trigger -->
+        <span class="query-state-label" id="sessionShareState"></span>
         <span class="query-state-dot" id="queryStateDot"></span>
-        <div style="margin-left:auto;display:flex;gap:20px;align-items:center;">
-          <button class="query-secondary-btn" onclick="downloadPDF('dark')" id="sessionArchiveBtn">Archive</button>
-          <button class="query-secondary-btn" onclick="window.print()">Print</button>
+        <button class="query-toggle-btn" id="queryOpenTrigger" onclick="handleShareBtn()">Open Query</button>
+        <!-- Right: artifact governance -->
+        <div style="margin-left:auto;display:flex;align-items:center;gap:0;">
+          <button class="query-artifact-btn" onclick="downloadPDF('dark')" id="sessionArchiveBtn">Archive</button>
+          <span style="color:rgba(80,78,100,0.35);padding:0 10px;font-size:12px;">|</span>
+          <button class="query-artifact-btn" onclick="window.print()">Print</button>
         </div>
       </div>
 
@@ -1713,11 +1733,6 @@
           <button class="query-secondary-btn" id="querySyncBtn" onclick="govSync()" style="opacity:0.45;">Sync</button>
           <button class="query-close-btn" id="queryToggleBtn" onclick="handleShareBtn()">Close Query</button>
         </div>
-      </div>
-
-      <!-- Open Query trigger — private state only -->
-      <div class="query-open-trigger" id="queryOpenTrigger" style="display:flex;">
-        <button class="query-toggle-btn" onclick="handleShareBtn()">Open Query</button>
       </div>
 
     </div>
@@ -4220,8 +4235,8 @@ function updateSessionGovernanceUI() {
       urlText.textContent = window._currentShareUrl;
       urlText.classList.add('active');
     }
-    // Reset governance flow to default (Copy Link primary)
     if (typeof setGovState === 'function') setGovState('copy');
+    // Hide Open Query button when open
     if (openTrig) openTrig.style.display = 'none';
   } else {
     stateEl.textContent = '';
@@ -4230,7 +4245,8 @@ function updateSessionGovernanceUI() {
     if (stateDot) stateDot.classList.remove('visible');
     if (urlRow)   urlRow.classList.remove('visible');
     if (urlText)  { urlText.textContent = '—'; urlText.classList.remove('active'); }
-    if (openTrig) openTrig.style.display = 'flex';
+    // Show Open Query button when private
+    if (openTrig) openTrig.style.display = 'inline-block';
   }
 }
 
