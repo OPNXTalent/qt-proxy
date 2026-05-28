@@ -4199,6 +4199,27 @@ function initSidebar() {
     }
     renderThreads(allThreads);
 
+    // Bulk fetch open share state for all threads — populates _openThreadIds and sidebar dots
+    (function(threads) {
+      if (!threads || !threads.length) return;
+      var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://fgngixbhpilefmyyeldr.supabase.co';
+      var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+      var ids = threads.map(function(t) { return t.id; }).join(',');
+      fetch(SUPA_URL + '/rest/v1/shares?thread_id=in.(' + encodeURIComponent(ids) + ')&status=eq.active&select=thread_id', {
+        headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) {
+        if (!rows || !rows.length) return;
+        rows.forEach(function(row) {
+          if (row.thread_id) _openThreadIds.add(row.thread_id);
+        });
+        // Re-render sidebar with correct dots
+        renderThreads(allThreads);
+      })
+      .catch(function() {});
+    })(allThreads);
+
     // Auto-restore last active thread on page load
     var lastId = localStorage.getItem('qt_last_thread_id');
     if (lastId && allThreads.find(function(t) { return t.id === lastId; })) {
