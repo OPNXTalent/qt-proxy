@@ -3338,7 +3338,13 @@ function getThreadTitle(thread) {
   var local = localStorage.getItem('qt_thread_title_' + thread.id);
   if (local) return local;
   if (thread.title) return thread.title;
-  return thread.query ? (thread.query.length > 60 ? thread.query.slice(0, 60) + '\u2026' : thread.query) : 'Untitled';
+  return thread.query ? (thread.query.length > 60 ? thread.query.slice(0, 60) + '…' : thread.query) : 'Untitled';
+}
+
+function getSidebarTitle(title) {
+  var max = 26;
+  if (!title) return '';
+  return title.length > max ? title.slice(0, max).trimEnd() + '…' : title;
 }
 
 // RENDER THREADS - CSP-safe, no innerHTML, no eval
@@ -3359,6 +3365,7 @@ function renderThreads(threads) {
 
   threads.forEach(function(thread) {
     var title    = getThreadTitle(thread);
+    var sidebarTitle = getSidebarTitle(title);
     var preview  = thread.query ? (thread.query.length > 60 ? thread.query.slice(0, 60) + '\u2026' : thread.query) : '';
     var isActive = thread.id === activeThreadId;
     var isLocked = thread.isLocked || false;
@@ -3394,7 +3401,7 @@ function renderThreads(threads) {
       inp.addEventListener('click',   function(e) { e.stopPropagation(); });
       titleEl.appendChild(inp);
     } else {
-      titleEl.textContent = title;
+      titleEl.textContent = sidebarTitle;
     }
     item.appendChild(titleEl);
     // Dot appended to item (not titleEl) so it's never clipped by text overflow
