@@ -3526,8 +3526,13 @@ function selectThread(id) {
   if (!thread) return;
   activeThreadId = id;
   localStorage.setItem('qt_last_thread_id', id);
+  // Pre-stamp collaboration_open if we already know this thread is open
+  if (_openThreadIds.has(id)) {
+    allThreads = allThreads.map(function(t) {
+      return t.id === id ? Object.assign({}, t, { collaboration_open: true }) : t;
+    });
+  }
   renderThreads(allThreads);
-  reapplyOpenDots();
 
   var savedInput = localStorage.getItem('qt_input_' + id) || thread.query || '';
   var inputEl = document.getElementById('userInput');
@@ -3703,27 +3708,10 @@ function selectThread(id) {
     var fs = document.getElementById('followUpSection'); if (fs)  fs.style.display = 'none';
     var dr = document.getElementById('downloadRow');      if (dr)  dr.style.display = 'none';
   }
-  var mc = document.getElementById('mainContent');
-  if (mc) mc.scrollTop = 0;
-  // Scroll to top — try all candidate scroll containers
+  // Page scrolls on window — scroll window to top after render
   requestAnimationFrame(function() {
     requestAnimationFrame(function() {
-      // Find the actual scrolling ancestor of the result block
-      var target = document.getElementById('resultBlock') || document.getElementById('mainContent');
-      var el = target;
-      while (el) {
-        var style = window.getComputedStyle(el);
-        if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) {
-          el.scrollTop = 0;
-          break;
-        }
-        el = el.parentElement;
-      }
-      // Also try the canonical candidates
-      var mc = document.getElementById('mainContent');
-      if (mc) mc.scrollTop = 0;
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
+      window.scrollTo(0, 0);
     });
   });
 }
