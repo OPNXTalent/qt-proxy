@@ -556,21 +556,43 @@
   .query-url-text.active { color: rgba(185,180,165,0.8); }
 
   /* Sync — green primary */
+  /* Green box — Sync / Syncing... */
   .query-sync-btn {
     font-family: var(--mono);
     font-size: 9px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     padding: 6px 16px;
+    min-width: 96px;         /* reserves space for "SYNCING..." */
     border: 1px solid rgba(80,180,120,0.35);
     background: transparent;
     color: rgba(80,180,120,0.7);
     cursor: pointer;
-    transition: all 0.22s;
+    transition: color 0.22s, border-color 0.22s, opacity 0.3s;
     white-space: nowrap;
     flex-shrink: 0;
+    text-align: center;
   }
   .query-sync-btn:hover { border-color: rgba(80,180,120,0.65); color: rgba(80,180,120,0.95); }
+
+  /* Gold box — Copy Link */
+  .query-copy-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    min-width: 96px;
+    border: 1px solid rgba(201,168,76,0.3);
+    background: transparent;
+    color: rgba(201,168,76,0.65);
+    cursor: pointer;
+    transition: color 0.22s, border-color 0.22s, opacity 0.3s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-align: center;
+  }
+  .query-copy-btn:hover { border-color: rgba(201,168,76,0.6); color: rgba(201,168,76,0.95); }
 
   /* Artifact governance buttons — Archive, Print */
   .query-artifact-btn {
@@ -1752,8 +1774,8 @@
       <div class="query-address-layer" id="queryUrlRow">
         <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Copy link">—</span>
         <div style="display:flex;gap:20px;align-items:center;flex-shrink:0;">
-          <button class="query-sync-btn" id="queryCopyBtn" onclick="copyQueryLink()">Copy Link</button>
-          <button class="query-secondary-btn" id="querySyncBtn" onclick="govSync()" style="opacity:0.45;">Sync</button>
+          <button class="query-copy-btn" id="queryCopyBtn" onclick="copyQueryLink()">Copy Link</button>
+          <button class="query-sync-btn" id="querySyncBtn" onclick="govSync()" style="opacity:0.45;">Sync</button>
           <button class="query-close-btn" id="queryToggleBtn" onclick="handleShareBtn()">Close Query</button>
         </div>
       </div>
@@ -4285,28 +4307,33 @@ function setGovState(state) {
   var syncBtn = document.getElementById('querySyncBtn');
   if (!copyBtn || !syncBtn) return;
   if (state === 'copy') {
-    // Copy Link is primary
-    copyBtn.textContent = 'Copy Link';
-    copyBtn.onclick = copyQueryLink;
-    copyBtn.className = 'query-sync-btn'; // green primary style
+    // Copy Link (gold) = active; Sync = dim
     copyBtn.style.opacity = '1';
-    syncBtn.className = 'query-secondary-btn';
-    syncBtn.style.opacity = '0.45';
-  } else {
-    // Sync is primary
+    copyBtn.style.pointerEvents = 'auto';
     syncBtn.textContent = 'Sync';
-    syncBtn.className = 'query-sync-btn'; // green primary style
+    syncBtn.style.opacity = '0.35';
+    syncBtn.style.pointerEvents = 'auto';
+  } else {
+    // Sync (green) = active; Copy Link = dim
+    syncBtn.textContent = 'Sync';
     syncBtn.style.opacity = '1';
-    copyBtn.textContent = 'Copy Link';
-    copyBtn.className = 'query-secondary-btn';
-    copyBtn.style.opacity = '0.55';
+    copyBtn.style.opacity = '0.35';
   }
 }
 
 function govSync() {
+  var syncBtn = document.getElementById('querySyncBtn');
+  if (syncBtn) {
+    // Text-only change — fixed min-width keeps layout stable
+    syncBtn.textContent = 'Syncing…';
+    syncBtn.style.opacity = '1';
+    syncBtn.style.pointerEvents = 'none';
+  }
   startLiveSync();
-  // After sync: return to Copy Link as primary
-  setTimeout(function() { setGovState('copy'); }, 800);
+  setTimeout(function() {
+    if (syncBtn) syncBtn.style.pointerEvents = 'auto';
+    setGovState('copy');
+  }, 1800);
 }
 
 function copyQueryLink() {
