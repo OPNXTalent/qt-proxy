@@ -436,22 +436,23 @@
     flex-shrink: 0;
   }
   /* Session governance bar */
-  /* ── Query governance — four atmospheric layers ─────────────── */
+  /* ── Query governance — two clean relational states ────────── */
   #sessionGovernance {
     display: none;
     flex-direction: column;
     gap: 0;
     margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(42,42,64,0.18);
   }
 
-  /* Layer 1 — Query state: QUERY OPEN ● */
+  /* State row: label + dot + toggle + secondary actions */
   .query-state-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding-bottom: 14px;
-    margin-bottom: 14px;
-    border-bottom: 1px solid rgba(42,42,64,0.2);
+    gap: 12px;
+    margin-bottom: 0;
+    flex-wrap: wrap;
   }
   .query-state-label {
     font-family: var(--mono);
@@ -459,125 +460,85 @@
     letter-spacing: 0.26em;
     text-transform: uppercase;
     color: rgba(120,118,140,0.3);
+    flex: 1;
   }
-  .query-state-label.open { color: rgba(80,180,120,0.55); }
+  .query-state-label.open { color: rgba(80,180,120,0.6); }
   .query-state-dot {
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: rgba(80,180,120,0.65);
+    background: rgba(80,180,120,0.7);
     box-shadow: 0 0 5px rgba(80,180,120,0.25);
     display: none;
     flex-shrink: 0;
+    margin-left: -6px;
   }
   .query-state-dot.visible { display: block; }
-  /* Lifecycle governance — quiet, upper right */
-  .query-lifecycle-cluster {
-    margin-left: auto;
-    display: flex;
-    gap: 14px;
-    align-items: center;
+
+  /* Primary toggle: Open Query / Close Query */
+  .query-toggle-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border: 1px solid rgba(80,180,120,0.28);
+    background: transparent;
+    color: rgba(80,180,120,0.65);
+    cursor: pointer;
+    transition: all 0.22s;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
-  .query-lifecycle-btn {
+  .query-toggle-btn:hover { border-color: rgba(80,180,120,0.6); color: rgba(80,180,120,0.95); }
+  .query-toggle-btn.close { border-color: rgba(120,118,140,0.25); color: rgba(120,118,140,0.4); }
+  .query-toggle-btn.close:hover { border-color: rgba(180,80,80,0.3); color: rgba(200,100,100,0.6); }
+
+  /* Secondary actions: Copy Link, Print, Archive */
+  .query-secondary-btn {
     font-family: var(--mono);
     font-size: 8px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     background: transparent;
     border: none;
-    color: rgba(100,98,120,0.4);
+    color: rgba(100,98,120,0.35);
     cursor: pointer;
     transition: color 0.22s;
     padding: 0;
     white-space: nowrap;
+    flex-shrink: 0;
   }
-  .query-lifecycle-btn:hover { color: rgba(160,155,140,0.65); }
-  .query-lifecycle-btn.close-btn { color: rgba(120,118,140,0.35); }
-  .query-lifecycle-btn.close-btn:hover { color: rgba(200,80,80,0.5); }
+  .query-secondary-btn:hover { color: rgba(160,155,140,0.6); }
 
-  /* Layer 2 — Relational address bar */
+  /* URL address row — open state only */
   .query-address-layer {
     display: none;
-    flex-direction: column;
-    gap: 10px;
-    padding-bottom: 16px;
-    margin-bottom: 4px;
-    border-bottom: 1px solid rgba(42,42,64,0.15);
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(42,42,64,0.18);
   }
   .query-address-layer.visible { display: flex; }
   .query-url-text {
     font-family: var(--mono);
-    font-size: 12px;
-    color: rgba(190,185,168,0.6);
+    font-size: 11.5px;
+    color: rgba(185,180,165,0.6);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     letter-spacing: 0.04em;
     cursor: pointer;
     transition: color 0.22s;
-    line-height: 1;
+    flex: 1;
   }
   .query-url-text:hover { color: rgba(201,168,76,0.65); }
-  .query-url-text.synced { color: rgba(190,185,168,0.72); }
-
-  /* Layer 3 — Accessibility actions */
-  .query-access-actions {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-  }
-  .query-access-primary {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    padding: 6px 14px;
-    border: 1px solid rgba(80,180,120,0.3);
-    background: rgba(80,180,120,0.04);
-    color: rgba(80,180,120,0.7);
-    cursor: pointer;
-    transition: all 0.22s;
-    white-space: nowrap;
-  }
-  .query-access-primary:hover { border-color: rgba(80,180,120,0.6); color: rgba(80,180,120,0.95); background: rgba(80,180,120,0.07); }
-  .query-access-secondary {
-    font-family: var(--mono);
-    font-size: 8px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    background: transparent;
-    border: none;
-    color: rgba(120,118,140,0.4);
-    cursor: pointer;
-    transition: color 0.22s;
-    padding: 0;
-    white-space: nowrap;
-  }
-  .query-access-secondary:hover { color: rgba(180,175,160,0.65); }
-
-  /* Layer 4 — Share trigger (private state) */
-  .query-share-trigger {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .query-share-btn {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    padding: 6px 14px;
-    border: 1px solid rgba(42,42,64,0.5);
-    background: transparent;
-    color: rgba(120,118,140,0.45);
-    cursor: pointer;
-    transition: all 0.22s;
-    white-space: nowrap;
-  }
-  .query-share-btn:hover { border-color: rgba(80,180,120,0.35); color: rgba(80,180,120,0.7); }
+  .query-url-text.active { color: rgba(185,180,165,0.75); }
 
   /* Legacy compat */
   .query-gov-btn { display: none; }
+  .query-access-secondary { display: none; }
 
   .thread-item { padding: 10px 20px; border-bottom: 1px solid rgba(42,42,64,0.25); cursor: pointer; transition: background 0.2s; position: relative; }
   .thread-item:hover { background: rgba(255,255,255,0.015); }
@@ -1692,34 +1653,22 @@
   <!-- RESULT ---->
   <div class="result" id="resultBlock">
     <!-- Query governance area — stewardship + URL bar -->
-    <!-- Query governance — four atmospheric layers -->
+    <!-- Query governance — two relational states -->
     <div id="sessionGovernance" style="display:none;">
 
-      <!-- Layer 1: Query state + lifecycle governance -->
+      <!-- State row: label · dot · Open/Close toggle · secondary actions -->
       <div class="query-state-row">
         <span class="query-state-label" id="sessionShareState">Private Query</span>
         <span class="query-state-dot" id="queryStateDot"></span>
-        <div class="query-lifecycle-cluster">
-          <button class="query-lifecycle-btn" onclick="downloadPDF('dark')" title="Export archival PDF" id="sessionArchiveBtn">Archive</button>
-          <button class="query-lifecycle-btn close-btn" id="sessionShareBtn" onclick="handleShareBtn()" style="display:none;" title="Close relational access">Close Query</button>
-        </div>
+        <button class="query-toggle-btn" id="queryToggleBtn" onclick="handleShareBtn()">Open Query</button>
+        <button class="query-secondary-btn" onclick="window.print()">Print</button>
+        <button class="query-secondary-btn" onclick="downloadPDF('dark')" id="sessionArchiveBtn">Archive</button>
       </div>
 
-      <!-- Layers 2+3: Relational address + accessibility (open state only) -->
+      <!-- URL address row — visible when Query is open -->
       <div class="query-address-layer" id="queryUrlRow">
-        <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Click to copy link">—</span>
-        <div class="query-access-actions">
-          <button class="query-access-primary" onclick="startLiveSync()" id="querySyncBtn" title="Synchronize Query accessibility">Sync</button>
-          <button class="query-access-secondary" onclick="copyQueryLink()" id="queryCopyBtn">Copy Link</button>
-          <button class="query-access-secondary" onclick="window.print()">Print</button>
-        </div>
-      </div>
-
-      <!-- Layer 4: Share trigger (private state only) -->
-      <div class="query-share-trigger" id="queryShareTrigger">
-        <button class="query-share-btn" onclick="handleShareBtn()" title="Open this Query to collaborators" id="sessionShareTrigger">Share Query</button>
-        <button class="query-access-secondary" onclick="window.print()" style="margin-left:4px;">Print</button>
-        <button class="query-access-secondary" onclick="downloadPDF('dark')" style="margin-left:4px;">Archive</button>
+        <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Copy link">—</span>
+        <button class="query-secondary-btn" onclick="copyQueryLink()" id="queryCopyBtn">Copy Link</button>
       </div>
 
     </div>
@@ -4205,39 +4154,30 @@ var _presencePollInterval = null;
 // First tap: creates share + starts delivery flow
 // Subsequent taps: opens management modal (step 3)
 function updateSessionGovernanceUI() {
-  var stateEl    = document.getElementById('sessionShareState');
-  var stateDot   = document.getElementById('queryStateDot');
-  var closeBtn   = document.getElementById('sessionShareBtn');
-  var urlRow     = document.getElementById('queryUrlRow');
-  var urlText    = document.getElementById('queryUrlText');
-  var shareTrig  = document.getElementById('queryShareTrigger');
+  var stateEl   = document.getElementById('sessionShareState');
+  var stateDot  = document.getElementById('queryStateDot');
+  var toggleBtn = document.getElementById('queryToggleBtn');
+  var urlRow    = document.getElementById('queryUrlRow');
+  var urlText   = document.getElementById('queryUrlText');
   if (!stateEl) return;
 
   if (window._shareActive) {
-    // Layer 1: state
     stateEl.textContent = 'Query Open';
     stateEl.className = 'query-state-label open';
-    if (stateDot) stateDot.classList.add('visible');
-    if (closeBtn) closeBtn.style.display = 'inline-block';
-    // Layer 2+3: address + actions
-    if (urlRow) urlRow.classList.add('visible');
+    if (stateDot)  stateDot.classList.add('visible');
+    if (toggleBtn) { toggleBtn.textContent = 'Close Query'; toggleBtn.className = 'query-toggle-btn close'; }
+    if (urlRow)    urlRow.classList.add('visible');
     if (urlText && window._currentShareUrl) {
       urlText.textContent = window._currentShareUrl;
-      urlText.classList.add('synced');
+      urlText.classList.add('active');
     }
-    // Layer 4: hide share trigger
-    if (shareTrig) shareTrig.style.display = 'none';
   } else {
-    // Layer 1: state
     stateEl.textContent = 'Private Query';
     stateEl.className = 'query-state-label';
-    if (stateDot) stateDot.classList.remove('visible');
-    if (closeBtn) closeBtn.style.display = 'none';
-    // Layer 2+3: hide address
-    if (urlRow) urlRow.classList.remove('visible');
-    if (urlText) { urlText.textContent = '—'; urlText.classList.remove('synced'); }
-    // Layer 4: show share trigger
-    if (shareTrig) shareTrig.style.display = 'flex';
+    if (stateDot)  stateDot.classList.remove('visible');
+    if (toggleBtn) { toggleBtn.textContent = 'Open Query'; toggleBtn.className = 'query-toggle-btn'; }
+    if (urlRow)    urlRow.classList.remove('visible');
+    if (urlText)   { urlText.textContent = '—'; urlText.classList.remove('active'); }
   }
 }
 
@@ -4247,7 +4187,7 @@ function copyQueryLink() {
   var doCopy = function() {
     var btn = document.getElementById('queryCopyBtn');
     var txt = document.getElementById('queryUrlText');
-    if (btn) { var orig = btn.textContent; btn.textContent = 'Copied'; setTimeout(function() { btn.textContent = orig; }, 2000); }
+    if (btn) { var orig = btn.textContent.trim(); btn.textContent = 'Copied'; setTimeout(function() { btn.textContent = orig; }, 2000); }
     if (txt) { txt.style.color = 'rgba(80,180,120,0.7)'; setTimeout(function() { txt.style.color = ''; }, 1500); }
   };
   if (navigator.clipboard) {
@@ -4384,7 +4324,7 @@ async function handleShareBtn() {
 
     // Populate top URL bar immediately
     var qUrlText = document.getElementById('queryUrlText');
-    if (qUrlText) { qUrlText.textContent = data.shareUrl; qUrlText.classList.add('synced'); }
+    if (qUrlText) { qUrlText.textContent = data.shareUrl; qUrlText.classList.add('active'); }
     var qUrlRow = document.getElementById('queryUrlRow');
     if (qUrlRow) qUrlRow.classList.add('visible');
 
