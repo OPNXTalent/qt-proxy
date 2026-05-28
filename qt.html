@@ -424,17 +424,12 @@
   .sidebar-threads::-webkit-scrollbar-thumb { background: var(--border); }
 
   /* Shared inquiry dot */
-  .thread-shared-dot {
-    position: absolute;
-    top: 11px;      /* aligns with title text baseline area */
-    right: 10px;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: rgba(80,180,120,0.7);
-    box-shadow: 0 0 4px rgba(80,180,120,0.3);
-    pointer-events: none;
-    flex-shrink: 0;
+  /* Open/shared query row — green frame, no dot */
+  .thread-item.collab-open {
+    box-shadow: inset 0 0 0 1px rgba(80,180,120,0.22);
+  }
+  .thread-item.collab-open.active {
+    box-shadow: inset 0 0 0 1px rgba(80,180,120,0.35);
   }
   /* Session governance bar */
   /* ── Query governance — two clean relational states ────────── */
@@ -638,10 +633,10 @@
   .thread-item { padding: 10px 20px; border-bottom: 1px solid rgba(42,42,64,0.25); cursor: pointer; transition: background 0.2s; position: relative; }
   .thread-item:hover { background: rgba(255,255,255,0.015); }
   .thread-item.active { background: rgba(201,168,76,0.04); border-left: 1px solid rgba(201,168,76,0.3); padding-left: 19px; }
-  .thread-item.collab-open { border-left: 1px solid rgba(80,180,120,0.4); background: rgba(80,180,120,0.02); padding-left: 19px; }
-  .thread-item.collab-open.active { border-left: 1px solid rgba(80,180,120,0.6); background: rgba(80,180,120,0.04); }
+  .thread-item.collab-open { background: rgba(80,180,120,0.018); }
+  .thread-item.collab-open.active { background: rgba(80,180,120,0.035); }
   .thread-item.locked { cursor: default; }
-  .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text-dim); line-height: 1.4; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px; }
+  .thread-title { font-family: var(--crimson); font-size: 14px; color: var(--text-dim); line-height: 1.4; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .thread-item.active .thread-title { color: var(--text); }
   .thread-item.locked .thread-title { color: var(--text-muted); }
   .thread-subtitle { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3373,7 +3368,7 @@ function renderThreads(threads) {
     var daysLeft = thread.daysLeft != null ? thread.daysLeft : 90;
 
     var item = document.createElement('div');
-    var collabOpen = thread.collaboration_open || false;
+    var collabOpen = thread.collaboration_open || _openThreadIds.has(thread.id) || false;
     var collabClass = collabOpen ? ' collab-open' : '';
     item.className = 'thread-item' + (isActive ? ' active' : '') + (isLocked ? ' locked' : '') + collabClass;
     item.id = 'ti-' + thread.id;
@@ -3404,13 +3399,6 @@ function renderThreads(threads) {
       titleEl.textContent = sidebarTitle;
     }
     item.appendChild(titleEl);
-    // Dot appended to item (not titleEl) so it's never clipped by text overflow
-    if (collabOpen || _openThreadIds.has(thread.id)) {
-      var dot = document.createElement('span');
-      dot.className = 'thread-shared-dot';
-      dot.title = 'Query open';
-      item.appendChild(dot);
-    }
 
     // Only show subtitle if different from title
     if (preview && preview !== title) {
@@ -4395,14 +4383,10 @@ function copyQueryLink() {
 function updateSidebarSharedDot(threadId, isShared) {
   var item = document.getElementById('ti-' + threadId);
   if (!item) return;
-  var existing = item.querySelector('.thread-shared-dot');
-  if (isShared && !existing) {
-    var dot = document.createElement('span');
-    dot.className = 'thread-shared-dot';
-    dot.title = 'Query open';
-    item.appendChild(dot); // on item, not title — never clipped
-  } else if (!isShared && existing) {
-    existing.remove();
+  if (isShared) {
+    item.classList.add('collab-open');
+  } else {
+    item.classList.remove('collab-open');
   }
 }
 
