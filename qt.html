@@ -3524,6 +3524,11 @@ function renderThreads(threads) {
 function selectThread(id) {
   var thread = allThreads.find(function(t) { return t.id === id; });
   if (!thread) return;
+  console.log('[selectThread]', id, {
+    inOpenThreadIds: _openThreadIds.has(id),
+    collaboration_open: thread.collaboration_open,
+    openThreadIds: Array.from(_openThreadIds)
+  });
   activeThreadId = id;
   localStorage.setItem('qt_last_thread_id', id);
   // Pre-stamp collaboration_open if we already know this thread is open
@@ -3533,6 +3538,7 @@ function selectThread(id) {
     });
   }
   renderThreads(allThreads);
+  console.log('[after renderThreads] collab-open on item:', !!document.getElementById('ti-'+id)?.classList.contains('collab-open'));
 
   var savedInput = localStorage.getItem('qt_input_' + id) || thread.query || '';
   var inputEl = document.getElementById('userInput');
