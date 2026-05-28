@@ -3394,8 +3394,8 @@ function renderThreads(threads) {
       titleEl.appendChild(inp);
     } else {
       titleEl.textContent = title;
-      // Add shared dot if inquiry is open
-      if (collabOpen) {
+      // Add shared dot if query is open (from server flag or live tracking)
+      if (collabOpen || _openThreadIds.has(thread.id)) {
         var dot = document.createElement('span');
         dot.className = 'thread-shared-dot';
         dot.title = 'Query open';
@@ -3499,7 +3499,8 @@ function selectThread(id) {
     showResult();
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
-    var govBar = document.getElementById('sessionGovernance'); if (govBar) { govBar.style.display = 'flex'; updateSessionGovernanceUI(); }
+    var govBar = document.getElementById('sessionGovernance'); if (govBar) govBar.style.display = 'flex';
+    // Don't call updateSessionGovernanceUI() here — wait for async share fetch below
     var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     window._shareHandlingFollowUps = false;
@@ -3516,9 +3517,12 @@ function selectThread(id) {
     var existingFus = document.querySelectorAll('#resultContent .fu-block');
     existingFus.forEach(function(el) { el.remove(); });
 
-    // Reset share state for this thread — will be restored below if share exists
+    // Reset share state for this thread — async fetch will restore if open
     window._shareActive = false;
     _currentSharedSessionId = null;
+    // Immediately show correct governance state based on cached open threads
+    // (will be overridden by async fetch result)
+    updateSessionGovernanceUI();
 
     // Look up whether this thread has an active share — restore state and start polling
     (function(threadId) {
@@ -3539,6 +3543,9 @@ function selectThread(id) {
         window._shareActive     = true;
         window._currentShareToken = share.token;
         window._currentShareUrl = 'https://theprism.io/share.html?t=' + share.token;
+        // Track as open — sidebar dot will reflect this
+        _openThreadIds.add(threadId);
+        updateSidebarSharedDot(threadId, true);
 
         // Restore share button state
         var shareBtn = document.getElementById('shareBtn');
@@ -4391,11 +4398,10 @@ async function deactivateShare() {
   _shareStatus = 'off';
   window._currentShareUrl = null;
 
-  // Sync all node share buttons
+  // Remove from open set — this thread is now closed
+  _openThreadIds.delete(activeThreadId);
   syncNodeShareButtons();
-  // Update session governance UI (clears URL bar)
   updateSessionGovernanceUI();
-  // Remove sidebar dot
   updateSidebarSharedDot(activeThreadId, false);
 
   // Reset Share button
@@ -4487,12 +4493,11 @@ async function handleShareBtn() {
     var collabBtn = document.getElementById('collabToggleBtn');
     if (collabBtn) collabBtn.style.display = 'inline-block';
 
-    // Sync all node share buttons
+    // Track this thread as open
+    _openThreadIds.add(activeThreadId);
     syncNodeShareButtons();
-    // Update session governance UI
     updateSessionGovernanceUI();
-    // Update sidebar dot
-    if (_currentSharedSessionId) updateSidebarSharedDot(activeThreadId, true);
+    updateSidebarSharedDot(activeThreadId, true);
 
     // Update share button appearance
     if (btn) {
@@ -4631,6 +4636,7 @@ var _explorerCount      = 0;
 var _renderedChatIds    = new Set();
 var _sentByMe           = new Set();  // fingerprints of messages we sent
 var _activeNodeId       = 'root';     // currently focused interpretation node
+var _openThreadIds      = new Set();  // threads with active shares — persists across selection
 var _nodeLabels         = {};         // nodeId → 'R1', 'R2' etc.
 var _nodeCounter        = 0;          // increments per follow-up rendered
 
