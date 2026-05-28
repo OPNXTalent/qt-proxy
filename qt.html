@@ -426,15 +426,15 @@
   /* Shared inquiry dot */
   .thread-shared-dot {
     position: absolute;
-    top: 50%;
+    top: 11px;      /* aligns with title text baseline area */
     right: 10px;
-    transform: translateY(-50%);
     width: 5px;
     height: 5px;
     border-radius: 50%;
     background: rgba(80,180,120,0.7);
     box-shadow: 0 0 4px rgba(80,180,120,0.3);
     pointer-events: none;
+    flex-shrink: 0;
   }
   /* Session governance bar */
   /* ── Query governance — two clean relational states ────────── */
@@ -3501,7 +3501,6 @@ function selectThread(id) {
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
     var govBar = document.getElementById('sessionGovernance'); if (govBar) govBar.style.display = 'flex';
-    // Don't call updateSessionGovernanceUI() here — wait for async share fetch below
     var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     window._shareHandlingFollowUps = false;
@@ -3518,11 +3517,10 @@ function selectThread(id) {
     var existingFus = document.querySelectorAll('#resultContent .fu-block');
     existingFus.forEach(function(el) { el.remove(); });
 
-    // Reset share state for this thread — async fetch will restore if open
+    // Reset share state immediately — async fetch will restore if this thread is open
     window._shareActive = false;
     _currentSharedSessionId = null;
-    // Immediately show correct governance state based on cached open threads
-    // (will be overridden by async fetch result)
+    window._currentShareUrl = null;
     updateSessionGovernanceUI();
 
     // Look up whether this thread has an active share — restore state and start polling
