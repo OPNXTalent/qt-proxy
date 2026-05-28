@@ -623,7 +623,7 @@
   .query-gov-btn { display: none; }
   .query-access-secondary { display: none; }
 
-  .thread-item { padding: 10px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: background 0.2s; position: relative; }
+  .thread-item { padding: 12px 20px 11px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: background 0.2s; position: relative; }
   .thread-item:hover { background: rgba(255,255,255,0.015); }
   .thread-item.active { background: rgba(201,168,76,0.04); border-left: 1px solid rgba(201,168,76,0.3); padding-left: 19px; }
   .thread-item.collab-open { /* state carried via dot in status line */ }
@@ -632,10 +632,17 @@
   .thread-item.active .thread-title { color: var(--text); }
   .thread-item.locked .thread-title { color: var(--text-muted); }
   .thread-subtitle { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .thread-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 3px; }
-  .thread-shared-dot-inline { color: rgba(80,180,120,0.75); font-size: 7px; flex-shrink: 0; margin-right: 4px; line-height: 1; vertical-align: middle; }
-  .thread-date { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.06em; color: rgba(120,118,140,0.6); }
-  .thread-badge { font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; border: none; white-space: nowrap; font-weight: 400; }
+  /* Thread row — 3-layer structure */
+  .thread-timestamp { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.06em; color: rgba(120,118,140,0.5); margin-top: 3px; }
+  .thread-status-row { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; min-height: 14px; }
+  .thread-shared-dot-inline { color: rgba(80,180,120,0.7); font-size: 6px; flex-shrink: 0; line-height: 1; }
+  .thread-expiry { font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(160,138,80,0.55); margin-left: auto; }
+  .thread-expiry.badge-urgent { color: rgba(192,60,60,0.65); }
+  .thread-expiry.badge-expired { color: rgba(100,98,114,0.5); }
+  /* Legacy compat */
+  .thread-meta { display: none; }
+  .thread-date { display: none; }
+  .thread-badge { display: none; }
   .badge-ok     { background: rgba(201,168,76,0.25); }
   .badge-warn   { background: transparent; color: rgba(212,137,74,0.5); }
   .badge-urgent { background: transparent; color: rgba(192,60,60,0.45); }
@@ -3402,42 +3409,43 @@ function renderThreads(threads) {
       item.appendChild(previewEl);
     }
 
-    var metaEl = document.createElement('div');
-    metaEl.className = 'thread-meta';
+    // ── Layer A: Title (already appended above) ──────────────────────────
 
-    // ── Date (left) ────────────────────────────────────────────────────────
-    var dateEl = document.createElement('span');
-    dateEl.className = 'thread-date';
-    dateEl.textContent = thread.lastVisited || '';
-    metaEl.appendChild(dateEl);
+    // ── Layer B: Timestamp ────────────────────────────────────────────────
+    var tsEl = document.createElement('div');
+    tsEl.className = 'thread-timestamp';
+    tsEl.textContent = thread.lastVisited || '';
+    item.appendChild(tsEl);
 
-    // ── Status line — dot (if open) + expiration (always) ────────────────
+    // ── Layer C: Status row — dot (left) + expiry (right) ────────────────
     var isShared = collabOpen;
+    var statusRow = document.createElement('div');
+    statusRow.className = 'thread-status-row';
 
-    // Green dot for open/shared queries
+    // Green dot — open/shared indicator
     if (isShared) {
       var dotEl = document.createElement('span');
       dotEl.className = 'thread-shared-dot-inline';
       dotEl.textContent = '●';
       dotEl.title = 'Query open';
-      metaEl.appendChild(dotEl);
+      statusRow.appendChild(dotEl);
     }
 
-    // Expiration — independent of share state
+    // Expiry — right-aligned, compact archival notation
     var expText, expCls;
-    if (expired)         { expText = 'expired';      expCls = 'badge-expired'; }
-    else if (isLocked)   { expText = 'locked';       expCls = 'badge-expired'; }
-    else if (daysLeft <= 5)  { expText = daysLeft + 'd'; expCls = 'badge-urgent'; }
-    else if (daysLeft <= 10) { expText = daysLeft + 'd'; expCls = 'badge-warn'; }
-    else if (daysLeft >= 360){ expText = 'non-expiring'; expCls = ''; }
-    else                     { expText = daysLeft + 'd'; expCls = ''; }
+    if (expired)              { expText = 'expired';  expCls = 'badge-expired'; }
+    else if (isLocked)        { expText = 'locked';   expCls = 'badge-expired'; }
+    else if (daysLeft <= 0)   { expText = 'today';    expCls = 'badge-urgent';  }
+    else if (daysLeft <= 5)   { expText = daysLeft + 'd'; expCls = 'badge-urgent'; }
+    else if (daysLeft >= 360) { expText = '∞';   expCls = ''; }
+    else                      { expText = daysLeft + 'd'; expCls = ''; }
 
     var expEl = document.createElement('span');
-    expEl.className = 'thread-badge' + (expCls ? ' ' + expCls : '');
+    expEl.className = 'thread-expiry' + (expCls ? ' ' + expCls : '');
     expEl.textContent = expText;
-    metaEl.appendChild(expEl);
+    statusRow.appendChild(expEl);
 
-    item.appendChild(metaEl);
+    item.appendChild(statusRow);
 
     // Action buttons container — appears on hover, top right
     if (!isLocked) {
@@ -4393,34 +4401,26 @@ function updateSidebarSharedDot(threadId, isShared) {
   } else {
     item.classList.remove('collab-open');
   }
-  // Rebuild dot + expiration independently
-  var thread = allThreads.find(function(t) { return t.id === threadId; });
-  if (!thread) return;
-  var meta = item.querySelector('.thread-meta');
-  if (!meta) return;
-  // Remove old dot and expiry
-  var oldDot = meta.querySelector('.thread-shared-dot-inline');
-  if (oldDot) oldDot.remove();
-  var oldBadge = meta.querySelector('.thread-badge');
-  if (oldBadge) oldBadge.remove();
-  // Re-add dot if shared
+  // Rebuild status row for new 3-layer structure
+  var statusRow = item.querySelector('.thread-status-row');
+  if (!statusRow) return;
+  statusRow.innerHTML = '';
   if (isShared) {
     var dotEl = document.createElement('span');
     dotEl.className = 'thread-shared-dot-inline';
-    dotEl.textContent = '●';
-    dotEl.title = 'Query open';
-    meta.appendChild(dotEl);
+    dotEl.textContent = '●'; dotEl.title = 'Query open';
+    statusRow.appendChild(dotEl);
   }
-  // Re-add expiration
-  var dl = thread.daysLeft != null ? thread.daysLeft : 90;
-  var exp = thread.expired || false;
-  var lck = thread.isLocked || false;
-  var eText = exp ? 'expired' : lck ? 'locked' : dl <= 5 ? dl+'d' : dl <= 10 ? dl+'d' : dl >= 360 ? 'non-expiring' : dl+'d';
-  var eCls  = exp || lck ? 'badge-expired' : dl <= 5 ? 'badge-urgent' : dl <= 10 ? 'badge-warn' : '';
-  var expEl = document.createElement('span');
-  expEl.className = 'thread-badge' + (eCls ? ' ' + eCls : '');
-  expEl.textContent = eText;
-  meta.appendChild(expEl);
+  var thread = allThreads.find(function(t) { return t.id === threadId; });
+  if (thread) {
+    var dl = thread.daysLeft != null ? thread.daysLeft : 90;
+    var eText = thread.expired ? 'expired' : thread.isLocked ? 'locked' : dl <= 0 ? 'today' : dl <= 5 ? dl+'d' : dl >= 360 ? '∞' : dl+'d';
+    var eCls  = thread.expired || thread.isLocked ? 'badge-expired' : dl <= 5 ? 'badge-urgent' : '';
+    var expEl = document.createElement('span');
+    expEl.className = 'thread-expiry' + (eCls ? ' ' + eCls : '');
+    expEl.textContent = eText;
+    statusRow.appendChild(expEl);
+  }
 }
 
 async function deactivateShare() {
