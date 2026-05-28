@@ -3351,6 +3351,31 @@ function getSidebarTitle(fullTitle) {
 }
 
 // RENDER THREADS - CSP-safe, no innerHTML, no eval
+function reapplyOpenDots() {
+  // After any renderThreads call, re-stamp collab-open on all known open threads
+  _openThreadIds.forEach(function(tid) {
+    var el = document.getElementById('ti-' + tid);
+    if (el && !el.classList.contains('collab-open')) {
+      el.classList.add('collab-open');
+      // Also restore the Shared label in status row if missing
+      var statusRow = el.querySelector('.thread-status-row');
+      if (statusRow && !statusRow.querySelector('.thread-shared-indicator')) {
+        var sharedWrap = document.createElement('span');
+        sharedWrap.className = 'thread-shared-indicator';
+        var dotEl = document.createElement('span');
+        dotEl.className = 'thread-shared-dot-inline';
+        dotEl.textContent = '●';
+        var wordEl = document.createElement('span');
+        wordEl.className = 'thread-shared-word';
+        wordEl.textContent = 'Shared';
+        sharedWrap.appendChild(dotEl);
+        sharedWrap.appendChild(wordEl);
+        statusRow.insertBefore(sharedWrap, statusRow.firstChild);
+      }
+    }
+  });
+}
+
 function renderThreads(threads) {
   var list = document.getElementById('sidebarThreads');
   if (!list) return;
@@ -3502,6 +3527,7 @@ function selectThread(id) {
   activeThreadId = id;
   localStorage.setItem('qt_last_thread_id', id);
   renderThreads(allThreads);
+  reapplyOpenDots();
 
   var savedInput = localStorage.getItem('qt_input_' + id) || thread.query || '';
   var inputEl = document.getElementById('userInput');
@@ -3675,6 +3701,11 @@ function selectThread(id) {
   }
   var mc = document.getElementById('mainContent');
   if (mc) mc.scrollTop = 0;
+  // Scroll to top again after render completes — content load can push scroll down
+  setTimeout(function() {
+    var mc2 = document.getElementById('mainContent');
+    if (mc2) mc2.scrollTo({ top: 0, behavior: 'smooth' });
+  }, 80);
 }
 
 // RESTORE FOLLOW-UPS
