@@ -436,44 +436,107 @@
     flex-shrink: 0;
   }
   /* Session governance bar */
+  /* ── Query governance area ─────────────────────────────────── */
   #sessionGovernance {
     display: none;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 28px;
+    border: 1px solid rgba(42,42,64,0.35);
+    background: rgba(13,13,20,0.6);
+  }
+
+  /* Top row: state + action buttons */
+  .query-stewardship-row {
+    display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid rgba(42,42,64,0.25);
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(42,42,64,0.3);
     flex-wrap: wrap;
   }
   .query-state-label {
     font-family: var(--mono);
-    font-size: 8.5px;
-    letter-spacing: 0.22em;
+    font-size: 8px;
+    letter-spacing: 0.24em;
     text-transform: uppercase;
     color: rgba(120,118,140,0.35);
     flex: 1;
     min-width: 80px;
   }
   .query-state-label.open {
-    color: rgba(80,180,120,0.6);
+    color: rgba(80,180,120,0.65);
   }
   .query-gov-btn {
     font-family: var(--mono);
-    font-size: 8.5px;
+    font-size: 8px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     padding: 5px 11px;
-    border: 1px solid rgba(42,42,64,0.55);
+    border: 1px solid rgba(42,42,64,0.5);
     background: transparent;
     color: rgba(120,118,140,0.45);
     cursor: pointer;
     transition: all 0.22s;
     white-space: nowrap;
   }
-  .query-gov-btn:hover { border-color: rgba(201,168,76,0.28); color: rgba(201,168,76,0.6); }
-  .query-gov-btn.open-query { border-color: rgba(80,180,120,0.28); color: rgba(80,180,120,0.6); }
-  .query-gov-btn.open-query:hover { border-color: rgba(80,180,120,0.55); color: rgba(80,180,120,0.85); }
-  .query-gov-btn.active-state { border-color: rgba(80,180,120,0.22); color: rgba(80,180,120,0.55); }
+  .query-gov-btn:hover { border-color: rgba(201,168,76,0.3); color: rgba(201,168,76,0.65); }
+  .query-gov-btn.open-query { border-color: rgba(80,180,120,0.3); color: rgba(80,180,120,0.65); }
+  .query-gov-btn.open-query:hover { border-color: rgba(80,180,120,0.6); color: rgba(80,180,120,0.9); }
+  .query-gov-btn.active-state { border-color: rgba(80,180,120,0.25); color: rgba(80,180,120,0.6); }
+
+  /* URL bar row */
+  .query-url-row {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+  }
+  .query-url-row.visible { display: flex; }
+  .query-url-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(80,180,120,0.4);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .query-url-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: rgba(180,175,160,0.6);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .query-url-text:hover { color: rgba(201,168,76,0.7); }
+  .query-url-text.synced { color: rgba(180,175,160,0.75); }
+  .query-url-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .query-url-btn {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid rgba(42,42,64,0.5);
+    background: transparent;
+    color: rgba(120,118,140,0.45);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .query-url-btn:hover { border-color: rgba(201,168,76,0.3); color: rgba(201,168,76,0.65); }
+  .query-url-btn.sync-btn { border-color: rgba(80,180,120,0.25); color: rgba(80,180,120,0.55); }
+  .query-url-btn.sync-btn:hover { border-color: rgba(80,180,120,0.55); color: rgba(80,180,120,0.9); }
 
   .thread-item { padding: 10px 20px; border-bottom: 1px solid rgba(42,42,64,0.25); cursor: pointer; transition: background 0.2s; position: relative; }
   .thread-item:hover { background: rgba(255,255,255,0.015); }
@@ -1587,21 +1650,33 @@
 
   <!-- RESULT ---->
   <div class="result" id="resultBlock">
-    <!-- Query governance bar — top-level stewardship controls -->
-    <div id="sessionGovernance">
-      <span class="query-state-label" id="sessionShareState">Private Query</span>
-      <button class="query-gov-btn open-query" id="sessionShareBtn" onclick="handleShareBtn()" title="Open this Query to collaborators">
-        Open Query
-      </button>
-      <button class="query-gov-btn" id="sessionCopyLinkBtn" onclick="copyQueryLink()" style="display:none;" title="Copy share link">
-        Copy Link
-      </button>
-      <button class="query-gov-btn" id="sessionPrintBtn" onclick="window.print()" title="Print or save as PDF">
-        Print
-      </button>
-      <button class="query-gov-btn" id="sessionArchiveBtn" onclick="downloadPDF('dark')" title="Export archival PDF">
-        Archive
-      </button>
+    <!-- Query governance area — stewardship + URL bar -->
+    <div id="sessionGovernance" style="display:none;">
+
+      <!-- Stewardship row -->
+      <div class="query-stewardship-row">
+        <span class="query-state-label" id="sessionShareState">Private Query</span>
+        <button class="query-gov-btn open-query" id="sessionShareBtn" onclick="handleShareBtn()" title="Open this Query to collaborators">
+          Share
+        </button>
+        <button class="query-gov-btn" id="sessionPrintBtn" onclick="window.print()" title="Print or save this Query">
+          Print
+        </button>
+        <button class="query-gov-btn" id="sessionArchiveBtn" onclick="downloadPDF('dark')" title="Export as archival PDF">
+          Archive
+        </button>
+      </div>
+
+      <!-- URL bar — visible only when Query is open -->
+      <div class="query-url-row" id="queryUrlRow">
+        <span class="query-url-label">Query URL</span>
+        <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Click to copy">—</span>
+        <div class="query-url-actions">
+          <button class="query-url-btn" onclick="copyQueryLink()" id="queryCopyBtn" title="Copy share link">Copy Link</button>
+          <button class="query-url-btn sync-btn" onclick="startLiveSync()" id="querySyncBtn" title="Synchronize Query accessibility">Sync</button>
+        </div>
+      </div>
+
     </div>
 
     <div id="subjectBanner" style="display:none; margin-bottom:28px;">
@@ -2002,7 +2077,7 @@ async function runInterpretation() {
     document.getElementById('downloadRow').style.display = 'none';
     // Show session governance bar
     var govBar = document.getElementById('sessionGovernance');
-    if (govBar) govBar.style.display = 'flex';
+    if (govBar) govBar.style.display = 'block';
     updateSessionGovernanceUI();
 
     sessionQueryCount++;
@@ -3371,6 +3446,9 @@ function selectThread(id) {
         }
 
         // Restore URL display
+        // Update top URL bar
+        updateSessionGovernanceUI();
+        // Legacy elements (kept for JS compat)
         var urlRow  = document.getElementById('shareUrlRow');
         var urlDisp = document.getElementById('shareUrlDisplay');
         if (urlRow)  urlRow.style.display = 'flex';
@@ -4082,9 +4160,10 @@ var _presencePollInterval = null;
 // First tap: creates share + starts delivery flow
 // Subsequent taps: opens management modal (step 3)
 function updateSessionGovernanceUI() {
-  var stateEl   = document.getElementById('sessionShareState');
-  var shareBtn  = document.getElementById('sessionShareBtn');
-  var copyBtn   = document.getElementById('sessionCopyLinkBtn');
+  var stateEl  = document.getElementById('sessionShareState');
+  var shareBtn = document.getElementById('sessionShareBtn');
+  var urlRow   = document.getElementById('queryUrlRow');
+  var urlText  = document.getElementById('queryUrlText');
   if (!stateEl || !shareBtn) return;
 
   if (window._shareActive) {
@@ -4093,36 +4172,44 @@ function updateSessionGovernanceUI() {
     shareBtn.textContent = 'Close Query';
     shareBtn.className = 'query-gov-btn active-state';
     shareBtn.title = 'Close relational access to this Query';
-    if (copyBtn) copyBtn.style.display = 'inline-block';
+    // Show and populate URL bar
+    if (urlRow) urlRow.classList.add('visible');
+    if (urlText && window._currentShareUrl) {
+      urlText.textContent = window._currentShareUrl;
+      urlText.classList.add('synced');
+    }
   } else {
     stateEl.textContent = 'Private Query';
     stateEl.className = 'query-state-label';
-    shareBtn.textContent = 'Open Query';
+    shareBtn.textContent = 'Share';
     shareBtn.className = 'query-gov-btn open-query';
     shareBtn.title = 'Open this Query to collaborators';
-    if (copyBtn) copyBtn.style.display = 'none';
+    // Hide URL bar
+    if (urlRow) urlRow.classList.remove('visible');
+    if (urlText) { urlText.textContent = '—'; urlText.classList.remove('synced'); }
   }
 }
 
 function copyQueryLink() {
   var url = window._currentShareUrl;
   if (!url) return;
-  navigator.clipboard.writeText(url).then(function() {
-    var btn = document.getElementById('sessionCopyLinkBtn');
-    if (btn) {
-      var orig = btn.textContent;
-      btn.textContent = 'Copied';
-      setTimeout(function() { btn.textContent = orig; }, 2000);
-    }
-  }).catch(function() {
-    // Fallback
+  var doCopy = function() {
+    var btn = document.getElementById('queryCopyBtn');
+    var txt = document.getElementById('queryUrlText');
+    if (btn) { var orig = btn.textContent; btn.textContent = 'Copied'; setTimeout(function() { btn.textContent = orig; }, 2000); }
+    if (txt) { txt.style.color = 'rgba(80,180,120,0.7)'; setTimeout(function() { txt.style.color = ''; }, 1500); }
+  };
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(doCopy).catch(function() {
+      var el = document.createElement('textarea');
+      el.value = url; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+      doCopy();
+    });
+  } else {
     var el = document.createElement('textarea');
-    el.value = url;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-  });
+    el.value = url; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+    doCopy();
+  }
 }
 
 function updateSidebarSharedDot(threadId, isShared) {
@@ -4160,7 +4247,7 @@ async function deactivateShare() {
 
   // Sync all node share buttons
   syncNodeShareButtons();
-  // Update session governance UI
+  // Update session governance UI (clears URL bar)
   updateSessionGovernanceUI();
   // Remove sidebar dot
   updateSidebarSharedDot(activeThreadId, false);
@@ -4243,6 +4330,12 @@ async function handleShareBtn() {
     _shareStatus            = 'on';
     window._shareActive     = true;
     window._currentShareUrl = data.shareUrl;
+
+    // Populate top URL bar immediately
+    var qUrlText = document.getElementById('queryUrlText');
+    if (qUrlText) { qUrlText.textContent = data.shareUrl; qUrlText.classList.add('synced'); }
+    var qUrlRow = document.getElementById('queryUrlRow');
+    if (qUrlRow) qUrlRow.classList.add('visible');
 
     // Show Discussion button
     var collabBtn = document.getElementById('collabToggleBtn');
