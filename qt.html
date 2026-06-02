@@ -6568,6 +6568,13 @@ function _validateConceptNode(node) {
           console.warn('[ConceptNode] "' + node.id + '" ragMetadata missing array: ' + f);
         }
       });
+      // Resolver-critical fields get a dedicated warning per spec
+      if (!Array.isArray(node.ragMetadata.aliases) || node.ragMetadata.aliases.length === 0) {
+        console.warn('Concept ' + node.id + ' is missing aliases or detectionTerms');
+      }
+      if (!Array.isArray(node.ragMetadata.detectionTerms) || node.ragMetadata.detectionTerms.length === 0) {
+        console.warn('Concept ' + node.id + ' is missing aliases or detectionTerms');
+      }
     }
   }
 }
@@ -6648,8 +6655,8 @@ var conceptNodes = {
     ragMetadata: {
       sourcePriority: ['Scripture', '1 Enoch', 'Second Temple Literature', 'The Prism', 'RCT', 'Physics'],
       tags: ['heaven', 'angels', 'unseen realm', 'layered reality', 'divine beings', 'cosmology', 'Second Temple'],
-      aliases: ['heaven', 'heavens', 'heavenly realms', 'the heavens', 'shamayim'],
-      detectionTerms: ['shamayim', 'heavenly realms', 'layered heaven', 'unseen realm', 'third heaven']
+      aliases: ['Heaven', 'Heavens', 'Heavenly Realms', 'The Heavens', 'the heavens', 'heavenly realms', 'heaven', 'heavens', 'shamayim'],
+      detectionTerms: ['Shamayim', 'shamayim', 'Heaven', 'Heavens', 'Heavenly Realm', 'Heavenly Realms', 'heavenly realms', 'layered heaven', 'unseen realm', 'third heaven']
     }
   },
 
@@ -6718,8 +6725,8 @@ var conceptNodes = {
     ragMetadata: {
       sourcePriority: ['Scripture', 'Talmud', 'Second Temple Literature', 'The Prism', 'RCT'],
       tags: ['eschatology', 'age to come', 'resurrection', 'new creation', 'kingdom of God', 'two ages'],
-      aliases: ['world to come', 'age to come', 'the coming age', 'olam haba', 'olam ha-ba'],
-      detectionTerms: ['olam haba', "olam ha'ba", 'olam ha-ba', 'age to come', 'world to come', 'the coming age']
+      aliases: ['World to Come', 'Age to Come', 'world to come', 'age to come', 'the coming age', 'olam haba', 'olam ha-ba'],
+      detectionTerms: ['Olam HaBa', 'olam haba', "olam ha'ba", 'olam ha-ba', 'World to Come', 'world to come', 'Age to Come', 'age to come', 'the coming age']
     }
   },
 
@@ -6784,8 +6791,8 @@ var conceptNodes = {
     ragMetadata: {
       sourcePriority: ['Scripture', 'Talmud', 'Second Temple Literature', 'The Prism', 'RCT'],
       tags: ['eschatology', 'present age', 'two ages', 'already not yet', 'decoherence', 'hebel'],
-      aliases: ['this age', 'present age', 'present evil age', 'this world', 'olam hazeh', 'olam ha-zeh'],
-      detectionTerms: ['olam hazeh', "olam ha'zeh", 'olam ha-zeh', 'present age', 'this present age', 'this evil age', 'already but not yet']
+      aliases: ['Present Age', 'This World', 'this age', 'present age', 'present evil age', 'this world', 'olam hazeh', 'olam ha-zeh'],
+      detectionTerms: ['Olam HaZeh', 'olam hazeh', "olam ha'zeh", 'olam ha-zeh', 'Present Age', 'present age', 'This World', 'this present age', 'this evil age', 'already but not yet']
     }
   },
 
@@ -6863,8 +6870,8 @@ var conceptNodes = {
     ragMetadata: {
       sourcePriority: ['Scripture', '1 Enoch', 'Dead Sea Scrolls', 'Second Temple Literature', 'The Prism', 'RCT'],
       tags: ['divine council', 'elohim', 'sons of God', 'watchers', 'principalities', 'powers', 'nations', 'heavenly assembly'],
-      aliases: ['heavenly council', 'divine assembly', 'council of God', 'sons of God', 'elohim assembly'],
-      detectionTerms: ['divine council', 'heavenly council', 'sons of god', 'council of god', 'divine assembly', 'principalities and powers', 'prince of persia', 'bene elohim']
+      aliases: ['Heavenly Council', 'Divine Assembly', 'heavenly council', 'divine assembly', 'council of God', 'sons of God', 'elohim assembly'],
+      detectionTerms: ['Divine Council', 'divine council', 'Heavenly Council', 'heavenly council', 'Divine Assembly', 'divine assembly', 'sons of god', 'council of god', 'principalities and powers', 'prince of persia', 'bene elohim']
     }
   },
 
@@ -6937,8 +6944,8 @@ var conceptNodes = {
     ragMetadata: {
       sourcePriority: ['Physics', 'The Prism', 'RCT', 'Scripture'],
       tags: ['non-locality', 'entanglement', 'quantum mechanics', 'relational ontology', 'holism', 'Bell theorem', 'structural analogy'],
-      aliases: ['quantum non-locality', 'entanglement', 'non-local', 'nonlocal correlation'],
-      detectionTerms: ['non-locality', 'non locality', 'nonlocality', 'entanglement', 'quantum entangle', "bell's theorem", 'non-local', 'bell theorem']
+      aliases: ['Non Locality', 'Nonlocal Influence', 'non locality', 'nonlocal influence', 'quantum non-locality', 'entanglement', 'non-local', 'nonlocal correlation'],
+      detectionTerms: ['Non-Locality', 'non-locality', 'Non Locality', 'non locality', 'nonlocality', 'Nonlocal Influence', 'nonlocal influence', 'entanglement', 'quantum entangle', "bell's theorem", 'non-local', 'bell theorem']
     }
   }
 
@@ -6998,28 +7005,66 @@ function renderConceptNodes(nodes) {
 // Reset on each fresh openConceptModal() call from outside the modal.
 var _conceptTrail = [];
 
-// Title/alias → id index, built from canonical node data (no manual hardcoding)
-var _conceptTitleIndex = (function() {
-  var idx = {};
+/**
+ * _resolveConceptId(titleOrId)
+ *
+ * Four-step resolution order — fully data-driven from node metadata:
+ *
+ *   1. Direct ID match          — conceptNodes[id] exists
+ *   2. Title match              — node.title (case-insensitive)
+ *   3. Alias match              — node.ragMetadata.aliases (case-insensitive)
+ *   4. Detection term match     — node.ragMetadata.detectionTerms (case-insensitive)
+ *   5. Legacy label fallback    — relatedConcepts[].label → id
+ *      // TODO: Remove once all concepts carry aliases in ragMetadata.
+ *
+ * As the concept library grows, aliases and detectionTerms in each node's
+ * ragMetadata are the single source of truth. The legacy fallback exists only
+ * for labels that appear in relatedConcepts before a matching node is authored.
+ */
+function _resolveConceptId(input) {
+  if (!input) return null;
+  var lower = input.toLowerCase();
+
+  // Step 1: direct ID match
+  if (conceptNodes[input]) return input;
+
+  // Steps 2–4: scan all nodes by title, aliases, then detectionTerms
   for (var key in conceptNodes) {
     var n = conceptNodes[key];
-    // Index by lowercased title
-    idx[n.title.toLowerCase()] = n.id;
-    // Index all ragMetadata.aliases
+
+    // Step 2: title
+    if (n.title && n.title.toLowerCase() === lower) return n.id;
+
+    // Step 3: ragMetadata.aliases
     if (n.ragMetadata && n.ragMetadata.aliases) {
-      n.ragMetadata.aliases.forEach(function(a) { idx[a.toLowerCase()] = n.id; });
+      for (var ai = 0; ai < n.ragMetadata.aliases.length; ai++) {
+        if (n.ragMetadata.aliases[ai].toLowerCase() === lower) return n.id;
+      }
     }
-    // Index relatedConcepts labels pointing to known ids
-    if (n.relatedConcepts) {
-      n.relatedConcepts.forEach(function(rc) { if (rc.id) idx[rc.label.toLowerCase()] = rc.id; });
+
+    // Step 4: ragMetadata.detectionTerms
+    if (n.ragMetadata && n.ragMetadata.detectionTerms) {
+      for (var di = 0; di < n.ragMetadata.detectionTerms.length; di++) {
+        if (n.ragMetadata.detectionTerms[di].toLowerCase() === lower) return n.id;
+      }
     }
   }
-  return idx;
-}());
 
-function _resolveConceptId(titleOrId) {
-  if (conceptNodes[titleOrId]) return titleOrId;
-  return _conceptTitleIndex[titleOrId.toLowerCase()] || null;
+  // Step 5: legacy label fallback — relatedConcepts labels pointing to known ids
+  // TODO: Remove once all concepts contain aliases in ragMetadata.
+  for (var lkey in conceptNodes) {
+    var ln = conceptNodes[lkey];
+    if (ln.relatedConcepts) {
+      for (var ri = 0; ri < ln.relatedConcepts.length; ri++) {
+        var rc = ln.relatedConcepts[ri];
+        if (rc.id && rc.label && rc.label.toLowerCase() === lower && conceptNodes[rc.id]) {
+          return rc.id;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 // ── Modal Content Renderer ────────────────────────────────────────────────────
