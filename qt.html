@@ -1676,6 +1676,54 @@
     background: rgba(212,175,55,0.1);
     border-color: rgba(212,175,55,0.32);
   }
+
+  /* Navigable chips — clickable, button-reset */
+  .concept-chip--nav {
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .concept-chip--nav:hover {
+    background: rgba(212,175,55,0.14);
+    border-color: rgba(212,175,55,0.45);
+    color: rgba(212,175,55,0.95);
+  }
+  /* Unknown concepts — not yet in the node set */
+  .concept-chip--dim {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  /* Concept modal breadcrumb */
+  #conceptModalBreadcrumb {
+    display: none;
+    padding: 10px 24px 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: rgba(212,175,55,0.35);
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .concept-bc-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: rgba(212,175,55,0.45);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .concept-bc-link:hover { color: rgba(212,175,55,0.8); }
+  .concept-bc-sep {
+    margin: 0 5px;
+    color: rgba(212,175,55,0.2);
+  }
+  .concept-bc-current {
+    color: rgba(212,175,55,0.65);
+  }
   /* ── End Concept Cards ──────────────────────────────────────────────────── */
 </style>
 </head>
@@ -6564,30 +6612,165 @@ function renderConceptNodes(nodes) {
   return '<div class="concept-nodes-section"><div class="concept-nodes-label">Framework Concepts</div><div class="concept-cards-grid">' + cards + '</div></div>';
 }
 
-function openConceptModal(conceptId) {
+// ── Concept Knowledge Graph — navigation state ───────────────────────────────
+// Breadcrumb trail: array of {id, title}, capped at 3 entries.
+// Reset each time a fresh openConceptModal() call is made from outside the modal.
+var _conceptTrail = [];
+
+// Title → id lookup. Allows chip labels ("Olam HaBa") to resolve to node ids.
+// Chips for concepts not yet in the static set gracefully no-op.
+var _conceptTitleIndex = (function() {
+  var idx = {};
+  for (var key in conceptNodes) {
+    idx[conceptNodes[key].title.toLowerCase()] = key;
+  }
+  // Manual aliases for common label variants used in related arrays
+  idx['olam haba']      = 'olam_haba';
+  idx["olam ha'ba"]     = 'olam_haba';
+  idx['olam hazeh']     = 'olam_hazeh';
+  idx["olam ha'zeh"]    = 'olam_hazeh';
+  idx['divine council'] = 'divine_council';
+  idx['non-locality']   = 'non_locality';
+  idx['non locality']   = 'non_locality';
+  idx['nonlocality']    = 'non_locality';
+  return idx;
+}());
+
+function _resolveConceptId(titleOrId) {
+  if (conceptNodes[titleOrId]) return titleOrId;
+  return _conceptTitleIndex[titleOrId.toLowerCase()] || null;
+}
+
+/**
+ * loadConcept(conceptId)
+ * Single entry point for all concept navigation — initial open and chip traversal.
+ * Phase II: swap body to fetch node from API/RAG; UI unchanged.
+ */
+function loadConcept(conceptId) {
   var node = conceptNodes[conceptId];
   if (!node) return;
-  var scriptureHtml = node.scripture.map(function(s) {
-    return '<div class="modal-scripture-item"><div class="modal-scripture-ref">' + escHtml(s.reference) + '</div><div class="modal-scripture-exp">' + escHtml(s.explanation) + '</div></div>';
-  }).join('');
-  var relatedHtml = node.related.map(function(r) {
-    return '<span class="concept-chip">' + escHtml(r) + '</span>';
-  }).join('');
-  document.getElementById('conceptModalTitle').textContent = node.title;
-  document.getElementById('conceptModalSource').textContent = node.source;
-  document.getElementById('conceptModalHistorical').textContent = node.historicalContext;
-  document.getElementById('conceptModalScripture').innerHTML = scriptureHtml;
-  document.getElementById('conceptModalQuantum').innerHTML = node.quantumReflection;
-  document.getElementById('conceptModalRelated').innerHTML = relatedHtml;
+
+  var body = document.getElementById('conceptModalBody');
+  if (!body) return;
+
+  // Fade out
+  body.style.transition = 'opacity 0.18s ease';
+  body.style.opacity = '0';
+
+  setTimeout(function() {
+    // Render scripture
+    var scriptureHtml = node.scripture.map(function(s) {
+      return '<div class="modal-scripture-item">' +
+        '<div class="modal-scripture-ref">' + escHtml(s.reference) + '</div>' +
+        '<div class="modal-scripture-exp">' + escHtml(s.explanation) + '</div>' +
+        '</div>';
+    }).join('');
+
+    // Render chips — wire to navigable concepts, dim unknowns
+    var relatedHtml = node.related.map(function(r) {
+      var targetId = _resolveConceptId(r);
+      if (targetId) {
+        return '<button class="concept-chip concept-chip--nav" onclick="navigateConcept(\'' + targetId + '\')">' + escHtml(r) + '</button>';
+      }
+      return '<span class="concept-chip concept-chip--dim">' + escHtml(r) + '</span>';
+    }).join('');
+
+    // Update header
+    document.getElementById('conceptModalTitle').textContent = node.title;
+    document.getElementById('conceptModalSource').textContent = node.source;
+
+    // Update body sections
+    document.getElementById('conceptModalHistorical').textContent = node.historicalContext;
+    document.getElementById('conceptModalScripture').innerHTML = scriptureHtml;
+    document.getElementById('conceptModalQuantum').innerHTML = node.quantumReflection;
+    document.getElementById('conceptModalRelated').innerHTML = relatedHtml;
+
+    // Render breadcrumb
+    _renderConceptBreadcrumb();
+
+    // Scroll to top
+    body.scrollTop = 0;
+
+    // Fade in
+    body.style.opacity = '1';
+  }, 180);
+}
+
+function _renderConceptBreadcrumb() {
+  var el = document.getElementById('conceptModalBreadcrumb');
+  if (!el) return;
+  if (_conceptTrail.length <= 1) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  var parts = _conceptTrail.map(function(entry, i) {
+    var isLast = (i === _conceptTrail.length - 1);
+    if (isLast) {
+      return '<span class="concept-bc-current">' + escHtml(entry.title) + '</span>';
+    }
+    return '<button class="concept-bc-link" onclick="jumpConcept(\'' + escHtml(entry.id) + '\', ' + i + ')">' + escHtml(entry.title) + '</button>';
+  });
+  el.innerHTML = parts.join('<span class="concept-bc-sep">›</span>');
+  el.style.display = 'block';
+}
+
+/**
+ * openConceptModal(conceptId)
+ * Entry from outside the modal (Explore Concept buttons).
+ * Resets the breadcrumb trail.
+ */
+function openConceptModal(conceptId) {
+  var id = _resolveConceptId(conceptId);
+  if (!id) return;
+  var node = conceptNodes[id];
+  if (!node) return;
+
+  // Reset trail for fresh entry
+  _conceptTrail = [{ id: id, title: node.title }];
+
   var overlay = document.getElementById('conceptModalOverlay');
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
+
+  // Hide breadcrumb until there's a trail to show
+  var bc = document.getElementById('conceptModalBreadcrumb');
+  if (bc) { bc.style.display = 'none'; bc.innerHTML = ''; }
+
+  loadConcept(id);
+}
+
+/**
+ * navigateConcept(conceptId)
+ * Called by Related Concept chip clicks — extends the trail.
+ */
+function navigateConcept(conceptId) {
+  var node = conceptNodes[conceptId];
+  if (!node) return;
+
+  // Extend trail, cap at 3
+  _conceptTrail.push({ id: conceptId, title: node.title });
+  if (_conceptTrail.length > 3) {
+    _conceptTrail.shift();
+  }
+
+  loadConcept(conceptId);
+}
+
+/**
+ * jumpConcept(conceptId, trailIndex)
+ * Called by breadcrumb link clicks — trims the trail back to that position.
+ */
+function jumpConcept(conceptId, trailIndex) {
+  _conceptTrail = _conceptTrail.slice(0, trailIndex + 1);
+  loadConcept(conceptId);
 }
 
 function closeConceptModal() {
   var overlay = document.getElementById('conceptModalOverlay');
   overlay.classList.remove('active');
   document.body.style.overflow = '';
+  _conceptTrail = [];
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -6765,7 +6948,8 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <button class="concept-modal-close" onclick="closeConceptModal()" aria-label="Close">&times;</button>
     </div>
-    <div class="concept-modal-body">
+    <div id="conceptModalBreadcrumb"></div>
+    <div class="concept-modal-body" id="conceptModalBody">
       <div class="concept-modal-section">
         <div class="concept-modal-section-label">Historical Context</div>
         <div class="concept-modal-text" id="conceptModalHistorical"></div>
