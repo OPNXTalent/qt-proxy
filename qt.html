@@ -1527,6 +1527,13 @@
     letter-spacing: 0.04em;
     margin-bottom: 2px;
   }
+  .concept-card-category {
+    font-size: 9px;
+    color: rgba(212,175,55,0.35);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 1px;
+  }
   .concept-card-source {
     font-size: 10px;
     color: rgba(212,175,55,0.45);
@@ -1595,7 +1602,19 @@
     font-weight: 600;
     color: rgba(212,175,55,0.95);
     letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
+  .concept-modal-subtitle {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
     margin-bottom: 3px;
+    font-style: italic;
+  }
+  .concept-modal-category {
+    font-size: 10px;
+    color: rgba(212,175,55,0.4);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
   }
   .concept-modal-source {
     font-size: 10px;
@@ -1675,6 +1694,37 @@
   .concept-chip:hover {
     background: rgba(212,175,55,0.1);
     border-color: rgba(212,175,55,0.32);
+  }
+
+  .modal-scripture-relevance {
+    font-size: 11px;
+    line-height: 1.6;
+    color: rgba(212,175,55,0.45);
+    margin-top: 5px;
+    font-style: italic;
+  }
+
+  /* Prism five-property blocks */
+  .prism-property-block {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    background: rgba(212,175,55,0.03);
+    border-left: 2px solid rgba(212,175,55,0.25);
+    border-radius: 0 4px 4px 0;
+  }
+  .prism-property-block:last-child { margin-bottom: 0; }
+  .prism-property-name {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(212,175,55,0.8);
+    margin-bottom: 6px;
+  }
+  .prism-property-body {
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: rgba(255,255,255,0.68);
   }
 
   /* Navigable chips — clickable, button-reset */
@@ -6486,112 +6536,440 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-// ── Concept Exploration Cards ────────────────────────────────────────────────
-// Phase I: static data. Phase II: replace getConceptNodes() with API fetch.
-// UI contract (array of node objects) must remain unchanged on upgrade.
+// ── Concept Exploration Cards — Phase II: Canonical Node Architecture ─────────
+//
+// Data contract: conceptNodes is a keyed object of ConceptNode records.
+// Future: replace with `conceptNodes = await fetchConceptNodes()` — UI unchanged.
+//
+// ConceptNode schema:
+//   id, title, subtitle, category, primarySourceLabel,
+//   shortSummary, historicalContext,
+//   scripturalFoundation[]: { reference, summary, relevance }
+//   prismReflection: { summary, fiveProperties[]: { property, explanation } }
+//   relatedConcepts[]: { id, label }
+//   ragMetadata: { sourcePriority[], tags[], aliases[], detectionTerms[] }
+
+var CONCEPT_REQUIRED_FIELDS = [
+  'id','title','subtitle','category','primarySourceLabel',
+  'shortSummary','historicalContext','scripturalFoundation',
+  'prismReflection','relatedConcepts','ragMetadata'
+];
+
+function _validateConceptNode(node) {
+  if (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost') {
+    CONCEPT_REQUIRED_FIELDS.forEach(function(f) {
+      if (!node[f] && node[f] !== 0) {
+        console.warn('[ConceptNode] "' + node.id + '" is missing required field: ' + f);
+      }
+    });
+    if (node.ragMetadata) {
+      ['sourcePriority','tags','aliases','detectionTerms'].forEach(function(f) {
+        if (!Array.isArray(node.ragMetadata[f])) {
+          console.warn('[ConceptNode] "' + node.id + '" ragMetadata missing array: ' + f);
+        }
+      });
+    }
+  }
+}
 
 var conceptNodes = {
+
   shamayim: {
     id: 'shamayim',
     title: 'Shamayim',
-    source: '1 Enoch · Hebrew Bible',
-    summary: 'Layered heavenly realms inhabited by divine beings, spiritual powers, and the throne of God — a multi-tiered cosmic architecture rather than a single undifferentiated "sky."',
+    subtitle: 'The Layered Heavenly Realms',
+    category: 'Second Temple Cosmology',
+    primarySourceLabel: '1 Enoch · Hebrew Bible',
+
+    shortSummary: 'A multi-tiered cosmic architecture of heavenly domains inhabited by divine beings, spiritual powers, and the throne of God — not a single undifferentiated "sky" but a structured hierarchy whose logic interpenetrates earthly reality.',
+
     historicalContext: 'In Second Temple Judaism, shamayim was not a simple location but a structured hierarchy of heavenly domains. 1 Enoch describes multiple heavens, each populated with distinct classes of divine beings — watchers, archangels, luminaries governed by celestial laws. The Third Heaven of 2 Enoch contained both a paradise of the righteous and a place of judgment. This layered cosmology shaped how first-century hearers understood phrases like "the Kingdom of Heaven" — not as a distant realm but as a present domain whose logic was already interpenetrating earthly reality.',
-    scripture: [
-      { reference: 'Genesis 1:1', explanation: 'The opening word — "In the beginning God created the shamayim and the earth" — establishes heaven not as background but as the first named domain of created order, placed before earth.' },
-      { reference: 'Daniel 10:12–14', explanation: 'The angelic messenger is delayed twenty-one days by the "prince of Persia" — a divine being governing a geopolitical domain within the shamayim. Heavenly activity and earthly history are portrayed as causally entangled.' },
-      { reference: 'Psalm 82:1', explanation: '"God stands in the divine assembly; he renders judgment in the midst of the gods." The heavenly council convenes within the shamayim as a governing jurisdiction, not a ceremonial backdrop.' },
-      { reference: '1 Kings 22:19–22', explanation: 'Micaiah sees the host of heaven assembled before YHWH — a governing council deliberating over earthly outcomes. The shamayim is a realm of active agency.' },
-      { reference: '2 Corinthians 12:2', explanation: 'Paul references "the third heaven" as a location he was caught up into — signaling that the layered shamayim of Second Temple cosmology remained a live framework in early Christian experience.' }
+
+    scripturalFoundation: [
+      {
+        reference: 'Genesis 1:1',
+        summary: 'Creation opens with shamayim named before the earth — establishing the heavenly domain as the first-order structure of created reality.',
+        relevance: 'Heaven precedes earth in ontological priority, not merely temporal sequence.'
+      },
+      {
+        reference: 'Daniel 10:12–14',
+        summary: 'The angelic messenger is delayed twenty-one days by the "prince of Persia" — a divine being governing a geopolitical domain within the shamayim.',
+        relevance: 'Heavenly activity and earthly history are portrayed as causally entangled across domains.'
+      },
+      {
+        reference: 'Psalm 82:1',
+        summary: '"God stands in the divine assembly; he renders judgment in the midst of the gods." The heavenly council convenes within the shamayim as a governing jurisdiction.',
+        relevance: 'The shamayim is a realm of active governance, not ceremonial backdrop.'
+      },
+      {
+        reference: '1 Kings 22:19–22',
+        summary: 'Micaiah sees the host of heaven assembled before YHWH — a governing council deliberating over earthly outcomes.',
+        relevance: 'Confirms that heavenly council deliberations directly determine earthly events.'
+      },
+      {
+        reference: '2 Corinthians 12:2',
+        summary: 'Paul references "the third heaven" as a location he was caught up into — signaling that the layered shamayim of Second Temple cosmology remained a live framework in early Christian experience.',
+        relevance: 'The multi-tiered heavenly structure was not abandoned by New Testament writers.'
+      }
     ],
-    quantumReflection: 'Shamayim illuminates several of the Prism\'s foundational properties. Its layered architecture expresses <strong>Holism</strong> — the heavenly and earthly realms are not separate systems but nested domains whose states are mutually conditioned. The angelic figures of Daniel 10 and Psalm 82 demonstrate <strong>Relationality</strong> — identity and agency emerge through relational position within the council, not as isolated entities. The simultaneous divine governance of both the heavenly assembly and earthly history reflects <strong>Non-Locality</strong> — causal influence operating across apparent spatial separation. The ordered structure of the heavenly realms embodies <strong>Law-Like Structure</strong> — the cosmos operates under binding relational constraints. Finally, the fact that shamayim means different things depending on speaker, audience, and context illustrates <strong>Context-Sensitivity</strong> — the term is not a fixed spatial coordinate but a relational concept whose meaning resolves under particular interpretive conditions.',
-    related: ['Divine Council', 'Olam HaBa', 'Watchers', 'Kingdom of God', 'Metatron']
+
+    prismReflection: {
+      summary: 'Shamayim is one of the most structurally rich concepts for understanding why the Prism uses quantum-relational language to approach ancient cosmology. Each of the five foundational properties finds a natural resonance here.',
+      fiveProperties: [
+        {
+          property: 'Holism',
+          explanation: 'The Prism uses this as a way to consider how the heavenly and earthly realms function as nested, mutually conditioned domains rather than separate systems. This does not prove a theological claim — it helps modern readers imagine why ancient writers described events in both domains as aspects of a single reality.'
+        },
+        {
+          property: 'Relationality',
+          explanation: 'The angelic figures of Daniel 10 and Psalm 82 hold identity and authority through their relational position within the council, not through intrinsic properties. The conceptual bridge is that identity constituted by relation — not by isolated essence — is a pattern the Prism recognizes across both ancient cosmology and relational physics.'
+        },
+        {
+          property: 'Non-Locality',
+          explanation: 'The simultaneous governance of the heavenly assembly and earthly geopolitical outcomes suggests causal influence operating across apparent spatial separation. The Prism uses this as a structural analogy, not as a proof that quantum entanglement explains angelic agency.'
+        },
+        {
+          property: 'Law-Like Structure',
+          explanation: 'The ordered structure of the heavenly realms — distinct offices, governing laws, accountability before YHWH — reflects a cosmos operating under binding relational constraints, not arbitrary divine will. The Prism finds this pattern coherent with a universe governed by law-like structure at every level.'
+        },
+        {
+          property: 'Context-Sensitivity',
+          explanation: 'Shamayim means different things depending on the speaker, audience, and literary context. It is not a fixed spatial coordinate. The Prism uses this to illustrate that meaning in ancient texts resolves relationally — under interpretive conditions — rather than as a fixed referent.'
+        }
+      ]
+    },
+
+    relatedConcepts: [
+      { id: 'divine_council', label: 'Divine Council' },
+      { id: 'olam_haba',      label: 'Olam HaBa' },
+      { id: 'non_locality',   label: 'Non-Locality' }
+    ],
+
+    ragMetadata: {
+      sourcePriority: ['Scripture', '1 Enoch', 'Second Temple Literature', 'The Prism', 'RCT', 'Physics'],
+      tags: ['heaven', 'angels', 'unseen realm', 'layered reality', 'divine beings', 'cosmology', 'Second Temple'],
+      aliases: ['heaven', 'heavens', 'heavenly realms', 'the heavens', 'shamayim'],
+      detectionTerms: ['shamayim', 'heavenly realms', 'layered heaven', 'unseen realm', 'third heaven']
+    }
   },
+
   olam_haba: {
     id: 'olam_haba',
     title: 'Olam HaBa',
-    source: 'Talmud · Second Temple Literature',
-    summary: 'The Age to Come — understood in Hebraic thought not as a disembodied afterlife but as the coming age of full divine governance, when heaven and earth are finally integrated under YHWH\'s uncontested rule.',
+    subtitle: 'The Age to Come',
+    category: 'Hebraic Eschatology',
+    primarySourceLabel: 'Talmud · Second Temple Literature',
+
+    shortSummary: 'The coming age of full divine governance — understood in Hebraic thought not as a disembodied afterlife but as the next epoch in history, when heaven and earth are finally integrated under YHWH\'s uncontested rule and the dead are raised to embodied life.',
+
     historicalContext: 'Olam HaBa (עוֹלָם הַבָּא) is paired inseparably with Olam HaZeh (this present age). The rabbis and Second Temple writers did not mean by "the world to come" a Greek-style immortal soul ascending to a timeless realm. They meant the next epoch in a historical sequence — the age in which the present disordering of creation is resolved, the dead are raised, and God\'s sovereign rule is no longer contested. This is why resurrection, not escape, is the central Jewish hope. The body matters because the coming age is an embodied, renewed, historical reality — not an escape from it.',
-    scripture: [
-      { reference: 'Isaiah 65:17–25', explanation: 'The vision of the "new heavens and new earth" is not destruction of the present order but its renewal — wolves and lambs coexisting, no premature death, labor bearing fruit. This is Olam HaBa imagined in concrete, historical terms.' },
-      { reference: 'Daniel 12:2', explanation: 'The resurrection of the dead into "everlasting life" or "everlasting contempt" situates Olam HaBa as a bodily, historical reality following a period of judgment — not a spiritual escape from history.' },
-      { reference: 'Matthew 12:32', explanation: 'Jesus references "this age" (Olam HaZeh) and "the age to come" (Olam HaBa) as a standard framework — his audience understood the distinction without explanation.' },
-      { reference: 'Romans 8:19–23', explanation: 'Paul\'s "groaning of creation" and its liberation from bondage is Olam HaBa expressed in Hellenistic Jewish idiom — the creation itself is waiting to be renewed, not abandoned.' }
+
+    scripturalFoundation: [
+      {
+        reference: 'Isaiah 65:17–25',
+        summary: 'The vision of new heavens and a new earth described in concrete, historical terms — renewed creation, no premature death, labor bearing fruit.',
+        relevance: 'Olam HaBa is not the destruction of the present order but its comprehensive renewal.'
+      },
+      {
+        reference: 'Daniel 12:2',
+        summary: 'The resurrection of the dead into everlasting life or everlasting contempt — framed as a bodily, historical event following a period of unprecedented distress.',
+        relevance: 'Bodily resurrection situates Olam HaBa as a historical reality, not a spiritual escape.'
+      },
+      {
+        reference: 'Matthew 12:32',
+        summary: 'Jesus references "this age" and "the age to come" as a framework his audience understood without explanation — confirming the two-age structure was operative in first-century Jewish thought.',
+        relevance: 'The two-age structure is assumed, not introduced, by Jesus — it was the common cosmological frame.'
+      },
+      {
+        reference: 'Romans 8:19–23',
+        summary: 'Paul\'s "groaning of creation" waiting for liberation from bondage expresses Olam HaBa in Hellenistic Jewish idiom — creation itself is waiting to be renewed.',
+        relevance: 'The scope of Olam HaBa is cosmic, not merely personal or spiritual.'
+      }
     ],
-    quantumReflection: 'Olam HaBa insists on <strong>Law-Like Structure</strong> through a genuine historical sequence (this age → the age to come) that cannot be shortcut or spiritualized away. The pairing with Olam HaZeh demonstrates <strong>Context-Sensitivity</strong> — the meaning of covenant promises, justice, and suffering changes dramatically depending on which age one understands themselves to be living within. The expected integration of heaven and earth reflects <strong>Holism</strong> — the final resolution is not the soul\'s escape from matter but the full coherence of all domains under divine governance. The resurrection hope embedded in Olam HaBa reflects <strong>Relationality</strong>: identity is not dissolved but carried forward in transformed relational continuity.',
-    related: ['Olam HaZeh', 'Shamayim', 'Resurrection', 'Kingdom of God', 'New Creation']
+
+    prismReflection: {
+      summary: 'Olam HaBa is one of the framework\'s most significant temporal anchors. It reshapes how the Prism reads every text — as words written within a particular epoch, carrying expectations about how the story ends.',
+      fiveProperties: [
+        {
+          property: 'Law-Like Structure',
+          explanation: 'Olam HaBa insists on a genuine historical sequence — this age, then the age to come — that cannot be shortcut or spiritualized away. The Prism uses this as a way to consider how covenantal logic operates across time with the same binding regularity as physical law.'
+        },
+        {
+          property: 'Context-Sensitivity',
+          explanation: 'The meaning of covenant promises, justice, and suffering changes dramatically depending on which age one understands themselves to be living within. The conceptual bridge is that interpretation is always positional — the observer\'s location in time shapes what can be seen.'
+        },
+        {
+          property: 'Holism',
+          explanation: 'The final resolution in Olam HaBa is not the soul\'s escape from matter but the full coherence of all domains — heaven, earth, body, spirit — under divine governance. This helps modern readers imagine why Hebraic hope was never about escaping creation but about its comprehensive renewal.'
+        },
+        {
+          property: 'Relationality',
+          explanation: 'The resurrection hope embedded in Olam HaBa insists that embodied personal identity is not dissolved but carried forward in transformed relational continuity. Identity remains constituted by relation — to YHWH, to community, to history.'
+        }
+      ]
+    },
+
+    relatedConcepts: [
+      { id: 'olam_hazeh',     label: 'Olam HaZeh' },
+      { id: 'shamayim',       label: 'Shamayim' },
+      { id: 'divine_council', label: 'Divine Council' }
+    ],
+
+    ragMetadata: {
+      sourcePriority: ['Scripture', 'Talmud', 'Second Temple Literature', 'The Prism', 'RCT'],
+      tags: ['eschatology', 'age to come', 'resurrection', 'new creation', 'kingdom of God', 'two ages'],
+      aliases: ['world to come', 'age to come', 'the coming age', 'olam haba', 'olam ha-ba'],
+      detectionTerms: ['olam haba', "olam ha'ba", 'olam ha-ba', 'age to come', 'world to come', 'the coming age']
+    }
   },
+
   olam_hazeh: {
     id: 'olam_hazeh',
     title: 'Olam HaZeh',
-    source: 'Talmud · Second Temple Literature',
-    summary: 'This Present Age — the current epoch characterized by contested divine governance, the coexistence of sin and death alongside divine faithfulness. The backdrop against which the Prism reads every text.',
+    subtitle: 'This Present Age',
+    category: 'Hebraic Eschatology',
+    primarySourceLabel: 'Talmud · Second Temple Literature',
+
+    shortSummary: 'The current epoch characterized by contested divine governance, the coexistence of sin and death alongside covenant faithfulness — not a world to be escaped but a precise temporal marker for where we are in the larger story.',
+
     historicalContext: 'Olam HaZeh (עוֹלָם הַזֶּה) is not a pessimistic label for a fallen world to be escaped. It is a precise temporal marker: the age we are in now, between the giving of Torah and the full establishment of Olam HaBa. Within this framework, suffering is not evidence that God has abandoned history — it is evidence that the transition between ages is not yet complete. Second Temple writers understood themselves as living in the overlap, where the powers of the present age still operate but the powers of the age to come have already begun to break through. This is exactly the framework the New Testament assumes.',
-    scripture: [
-      { reference: 'Galatians 1:4', explanation: 'Paul describes Jesus as giving himself "for our sins to rescue us from the present evil age" — using Olam HaZeh as the domain from which rescue is effected, not as the totality of created reality.' },
-      { reference: 'Matthew 13:39–40', explanation: 'The Parable of the Weeds explicitly names "the end of the age" as the moment of separation — confirming that the present age has a defined endpoint within a sequential historical framework.' },
-      { reference: 'Romans 12:2', explanation: '"Do not conform to this age" — Paul\'s use of "this age" as a source of formative pressure presupposes that Olam HaZeh has a distinct logic, a patterning power, that must be actively resisted.' },
-      { reference: 'Ecclesiastes 1:2–4', explanation: 'The "vanity" (hebel — vapor, mist) of Qohelet is precisely the experience of Olam HaZeh: the frustrating circularity of life under conditions where ultimate resolution has not yet arrived.' }
+
+    scripturalFoundation: [
+      {
+        reference: 'Galatians 1:4',
+        summary: 'Paul describes Jesus as giving himself to rescue believers "from the present evil age" — using Olam HaZeh as the domain from which rescue is effected.',
+        relevance: 'The present age has a defined character: it is evil, structurally disordered, a domain requiring rescue — not merely moral improvement.'
+      },
+      {
+        reference: 'Matthew 13:39–40',
+        summary: 'The Parable of the Weeds explicitly names "the end of the age" as the moment of separation — confirming that the present age has a defined endpoint.',
+        relevance: 'The present age is not permanent. It has a terminus, after which the conditions of Olam HaBa take hold.'
+      },
+      {
+        reference: 'Romans 12:2',
+        summary: '"Do not conform to this age" — Paul frames Olam HaZeh as a source of formative pressure with a distinct logic that must be actively resisted.',
+        relevance: 'The present age exerts a patterning influence on those within it. Resistance is possible but requires intentional counter-formation.'
+      },
+      {
+        reference: 'Ecclesiastes 1:2–4',
+        summary: 'The "vanity" (hebel — vapor, mist) of Qohelet names the frustrating circularity of life under conditions where ultimate resolution has not yet arrived.',
+        relevance: 'Hebel is the experiential texture of Olam HaZeh — not nihilism but the felt dissonance of living before the age turns.'
+      }
     ],
-    quantumReflection: 'Olam HaZeh maps onto the Prism as the present <strong>decoherence condition</strong> — the state in which systems are operating under constraints that have not yet fully resolved. The tension between divine faithfulness and observable disorder is a feature of the present age\'s <strong>Law-Like Structure</strong>: covenantal logic continues operating even when outcomes appear contradictory. <strong>Context-Sensitivity</strong> is most visible here — the meaning of suffering, delay, and unanswered prayer shifts entirely depending on whether one reads from within an Olam HaZeh frame (resolution is coming but not yet) versus a Greek frame (suffering is simply the nature of material existence). The overlap of the two ages — the "already but not yet" — is a dynamic <strong>Relational</strong> condition, not a logical contradiction.',
-    related: ['Olam HaBa', 'Shamayim', 'Kingdom of God', 'Covenant', 'Hebel']
+
+    prismReflection: {
+      summary: 'Olam HaZeh functions as the Prism\'s present-tense interpretive frame. Every text in Scripture was written from within Olam HaZeh — by writers who knew they were not at the end of the story.',
+      fiveProperties: [
+        {
+          property: 'Context-Sensitivity',
+          explanation: 'The meaning of suffering, delay, and unanswered prayer shifts entirely depending on whether one reads from within an Olam HaZeh frame — where resolution is coming but not yet — or a Greek frame where suffering is simply the nature of material existence. The Prism uses this distinction as a way to consider how interpretive position determines what can be seen in a text.'
+        },
+        {
+          property: 'Law-Like Structure',
+          explanation: 'Covenantal logic continues operating within Olam HaZeh even when outcomes appear contradictory. The tension between divine faithfulness and observable disorder is a feature of the present age\'s structure — not a refutation of the covenant. This does not prove the covenant; it offers a framework in which the tension is coherent rather than fatal.'
+        },
+        {
+          property: 'Relationality',
+          explanation: 'The overlap of the two ages — the "already but not yet" of early Christian thought — is a dynamic relational condition, not a logical contradiction. The Prism uses this as a way to consider how identity and meaning can be constituted by a future that has not yet fully arrived but is already relationally present.'
+        }
+      ]
+    },
+
+    relatedConcepts: [
+      { id: 'olam_haba',      label: 'Olam HaBa' },
+      { id: 'shamayim',       label: 'Shamayim' },
+      { id: 'divine_council', label: 'Divine Council' }
+    ],
+
+    ragMetadata: {
+      sourcePriority: ['Scripture', 'Talmud', 'Second Temple Literature', 'The Prism', 'RCT'],
+      tags: ['eschatology', 'present age', 'two ages', 'already not yet', 'decoherence', 'hebel'],
+      aliases: ['this age', 'present age', 'present evil age', 'this world', 'olam hazeh', 'olam ha-zeh'],
+      detectionTerms: ['olam hazeh', "olam ha'zeh", 'olam ha-zeh', 'present age', 'this present age', 'this evil age', 'already but not yet']
+    }
   },
+
   divine_council: {
     id: 'divine_council',
     title: 'Divine Council',
-    source: 'Psalm 82 · Deuteronomy 32 · 1 Enoch',
-    summary: 'The heavenly governing assembly through which YHWH administers creation — a council of divine beings assigned jurisdictional authority over nations, whose failure is the background for Israel\'s election and the New Testament\'s proclamation of Christ\'s universal authority.',
-    historicalContext: 'The Divine Council is structural to the Hebrew Bible\'s worldview. Psalm 82 opens with God presiding over an assembly of "gods" (elohim) who are judged for corrupt governance of the nations. Deuteronomy 32:8 (in the Dead Sea Scrolls text) reads "according to the number of the sons of God" — divine beings assigned jurisdictional governance over the nations at Babel, while Israel is kept as YHWH\'s direct portion. The prophets assume this framework: the "princes" of Daniel 10 are council members governing geopolitical domains. The New Testament announcement that Christ has been exalted "above every principality and power" makes no sense without it.',
-    scripture: [
-      { reference: 'Psalm 82', explanation: 'The clearest council text in the Hebrew Bible: YHWH presides, judges the "gods" for unjust governance of the nations, and pronounces their mortality. The psalm ends with a call for YHWH to "arise and judge the earth" — implying the current situation is one of delegated and failed administration.' },
-      { reference: 'Deuteronomy 32:8–9', explanation: 'In the DSS reading, the nations are assigned "according to the number of the sons of God" — a direct reference to council members receiving jurisdictional authority over nations at the Table of Nations event.' },
-      { reference: 'Daniel 10:13,20', explanation: 'The "Prince of Persia" and "Prince of Greece" are divine beings governing those nations in the heavenly realm, actively resisting angelic messengers — council administration in visible operation.' },
-      { reference: 'Colossians 1:16', explanation: 'Paul\'s catalog of "thrones, dominions, principalities, authorities" are council members — all things created through and for Christ, whose exaltation represents a total reconfiguration of the council\'s authority structure.' },
-      { reference: 'Revelation 4–5', explanation: 'The heavenly throne room scene is a council assembly — the twenty-four elders, the living creatures, and the Lamb who is worthy to open the sealed scroll. The council is reordered around the risen Christ.' }
+    subtitle: 'The Heavenly Governing Assembly',
+    category: 'Second Temple Cosmology',
+    primarySourceLabel: 'Psalm 82 · Deuteronomy 32 · 1 Enoch',
+
+    shortSummary: 'The heavenly assembly through which YHWH administers creation — a council of divine beings assigned jurisdictional authority over the nations, whose failure is the structural background for Israel\'s election and the New Testament\'s proclamation of Christ\'s universal lordship.',
+
+    historicalContext: 'The Divine Council is not a late theological embarrassment to be explained away — it is structural to the Hebrew Bible\'s worldview. Psalm 82 opens with God presiding over an assembly of "gods" (elohim) who are judged for corrupt governance of the nations. Deuteronomy 32:8 in the Dead Sea Scrolls reads "according to the number of the sons of God" — divine beings assigned jurisdictional governance over the nations at the Table of Nations event, while Israel is kept as YHWH\'s direct portion. The prophets assume this framework: the "princes" of Daniel 10 are council members governing geopolitical domains. The New Testament announcement that Christ has been exalted "above every principality and power" makes no sense without this background.',
+
+    scripturalFoundation: [
+      {
+        reference: 'Psalm 82',
+        summary: 'YHWH presides over an assembly of "gods," judges them for unjust governance of the nations, and pronounces their mortality. The psalm ends with a call for YHWH to "arise and judge the earth."',
+        relevance: 'The clearest council text in the Hebrew Bible — establishing that the nations were governed by delegated divine beings whose administration has been judged as corrupt.'
+      },
+      {
+        reference: 'Deuteronomy 32:8–9',
+        summary: 'In the Dead Sea Scrolls reading, the nations are distributed "according to the number of the sons of God" at the Table of Nations event — divine beings receive jurisdictional governance over each nation.',
+        relevance: 'Establishes the theological ground for why Israel\'s election is meaningful — YHWH disinherited the nations to the council members but kept Israel as his direct portion.'
+      },
+      {
+        reference: 'Daniel 10:13,20',
+        summary: 'The "Prince of Persia" and "Prince of Greece" are divine beings governing those nations in the heavenly realm, actively resisting the angelic messenger sent to Daniel.',
+        relevance: 'Council administration is shown in active operation — heavenly opposition and geopolitical history are directly causally linked.'
+      },
+      {
+        reference: 'Colossians 1:16',
+        summary: 'Paul\'s catalog of "thrones, dominions, principalities, authorities" names council members — all things created through and for Christ.',
+        relevance: 'Christ\'s exaltation represents a total reconfiguration of the council\'s authority structure, which presupposes that structure existed and mattered.'
+      },
+      {
+        reference: 'Revelation 4–5',
+        summary: 'The heavenly throne room scene is a council assembly — twenty-four elders, four living creatures, the Lamb who alone is worthy to open the sealed scroll.',
+        relevance: 'The reordering of the council around the risen Christ is the climactic event of the book\'s opening vision.'
+      }
     ],
-    quantumReflection: 'The Divine Council most directly expresses <strong>Relationality</strong> — the council is a system where identity, authority, and function are all constituted by one\'s relational position within the assembly, not by intrinsic properties. The council\'s jurisdictional assignments express <strong>Law-Like Structure</strong> — governance of creation operates through binding delegated authority. The simultaneous operation of heavenly council decisions and earthly geopolitical outcomes demonstrates <strong>Non-Locality</strong> — causal connection between what happens in the assembly and what happens in the nations operates across apparent spatial separation. The different authority structures in different ages reflect <strong>Context-Sensitivity</strong> — who governs, and how, changes based on the covenantal epoch. The council as a unified governing system whose parts are mutually conditioned expresses <strong>Holism</strong>.',
-    related: ['Shamayim', 'Watchers', 'Olam HaBa', 'Principalities and Powers', 'Sons of God']
+
+    prismReflection: {
+      summary: 'The Divine Council is arguably the single concept that most directly illuminates why the Prism reads Scripture in terms of relational ontology rather than substance ontology. The council is a system where identity, authority, and function are constituted relationally.',
+      fiveProperties: [
+        {
+          property: 'Relationality',
+          explanation: 'In the council, identity and authority are constituted by relational position within the assembly — not by intrinsic substance. A "son of God" is not a category of being but a role within a relational structure. The Prism uses this as a way to consider how the Hebrew Bible may be operating with a relational ontology that predates modern relational frameworks.'
+        },
+        {
+          property: 'Law-Like Structure',
+          explanation: 'Governance of creation operates through binding delegated authority — not arbitrary divine micromanagement. The council members are given jurisdictions and are accountable for how they exercise them. This does not prove anything about physics; it helps modern readers imagine why ancient writers portrayed the cosmos as governed by structured, law-like relational constraints.'
+        },
+        {
+          property: 'Non-Locality',
+          explanation: 'The simultaneous operation of heavenly council decisions and earthly geopolitical outcomes suggests causal connection across apparent spatial separation. The conceptual bridge is that two domains — heavenly assembly and earthly history — are entangled rather than independent. The Prism uses this analogy carefully, without claiming quantum entanglement explains angelic governance.'
+        },
+        {
+          property: 'Context-Sensitivity',
+          explanation: 'Who governs, and how, changes based on the covenantal epoch — the council structure before the Table of Nations, after it, and after the resurrection are three distinct configurations. The meaning of "authority" is context-dependent, not fixed.'
+        },
+        {
+          property: 'Holism',
+          explanation: 'The council as a unified governing system whose parts are mutually conditioned cannot be understood by examining the nations or Israel in isolation. The whole structure — YHWH, council members, Israel, the nations — is the unit of meaning.'
+        }
+      ]
+    },
+
+    relatedConcepts: [
+      { id: 'shamayim',     label: 'Shamayim' },
+      { id: 'olam_haba',    label: 'Olam HaBa' },
+      { id: 'non_locality', label: 'Non-Locality' }
+    ],
+
+    ragMetadata: {
+      sourcePriority: ['Scripture', '1 Enoch', 'Dead Sea Scrolls', 'Second Temple Literature', 'The Prism', 'RCT'],
+      tags: ['divine council', 'elohim', 'sons of God', 'watchers', 'principalities', 'powers', 'nations', 'heavenly assembly'],
+      aliases: ['heavenly council', 'divine assembly', 'council of God', 'sons of God', 'elohim assembly'],
+      detectionTerms: ['divine council', 'heavenly council', 'sons of god', 'council of god', 'divine assembly', 'principalities and powers', 'prince of persia', 'bene elohim']
+    }
   },
+
   non_locality: {
     id: 'non_locality',
     title: 'Non-Locality',
-    source: "Bell's Theorem · Quantum Mechanics",
-    summary: 'The quantum mechanical property by which entangled particles exhibit correlated states regardless of the spatial distance separating them — used in the Prism as a structural analogy for the relational coherence between heaven and earth, divine action and human history.',
-    historicalContext: "Non-locality as a formal concept emerges from Bell's theorem (1964) and Alain Aspect's experimental work (1982), which demonstrated that entangled quantum particles cannot be described as having independent, pre-existing states — their correlation at measurement exceeds any local hidden variable explanation. This is not a claim that information travels faster than light; it is a claim that the system must be understood as a whole rather than as two separate particles. The Prism does not use this as proof of theology. It uses it as a structural analogy: the kind of coherence quantum mechanics reveals in physical systems — wholeness, relational determination of state, non-separability — resonates with the Hebraic intuition that heaven and earth are not two independent domains but one integrated creation whose states are mutually determining.",
-    scripture: [
-      { reference: 'Colossians 1:17', explanation: '"In him all things hold together" — the Greek synestēken implies a continuous relational coherence, not merely an initial act of creation. Creation\'s continued integrity is a relational property, not a mechanical one.' },
-      { reference: 'Hebrews 1:3', explanation: 'Christ "sustaining all things by his powerful word" — the same relational upholding-coherence expressed in active present-tense terms, not past-tense creation language.' },
-      { reference: 'Acts 17:28', explanation: '"In him we live and move and have our being" — Paul\'s use of Greek philosophical language to express a Hebraic intuition: creaturely existence is constitutively relational, not independent.' },
-      { reference: 'John 17:21', explanation: 'The prayer that believers may be "one as we are one" — the Father-Son relationship proposed as the model for human relational coherence, not as metaphor but as ontological participation.' }
-    ],
-    quantumReflection: '<strong>Non-Locality</strong> is itself one of the five foundational properties the Prism uses to read Scripture — so this card serves as a self-reflective entry into the framework itself. As a structural analogy it challenges the assumption that divine action must be local and sequential to be real. <strong>Holism</strong> is the broader category non-locality belongs to: the refusal to treat parts of a system as genuinely independent. <strong>Relationality</strong> appears in the entanglement metaphor: state is not intrinsic to a particle but emerges through its relation to the whole. <strong>Law-Like Structure</strong> is preserved: non-locality operates within deterministic constraints (no faster-than-light signaling), just as divine action in the Hebraic framework operates within covenantal law. <strong>Context-Sensitivity</strong> appears in the measurement problem: the state observed depends on the relational context of observation — a structural parallel to how Scripture\'s meaning resolves differently under different interpretive frameworks.',
-    related: ['Holism', 'Entanglement', 'Shamayim', 'Relational Ontology', 'Divine Council']
-  }
-};
+    subtitle: 'Relational Coherence Across Distance',
+    category: 'Prism Framework · Physics',
+    primarySourceLabel: "Bell's Theorem · Quantum Mechanics",
 
-var conceptKeywords = {
-  shamayim:       ['shamayim'],
-  olam_haba:      ['olam haba', "olam ha'ba", 'age to come', 'world to come', 'olam ha-ba'],
-  olam_hazeh:     ['olam hazeh', "olam ha'zeh", 'present age', 'this age', 'olam ha-zeh'],
-  divine_council: ['divine council', 'heavenly council', 'sons of god', 'council of god', 'divine assembly'],
-  non_locality:   ['non-locality', 'non locality', 'nonlocality', 'entanglement', 'quantum entangle', "bell's theorem", 'non-local']
-};
+    shortSummary: 'The quantum mechanical property by which entangled particles exhibit correlated states regardless of the spatial distance separating them — used in the Prism as a structural analogy for why ancient writers described heaven and earth as a single relational system rather than two independent domains.',
+
+    historicalContext: "Non-locality as a formal concept emerges from Bell's theorem (1964) and Alain Aspect's experimental work (1982), which demonstrated that entangled quantum particles cannot be described as having independent, pre-existing states — their correlation at measurement exceeds any local hidden variable explanation. This is not a claim that information travels faster than light; it is a claim that the system must be understood as a whole rather than as two separate particles. The Prism does not use non-locality as proof of theology. It uses it as a structural analogy: the kind of coherence that quantum mechanics reveals in physical systems — wholeness, relational determination of state, non-separability — resonates with the Hebraic intuition that heaven and earth are not two independent domains but one integrated creation whose states are mutually determining.",
+
+    scripturalFoundation: [
+      {
+        reference: 'Colossians 1:17',
+        summary: '"In him all things hold together" — the Greek synestēken implies continuous relational coherence, not merely an initial act of creation.',
+        relevance: 'Creation\'s ongoing integrity is framed as a relational property, not a mechanical one. The holding-together is active and present-tense.'
+      },
+      {
+        reference: 'Hebrews 1:3',
+        summary: 'Christ "sustaining all things by his powerful word" — the same relational coherence expressed in active present-tense terms.',
+        relevance: 'The continuity of creation is not self-sustaining but relationally upheld — a pattern the Prism considers structurally analogous to non-separability.'
+      },
+      {
+        reference: 'Acts 17:28',
+        summary: '"In him we live and move and have our being" — creaturely existence is constitutively relational, not independent.',
+        relevance: 'Paul uses Greek philosophical language to express a Hebraic intuition about ontological dependence and relational constitution.'
+      },
+      {
+        reference: 'John 17:21',
+        summary: 'The prayer that believers may be "one as we are one" — the Father-Son relationship proposed as the model for human relational coherence.',
+        relevance: 'Unity here is not metaphor but ontological participation — the relational structure of the Godhead as the ground of creaturely coherence.'
+      }
+    ],
+
+    prismReflection: {
+      summary: 'Non-Locality is itself one of the five foundational properties the Prism uses to read Scripture, which makes this node self-referential — an entry point into the framework\'s own structure. The Prism is explicit that non-locality does not prove theology; it offers a structural analogy that helps modern readers imagine why ancient writers described heaven and earth as a single relational system.',
+      fiveProperties: [
+        {
+          property: 'Non-Locality',
+          explanation: 'This concept is one of the five properties itself. The Prism uses non-locality as a structural analogy — not as proof — for why divine action need not be spatially local to be causally real. The conceptual bridge is that if physical systems can exhibit genuine correlation across spatial separation, the ancient intuition that events in heaven and earth are mutually determining is not structurally incoherent.'
+        },
+        {
+          property: 'Holism',
+          explanation: 'Non-locality is a direct expression of holism: the entangled system cannot be understood by analyzing each particle independently. The Prism uses this as a way to consider why ancient cosmology treated heaven-and-earth as a single system whose parts cannot be meaningfully isolated.'
+        },
+        {
+          property: 'Relationality',
+          explanation: 'In quantum entanglement, state is not intrinsic to a particle but emerges through its relation to the whole system. The conceptual bridge to the Hebraic framework is that identity and reality may be constituted relationally — neither heaven nor earth is self-defining in isolation.'
+        },
+        {
+          property: 'Law-Like Structure',
+          explanation: 'Non-locality operates within strict law-like constraints — no faster-than-light signaling, no violation of relativistic causality. The analogy the Prism draws is that divine action, though non-local in its relational reach, operates within covenantal law-like structure — not arbitrary intervention.'
+        },
+        {
+          property: 'Context-Sensitivity',
+          explanation: 'The state that is observed in a quantum system depends on the relational context of observation — the measurement basis chosen. The Prism uses this as a structural parallel to how Scripture\'s meaning resolves differently under different interpretive frameworks. This does not prove that Scripture behaves like a quantum system; it offers an analogy for why interpretive context is not merely subjective preference but a condition of what can be seen.'
+        }
+      ]
+    },
+
+    relatedConcepts: [
+      { id: 'shamayim',       label: 'Shamayim' },
+      { id: 'divine_council', label: 'Divine Council' },
+      { id: 'olam_haba',      label: 'Olam HaBa' }
+    ],
+
+    ragMetadata: {
+      sourcePriority: ['Physics', 'The Prism', 'RCT', 'Scripture'],
+      tags: ['non-locality', 'entanglement', 'quantum mechanics', 'relational ontology', 'holism', 'Bell theorem', 'structural analogy'],
+      aliases: ['quantum non-locality', 'entanglement', 'non-local', 'nonlocal correlation'],
+      detectionTerms: ['non-locality', 'non locality', 'nonlocality', 'entanglement', 'quantum entangle', "bell's theorem", 'non-local', 'bell theorem']
+    }
+  }
+
+}; // end conceptNodes
+
+// Run validation on all nodes at init (dev warnings only)
+(function() {
+  for (var key in conceptNodes) {
+    _validateConceptNode(conceptNodes[key]);
+  }
+}());
+
+// ── Detection ─────────────────────────────────────────────────────────────────
+// Uses ragMetadata.detectionTerms per node — no separate hardcoded keyword map.
+// Phase II: replace getConceptNodes() body with API/RAG fetch; signature unchanged.
 
 /**
  * getConceptNodes(text)
- * Phase I: keyword detection. Phase II: replace body with API/RAG call.
- * Return contract: array of conceptNode objects. Do not change the signature.
+ * Returns array of matched ConceptNode objects.
+ * Return contract must remain stable across Phase I → Phase II migration.
  */
 function getConceptNodes(text) {
   if (!text) return [];
   var lower = text.toLowerCase();
   var matched = [];
-  for (var key in conceptKeywords) {
-    var keywords = conceptKeywords[key];
-    for (var i = 0; i < keywords.length; i++) {
-      if (lower.indexOf(keywords[i]) !== -1) {
-        matched.push(conceptNodes[key]);
+  for (var key in conceptNodes) {
+    var node = conceptNodes[key];
+    var terms = (node.ragMetadata && node.ragMetadata.detectionTerms) ? node.ragMetadata.detectionTerms : [];
+    for (var i = 0; i < terms.length; i++) {
+      if (lower.indexOf(terms[i].toLowerCase()) !== -1) {
+        matched.push(node);
         break;
       }
     }
@@ -6599,40 +6977,43 @@ function getConceptNodes(text) {
   return matched;
 }
 
+// ── Card Rendering ────────────────────────────────────────────────────────────
+
 function renderConceptNodes(nodes) {
   if (!nodes || nodes.length === 0) return '';
   var cards = nodes.map(function(node) {
     return '<div class="concept-card">' +
       '<div class="concept-card-title">' + escHtml(node.title) + '</div>' +
-      '<div class="concept-card-source">' + escHtml(node.source) + '</div>' +
-      '<div class="concept-card-summary">' + escHtml(node.summary) + '</div>' +
+      '<div class="concept-card-category">' + escHtml(node.category || '') + '</div>' +
+      '<div class="concept-card-source">' + escHtml(node.primarySourceLabel || '') + '</div>' +
+      '<div class="concept-card-summary">' + escHtml(node.shortSummary || '') + '</div>' +
       '<button class="concept-explore-btn" onclick="openConceptModal(\'' + node.id + '\')">Explore Concept</button>' +
       '</div>';
   }).join('');
   return '<div class="concept-nodes-section"><div class="concept-nodes-label">Framework Concepts</div><div class="concept-cards-grid">' + cards + '</div></div>';
 }
 
-// ── Concept Knowledge Graph — navigation state ───────────────────────────────
+// ── Knowledge Graph — navigation state ───────────────────────────────────────
 // Breadcrumb trail: array of {id, title}, capped at 3 entries.
-// Reset each time a fresh openConceptModal() call is made from outside the modal.
+// Reset on each fresh openConceptModal() call from outside the modal.
 var _conceptTrail = [];
 
-// Title → id lookup. Allows chip labels ("Olam HaBa") to resolve to node ids.
-// Chips for concepts not yet in the static set gracefully no-op.
+// Title/alias → id index, built from canonical node data (no manual hardcoding)
 var _conceptTitleIndex = (function() {
   var idx = {};
   for (var key in conceptNodes) {
-    idx[conceptNodes[key].title.toLowerCase()] = key;
+    var n = conceptNodes[key];
+    // Index by lowercased title
+    idx[n.title.toLowerCase()] = n.id;
+    // Index all ragMetadata.aliases
+    if (n.ragMetadata && n.ragMetadata.aliases) {
+      n.ragMetadata.aliases.forEach(function(a) { idx[a.toLowerCase()] = n.id; });
+    }
+    // Index relatedConcepts labels pointing to known ids
+    if (n.relatedConcepts) {
+      n.relatedConcepts.forEach(function(rc) { if (rc.id) idx[rc.label.toLowerCase()] = rc.id; });
+    }
   }
-  // Manual aliases for common label variants used in related arrays
-  idx['olam haba']      = 'olam_haba';
-  idx["olam ha'ba"]     = 'olam_haba';
-  idx['olam hazeh']     = 'olam_hazeh';
-  idx["olam ha'zeh"]    = 'olam_hazeh';
-  idx['divine council'] = 'divine_council';
-  idx['non-locality']   = 'non_locality';
-  idx['non locality']   = 'non_locality';
-  idx['nonlocality']    = 'non_locality';
   return idx;
 }());
 
@@ -6641,10 +7022,12 @@ function _resolveConceptId(titleOrId) {
   return _conceptTitleIndex[titleOrId.toLowerCase()] || null;
 }
 
+// ── Modal Content Renderer ────────────────────────────────────────────────────
+
 /**
  * loadConcept(conceptId)
  * Single entry point for all concept navigation — initial open and chip traversal.
- * Phase II: swap body to fetch node from API/RAG; UI unchanged.
+ * Phase II: swap body to fetch node from API/RAG; all rendering below unchanged.
  */
 function loadConcept(conceptId) {
   var node = conceptNodes[conceptId];
@@ -6653,114 +7036,99 @@ function loadConcept(conceptId) {
   var body = document.getElementById('conceptModalBody');
   if (!body) return;
 
-  // Fade out
   body.style.transition = 'opacity 0.18s ease';
   body.style.opacity = '0';
 
   setTimeout(function() {
-    // Render scripture
-    var scriptureHtml = node.scripture.map(function(s) {
+
+    // Scripture
+    var scriptureHtml = (node.scripturalFoundation || []).map(function(s) {
       return '<div class="modal-scripture-item">' +
         '<div class="modal-scripture-ref">' + escHtml(s.reference) + '</div>' +
-        '<div class="modal-scripture-exp">' + escHtml(s.explanation) + '</div>' +
+        '<div class="modal-scripture-exp">' + escHtml(s.summary || s.explanation || '') + '</div>' +
+        (s.relevance ? '<div class="modal-scripture-relevance">' + escHtml(s.relevance) + '</div>' : '') +
         '</div>';
     }).join('');
 
-    // Render chips — wire to navigable concepts, dim unknowns
-    var relatedHtml = node.related.map(function(r) {
-      var targetId = _resolveConceptId(r);
-      if (targetId) {
-        return '<button class="concept-chip concept-chip--nav" onclick="navigateConcept(\'' + targetId + '\')">' + escHtml(r) + '</button>';
+    // Prism Reflection — five properties as individual blocks
+    var prismHtml = '';
+    if (node.prismReflection) {
+      if (node.prismReflection.summary) {
+        prismHtml += '<p class="concept-modal-text" style="margin-bottom:16px;">' + escHtml(node.prismReflection.summary) + '</p>';
       }
-      return '<span class="concept-chip concept-chip--dim">' + escHtml(r) + '</span>';
+      if (node.prismReflection.fiveProperties && node.prismReflection.fiveProperties.length > 0) {
+        prismHtml += node.prismReflection.fiveProperties.map(function(p) {
+          return '<div class="prism-property-block">' +
+            '<div class="prism-property-name">' + escHtml(p.property) + '</div>' +
+            '<div class="prism-property-body">' + escHtml(p.explanation) + '</div>' +
+            '</div>';
+        }).join('');
+      }
+    }
+
+    // Related chips — wire navigable, dim unknowns
+    var relatedHtml = (node.relatedConcepts || []).map(function(rc) {
+      var targetId = rc.id ? _resolveConceptId(rc.id) : _resolveConceptId(rc.label || rc);
+      var label = rc.label || rc;
+      if (targetId) {
+        return '<button class="concept-chip concept-chip--nav" onclick="navigateConcept(\'' + targetId + '\')">' + escHtml(label) + '</button>';
+      }
+      return '<span class="concept-chip concept-chip--dim">' + escHtml(label) + '</span>';
     }).join('');
 
     // Update header
     document.getElementById('conceptModalTitle').textContent = node.title;
-    document.getElementById('conceptModalSource').textContent = node.source;
+    document.getElementById('conceptModalSubtitle').textContent = node.subtitle || '';
+    document.getElementById('conceptModalCategory').textContent = (node.category || '') + (node.primarySourceLabel ? '  ·  ' + node.primarySourceLabel : '');
 
-    // Update body sections
-    document.getElementById('conceptModalHistorical').textContent = node.historicalContext;
+    // Update body
+    document.getElementById('conceptModalHistorical').textContent = node.historicalContext || '';
     document.getElementById('conceptModalScripture').innerHTML = scriptureHtml;
-    document.getElementById('conceptModalQuantum').innerHTML = node.quantumReflection;
+    document.getElementById('conceptModalPrism').innerHTML = prismHtml;
     document.getElementById('conceptModalRelated').innerHTML = relatedHtml;
 
-    // Render breadcrumb
     _renderConceptBreadcrumb();
-
-    // Scroll to top
     body.scrollTop = 0;
-
-    // Fade in
     body.style.opacity = '1';
+
   }, 180);
 }
 
 function _renderConceptBreadcrumb() {
   var el = document.getElementById('conceptModalBreadcrumb');
   if (!el) return;
-  if (_conceptTrail.length <= 1) {
-    el.style.display = 'none';
-    el.innerHTML = '';
-    return;
-  }
+  if (_conceptTrail.length <= 1) { el.style.display = 'none'; el.innerHTML = ''; return; }
   var parts = _conceptTrail.map(function(entry, i) {
     var isLast = (i === _conceptTrail.length - 1);
-    if (isLast) {
-      return '<span class="concept-bc-current">' + escHtml(entry.title) + '</span>';
-    }
-    return '<button class="concept-bc-link" onclick="jumpConcept(\'' + escHtml(entry.id) + '\', ' + i + ')">' + escHtml(entry.title) + '</button>';
+    if (isLast) return '<span class="concept-bc-current">' + escHtml(entry.title) + '</span>';
+    return '<button class="concept-bc-link" onclick="jumpConcept(\'' + entry.id + '\', ' + i + ')">' + escHtml(entry.title) + '</button>';
   });
   el.innerHTML = parts.join('<span class="concept-bc-sep">›</span>');
   el.style.display = 'block';
 }
 
-/**
- * openConceptModal(conceptId)
- * Entry from outside the modal (Explore Concept buttons).
- * Resets the breadcrumb trail.
- */
 function openConceptModal(conceptId) {
   var id = _resolveConceptId(conceptId);
   if (!id) return;
   var node = conceptNodes[id];
   if (!node) return;
-
-  // Reset trail for fresh entry
   _conceptTrail = [{ id: id, title: node.title }];
-
   var overlay = document.getElementById('conceptModalOverlay');
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
-
-  // Hide breadcrumb until there's a trail to show
   var bc = document.getElementById('conceptModalBreadcrumb');
   if (bc) { bc.style.display = 'none'; bc.innerHTML = ''; }
-
   loadConcept(id);
 }
 
-/**
- * navigateConcept(conceptId)
- * Called by Related Concept chip clicks — extends the trail.
- */
 function navigateConcept(conceptId) {
   var node = conceptNodes[conceptId];
   if (!node) return;
-
-  // Extend trail, cap at 3
   _conceptTrail.push({ id: conceptId, title: node.title });
-  if (_conceptTrail.length > 3) {
-    _conceptTrail.shift();
-  }
-
+  if (_conceptTrail.length > 3) _conceptTrail.shift();
   loadConcept(conceptId);
 }
 
-/**
- * jumpConcept(conceptId, trailIndex)
- * Called by breadcrumb link clicks — trims the trail back to that position.
- */
 function jumpConcept(conceptId, trailIndex) {
   _conceptTrail = _conceptTrail.slice(0, trailIndex + 1);
   loadConcept(conceptId);
@@ -6780,7 +7148,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeConceptModal(); });
   }
 });
-// ── End Concept Exploration Cards ────────────────────────────────────────────
+// ── End Concept Exploration Cards ─────────────────────────────────────────────
 </script>
 <div id="prism-starfield" aria-hidden="true"></div>
 
@@ -6944,7 +7312,8 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="concept-modal-head">
       <div>
         <div class="concept-modal-title" id="conceptModalTitle"></div>
-        <div class="concept-modal-source" id="conceptModalSource"></div>
+        <div class="concept-modal-subtitle" id="conceptModalSubtitle"></div>
+        <div class="concept-modal-category" id="conceptModalCategory"></div>
       </div>
       <button class="concept-modal-close" onclick="closeConceptModal()" aria-label="Close">&times;</button>
     </div>
@@ -6959,8 +7328,8 @@ document.addEventListener('DOMContentLoaded', function() {
         <div id="conceptModalScripture"></div>
       </div>
       <div class="concept-modal-section">
-        <div class="concept-modal-section-label">Quantum Reflection</div>
-        <div class="concept-modal-text" id="conceptModalQuantum"></div>
+        <div class="concept-modal-section-label">Prism Reflection</div>
+        <div id="conceptModalPrism"></div>
       </div>
       <div class="concept-modal-section">
         <div class="concept-modal-section-label">Related Concepts</div>
