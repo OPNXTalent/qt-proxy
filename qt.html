@@ -6576,6 +6576,14 @@ function _validateConceptNode(node) {
         console.warn('Concept ' + node.id + ' is missing aliases or detectionTerms');
       }
     }
+    // Validate relatedConcepts entries have relationshipType
+    if (Array.isArray(node.relatedConcepts)) {
+      node.relatedConcepts.forEach(function(related) {
+        if (!related.relationshipType) {
+          console.warn('Concept ' + node.id + ' has relatedConcept ' + related.id + ' missing relationshipType');
+        }
+      });
+    }
   }
 }
 
