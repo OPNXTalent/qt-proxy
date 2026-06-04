@@ -1789,7 +1789,8 @@
     <div class="sidebar-logo">The Prism</div>
     <div class="sidebar-tier" id="sidebarTierLabel"></div>
     <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; display:flex; flex-direction:column; gap:3px;">
-      <span id="sidebarQueryCountText" style="transition:color 0.4s;">— queries remaining</span>
+      <span id="sidebarQueryCountText" style="transition:color 0.4s;">— / — Queries</span>
+      <span id="sidebarRefillDate" style="display:none; color:rgba(201,168,76,0.45); font-size:9px; letter-spacing:0.12em;"></span>
       <span id="sidebarQueryCreditsText" style="display:none; color:var(--gold-dim);">— Signal Bank</span>
       <span id="sidebarQueryCreditsSubText" style="display:none; color:var(--gold-dim); font-size:9px; letter-spacing:0.1em;">(Non-Expiring / Giftable Queries)</span>
     </div>
@@ -4356,11 +4357,13 @@ function decrementSidebarCounter() {
   const countEl = document.getElementById('sidebarQueryCountText');
   const wrapEl  = document.getElementById('sidebarCredits');
   if (!countEl || wrapEl.style.display === 'none') return;
-  const match = countEl.textContent.match(/(\d+)/);
+  // Parse "N / limit Queries" or legacy "N Queries"
+  const match = countEl.textContent.match(/(\d+)\s*\/\s*(\d+)|^(\d+)/);
   if (!match) return;
-  const current = parseInt(match[1]);
+  const current = parseInt(match[1] !== undefined ? match[1] : match[3]);
+  const limit   = match[2] !== undefined ? parseInt(match[2]) : null;
   const updated = Math.max(0, current - 1);
-  setQueryCount(countEl, updated);
+  setQueryCount(countEl, updated, limit);
 }
 
 function toggleSessionsPanel() { /* sessionsPanel replaced by keepQuestioningBox */ }
@@ -4374,13 +4377,53 @@ function toggleKeepQuestioning() {
   if (btn) btn.textContent = open ? '↓' : '↑';
 }
 
-// ── QUERY COUNT COLOR HELPER ─────────────────────────────────────────────────
-function setQueryCount(el, n) {
+// ── QUERY COUNT DISPLAY ───────────────────────────────────────────────────────
+function setQueryCount(el, remaining, limit) {
   if (!el) return;
-  el.textContent = n === 1 ? '1 query remaining' : n + ' queries remaining';
-  el.style.color = n <= 5  ? '#c0392b'               // red
-                 : n <= 10 ? 'var(--gold-pale)'       // gold
-                 : 'rgba(80,200,130,0.9)';            // green
+  var cap = (limit !== undefined && limit !== null) ? limit : null;
+  if (cap !== null) {
+    el.textContent = remaining + ' / ' + cap + ' Queries';
+  } else {
+    el.textContent = remaining + ' Queries';
+  }
+  el.style.color = 'rgba(201,168,76,0.85)';
+}
+
+// Compute and display the next monthly refill date from a subscription anchor date.
+// Uses created_at as the billing anchor — advances month-by-month until the next
+// future date, handling month-length edge cases (e.g. Jan 31 → Feb 28).
+function setRefillDate(anchorDateStr) {
+  var el = document.getElementById('sidebarRefillDate');
+  if (!el) return;
+  if (!anchorDateStr) { el.style.display = 'none'; return; }
+
+  try {
+    var anchor = new Date(anchorDateStr);
+    var anchorDay = anchor.getUTCDate();
+    var now = new Date();
+    var year = now.getUTCFullYear();
+    var month = now.getUTCMonth(); // 0-based
+
+    // Walk forward month-by-month until we find the next future anniversary
+    var next;
+    for (var i = 0; i < 24; i++) {
+      var y = year + Math.floor((month + i) / 12);
+      var m = (month + i) % 12;
+      // Clamp day to month length (e.g. day 31 in February → 28/29)
+      var daysInMonth = new Date(y, m + 1, 0).getUTCDate();
+      var d = Math.min(anchorDay, daysInMonth);
+      var candidate = new Date(Date.UTC(y, m, d));
+      if (candidate > now) { next = candidate; break; }
+    }
+
+    if (!next) { el.style.display = 'none'; return; }
+
+    var formatted = next.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    el.textContent = 'Refills ' + formatted;
+    el.style.display = 'inline';
+  } catch (e) {
+    el.style.display = 'none';
+  }
 }
 
 function setQueryCredits(n) {
@@ -4402,12 +4445,15 @@ async function loadSidebarCreditsAnon() {
     const wrapEl  = document.getElementById('sidebarCredits');
     if (!countEl || !wrapEl) return;
     if (data.locked) {
-      setQueryCount(countEl, 0);
+      setQueryCount(countEl, 0, 3);
     } else {
       const used = data.queriesUsed || 0;
       const remaining = Math.max(0, 3 - used);
-      setQueryCount(countEl, remaining);
+      setQueryCount(countEl, remaining, 3);
     }
+    // No refill date for anonymous/free users
+    var refillEl = document.getElementById('sidebarRefillDate');
+    if (refillEl) refillEl.style.display = 'none';
     wrapEl.style.display = 'flex';
   } catch {}
 }
@@ -4429,24 +4475,23 @@ async function loadSidebarCredits() {
     const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
     const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
     const res = await fetch(
-      `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=query_count,purchased_credits&limit=1`,
+      `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=query_count,purchased_credits,created_at&limit=1`,
       { headers: { 'apikey': sbAnon, 'Authorization': `Bearer ${sbAnon}` } }
     );
     const data = await res.json();
     if (!data?.[0]) return;
 
-    const used    = data[0].query_count || 0;
-    const credits = data[0].purchased_credits || 0;
-    const monthly = Math.max(0, limit - used);
-    const total   = monthly + credits;
+    const used      = data[0].query_count || 0;
+    const credits   = data[0].purchased_credits || 0;
+    const createdAt = data[0].created_at || null;
+    const monthly   = Math.max(0, limit - used);
 
-    const countEl   = document.getElementById('sidebarQueryCountText');
-    const wrapEl    = document.getElementById('sidebarCredits');
-    const tooltipEl = document.getElementById('sidebarQueryTooltip');
-    const hoverEl   = document.getElementById('sidebarQueryCount');
+    const countEl = document.getElementById('sidebarQueryCountText');
+    const wrapEl  = document.getElementById('sidebarCredits');
     if (!countEl || !wrapEl) return;
 
-    setQueryCount(countEl, total);
+    setQueryCount(countEl, monthly, limit);
+    setRefillDate(createdAt);
     setQueryCredits(credits);
     wrapEl.style.display = 'flex';
 
@@ -4460,10 +4505,11 @@ function updateSidebarCredits(newCredits) {
   const countEl = document.getElementById('sidebarQueryCountText');
   const wrapEl  = document.getElementById('sidebarCredits');
   if (!countEl || !wrapEl) return;
-  const match = countEl.textContent.match(/(\d+)/);
-  const current = match ? parseInt(match[1]) : 0;
+  const match   = countEl.textContent.match(/(\d+)\s*\/\s*(\d+)|^(\d+)/);
+  const current = match ? parseInt(match[1] !== undefined ? match[1] : match[3]) : 0;
+  const limit   = (match && match[2] !== undefined) ? parseInt(match[2]) : null;
   const updated = current + newCredits;
-  setQueryCount(countEl, updated);
+  setQueryCount(countEl, updated, limit);
   wrapEl.style.display = 'flex';
 }
 
@@ -5015,10 +5061,12 @@ function showCreditAnimation() {
 function incrementSidebarCounter() {
   var countEl = document.getElementById('sidebarQueryCountText');
   if (!countEl) return;
-  var match = countEl.textContent.match(/(\d+)/);
+  var match   = countEl.textContent.match(/(\d+)\s*\/\s*(\d+)|^(\d+)/);
   if (!match) return;
-  var updated = parseInt(match[1]) + 1;
-  setQueryCount(countEl, updated);
+  var current = parseInt(match[1] !== undefined ? match[1] : match[3]);
+  var limit   = (match[2] !== undefined) ? parseInt(match[2]) : null;
+  var updated = current + 1;
+  setQueryCount(countEl, updated, limit);
 }
 
 /* ── SHARE MODAL ── */
