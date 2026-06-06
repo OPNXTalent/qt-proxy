@@ -930,6 +930,32 @@
     line-height: 1.6;
   }
 
+  /* Orientation question banner */
+  .orientation-banner {
+    border-left: 2px solid rgba(201,168,76,0.35);
+    padding: 20px 28px;
+    background: transparent;
+    margin-bottom: 32px;
+  }
+
+  .orientation-label {
+    font-family: var(--cinzel);
+    font-size: 10px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    opacity: 0.6;
+    margin-bottom: 10px;
+  }
+
+  .orientation-text {
+    font-size: 20px;
+    color: var(--text);
+    font-style: italic;
+    line-height: 1.65;
+    opacity: 0.85;
+  }
+
   /* Recognition threshold */
   .qt-recognition {
     padding: 28px 0 28px;
@@ -2934,15 +2960,20 @@ function renderResult(d) {
 
   let html = '';
 
-  // 1. Recognition moment — renders first, always. Constitutional First Move.
-  // The person is seen before the text speaks.
-  if (d.recognition) {
-    html += '<div class="qt-recognition"><p>' + escHtml(d.recognition) + '</p></div>';
+  // Orientation question banner — renders before verse banner when populated
+  // Fires for non-Textual inquiries where First Move is not Source Text
+  if (d.orientation_question) {
+    html += '<div class="orientation-banner"><div class="orientation-label">A question worth sitting with</div><div class="orientation-text">' + escHtml(d.orientation_question) + '</div></div>';
   }
 
-  // Verse banner — renders after recognition. Grounding follows orientation.
+  // Verse banner — show reference always when identified; text supplied by AI for all traditions
   if (d.verse_identified) {
     html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text || '') + '</div></div>';
+  }
+
+  // 1. Recognition moment — unlabeled, pure prose, full breathing room
+  if (d.recognition) {
+    html += '<div class="qt-recognition"><p>' + escHtml(d.recognition) + '</p></div>';
   }
 
   // 2. Core insight — unlabeled, framework language now permitted
