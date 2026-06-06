@@ -2934,14 +2934,15 @@ function renderResult(d) {
 
   let html = '';
 
-  // Verse banner — show reference always when identified; text supplied by AI for all traditions
-  if (d.verse_identified) {
-    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text || '') + '</div></div>';
-  }
-
-  // 1. Recognition moment — unlabeled, pure prose, full breathing room
+  // 1. Recognition moment — renders first, always. Constitutional First Move.
+  // The person is seen before the text speaks.
   if (d.recognition) {
     html += '<div class="qt-recognition"><p>' + escHtml(d.recognition) + '</p></div>';
+  }
+
+  // Verse banner — renders after recognition. Grounding follows orientation.
+  if (d.verse_identified) {
+    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text || '') + '</div></div>';
   }
 
   // 2. Core insight — unlabeled, framework language now permitted
