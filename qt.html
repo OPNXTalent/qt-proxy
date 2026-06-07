@@ -2149,17 +2149,17 @@
     <!-- Breadcrumb — future sprint -->
     <div class="disc-breadcrumb" id="discBreadcrumb"></div>
 
-    <!-- Top bar: REFRACTIONS label + count + close — full bar is clickable to close -->
-    <div class="disc-topbar" onclick="closeDiscussionPanel()" title="Close Refractions" style="cursor:pointer;">
+    <!-- Top bar: REFRACTIONS label + count + close -->
+    <div class="disc-topbar">
       <span class="disc-topbar-label">Refractions</span>
       <div class="disc-topbar-right">
         <span style="font-family:var(--mono);font-size:8px;color:rgba(120,118,140,0.25);" id="chatBarCount"></span>
-        <button class="disc-close-btn" onclick="event.stopPropagation();closeDiscussionPanel()" title="Close">‹</button>
+        <button class="disc-close-btn" onclick="closeDiscussionPanel()" title="Close">‹</button>
       </div>
     </div>
 
-    <!-- Chamber header: sigil + title -->
-    <div class="disc-chamber-header" id="discAnchor">
+    <!-- Chamber header: sigil + title — clickable to close -->
+    <div class="disc-chamber-header" id="discAnchor" onclick="closeDiscussionPanel()" title="Close Refractions" style="cursor:pointer;">
       <div class="disc-sigil" id="discSigil">Q</div>
       <div class="disc-chamber-divider"></div>
       <div class="disc-chamber-title">Refractions</div>
