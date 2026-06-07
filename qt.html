@@ -2148,11 +2148,11 @@
     <div class="disc-breadcrumb" id="discBreadcrumb"></div>
 
     <!-- Top bar: REFRACTIONS label + count + close -->
-    <div class="disc-topbar">
+    <div class="disc-topbar" onclick="closeDiscussionPanel()" title="Close Refractions" style="cursor:pointer;">
       <span class="disc-topbar-label">Refractions</span>
       <div class="disc-topbar-right">
         <span style="font-family:var(--mono);font-size:8px;color:rgba(120,118,140,0.25);" id="chatBarCount"></span>
-        <button class="disc-close-btn" onclick="closeDiscussionPanel()" title="Close">‹</button>
+        <button class="disc-close-btn" onclick="event.stopPropagation();closeDiscussionPanel()" title="Close">‹</button>
       </div>
     </div>
 
@@ -2415,7 +2415,9 @@ async function runInterpretation() {
       const firstBrace = cleaned.indexOf('{');
       const lastBrace = cleaned.lastIndexOf('}');
       if (firstBrace !== -1 && lastBrace !== -1) cleaned = cleaned.slice(firstBrace, lastBrace + 1);
-      // Sanitize: fix unescaped newlines/tabs inside JSON string values
+      // Sanitize: smart quotes and unescaped characters (mobile keyboard substitutions)
+      cleaned = cleaned.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+      cleaned = cleaned.replace(/\u2014/g, '--').replace(/\u2013/g, '-');
       cleaned = cleaned.replace(/"((?:[^"\\]|\\.)*)"/g, (m, inner) =>
         '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"'
       );
