@@ -1135,6 +1135,102 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const QUERY_LIMIT = 3;
 const WINDOW_HOURS = 24;
 
+// ── RAG RETRIEVAL LAYER ───────────────────────────────────────────────────────
+// Queries corpus_embeddings before AI call.
+// Retrieved passages are injected into the system prompt as authoritative context.
+// Fails gracefully — if retrieval fails, interpreter proceeds normally.
+
+const RAG_CONFIG = {
+  embeddingModel:   'text-embedding-3-small',
+  matchThreshold:   0.35,
+  matchCount:       4,
+};
+
+const RETRIEVAL_ELIGIBLE_TYPES = [
+  'Framework-Definitional',
+  'Philosophical',
+  'Theological',
+  'Existential',
+  'Comparative',
+];
+
+async function embedQuery(text) {
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      model: RAG_CONFIG.embeddingModel,
+      input: text,
+    }),
+  });
+  if (!response.ok) throw new Error(`Embedding error: ${response.status}`);
+  const data = await response.json();
+  return data.data[0].embedding;
+}
+
+async function getRetrievedContext(userQuery, inquiryClassification) {
+  // When classification is null, retrieve for all queries
+  // When classification is provided, only retrieve for eligible types
+  if (inquiryClassification && !RETRIEVAL_ELIGIBLE_TYPES.includes(inquiryClassification)) {
+    return '';
+  }
+
+  let embedding;
+  try {
+    embedding = await embedQuery(userQuery);
+  } catch (err) {
+    console.error('RAG embed error:', err.message);
+    return '';
+  }
+
+  try {
+    const rpcResponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/match_corpus`, {
+      method:  'POST',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({
+        query_embedding:  embedding,
+        match_threshold:  RAG_CONFIG.matchThreshold,
+        match_count:      RAG_CONFIG.matchCount,
+        filter_source:    null,
+      }),
+    });
+
+    if (!rpcResponse.ok) {
+      console.error('RAG retrieval error:', rpcResponse.status);
+      return '';
+    }
+
+    const passages = await rpcResponse.json();
+    if (!passages || passages.length === 0) return '';
+
+    const sourceLabels = {
+      'rct':              'Relational Coherence Theory',
+      'quantum_theology': 'Quantum Theology / The Prism',
+      'constitution':     'The Prism — First Principle (Context and Relationality)',
+      'architecture':     'The Prism — Architecture Overview',
+    };
+
+    const formatted = passages.map((p, i) => {
+      const label = sourceLabels[p.source] || p.source;
+      return `[Retrieved ${i + 1} | ${label}]\n${p.text}`;
+    }).join('\n\n');
+
+    return `\n\n───────────────────────────────────────────\nRETRIEVED CORPUS PASSAGES — AUTHORITATIVE SOURCE CONTEXT\n───────────────────────────────────────────\nThe following passages have been retrieved from the authoritative corpus. These are Tier 1 source documents. Where retrieved passages speak to the inquiry, draw from them directly and precisely rather than from training memory. The retrieved text is authoritative over any training-data approximation of these documents.\n\n${formatted}\n───────────────────────────────────────────`;
+
+  } catch (err) {
+    console.error('RAG retrieval error:', err.message);
+    return '';
+  }
+}
+// ── END RAG RETRIEVAL LAYER ───────────────────────────────────────────────────
+
 // ── TIER CONFIGURATION ────────────────────────────────────────────────────────
 const TIER_LIMITS = {
   refraction:    100,
@@ -1895,6 +1991,11 @@ export default async function handler(req, res) {
         res.setHeader('X-Prism-Tier', tier);
         res.setHeader('X-Prism-Subscriber', 'true');
 
+        // RAG: retrieve relevant corpus passages before AI call
+        // Pass null for classification — getRetrievedContext will retrieve for all queries
+        const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
+        const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT + ragContext;
+
         const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -1906,7 +2007,7 @@ export default async function handler(req, res) {
             model: 'claude-sonnet-4-6',
             max_tokens: 4000,
             stream: true,
-            system: PRISM_SYSTEM_PROMPT,
+            system: enhancedSystemPrompt,
             messages: apiMessages
           })
         });
@@ -2026,6 +2127,11 @@ export default async function handler(req, res) {
     res.setHeader('X-Prism-Tier', 'free');
     res.setHeader('X-Prism-Subscriber', 'false');
 
+    // RAG: retrieve relevant corpus passages before AI call
+    // Pass null for classification — getRetrievedContext will retrieve for all queries
+    const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
+    const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT + ragContext;
+
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -2037,7 +2143,7 @@ export default async function handler(req, res) {
         model: 'claude-sonnet-4-6',
         max_tokens: 3000,
         stream: true,
-        system: PRISM_SYSTEM_PROMPT,
+        system: enhancedSystemPrompt,
         messages: apiMessages
       })
     });
