@@ -1391,10 +1391,10 @@ const CHILD_ABUSE_SIGNALS = [
   'touches my private', 'touched my private', 'touches my body',
   'he touches me', 'she touches me', 'they touch me',
   'he hurt me', 'she hurt me', 'hurts me at home',
-  'mom's boyfriend', 'dad's girlfriend', 'stepdad hurts', 'stepmom hurts',
+  "mom's boyfriend", "dad's girlfriend", 'stepdad hurts', 'stepmom hurts',
   'adult touches', 'grown up touches', 'makes me touch',
   'made me touch', 'showed me pictures', 'takes pictures of me',
-  'don't tell anyone', 'our secret', 'special secret',
+  "don't tell anyone", 'our secret', 'special secret',
   'inappropriate', 'molest', 'abuse me', 'abusing me', 'abused me',
   'sexually', 'rape', 'raped',
 ];
