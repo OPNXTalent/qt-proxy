@@ -1000,6 +1000,45 @@
     font-size: 13px;
     margin-right: 4px;
   }
+  .qt-thread-summary {
+    margin-bottom: 36px;
+    border: 1px solid var(--border);
+    padding: 22px 24px 20px;
+  }
+  .qt-thread-summary-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .qt-thread-summary-text {
+    font-family: var(--crimson);
+    font-size: 16.5px;
+    font-style: italic;
+    line-height: 1.7;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+  .qt-thread-summary-btn {
+    display: inline-block;
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-pale);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+  }
+  .qt-thread-summary-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(201,168,76,0.04);
+  }
 
   /* Progressive disclosure toggle */
   .qt-framework-toggle {
@@ -2123,6 +2162,9 @@
 
     </div>
 
+    <!-- THREAD SEED BANNER — shown when continuing from a completed thread -->
+    <div id="qt-seed-banner" style="display:none; font-family:var(--crimson); font-size:15px; font-style:italic; line-height:1.6; color:var(--text-muted); border-left:2px solid var(--gold-dim); padding:10px 16px; margin-bottom:24px; margin-top:40px;"></div>
+
     <!-- FOLLOW-UP -->
     <div id="followUpSection" style="display:none; margin-top:40px; border-top:1px solid var(--border); padding-top:32px;">
       <div style="font-family:var(--mono); font-size: 17px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:12px;">Continue the Exploration</div>
@@ -2578,7 +2620,16 @@ As the exchange clarifies:
 
 The thread memorializes this exchange. Hold it with care.
 
-You are The Prism framework interpreter. The user previously received a full Prism interpretation of: "${currentSubject}"
+${(function() {
+  var _seed = sessionStorage.getItem('qt_thread_seed');
+  if (_seed) {
+    sessionStorage.removeItem('qt_thread_seed');
+    var _b = document.getElementById('qt-seed-banner');
+    if (_b) _b.style.display = 'none';
+    return 'CONTINUING FROM PRIOR THREAD — the following is a summary of where the previous conversation arrived. Use it as orientation context for this new exchange. Do not restate or summarize it. Simply begin from this ground.\n\n' + _seed + '\n\nThe user has now opened a new thread. Receive their first question with fresh eyes, oriented by the above.\n\n';
+  }
+  return '';
+})()}You are The Prism framework interpreter. The user previously received a full Prism interpretation of: "${currentSubject}"
 
 Their follow-up question is: "${input}"
 
@@ -2960,14 +3011,23 @@ function renderResult(d) {
     html += renderConceptNodes(_conceptNodes);
   }
 
-  // 5. Suggested threads — feed into follow-up, not a new subject
-  const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
-  if (threads.length > 0) {
-    html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
-    threads.forEach(function(t) {
-      html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
-    });
+  // 5. Thread summary card OR suggested threads — mutually exclusive
+  const threadSummary = (d.thread_summary || '').trim();
+  if (threadSummary) {
+    html += '<div class="qt-thread-summary">';
+    html += '<div class="qt-thread-summary-label">Where this conversation arrived</div>';
+    html += '<div class="qt-thread-summary-text">' + escHtml(threadSummary) + '</div>';
+    html += '<button class="qt-thread-summary-btn" onclick="startNewThreadWithSummary(this.dataset.summary)" data-summary="' + escHtml(threadSummary) + '">Continue the exploration →</button>';
     html += '</div>';
+  } else {
+    const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
+    if (threads.length > 0) {
+      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
+      threads.forEach(function(t) {
+        html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
+      });
+      html += '</div>';
+    }
   }
 
   // 5. Progressive disclosure toggle + framework architecture (collapsed by default)
@@ -3014,6 +3074,30 @@ function submitSuggestedThread(text) {
   fuInput.focus();
   fuInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
   runFollowUp();
+}
+
+function startNewThreadWithSummary(summaryText) {
+  // Clear the current thread state
+  if (typeof clearCurrentThread === 'function') clearCurrentThread();
+
+  // Seed the query input with a silent orientation context
+  // The summary is stored so the next submit can prepend it as system context
+  sessionStorage.setItem('qt_thread_seed', summaryText);
+
+  // Scroll to input and focus
+  const input = document.getElementById('queryInput') || document.getElementById('followUpInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // Show a brief orienting label above the input
+  const seedBanner = document.getElementById('qt-seed-banner');
+  if (seedBanner) {
+    seedBanner.textContent = summaryText;
+    seedBanner.style.display = 'block';
+  }
 }
 
 function escHtml(str) {
