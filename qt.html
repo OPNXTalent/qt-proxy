@@ -2499,6 +2499,16 @@ async function runInterpretation() {
 
     renderResult(parsed);
     window._lastParsedResult = parsed;
+
+    // Truncation notice — fires when response was cut at token limit
+    if (window._streamTruncated) {
+      window._streamTruncated = false;
+      var truncNotice = document.createElement('div');
+      truncNotice.style.cssText = 'margin:24px 0 8px; border-top:1px solid var(--border); padding-top:20px; font-family:var(--mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); text-align:center;';
+      truncNotice.textContent = 'This response reached its length limit. Continue the exploration below to receive the rest.';
+      document.getElementById('resultContent').appendChild(truncNotice);
+    }
+
     showResult();
 
     // Show subject banner, follow-up, and download button
@@ -2911,6 +2921,8 @@ async function callProxy(messages, rawQuery) {
   let buffer = '';
   let fullText = '';
   let tierFromStream = null;
+  let streamTruncated = false;
+  window._streamTruncated = false;
 
   // Show streaming indicator
   document.getElementById('loadingBlock').classList.remove('visible');
@@ -2940,6 +2952,9 @@ async function callProxy(messages, rawQuery) {
             const parsed = JSON.parse(data);
             if (parsed.type === 'delta' && parsed.text) {
               fullText += parsed.text;
+            } else if (parsed.type === 'truncated') {
+              streamTruncated = true;
+              window._streamTruncated = true;
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
             } else if (parsed.type === 'error') {
