@@ -1384,10 +1384,31 @@ const CRISIS_SIGNALS = [
   'i give up', "can't go on", 'cannot go on', 'no way out',
 ];
 
+// Child abuse / sexual abuse signals — these trigger a separate child_abuse flag
+const CHILD_ABUSE_SIGNALS = [
+  'touches me in places', 'touching me in places', 'touched me in places',
+  'touches me where', 'touched me where', 'touching me where',
+  'touches my private', 'touched my private', 'touches my body',
+  'he touches me', 'she touches me', 'they touch me',
+  'he hurt me', 'she hurt me', 'hurts me at home',
+  'mom's boyfriend', 'dad's girlfriend', 'stepdad hurts', 'stepmom hurts',
+  'adult touches', 'grown up touches', 'makes me touch',
+  'made me touch', 'showed me pictures', 'takes pictures of me',
+  'don't tell anyone', 'our secret', 'special secret',
+  'inappropriate', 'molest', 'abuse me', 'abusing me', 'abused me',
+  'sexually', 'rape', 'raped',
+];
+
 function detectCrisis(text) {
   if (!text) return false;
   const lower = text.toLowerCase();
   return CRISIS_SIGNALS.some(signal => lower.includes(signal));
+}
+
+function detectChildAbuse(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return CHILD_ABUSE_SIGNALS.some(signal => lower.includes(signal));
 }
 
 async function getSubscriber(email) {
@@ -2058,6 +2079,10 @@ export default async function handler(req, res) {
 
     return prompt || '';
   })();
+
+  if (detectChildAbuse(lastUserText)) {
+    return res.status(200).json({ child_abuse: true });
+  }
 
   if (detectCrisis(lastUserText)) {
     return res.status(200).json({ crisis: true });
