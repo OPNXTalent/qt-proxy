@@ -2178,6 +2178,8 @@ export default async function handler(req, res) {
                 if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
                   fullResponse += parsed.delta.text;
                   res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+                } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
+                  res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
                 } else if (parsed.type === 'message_stop') {
                   res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
                   streamDone = true;
@@ -2197,6 +2199,8 @@ export default async function handler(req, res) {
                 if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
                   fullResponse += parsed.delta.text;
                   res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+                } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
+                  res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
                 } else if (parsed.type === 'message_stop') {
                   res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
                   streamDone = true;
@@ -2280,7 +2284,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 3000,
+        max_tokens: 4000,
         stream: true,
         system: enhancedSystemPrompt,
         messages: apiMessages
@@ -2311,6 +2315,8 @@ export default async function handler(req, res) {
             const parsed = JSON.parse(data);
             if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
               res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+            } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
+              res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
             } else if (parsed.type === 'message_stop') {
               res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
             }
@@ -2328,6 +2334,8 @@ export default async function handler(req, res) {
             const parsed = JSON.parse(data);
             if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
               res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+            } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
+              res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
             } else if (parsed.type === 'message_stop') {
               res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
             }
