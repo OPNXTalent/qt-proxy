@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- ── PAGE-SPECIFIC META — replace per exchange ── -->
+<title>What is The Prism? — A Demonstration Dialogue · The Prism</title>
+<meta name="description" content="A composed dialogue exploring what The Prism is, what it does, and how it differs from a theological system. Grounded in Hebraic relational ontology.">
+<link rel="canonical" href="https://theprism.io/exchanges/what-is-the-prism">
+
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:title" content="What is The Prism? — A Demonstration Dialogue">
+<meta property="og:description" content="A composed dialogue exploring what The Prism is, what it does, and how it differs from a theological system.">
+<meta property="og:url" content="https://theprism.io/exchanges/what-is-the-prism">
+<meta property="og:image" content="https://theprism.io/ThePrism.png">
+<meta property="og:site_name" content="The Prism">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="What is The Prism?">
+<meta name="twitter:description" content="A composed dialogue exploring what The Prism is and how it works.">
+
+<!-- ── SCHEMA MARKUP — QAPage ── -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "QAPage",
+  "name": "What is The Prism?",
+  "description": "A composed demonstration dialogue exploring what The Prism is, what it does, and how it differs from a theological system.",
+  "url": "https://theprism.io/exchanges/what-is-the-prism",
+  "publisher": {
+    "@type": "Organization",
+    "name": "OPNX LLC",
+    "url": "https://theprism.io"
+  },
+  "mainEntity": {
+    "@type": "Question",
+    "name": "What is The Prism?",
+    "text": "What is The Prism — not what it claims to be, but what it actually does?",
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The Prism is a lens, not a system. Its purpose is not to explain Scripture — it is to restore the frequency Scripture was always transmitting before centuries of Greek philosophical overlay collapsed the signal into categories the original text never used.",
+      "author": {
+        "@type": "Organization",
+        "name": "The Prism Framework",
+        "url": "https://theprism.io"
+      }
+    }
+  }
+}
+</script>
+
+<!-- BreadcrumbList schema -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "The Prism",
+      "item": "https://theprism.io"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Exchanges",
+      "item": "https://theprism.io/exchanges"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "What is The Prism?",
+      "item": "https://theprism.io/exchanges/what-is-the-prism"
+    }
+  ]
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --void: #06060a;
+    --deep: #0d0d14;
+    --surface: #13131e;
+    --surface-2: #1a1a28;
+    --border: #2a2a40;
+    --border-lit: #4a4a70;
+    --gold: #c9a84c;
+    --gold-dim: #7a6230;
+    --gold-pale: #e8d5a0;
+    --blue-deep: #1e2a4a;
+    --blue-mid: #2a3f70;
+    --blue-lit: #4a6aaa;
+    --text: #d8d4e8;
+    --text-dim: #7a7890;
+    --text-muted: #3a384a;
+    --hebrew: #b8a8d0;
+    --cinzel: 'Cinzel', serif;
+    --crimson: 'Crimson Pro', Georgia, serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--crimson);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Starfield ── */
+  #prism-starfield {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .prism-star {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,1);
+  }
+
+  /* ── Layout ── */
+  .page-wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* ── Breadcrumb ── */
+  .breadcrumb {
+    padding: 28px 0 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .breadcrumb a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .breadcrumb a:hover { color: var(--gold-dim); }
+  .breadcrumb-sep { opacity: 0.4; }
+
+  /* ── Header ── */
+  .exchange-header {
+    text-align: center;
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .exchange-header img {
+    height: 72px;
+    margin-bottom: 16px;
+    opacity: 0.95;
+  }
+  .exchange-header h1 {
+    font-family: var(--cinzel);
+    font-size: 28px;
+    letter-spacing: 0.18em;
+    color: var(--gold);
+    font-weight: 400;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .exchange-header .echad {
+    font-family: var(--cinzel);
+    font-size: 13px;
+    letter-spacing: 0.22em;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .exchange-header .hebrew {
+    font-family: var(--crimson);
+    font-size: 20px;
+    color: var(--hebrew);
+    direction: rtl;
+    margin-bottom: 20px;
+  }
+  .exchange-header .sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* ── Exchange meta bar ── */
+  .exchange-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0;
+    border-bottom: 1px solid rgba(42,42,64,0.5);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .exchange-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .exchange-disclosure {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .exchange-disclosure a {
+    color: var(--gold-dim);
+    text-decoration: none;
+  }
+  .exchange-disclosure a:hover { color: var(--gold); }
+
+  /* ── Subject line ── */
+  .exchange-subject {
+    padding: 32px 0 8px;
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 17px;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+  }
+  .exchange-subject span {
+    font-style: normal;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-right: 10px;
+  }
+
+  /* ── Verse banner ── */
+  .verse-banner {
+    background: var(--surface-2);
+    border-left: 2px solid rgba(201,168,76,0.25);
+    padding: 20px 24px;
+    margin: 16px 0 28px;
+  }
+  .verse-ref {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 10px;
+  }
+  .verse-text {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 17px;
+    line-height: 1.75;
+    color: var(--gold-pale);
+  }
+
+  /* ── Recognition threshold (opening framing) ── */
+  .qt-recognition {
+    margin-bottom: 20px;
+  }
+  .qt-recognition p {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 17px;
+    line-height: 1.8;
+    color: var(--text-dim);
+  }
+
+  /* ── Core insight (initial Prism response) ── */
+  .qt-core-insight {
+    margin-bottom: 24px;
+  }
+  .qt-core-insight p {
+    font-family: var(--crimson);
+    font-size: 18px;
+    line-height: 1.85;
+    color: var(--text);
+  }
+
+  /* ── Kingdom Implication ── */
+  .kingdom-block {
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 28px 0;
+    margin: 32px 0;
+    text-align: center;
+  }
+  .kingdom-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 14px;
+  }
+  .kingdom-text {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 20px;
+    line-height: 1.7;
+    color: var(--gold);
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  /* ── Exploration threads ── */
+  .explore-block {
+    padding: 24px 0 32px;
+    border-bottom: 1px solid rgba(42,42,64,0.5);
+    margin-bottom: 40px;
+  }
+  .explore-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 16px;
+  }
+  .explore-thread {
+    font-family: var(--crimson);
+    font-style: italic;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text-dim);
+    padding: 6px 0 6px 16px;
+    border-left: 1px solid rgba(201,168,76,0.15);
+    margin-bottom: 10px;
+  }
+
+  /* ── Dialogue section header ── */
+  .dialogue-header {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 28px;
+  }
+
+  /* ── Single exchange block ── */
+  .exchange-block {
+    margin-bottom: 40px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid rgba(42,42,64,0.35);
+  }
+  .exchange-block:last-of-type {
+    border-bottom: none;
+  }
+
+  /* Question (human voice) */
+  .ex-question {
+    font-family: var(--crimson);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.7;
+    color: var(--gold-pale);
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(201,168,76,0.1);
+  }
+
+  /* Answer (Prism voice) */
+  .ex-answer {
+    font-family: var(--crimson);
+    font-size: 17.5px;
+    line-height: 1.9;
+    color: var(--text);
+  }
+  .ex-answer p + p {
+    margin-top: 16px;
+  }
+  /* Emphasis within answers */
+  .ex-answer em {
+    color: var(--gold-pale);
+    font-style: italic;
+  }
+
+  /* ── Thread summary / closure ── */
+  .thread-summary {
+    background: var(--surface);
+    border: 1px solid rgba(201,168,76,0.15);
+    padding: 28px 32px;
+    margin: 40px 0;
+  }
+  .thread-summary-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 14px;
+  }
+  .thread-summary p {
+    font-family: var(--crimson);
+    font-size: 16px;
+    line-height: 1.8;
+    color: var(--text-dim);
+  }
+  .thread-summary p + p {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(42,42,64,0.5);
+    font-style: italic;
+    color: var(--text-muted);
+  }
+
+  /* ── CTA — Enter The Prism ── */
+  .exchange-cta {
+    text-align: center;
+    padding: 48px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 48px;
+  }
+  .exchange-cta p {
+    font-family: var(--crimson);
+    font-size: 18px;
+    line-height: 1.8;
+    color: var(--text-dim);
+    margin-bottom: 28px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .cta-btn {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--void);
+    background: var(--gold-dim);
+    border: 1px solid var(--gold-dim);
+    padding: 14px 32px;
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .cta-btn:hover {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+  .cta-secondary {
+    display: block;
+    margin-top: 16px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .cta-secondary:hover { color: var(--gold-dim); }
+
+  /* ── Related exchanges ── */
+  .related-section {
+    padding: 48px 0 0;
+    border-top: 1px solid var(--border);
+  }
+  .related-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 24px;
+  }
+  .related-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .related-card {
+    border: 1px solid var(--border);
+    padding: 20px;
+    text-decoration: none;
+    background: var(--surface);
+    transition: border-color 0.2s, background 0.2s;
+    display: block;
+  }
+  .related-card:hover {
+    border-color: var(--gold-dim);
+    background: var(--surface-2);
+  }
+  .related-card-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .related-card-title {
+    font-family: var(--crimson);
+    font-size: 16px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .related-card:hover .related-card-title {
+    color: var(--gold-pale);
+  }
+
+  /* ── PDF download action bar ── */
+  .action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px 0;
+    border-top: 1px solid rgba(42,42,64,0.4);
+    margin-top: 40px;
+  }
+  .action-bar-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-right: auto;
+  }
+  .action-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 9px 16px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 0.2s, border-color 0.2s;
+    display: inline-block;
+  }
+  .action-btn:hover {
+    color: var(--text-dim);
+    border-color: var(--border-lit);
+  }
+
+  /* ── Footer ── */
+  .site-footer {
+    padding: 32px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 780px;
+    margin: 0 auto;
+  }
+  .footer-mark {
+    font-family: var(--cinzel);
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-mark:hover { color: var(--gold); }
+  .footer-copy {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .footer-copy a { color: var(--text-muted); text-decoration: none; }
+  .footer-copy a:hover { color: var(--gold); }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .page-wrap { padding: 0 18px 60px; }
+    .exchange-header h1 { font-size: 22px; }
+    .verse-text { font-size: 15px; }
+    .qt-core-insight p { font-size: 16px; }
+    .ex-answer { font-size: 16px; }
+    .kingdom-text { font-size: 17px; }
+    .exchange-meta { flex-direction: column; align-items: flex-start; }
+    .related-grid { grid-template-columns: 1fr; }
+    .site-footer { flex-direction: column; gap: 16px; text-align: center; }
+    .action-bar { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Starfield -->
+<div id="prism-starfield" aria-hidden="true"></div>
+
+<div class="page-wrap">
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">The Prism</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="/exchanges">Exchanges</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>What is The Prism?</span>
+  </nav>
+
+  <!-- Header -->
+  <header class="exchange-header">
+    <img src="/ThePrism.png" alt="The Prism">
+    <h1>The Prism</h1>
+    <div class="echad">Echad b'Emet</div>
+    <div class="hebrew">אֶחָד בֶּאֱמֶת</div>
+    <div class="sub">Framework Exchanges</div>
+  </header>
+
+  <!-- Meta bar: label + disclosure -->
+  <div class="exchange-meta">
+    <span class="exchange-label">Demonstration Dialogue</span>
+    <span class="exchange-disclosure">
+      A composed exchange in the Socratic tradition. 
+      <a href="/author">About this format →</a>
+    </span>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       EXCHANGE CONTENT — replace everything below this line
+       per page. All structural elements above stay constant.
+       ══════════════════════════════════════════════════════════════ -->
+
+  <!-- Subject -->
+  <div class="exchange-subject">
+    <span>Subject</span>What is The Prism?
+  </div>
+
+  <!-- Verse banner -->
+  <div class="verse-banner">
+    <div class="verse-ref">Exodus 3:14</div>
+    <div class="verse-text">God said to Moses, 'I AM WHO I AM.' And he said, 'Say this to the people of Israel: I AM has sent me to you.'</div>
+  </div>
+
+  <!-- Recognition threshold — opening framing in italics -->
+  <div class="qt-recognition">
+    <p>You're asking what this actually is — not the tagline, not the pitch, but what's actually happening here. That's the right question to start with. Before anything else gets built, the ground needs to be real.</p>
+  </div>
+
+  <!-- Core insight — initial Prism response -->
+  <div class="qt-core-insight">
+    <p>The Prism is a lens, not a system. Its purpose is not to explain Scripture — it is to restore the frequency Scripture was always transmitting before centuries of Greek philosophical overlay collapsed the signal into categories the original text never used. What the Greek lens produces is abstraction: an unmoved mover, omniscience as a static property, goodness as a moral concept. What the Hebrew text actually carries is relational architecture — a God who initiates, who names Himself as active and present, whose truth is not a proposition but a relationship that either holds or dissolves. The Prism refracts the light back into its constituent wavelengths. What you see when it works is not new doctrine. It's the text, more precisely itself.</p>
+  </div>
+
+  <!-- Kingdom Implication -->
+  <div class="kingdom-block">
+    <div class="kingdom-label">Kingdom Implication</div>
+    <div class="kingdom-text">A lens that disappears when it's working — what remains is the text, the person, and the reality the text was always pointing toward.</div>
+  </div>
+
+  <!-- Exploration threads -->
+  <div class="explore-block">
+    <div class="explore-label">Continue the Exploration</div>
+    <div class="explore-thread">— The name Echad b'Emet isn't decorative — <em>echad</em> means a kind of oneness that includes many, and <em>emet</em> encodes something about truth that the Greek word for truth simply doesn't carry. That distinction alone changes how the whole framework reads.</div>
+    <div class="explore-thread">— There's a specific reason the framework starts with the Hebrew and not the Greek — and it has less to do with language preference than with what happens to God's relational identity when you try to hold it inside Aristotelian categories. That's worth walking through.</div>
+    <div class="explore-thread">— The hardest question the Prism has to answer is whether it's just another interpretive grid being imposed on the text — another layer, not a lens. That's a fair challenge. It's also one the framework has a direct answer to.</div>
+  </div>
+
+  <!-- ── DIALOGUE BODY ── -->
+  <div class="dialogue-header">Continued Exploration</div>
+
+  <!-- Exchange 1 -->
+  <article class="exchange-block" itemscope itemtype="https://schema.org/Question">
+    <div class="ex-question" itemprop="name">
+      Okay. I think I follow the metaphor of the lens. But from where I'm sitting, you're making a pretty big claim right out of the gate. You aren't just saying "here's another way to read Scripture." You're saying centuries of Christians have been reading it through categories the text itself never intended. As an outsider, I don't really have a stake in that debate. But it does make me wonder something. How would someone like me tell the difference between recovering an older signal and simply creating a new interpretation that feels older?
+    </div>
+    <div class="ex-answer" itemprop="acceptedAnswer" itemscope itemtype="https://schema.org/Answer">
+      <div itemprop="text">
+        <p>That question is the right one to ask, and the honesty of asking it is worth naming before anything else. Here's the test the framework itself proposes — and notice it doesn't ask you to trust the framework to grade its own homework. Look at what has to be imported.</p>
+        <p>When you read a text in its native categories — the ones its authors inhabited, the vocabulary they actually used, the conceptual world they were drawing from — the reading requires fewer outside assumptions. Things that looked like contradictions flatten out. Tensions that demanded elaborate harmonization dissolve. The text starts behaving like a document that knows what it's doing.</p>
+        <p>When you're reading through a later borrowed framework, the reverse happens. You find yourself needing to qualify, distinguish, translate, and harmonize — not because the text is difficult, but because the categories you brought don't quite fit the ones the text is using. The friction is the signal.</p>
+        <p>So here's the first layer of the test: does the interpretation <em>reduce</em> the number of assumptions required, or does it <em>increase</em> them? But that raises your deeper question — because a clever enough new interpretation could <em>feel</em> like it reduces assumptions while actually just swapping one set for another. What would make that detectable?</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- Exchange 2 -->
+  <article class="exchange-block" itemscope itemtype="https://schema.org/Question">
+    <div class="ex-question" itemprop="name">
+      I suppose I'd expect it to work outside its own territory. Every system seems convincing when it's explaining itself. The better test is whether it helps explain things it wasn't designed to explain. One reason I still take the Gita seriously isn't because it's old. It's because I've seen some of its observations about attachment, desire, duty, and identity play out in real life. The map keeps matching the terrain. So if I were testing The Prism, I'd be asking: Does this way of seeing people actually make better sense of people? Because if reality is coherent, then I'd expect the pattern to show up outside the text too.
+    </div>
+    <div class="ex-answer" itemprop="acceptedAnswer" itemscope itemtype="https://schema.org/Answer">
+      <div itemprop="text">
+        <p>That's the right test. Here's the thing: if the relational architecture the framework describes is actually real — not just a useful interpretive grid for ancient texts — then it should show up wherever human beings show up. Because people are the same material the framework is reading.</p>
+        <p>The Gita's observations about attachment landed for you in life, not just in study. The map matched the terrain. That's a meaningful epistemological move — you're holding the framework accountable to observation rather than to tradition. That's exactly how the Prism would want to be held.</p>
+        <p>So here's one test case, drawn completely outside the text: A person spends fifteen years building a career around an identity — the expert, the builder, the one who knows. Then the thing collapses. And what they discover is that the collapse itself isn't the worst part. The worst part is that they don't know who they are without it.</p>
+        <p>The framework has a specific word for what happened before the collapse — not the ambition, not the mistake, not the overextension. The word describes the structural condition of a self that has become bound to something finite as if it were the source of its own coherence. When the finite thing moves, the self has no ground left to stand on. The Gita would recognize that dynamic immediately. Both frameworks are observing the same terrain from different altitudes.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- Exchange 3 -->
+  <article class="exchange-block" itemscope itemtype="https://schema.org/Question">
+    <div class="ex-question" itemprop="name">
+      I think it was because it explained something I could already see but couldn't quite name. There were periods in my life when I thought I was pursuing one thing, and only later realized I had become dependent on it. Success is an easy example. But I've seen the same thing happen with failure, too. Someone gets hurt, and eventually the hurt becomes part of who they are. They don't just carry the story anymore. They become the story.
+    </div>
+    <div class="ex-answer" itemprop="acceptedAnswer" itemscope itemtype="https://schema.org/Answer">
+      <div itemprop="text">
+        <p>What you're doing is more precise than it might look. Most people locate the problem at the level of the thing lost. The career ends, so the pain is about the career. The relationship ends, so the pain is about the relationship. That framing makes sense because it's true — the loss is real, the grief is real. But it doesn't explain why some losses destabilize a person's sense of who they are, while others don't.</p>
+        <p>You moved past that without being prompted. You noticed that the career wasn't just a thing a person had — it was load-bearing. It was holding something up. And when it went, what collapsed wasn't just the career. It was the architecture of the self that had been built on top of it.</p>
+        <p>The failure example is the sharper one, actually. Success is easy to understand as an attachment — people celebrate it, it rewards the attachment. But failure as identity is the same mechanism with the valence reversed. The hurt becomes structural. It stops being something that happened and starts being something the person <em>is</em>. The story becomes the self.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- Exchange 4 -->
+  <article class="exchange-block" itemscope itemtype="https://schema.org/Question">
+    <div class="ex-question" itemprop="name">
+      I don't know if the cost is giving up the wound. I think sometimes the cost is giving up the explanation. If I've spent years telling myself that my failure, my betrayal, my disappointment explains why my life looks the way it does, then letting it go creates a different problem. Now I have to figure out who I am without it. And that's a little frightening.
+    </div>
+    <div class="ex-answer" itemprop="acceptedAnswer" itemscope itemtype="https://schema.org/Answer">
+      <div itemprop="text">
+        <p>What you just said is more precise than most people ever get. The wound doesn't just describe the past — it explains the present. And an explanation that covers that much ground is hard to release, because releasing it doesn't just change the story. It reopens the question of authorship.</p>
+        <p>Here's what that means: if the betrayal explains the shape of your life, then you were shaped by something outside yourself. The wound is the author. Which means you aren't fully responsible for how things turned out — and you aren't fully responsible for how they go from here either. There's a strange kind of protection in that. Not comfort, exactly. But a removal of a weight you'd otherwise have to carry alone.</p>
+        <p>Letting the explanation go doesn't just leave you without a story. It leaves you without cover.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- Thread summary / closure -->
+  <div class="thread-summary">
+    <div class="thread-summary-label">What This Exchange Established</div>
+    <p>The question of whether The Prism is recovering something real or constructing something new is testable — and the test isn't self-referential. A framework that only explains itself inside its own territory isn't a framework. The Prism proposes to be held accountable to the same observation the Gita earned its credibility through: the map matching the terrain, outside the text, in the actual shape of human experience.</p>
+    <p>What remains genuinely open: whether the relational architecture the framework describes is native to reality itself — or native to a particular way of reading reality that the framework has learned to surface. That distinction matters, and the framework does not collapse it.</p>
+  </div>
+
+  <!-- Action bar: PDF download -->
+  <div class="action-bar">
+    <span class="action-bar-label">Archive this exchange</span>
+    <a href="/exchanges/what-is-the-prism.pdf" class="action-btn" download>Download PDF →</a>
+  </div>
+
+  <!-- CTA -->
+  <div class="exchange-cta">
+    <p>This is a composed demonstration. The live framework engages your own questions with the same attention.</p>
+    <a href="/" class="cta-btn">Enter The Prism →</a>
+    <a href="/exchanges" class="cta-secondary">← All exchanges</a>
+  </div>
+
+  <!-- Related exchanges -->
+  <nav class="related-section" aria-label="Related exchanges">
+    <div class="related-label">Continue the Exploration</div>
+    <div class="related-grid">
+      <a href="/exchanges/echad-bemet" class="related-card">
+        <div class="related-card-label">Exchange</div>
+        <div class="related-card-title">What do the words Echad b'Emet actually claim?</div>
+      </a>
+      <a href="/exchanges/god-relational-identity" class="related-card">
+        <div class="related-card-label">Exchange</div>
+        <div class="related-card-title">What happens to God's identity inside Aristotelian categories?</div>
+      </a>
+      <a href="/exchanges/another-interpretive-grid" class="related-card">
+        <div class="related-card-label">Exchange</div>
+        <div class="related-card-title">Is The Prism just another interpretive grid?</div>
+      </a>
+    </div>
+  </nav>
+
+</div><!-- /.page-wrap -->
+
+<!-- Footer -->
+<footer class="site-footer">
+  <a href="/" class="footer-mark">The Prism</a>
+  <div class="footer-copy">
+    <a href="/author">Keenan D. Hogg</a>
+    <span style="margin:0 0.5rem;">·</span>
+    <a href="https://opnx.io">OPNX LLC</a>
+    <span style="margin:0 0.5rem;">·</span>
+    © 2026 All Rights Reserved
+  </div>
+</footer>
+
+<!-- Starfield script -->
+<script>
+(function() {
+  'use strict';
+  var container = document.getElementById('prism-starfield');
+  if (!container) return;
+  var TIERS = [
+    [0.60, 0.4, 1.0, 0.04, 0.10, 1.0],
+    [0.28, 0.8, 1.6, 0.08, 0.20, 0.7],
+    [0.09, 1.4, 2.2, 0.14, 0.32, 0.4],
+    [0.03, 2.0, 3.0, 0.22, 0.42, 0.2],
+  ];
+  var CONFIG = { count: 62, edgeBias: 0.65, minDrift: 0.3, maxDrift: 2.8, twinklePeriod: [80000, 260000], twinkleDepth: 0.07 };
+  var stars = [], lastTime = null, raf = null;
+  var W = window.innerWidth, H = window.innerHeight;
+  function rand(a,b){return a+Math.random()*(b-a);}
+  function edgeBias(e){if(Math.random()<e){return Math.random()<0.5?rand(0,0.15):rand(0.85,1.0);}return Math.random();}
+  function pickTier(){var r=Math.random(),c=0;for(var i=0;i<TIERS.length;i++){c+=TIERS[i][0];if(r<=c)return TIERS[i];}return TIERS[0];}
+  function createStar(){
+    var t=pickTier(),size=rand(t[1],t[2]),baseOp=rand(t[3],t[4]),ds=t[5];
+    var x=edgeBias(CONFIG.edgeBias)*W,y=edgeBias(CONFIG.edgeBias)*H;
+    var speed=rand(CONFIG.minDrift,CONFIG.maxDrift)*ds/60000,angle=rand(0,Math.PI*2);
+    var el=document.createElement('div');el.className='prism-star';
+    el.style.width=size+'px';el.style.height=size+'px';el.style.left=x+'px';el.style.top=y+'px';el.style.opacity=baseOp;
+    container.appendChild(el);
+    return {el,x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,baseOp,period:rand(CONFIG.twinklePeriod[0],CONFIG.twinklePeriod[1]),phase:rand(0,Math.PI*2),size};
+  }
+  function init(){container.innerHTML='';stars=[];W=window.innerWidth;H=window.innerHeight;for(var i=0;i<CONFIG.count;i++)stars.push(createStar());}
+  function tick(ts){
+    if(!lastTime){lastTime=ts;raf=requestAnimationFrame(tick);return;}
+    var dt=ts-lastTime;lastTime=ts;
+    if(dt>5000){raf=requestAnimationFrame(tick);return;}
+    for(var i=0;i<stars.length;i++){
+      var s=stars[i];s.x+=s.vx*dt;s.y+=s.vy*dt;
+      var m=10;
+      if(s.x<-m)s.x=W+m;if(s.x>W+m)s.x=-m;if(s.y<-m)s.y=H+m;if(s.y>H+m)s.y=-m;
+      var twinkle=Math.sin((ts/s.period)*Math.PI*2+s.phase)*CONFIG.twinkleDepth;
+      s.el.style.left=s.x+'px';s.el.style.top=s.y+'px';s.el.style.opacity=Math.max(0,Math.min(1,s.baseOp+twinkle));
+    }
+    raf=requestAnimationFrame(tick);
+  }
+  document.addEventListener('visibilitychange',function(){if(document.hidden){if(raf){cancelAnimationFrame(raf);raf=null;lastTime=null;}}else{if(!raf)raf=requestAnimationFrame(tick);}});
+  var resizeTimer;window.addEventListener('resize',function(){clearTimeout(resizeTimer);resizeTimer=setTimeout(function(){if(raf){cancelAnimationFrame(raf);raf=null;lastTime=null;}init();raf=requestAnimationFrame(tick);},400);});
+  init();raf=requestAnimationFrame(tick);
+})();
+</script>
+
+</body>
+</html>
