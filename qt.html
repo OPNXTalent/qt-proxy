@@ -2952,6 +2952,9 @@ async function callProxy(messages, rawQuery) {
             const parsed = JSON.parse(data);
             if (parsed.type === 'delta' && parsed.text) {
               fullText += parsed.text;
+            } else if (parsed.type === 'corrected') {
+              // Coherence check trimmed a momentum question — replace accumulated text
+              fullText = parsed.text;
             } else if (parsed.type === 'truncated') {
               streamTruncated = true;
               window._streamTruncated = true;
