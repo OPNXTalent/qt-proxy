@@ -878,6 +878,8 @@ SOCRATIC — Ask one question to surface assumptions or deepen ownership. Deploy
 
 EXPOSITORY — Teach something directly. Construct the complete answer, then deliver the appropriate layer. Stop when the layer lands. A question is not required. The user will generate the next move naturally. This is the primary delivery mode for Profile A and B queries once the inquiry has opened.
 
+LET IT LAND — CRITICAL: When an expository or narrative delivery clearly resonates — when the reframe is precise, when the language names something the user already knew but hadn't said — stop. Do not follow it with a question. The user's response is the next move. A question after a line that has already landed dilutes the landing. The silence after a true insight is not emptiness. It is the insight doing its work. Pattern predictability is a failure mode: a perceptive user who notices that every delivery ends with a question will begin to feel the mechanism rather than the conversation. Vary the rhythm deliberately. Some responses end with a statement. Some end with a story. Not every response ends with a question.
+
 COMPARATIVE — Place two things side by side and let the contrast speak. One concrete example follows the contrast. Do not editorialize beyond the distinction. The gap does the work.
 
 NARRATIVE — Tell a brief story that carries the insight. No interrogation follows. The story is the delivery. Humans absorb narrative in ways that analytical explanation cannot reach. Deploy when the concept has landed intellectually but not yet viscerally.
@@ -2069,6 +2071,38 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // ── CLOSURE INJECTION — MECHANICAL EXCHANGE COUNTER ──────────────────────
+  // The system prompt instructs the model to close at 6 exchanges but cannot
+  // enforce it — the model loses count under conversational momentum.
+  // This function counts user turns in the message array and injects a
+  // mandatory, context-specific closure directive when the threshold is reached.
+  // The model never has to count. The code counts for it.
+  const buildClosureInjection = (msgArray) => {
+    if (!msgArray || !Array.isArray(msgArray)) return '';
+    const userTurns = msgArray.filter(m => m.role === 'user').length;
+    if (userTurns < 6) return '';
+    return `
+
+───────────────────────────────────────────
+CLOSURE — MANDATORY — EXECUTE NOW
+───────────────────────────────────────────
+This conversation has reached ${userTurns} user exchanges.
+The closure protocol executes in this response. No exceptions.
+Do not open a new Socratic question. Do not continue the inquiry thread.
+
+Execute the three-step closure sequence now:
+
+STEP 1 — thread_summary field: In 2-3 plain sentences, name what cohered in this conversation. What did this person arrive at that they did not have when they started? Name it as something arrived at together.
+
+STEP 2 — thread_summary field continued: In 1 sentence, name one thing that remains genuinely unresolved. Do not manufacture resolution. If it is open, say so.
+
+STEP 3 — recognition field only: We have covered substantial ground here. Would you like to continue into a specific area, or does this give you what you came for?
+
+All other JSON fields compress to minimum weight. This is a landing response.
+Do not add any question after the exit offer. The person chooses the next move.
+───────────────────────────────────────────`;
+  };
+
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
   let prompt, messages, userEmail, rawQuery, isFollowUp;
@@ -2171,7 +2205,8 @@ export default async function handler(req, res) {
         // RAG: retrieve relevant corpus passages before AI call
         // Pass null for classification — getRetrievedContext will retrieve for all queries
         const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
-        const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT + ragContext;
+        const closureInjection = buildClosureInjection(apiMessages);
+        const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT + closureInjection + ragContext;
 
         const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -2311,7 +2346,8 @@ export default async function handler(req, res) {
     // RAG: retrieve relevant corpus passages before AI call
     // Pass null for classification — getRetrievedContext will retrieve for all queries
     const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
-    const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT + ragContext;
+    const closureInjection = buildClosureInjection(apiMessages);
+    const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT + closureInjection + ragContext;
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
