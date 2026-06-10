@@ -2702,6 +2702,7 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
   var _streamTempId = 'fu-' + Date.now();
   var _streamLabel = assignNodeLabel(_streamTempId);
   followUpEl.innerHTML = `<div class="fu-question" data-label="${_streamLabel} — ">${escHtml(input)}</div>`;
+  _renderedFuQueries.add(input.trim()); // register question text so renderFUWithSource skips this block
   const followUpTextEl = document.createElement('div');
   followUpTextEl.className = 'fu-body';
   followUpEl.appendChild(followUpTextEl);
@@ -4024,6 +4025,7 @@ function selectThread(id) {
     }
     // Reset rendered ID tracker and clear existing follow-up blocks for new thread
     _renderedFuIds = new Set();
+    _renderedFuQueries = new Set();
     var existingFus = document.querySelectorAll('#resultContent .fu-block');
     existingFus.forEach(function(el) { el.remove(); });
 
@@ -4213,6 +4215,7 @@ function restoreFollowUps(id) {
 
 var _supabaseClient     = null;
 var _renderedFuIds      = new Set();
+var _renderedFuQueries  = new Set(); // tracks live-streamed questions to prevent re-render duplication
 var _qtPollInterval     = null;
 
 function startFollowUpPolling(threadId) {
@@ -4289,6 +4292,8 @@ function renderFUWithSource(list) {
     // Skip already-rendered entries
     var fuId = fu.id || (fu.query + '_' + fu.created_at);
     if (_renderedFuIds.has(fuId)) return;
+    // Also skip if this question was already rendered by the live streaming path
+    if (_renderedFuQueries.has((fu.query || '').trim())) return;
     _renderedFuIds.add(fuId);
 
     var isRecipient = fu.source === 'recipient';
