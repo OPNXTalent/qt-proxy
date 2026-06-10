@@ -3180,8 +3180,12 @@ function stripHebrew(text) {
 }
 
 async function downloadPDF(mode) {
-  // Fetch latest follow-ups before generating PDF to ensure R1 contributions are included
-  if (activeThreadId && !activeThreadId.startsWith('pending-') && typeof userEmail === 'function' && userEmail()) {
+  // Fetch latest follow-ups before generating PDF to ensure R1 contributions are included.
+  // Guard: only re-render if follow-ups are NOT already present in the DOM — prevents
+  // the duplication bug where renderFUWithSource appends to blocks already rendered
+  // during the live session, causing the PDF collector to pick up every exchange twice.
+  const existingFUBlocks = document.querySelectorAll('#resultContent .fu-block');
+  if (activeThreadId && !activeThreadId.startsWith('pending-') && typeof userEmail === 'function' && userEmail() && existingFUBlocks.length === 0) {
     try {
       var fuRes = await fetch((window.API_BASE || '') + '/api/followups?threadId=' + encodeURIComponent(activeThreadId), {
         headers: { 'x-user-email': userEmail() }
