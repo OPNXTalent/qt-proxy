@@ -2210,8 +2210,34 @@ export default async function handler(req, res) {
     ];
     const userIsOpening = userTransitionSignals.some(pattern => pattern.test(userMessage));
 
-    // True closure only when user signals arrival WITHOUT opening a new inquiry
-    const userIsTrulyClosing = userIsClosing && !userIsOpening;
+    // ── META-OBSERVATION DETECTION ────────────────────────────────────────────
+    // A conversation may approach closure without explicit closure language.
+    // Watch for moments when the user stops discussing the specific subject
+    // and begins naming the pattern beneath it:
+    //   — Moving from a doctrine to the nature of doctrine
+    //   — Moving from an interpretation to the nature of interpretation
+    //   — Moving from a framework to the nature of frameworks
+    //   — Moving from a belief to the nature of belief
+    // When the user successfully names the underlying mechanism that was
+    // generating the conversation, treat this as a potential landing state.
+    // Do not assume every insight requires another layer.
+    const userMetaSignals = [
+      /maybe that'?s what (keeps? )?(bothering|nagging|staying with) me/i,
+      /perhaps the (first|real|deeper|actual|prior) question (isn'?t|is|was)/i,
+      /every (tradition|system|organization|framework|belief|institution) (seems? to|tends? to|eventually)/i,
+      /the (real|deeper|actual|prior|harder) (question|problem|issue|thing) (isn'?t|is|was|might be)/i,
+      /nobody (reads?|sees?|examines?|questions?) (anything|everything|it) without/i,
+      /everyone (thinks?|assumes?|believes?|reads?) (they'?re?|it'?s?)/i,
+      /we'?ve? (all|always) (been|inherited|assumed|standing)/i,
+      /the (problem|issue|question) (isn'?t|wasn'?t) (really )?(about|whether|if|that)/i,
+      /what (this|that|it) (really|actually|ultimately) (means?|shows?|reveals?|points? to)/i,
+      /so perhaps/i,
+      /which means (no one|nobody|every|we|the)/i,
+    ];
+    const userIsMeta = userMetaSignals.some(pattern => pattern.test(userMessage));
+
+    // True closure: explicit closure OR meta-observation, without opening new inquiry
+    const userIsTrulyClosing = (userIsClosing || userIsMeta) && !userIsOpening;
 
     const coherencePrompt = `You are evaluating a draft response from a Socratic dialogue framework.
 
@@ -2221,11 +2247,15 @@ ${userMessage}
 DRAFT RESPONSE:
 ${trimmedDraft}
 
-USER CLOSURE DETECTED: ${userIsTrulyClosing ? 'YES — the user is summarizing the arc, naming what changed, or offering a conclusion, without opening a new inquiry. This is a terminal signal. Any question in the response is momentum and should be removed.' : userIsClosing && userIsOpening ? 'TRANSITION — user signals arrival but also opens a new inquiry. Treat as continuation, not closure.' : 'NO'}
+USER CLOSURE DETECTED: ${userIsTrulyClosing ? (userIsMeta && !userIsClosing ? 'META-OBSERVATION — the user has stopped discussing the specific subject and is naming the pattern beneath it. They have uncovered the mechanism that was generating the conversation. Witnessing this insight is the correct response. Do not extend it with another question. Do not add another layer.' : 'YES — the user is summarizing the arc, naming what changed, or offering a conclusion, without opening a new inquiry. This is a terminal signal. Any question in the response is momentum and should be removed.') : userIsClosing && userIsOpening ? 'TRANSITION — user signals arrival but also opens a new inquiry. Treat as continuation, not closure.' : 'NO'}
 
 TASK: Determine whether this response ends on a momentum question that should be removed.
 
-${userIsTrulyClosing ? `IMPORTANT: Because the user is closing the conversation (and not opening a new inquiry), ANY final question is momentum. The user has landed. Remove the final question regardless of its quality. End on the strongest statement in the response instead. Valid endings include: a witness statement, a synthesis, a naming of what the arc accomplished, or silence. Do not reopen the inquiry.` : `Score the draft on these criteria (answer yes/no for each):
+${userIsTrulyClosing ? `IMPORTANT: The user has reached a landing state. Remove the final question regardless of its quality. End on the strongest statement in the response instead.
+
+If this is a META-OBSERVATION (user naming the pattern beneath the conversation): the ideal ending witnesses what the user has seen, names what the conversation accomplished, and stops. Example form: 'You have moved past [specific question] to [underlying mechanism]. The conversation may have done what it needed to do. It did not resolve the frame. It made the frame visible.'
+
+If this is explicit closure: end on a synthesis or witness statement. Do not reopen the inquiry. Do not locate a deeper layer beneath the completed one. There are always more questions. Not every conversation is asking for another one.` : `Score the draft on these criteria (answer yes/no for each):
 1. Does the response name something the user already sensed but could not articulate?
 2. Does it compress several observations into one memorable sentence?
 3. Does it resolve or clarify a tension the user raised?
