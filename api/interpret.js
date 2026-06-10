@@ -2168,6 +2168,51 @@ export default async function handler(req, res) {
     // nothing to trim.
     if (!trimmedDraft.endsWith('?')) return draftResponse;
 
+    // ── USER CLOSURE DETECTION ──────────────────────────────────────────────
+    // Detect when the user's message is itself a terminal signal — they are
+    // summarizing the arc, naming what changed, or offering a conclusion.
+    // A question after a user closure is always momentum, regardless of quality.
+    // The plane has landed. Do not taxi back to the runway.
+    const userClosureSignals = [
+      /the conversation ended/i,
+      /ended somewhere different/i,
+      /came in (thinking|asking|wondering).+(now|but now)/i,
+      /somewhere along the way/i,
+      /that('s| is) (what|why) (i|we|this)/i,
+      /i think (that answers|that('s| is) it|i (understand|see it now|get it))/i,
+      /i think it does/i,
+      /now i (see|understand|realize|get)/i,
+      /what (i came|we came) (here )?with/i,
+      /that('s| is) (the|a) (precise|real|deeper|actual) (thing|point|question|answer|move)/i,
+      /maybe that'?s (why|the|what)/i,
+      /the (real|deeper|actual) question (was|is|isn'?t)/i,
+      /interpretation was never (really )?the (central )?issue/i,
+    ];
+    const userIsClosing = userClosureSignals.some(pattern => pattern.test(userMessage));
+
+    // ── TRANSITION DETECTION ─────────────────────────────────────────────────
+    // A user may signal arrival AND open a new arc in the same message.
+    // "That makes sense. Now I'm wondering something else." is a transition,
+    // not a closure. Detect new inquiry signals and override closure if present.
+    // Closure only executes when the user arrives WITHOUT opening a new thread.
+    const userTransitionSignals = [
+      /now i'?m (wondering|curious|thinking|asking)/i,
+      /that (raises|brings up|opens) (a |another |one more )?question/i,
+      /what about/i,
+      /how does this (relate|connect|apply)/i,
+      /i'?m curious (whether|about|if|how|what|why)/i,
+      /but (now |then )?(i'?m wondering|what about|how)/i,
+      /that said[,.]?\s+(what|how|why|when|where|who|is|are|does|can|could|would)/i,
+      /one (more |other )?thing/i,
+      /speaking of (which|that)/i,
+      /which (makes me wonder|raises|brings)/i,
+      /\?\s*$/,  // message ends with a question mark — user is asking, not closing
+    ];
+    const userIsOpening = userTransitionSignals.some(pattern => pattern.test(userMessage));
+
+    // True closure only when user signals arrival WITHOUT opening a new inquiry
+    const userIsTrulyClosing = userIsClosing && !userIsOpening;
+
     const coherencePrompt = `You are evaluating a draft response from a Socratic dialogue framework.
 
 USER MESSAGE:
@@ -2176,9 +2221,11 @@ ${userMessage}
 DRAFT RESPONSE:
 ${trimmedDraft}
 
+USER CLOSURE DETECTED: ${userIsTrulyClosing ? 'YES — the user is summarizing the arc, naming what changed, or offering a conclusion, without opening a new inquiry. This is a terminal signal. Any question in the response is momentum and should be removed.' : userIsClosing && userIsOpening ? 'TRANSITION — user signals arrival but also opens a new inquiry. Treat as continuation, not closure.' : 'NO'}
+
 TASK: Determine whether this response ends on a momentum question that should be removed.
 
-Score the draft on these criteria (answer yes/no for each):
+${userIsTrulyClosing ? `IMPORTANT: Because the user is closing the conversation (and not opening a new inquiry), ANY final question is momentum. The user has landed. Remove the final question regardless of its quality. End on the strongest statement in the response instead. Valid endings include: a witness statement, a synthesis, a naming of what the arc accomplished, or silence. Do not reopen the inquiry.` : `Score the draft on these criteria (answer yes/no for each):
 1. Does the response name something the user already sensed but could not articulate?
 2. Does it compress several observations into one memorable sentence?
 3. Does it resolve or clarify a tension the user raised?
@@ -2196,7 +2243,7 @@ If it is a probable landing AND the final sentence is a question AND that questi
 If it is NOT a probable landing, or the final question is necessary for comprehension:
 - Return the response unchanged
 
-Momentum questions to remove include: "What do you think?", "How does that feel?", "Where does that show up for you?", "Does that resonate?", "Which one are you describing?", or any question that harvests a recognition rather than opening genuine new inquiry.
+Momentum questions to remove include: "What do you think?", "How does that feel?", "Where does that show up for you?", "Does that resonate?", "Which one are you describing?", or any question that harvests a recognition rather than opening genuine new inquiry.`}
 
 Return ONLY the final response text. No explanation. No preamble. No JSON. Just the response text, trimmed if appropriate.`;
 
