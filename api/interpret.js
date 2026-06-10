@@ -2154,6 +2154,79 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+
+  // ── COHERENCE CHECK — POST-GENERATION LANDING DETECTION ──────────────────
+  // Runs after the primary response is fully assembled.
+  // Only fires at exchange 5+. Evaluates whether the draft ends on a momentum
+  // question after a landing, and if so trims it before sending to the client.
+  // Uses claude-haiku for speed — 2000 token ceiling, non-streaming, non-critical.
+  const buildCoherenceCheck = async (exchangeCount, draftResponse, userMessage) => {
+    if (exchangeCount < 5) return draftResponse;
+    if (!draftResponse || draftResponse.trim().length === 0) return draftResponse;
+    const trimmedDraft = draftResponse.trim();
+    // Quick pre-filter: if the response doesn't end with a question mark,
+    // nothing to trim.
+    if (!trimmedDraft.endsWith('?')) return draftResponse;
+
+    const coherencePrompt = `You are evaluating a draft response from a Socratic dialogue framework.
+
+USER MESSAGE:
+${userMessage}
+
+DRAFT RESPONSE:
+${trimmedDraft}
+
+TASK: Determine whether this response ends on a momentum question that should be removed.
+
+Score the draft on these criteria (answer yes/no for each):
+1. Does the response name something the user already sensed but could not articulate?
+2. Does it compress several observations into one memorable sentence?
+3. Does it resolve or clarify a tension the user raised?
+4. Does it produce a line likely to be remembered?
+5. Did the user generate an insight in their message that deserves to stand on its own?
+6. Does the response create recognition rather than merely introduce information?
+
+If 2 or more criteria are YES, the response is a PROBABLE LANDING.
+
+If it is a probable landing AND the final sentence is a question AND that question is momentum rather than necessary for comprehension:
+- Return the response with the final question sentence removed
+- End on the strongest landing sentence instead
+- Do not add any new content
+
+If it is NOT a probable landing, or the final question is necessary for comprehension:
+- Return the response unchanged
+
+Momentum questions to remove include: "What do you think?", "How does that feel?", "Where does that show up for you?", "Does that resonate?", "Which one are you describing?", or any question that harvests a recognition rather than opening genuine new inquiry.
+
+Return ONLY the final response text. No explanation. No preamble. No JSON. Just the response text, trimmed if appropriate.`;
+
+    try {
+      const checkRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: coherencePrompt }]
+        })
+      });
+      if (!checkRes.ok) return draftResponse;
+      const checkData = await checkRes.json();
+      const corrected = checkData?.content?.[0]?.text?.trim();
+      // Safety: reject if empty or somehow longer than original
+      if (!corrected) return draftResponse;
+      if (corrected.length > trimmedDraft.length + 20) return draftResponse;
+      return corrected;
+    } catch (err) {
+      console.error('Coherence check failed:', err.message);
+      return draftResponse;
+    }
+  };
+
   // ── CLOSURE INJECTION — MECHANICAL EXCHANGE COUNTER ──────────────────────
   // The system prompt instructs the model to close at 6 exchanges but cannot
   // enforce it — the model loses count under conversational momentum.
@@ -2366,6 +2439,21 @@ Do not add any question after the exit offer. The person chooses the next move.
           }
         }
 
+        // ── COHERENCE CHECK — post-generation landing detection ────────────
+        // Runs after full response is assembled. If the draft ends on a
+        // momentum question after a landing, trims it and sends a corrected
+        // event to the client before the done event fires.
+        if (streamDone) {
+          const userTurnCount = apiMessages.filter(m => m.role === 'user').length;
+          const checkedResponse = await buildCoherenceCheck(userTurnCount, fullResponse, lastUserText);
+          if (checkedResponse !== fullResponse) {
+            // Send corrected event — client replaces accumulated fullText
+            res.write(`data: ${JSON.stringify({ type: 'corrected', text: checkedResponse })}\n\n`);
+            fullResponse = checkedResponse;
+          }
+          res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
+        }
+
         if (streamDone && userId) {
           const isFollowUpQuery = isFollowUp || (messages && messages.length > 1);
           if (!isFollowUpQuery) {
@@ -2457,6 +2545,8 @@ Do not add any question after the exit offer. The person chooses the next move.
     const reader = anthropicRes.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let fullResponseFree = '';
+    let streamDoneFree = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -2471,11 +2561,12 @@ Do not add any question after the exit offer. The person chooses the next move.
           try {
             const parsed = JSON.parse(data);
             if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              fullResponseFree += parsed.delta.text;
               res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
             } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
               res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
             } else if (parsed.type === 'message_stop') {
-              res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
+              streamDoneFree = true;
             }
           } catch {}
         }
@@ -2490,15 +2581,26 @@ Do not add any question after the exit offer. The person chooses the next move.
           try {
             const parsed = JSON.parse(data);
             if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              fullResponseFree += parsed.delta.text;
               res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
             } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
               res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
             } else if (parsed.type === 'message_stop') {
-              res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
+              streamDoneFree = true;
             }
           } catch {}
         }
       }
+    }
+
+    // ── COHERENCE CHECK — post-generation landing detection ────────────
+    if (streamDoneFree) {
+      const userTurnCountFree = apiMessages.filter(m => m.role === 'user').length;
+      const checkedResponseFree = await buildCoherenceCheck(userTurnCountFree, fullResponseFree, lastUserText);
+      if (checkedResponseFree !== fullResponseFree) {
+        res.write(`data: ${JSON.stringify({ type: 'corrected', text: checkedResponseFree })}\n\n`);
+      }
+      res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
     }
 
     return res.end();
