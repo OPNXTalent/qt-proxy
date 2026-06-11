@@ -2532,6 +2532,796 @@ export async function extractInquiryArtifacts(transcriptText, sourceMetadata = {
 // ============================================================
 
 
+// ============================================================
+// RAG Inquiry Artifact Extraction — Seed Records
+// ------------------------------------------------------------
+// Self-contained section. References no other function in this
+// file and modifies no existing state. No network, no env vars.
+//
+// Public surface: getSeedSignalRecords(filter)
+//
+// Contents: 31 Signal Records manually extracted under The Prism
+// RAG Extraction Protocol v1.1 from two transcripts:
+//   SR series (15) — "Jesus Is The Creator Of The Universe"
+//   KS series (16) — "How To Seek The Kingdom Of God First"
+// Records use the exact schema produced by extractInquiryArtifacts()
+// above, so seed and live records are interchangeable downstream.
+//
+// MIGRATION NOTE — SINGLE SWAP POINT: getSeedSignalRecords() is the
+// only access path to these records (the array itself is module-
+// private). When records move to a Supabase signal_records table,
+// replace this function's internals with the query; no caller
+// changes. Same pattern as getConceptNodes().
+//
+// v2-PREVIEW FIELD: KS-004 and KS-011 carry strainLinks — record IDs
+// whose claims are under mutual stress (total divine authorship vs.
+// culpable human resistance). Coherence links mark kinship; strain
+// links mark stress. Only these two records carry the field.
+// ============================================================
+
+const PRISM_SEED_SOURCES = {
+  jc: {
+    source: "https://www.youtube.com/watch?v=IDMkpljdrrA",
+    title: "Jesus Is The Creator Of The Universe"
+  },
+  ks: {
+    source: "https://www.youtube.com/watch?v=MK3J04bHc1k",
+    title: "How To Seek The Kingdom Of God First"
+  }
+};
+
+function prismSeedMeta(recordId, sourceKey) {
+  return {
+    recordId,
+    source: PRISM_SEED_SOURCES[sourceKey].source,
+    sourceTitle: PRISM_SEED_SOURCES[sourceKey].title,
+    extractedAt: "2026-06-11",
+    extractedBy: "manual",
+    protocolVersion: "prism-rag-extraction-v1.1"
+  };
+}
+
+const PRISM_SEED_SIGNAL_RECORDS = [
+
+  // ── SR series — "Jesus Is The Creator Of The Universe" ──────────
+
+  {
+    signal: "The speaker claims John 1:1-3 corresponds to Genesis 1:1 more closely in Hebrew than in English translation.",
+    sourceContext: "John 1:1 matches Genesis 1:1 in Hebrew more than John 1:1 matches Genesis 1:1 in English... those first three verses match up.",
+    speakerInterpretation: "John's prologue is a deliberate re-reading of Genesis 1:1 identifying the Word as the creative agent, and the Hebrew text of Genesis encodes this identification in ways English flattens.",
+    alternativePerspectives: [
+      { perspective: "Mainstream NT scholarship affirms John 1:1 as intentional allusion to Genesis 1:1, but locates the correspondence at literary allusion and Logos theology, not hidden encoding in Hebrew letterforms.", provenance: "named-tradition" },
+      { perspective: "Jewish interpretation reads Genesis 1:1 with no second divine agent; Wisdom/Memra traditions are the nearest analogue and are themselves contested as background for John.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Genesis 1:1", "John 1:1-3", "Logos theology", "Memra (Targumic)", "Proverbs 8 Wisdom", "Colossians 1:16-17", "Creation theology"],
+    tension: "Is the Genesis-John correspondence a property of the Hebrew text itself, or of John's interpretive act? If the former, why is it invisible to Hebrew-native readers of Genesis for centuries?",
+    inquiryExpansion: [
+      "What in John's Greek prologue depends on knowledge of the Hebrew (not LXX) text of Genesis?",
+      "How did Targumic Memra theology mediate between Genesis 1 and John 1?",
+      "What does the LXX of Genesis 1:1 preserve or lose that bears on John's allusion?",
+      "Where else does John structure narrative around Genesis?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["Logos Theology", "proposed:Genesis-John Intertext"],
+    tags: ["genesis-1", "john-1", "logos", "intertextuality", "hebrew"],
+    _meta: prismSeedMeta("SR-001", "jc")
+  },
+  {
+    signal: "The speaker parses the six letters of bereshit by pictographic letter-meanings — bet (house), resh (head), aleph (God), shin (destroy), yod (hand), tav (cross/covenant) — yielding a gospel summary in the Bible's first word.",
+    sourceContext: "The Son of God is destroyed with his hand on a cross for our covenant — that's the first word.",
+    speakerInterpretation: "The gospel narrative is embedded in the first word of Scripture at the sub-lexical level; letterform meanings are stable semantic carriers placed there by divine authorship.",
+    alternativePerspectives: [
+      { perspective: "Academic Hebrew linguistics: letter names are acrophonic labels, not semantic components of words; bereshit derives from rosh (head/first) with prefix and suffix. The pictographic hermeneutic circulates in popular Hebrew Roots materials and is rejected by scholarly Semitics.", provenance: "named-tradition" },
+      { perspective: "Jewish midrash practices sub-lexical interpretation (notarikon, gematria) but treats it as homiletical play layered on the plain sense, not as the word's actual meaning.", provenance: "named-tradition" },
+      { perspective: "The parsing crosses methods mid-word: bet-resh is read as the lexeme bar (son) while shin-yod-tav are read as individual pictographs — two decoding rules in one word.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["SR-003", "SR-004", "SR-008", "Notarikon", "Genesis Rabbah 1", "Pictographic Hebrew hermeneutics", "John 10:18"],
+    tension: "Can a text carry divinely intended meaning at a level its original language community does not recognize as meaningful — and what constrains such readings from producing any desired message from any word?",
+    inquiryExpansion: [
+      "What rules, if any, govern when letter-meanings apply and when lexical meanings apply?",
+      "How do rabbinic notarikon and modern pictographic methods differ in their claims about authorial intent?",
+      "Could the same method extract a contrary message from the same word, and what would that imply?",
+      "When did the pictographic letter-meaning hermeneutic emerge historically, and through whom?",
+      "What is the relationship between homiletical resonance and textual meaning?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Pictographic Hermeneutics", "proposed:Bereshit Letter-Parsing"],
+    tags: ["bereshit", "hebrew-letterforms", "genesis-1", "hermeneutics", "gospel-typology"],
+    _meta: prismSeedMeta("SR-002", "jc")
+  },
+  {
+    signal: "The first two letters of both bereshit and barah are read as bar (son), supported by New Testament Aramaic patronymics (bar-Jonah, Bartimaeus, Barabbas).",
+    sourceContext: "Bet-resh, aleph — the Son of God... barah — the Son of God is the creator. It's everywhere.",
+    speakerInterpretation: "Son is lexically present inside 'in beginning' and 'create,' so the Son of God is named as creator from the Bible's first word, converging with John 1:3 and Colossians 1:16.",
+    alternativePerspectives: [
+      { perspective: "Bar (son) is Aramaic; Biblical Hebrew uses ben. The cited examples are Aramaic patronymics from a first-century context; reading Aramaic bar inside a Hebrew word of Genesis is a cross-language operation. Hebrew bar appears rarely (Psalm 2:12), itself contested.", provenance: "extractor-supplied" },
+      { perspective: "Jewish interpretation of Psalm 2:12 divides over whether bar means son or purity, illustrating that even the strongest Hebrew case is disputed.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["SR-002", "SR-005", "Psalm 2:12", "Proverbs 30:4", "Aramaic patronymics", "Colossians 1:16"],
+    tension: "Does a meaningful unit appearing inside a word constitute designed presence, combinatorial coincidence, or reader-projection — and does crossing from Hebrew to Aramaic strengthen or break the claim?",
+    inquiryExpansion: [
+      "How frequent is the bet-resh sequence across the Hebrew lexicon under base-rate analysis?",
+      "What is the interpretive history of Psalm 2:12 in Jewish and Christian readings?",
+      "Does Proverbs 30:4 supply an in-Tanakh precedent for a divine Son question?",
+      "What hermeneutical weight can bilingual wordplay legitimately carry?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Bar-Son Wordplay", "Messianic Typology"],
+    tags: ["bar", "son-of-god", "aramaic", "hebrew", "wordplay"],
+    _meta: prismSeedMeta("SR-003", "jc")
+  },
+  {
+    signal: "The square-script letter aleph is composed of two yods and a vav; the speaker reads this as 'two hands and a nail' — a crucifixion image in the letter representing God.",
+    sourceContext: "The letter that represents God is made of two hands and a nail. I'm talking about Jesus — we're in the first word.",
+    speakerInterpretation: "The letterform signifying God encodes pierced hands and a nail: the crucified Creator present in the alphabet itself, linked to John 10:18 and Philippians 2:8.",
+    alternativePerspectives: [
+      { perspective: "The yod-vav-yod composition of aleph is an authentic Jewish scribal/kabbalistic observation, but its traditional reading is numerical: 10+6+10 = 26, the gematria of YHWH — a cipher of the divine name, not crucifixion.", provenance: "named-tradition" },
+      { perspective: "The composition describes the late square (Aramaic-derived) script; Paleo-Hebrew aleph (the ox-head the speaker displays) has no such structure. The reading depends on a script post-dating Genesis, in tension with the speaker's own letter-continuity claim.", provenance: "extractor-supplied" },
+      { perspective: "Vav's name means hook/peg (tabernacle hooks, Exodus 27:10); 'nail' in the crucifixion sense is an interpretive sharpening.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["SR-002", "SR-014", "Gematria of YHWH (26)", "Kabbalistic letter mysticism", "Tabernacle vavim", "John 20:25", "Zechariah 12:10"],
+    tension: "Two traditions read the same letterform structure and reach different theophanies — divine name versus crucified Messiah. Can a letterform bear intended meaning when the form itself changed scripts mid-history?",
+    inquiryExpansion: [
+      "What does Jewish tradition do with the yod-vav-yod = 26 observation, and how old is it?",
+      "When did square script replace Paleo-Hebrew, and what does that imply for letterform theology?",
+      "Is there a principled way to adjudicate between the YHWH-cipher and crucifixion readings, or must both stand?",
+      "How does Zechariah 12:10 function in this constellation?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Aleph Composition", "proposed:Pictographic Hermeneutics"],
+    tags: ["aleph", "yod", "vav", "gematria", "crucifixion", "hebrew-letterforms"],
+    _meta: prismSeedMeta("SR-004", "jc")
+  },
+  {
+    signal: "The verb barah (create) takes only God as its subject in the Hebrew Bible; the speaker deploys this against 'speak things into existence' claims.",
+    sourceContext: "You don't speak things into existence. Only God speaks things into existence. The only one the Bible ever says baras anything is God.",
+    speakerInterpretation: "Creation ex nihilo is an exclusively divine act; humans do not share it, and manifestation theology misappropriates a divine prerogative.",
+    alternativePerspectives: [
+      { perspective: "The grammatical observation is standard: in the qal stem, barah's subject is consistently God. Whether barah denotes creation from nothing is debated; many scholars argue Genesis 1:1-2 describes ordering of pre-existent chaos, with ex nihilo crystallizing later.", provenance: "named-tradition" },
+      { perspective: "The anti-manifestation application is a contemporary polemic layered onto the grammar, which does not itself address human speech-acts (cf. blessing/cursing efficacy, Proverbs 18:21).", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["SR-003", "SR-010", "Genesis 1:1-2", "Isaiah 45:7", "2 Maccabees 7:28", "Word-of-faith theology", "Divine speech-acts"],
+    tension: "The verb is exclusively divine, yet humans bear the image of the speaking God — what is the actual scope and limit of human word-power in Hebraic thought?",
+    inquiryExpansion: [
+      "Does barah entail ex nihilo, or did that doctrine develop later?",
+      "How does asah (make) distribute differently from barah, and what does the contrast teach?",
+      "What does Hebrew Scripture actually claim about the efficacy of human blessing and cursing?",
+      "Where is the line between image-bearing creativity and divine prerogative?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["Creation Theology", "proposed:Barah Exclusivity"],
+    tags: ["barah", "creation", "ex-nihilo", "word-of-faith", "hebrew"],
+    _meta: prismSeedMeta("SR-005", "jc")
+  },
+  {
+    signal: "Elohim carries the masculine plural ending -im yet takes singular verbs; the speaker reads this as 'one, but more than just one.'",
+    sourceContext: "How can he be one and more than one at the same time? Well, he's God.",
+    speakerInterpretation: "A proto-Trinitarian signal in the Bible's first sentence: plurality within the one God, converging with John 1:1.",
+    alternativePerspectives: [
+      { perspective: "Hebrew grammarians and Jewish tradition: plural of majesty/intensification; the singular verb bara governs the sense, and the same plural form denotes the single god Chemosh (Judges 11:24).", provenance: "named-tradition" },
+      { perspective: "Christian tradition divides: older dogmatics saw Trinitarian adumbration; most modern Christian Hebraists caution the morphology alone proves nothing while holding the door open canonically (Genesis 1:26).", provenance: "named-tradition" },
+      { perspective: "The speaker's own thimble analogy concedes the claim rests on divine incomprehensibility rather than grammar.", provenance: "in-transcript" }
+    ],
+    coherenceLinks: ["Genesis 1:26", "Deuteronomy 6:4", "Plural of majesty", "Judges 11:24", "John 1:1", "Trinitarian theology", "Shema"],
+    tension: "The same morphological fact grounds opposite theologies — strict unity and internal plurality. The grammar under-determines; what legitimately closes the gap?",
+    inquiryExpansion: [
+      "What does echad in the Shema actually assert about the mode of God's oneness?",
+      "To whom is 'let us make' addressed in the history of interpretation?",
+      "How does plural-form/singular-verb behave across the wider Hebrew corpus?",
+      "Did Second Temple Judaism tolerate 'two powers in heaven,' and what happened to that tolerance?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Elohim Morphology", "Relational Theology"],
+    tags: ["elohim", "plurality", "shema", "trinity", "hebrew-grammar"],
+    _meta: prismSeedMeta("SR-006", "jc")
+  },
+  {
+    signal: "Elohim's letters are read pictographically as 'our strong Shepherd: behold his hand over the mighty waters,' connected to Psalm 23 and Jesus calming the storm.",
+    sourceContext: "The word Elohim speaks to our God, our strong Shepherd, behold his hand and its power, and it represents water.",
+    speakerInterpretation: "The divine name itself prophesies the Shepherd whose hand stills the sea — Mark 4 enacted from the letters of Genesis 1:1's third word.",
+    alternativePerspectives: [
+      { perspective: "Same methodological objection as the bereshit parsing: Elohim is morphologically eloah plus plural, related to el; letter-meanings are not semantic components. The Shepherd reading's resonance comes from canonical theology (Psalm 23, Ezekiel 34, John 10), not the letters.", provenance: "named-tradition" },
+      { perspective: "Mem's association with chaos-waters is a genuine canonical motif (Genesis 1:2, Psalm 29) — God's mastery over waters stands even if the letter-derivation does not.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["SR-002", "Psalm 23", "Ezekiel 34", "Mark 4:35-41", "Psalm 29", "Chaoskampf motif", "John 10"],
+    tension: "The conclusion (God as shepherd who masters chaos-waters) is canonically solid while the derivation is methodologically disputed — can a true conclusion validate a contested method, or does the method borrow credibility from the conclusion?",
+    inquiryExpansion: [
+      "Where does the Tanakh explicitly join shepherd imagery to mastery over waters?",
+      "How does the Chaoskampf motif frame Mark 4's storm-calming as a divine-identity claim?",
+      "Does Ezekiel 34 set up John 10 as a deity claim?",
+      "What distinguishes a derivation from an illustration in homiletics?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Shepherd Over Waters", "proposed:Pictographic Hermeneutics"],
+    tags: ["elohim", "shepherd", "chaos-waters", "mark-4", "psalm-23"],
+    _meta: prismSeedMeta("SR-007", "jc")
+  },
+  {
+    signal: "Genesis 1:1's untranslated particle et — grammatically a direct-object marker — is composed of the first and last Hebrew letters; the speaker identifies it with 'Alpha and Omega, the first and the last.'",
+    sourceContext: "It's the aleph-tav, the entirety of the alef-bet... the aleph-tav is right beside God. In the beginning was the Word, and the Word was with God.",
+    speakerInterpretation: "Et marks the Word's position with God in the act of creation: an untranslatable signature of the pre-incarnate Christ in Genesis 1:1, decoded by Revelation 1:8 and 22:13.",
+    alternativePerspectives: [
+      { perspective: "The speaker himself states the grammatical function: a direct-object marker pointing to the object of the verb. He holds both readings simultaneously.", provenance: "in-transcript" },
+      { perspective: "Et appears thousands of times before definite direct objects with no semantic content; its presence in Genesis 1:1 is syntactically required, not anomalous.", provenance: "named-tradition" },
+      { perspective: "Rabbinic midrash treats et as interpretively generative — Akiva's school read each et as including something beyond the stated object — but toward inclusion-expansion, not a divine person. The aleph-tav-as-Christ reading is characteristic of modern Messianic/Hebrew Roots interpretation.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["SR-001", "SR-002", "Revelation 1:8", "Revelation 22:13", "Isaiah 44:6", "R. Akiva on et", "Zechariah 12:10", "Direct-object marker grammar"],
+    tension: "Can a grammatical particle simultaneously perform its syntactic function and carry a theological signature within a divinely authored text — and if Akiva could expand et midrashically, on what grounds is the Christological expansion ruled in or out?",
+    inquiryExpansion: [
+      "How did Akiva's school justify interpreting et, and what limits did they observe?",
+      "What does Isaiah 44:6's 'first and last' contribute to Revelation's Alpha-Omega claim?",
+      "Why does Zechariah 12:10 place et before 'whom they have pierced,' and how have both traditions handled that verse?",
+      "Is there a difference in kind between midrashic inclusion-readings and person-identification readings of the same particle?",
+      "What is lost and gained when an untranslatable element becomes a doctrinal site?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Aleph-Tav Particle", "Logos Theology", "Messianic Typology"],
+    tags: ["aleph-tav", "et", "genesis-1", "alpha-omega", "hebrew-grammar"],
+    _meta: prismSeedMeta("SR-008", "jc")
+  },
+  {
+    signal: "Shamayim (heavens) is parsed as containing mayim (waters) — the heavens as 'sky-waters' — linked to the firmament of Genesis 1:6-8.",
+    sourceContext: "Hashamayim means the sky-waters... God separated the waters above the heavens from the waters beneath.",
+    speakerInterpretation: "The word itself preserves the cosmology of Genesis 1:6-8: heaven is named by its watery character, an internal coherence between vocabulary and creation narrative.",
+    alternativePerspectives: [
+      { perspective: "Talmudic tradition (b. Chagigah 12a) parses shamayim as fire-and-water or there-is-water — the water-parsing has ancient Jewish pedigree as homiletics.", provenance: "named-tradition" },
+      { perspective: "Comparative Semitics: shamayim cognates with Akkadian shamu; the etymology is uncertain and likely not a mayim compound — venerable folk etymology.", provenance: "named-tradition" },
+      { perspective: "The raqia/waters-above cosmology stands on its own (Psalm 148:4); the signal's force does not depend on the word-parsing.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Genesis 1:6-8", "b. Chagigah 12a", "Psalm 148:4", "Ancient Near Eastern cosmology", "Second Temple cosmology"],
+    tension: "Ancient interpreters and modern philologists examine the same word and split between meaningful compound and opaque inheritance — does a folk etymology endorsed within the tradition itself acquire interpretive standing?",
+    inquiryExpansion: [
+      "What did the rabbis intend by the fire-and-water parsing — etymology or theology?",
+      "How does Psalm 148:4 use the waters-above motif liturgically?",
+      "What was the firmament in Second Temple cosmology, and how did early readers handle it?",
+      "When does inner-biblical wordplay constitute evidence versus ornament?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["Second Temple Cosmology", "proposed:Shamayim Etymology"],
+    tags: ["shamayim", "firmament", "cosmology", "folk-etymology", "genesis-1"],
+    _meta: prismSeedMeta("SR-009", "jc")
+  },
+  {
+    signal: "The speaker derives 'abracadabra' from Hebrew/Aramaic as 'God creates as God speaks,' tied to creation by divine speech and John 1.",
+    sourceContext: "Abracadabra — watch Jesus pull the universe out of nothing.",
+    speakerInterpretation: "Even the world's residual magic-word preserves a fossil of the true cosmogony: creation by the spoken Word, the Logos.",
+    alternativePerspectives: [
+      { perspective: "The Aramaic derivation (avra k'davra) is a popular etymology of uncertain standing; first attestation is in the Latin poem of Serenus Sammonicus (c. 200 AD) as an apotropaic formula, and scholarly etymologies remain unresolved.", provenance: "named-tradition" },
+      { perspective: "The theological claim (creation by speech) is independently grounded in Genesis 1 and Psalm 33:6 and does not need the etymology.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["SR-005", "Genesis 1:3", "Psalm 33:6", "John 1:3", "Hebrews 11:3", "Late-antique magical formulas"],
+    tension: "A rhetorically powerful etymology with weak historical attestation supports a theologically true claim — does deploying uncertain evidence for a sound conclusion strengthen the case or compromise signal integrity?",
+    inquiryExpansion: [
+      "What is the actual attestation history of abracadabra, and how strong is the Aramaic proposal?",
+      "How does Psalm 33:6 formalize creation-by-speech as doctrine?",
+      "What distinguishes biblical creation-by-word from ancient magical word-power?",
+      "How should a teaching tradition handle popular etymologies it cannot verify?"
+    ],
+    coherenceStatus: "Open",
+    conceptNodeCandidates: ["Creation Theology", "proposed:Creation By Speech"],
+    tags: ["abracadabra", "creation-by-speech", "etymology", "logos", "psalm-33"],
+    _meta: prismSeedMeta("SR-010", "jc")
+  },
+  {
+    signal: "Barabbas = bar-abba, 'son of the father'; the crowd's choice between Jesus and Barabbas is read as a typological picture of substitutionary atonement.",
+    sourceContext: "Just like he took Barabbas's place that day, he took our place when he died on the cross. Barabbas is a picture of us.",
+    speakerInterpretation: "The Passion narrative encodes the substitution structurally: the guilty son-of-the-father walks free because the true Son of the Father takes his place.",
+    alternativePerspectives: [
+      { perspective: "The etymology is uncontested (bar-abba is a documented Aramaic name) and the irony widely noted; some early manuscripts of Matthew 27 read 'Jesus Barabbas,' which Origen knew and resisted.", provenance: "named-tradition" },
+      { perspective: "Dispute centers on intent: deliberate evangelistic design versus historical happenstance left uninterpreted — no NT author draws the typological conclusion explicitly.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Matthew 27:15-26", "Mark 15:6-15", "Substitutionary atonement", "Leviticus 16 (two goats)", "Textual variant Jesus Barabbas", "Messianic Typology"],
+    tension: "The pattern is undeniably present in the text and undeniably un-commented by the text — is uninterpreted structural irony authorial design, providential design, or reader-completion?",
+    inquiryExpansion: [
+      "What is the manuscript evidence for 'Jesus Barabbas,' and why did Origen resist it?",
+      "Does the Yom Kippur two-goats rite stand behind the Barabbas scene?",
+      "Where else do the Gospels deploy structural irony without explicit commentary?",
+      "What distinguishes typology from coincidence in narrative analysis?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["Messianic Typology", "proposed:Barabbas Substitution"],
+    tags: ["barabbas", "substitution", "typology", "passion-narrative", "aramaic"],
+    _meta: prismSeedMeta("SR-011", "jc")
+  },
+  {
+    signal: "The phrase 'God, or the universe, or whatever you want to call it' is analyzed as a category error — assigning the creation the attributes of its creator — via the Tesla/Elon Musk analogy.",
+    sourceContext: "We give what God created attributes for the one who created it, so that we can bring God down to a level that's lower than us.",
+    speakerInterpretation: "Conflating God with the universe is not humble agnosticism but a demotion strategy: a relational evasion that makes the Creator manageable by dissolving him into his artifact.",
+    alternativePerspectives: [
+      { perspective: "Pantheist and panentheist traditions (Spinoza; process theology) hold the God/universe identification or interpenetration as a serious metaphysical position, not a confusion.", provenance: "named-tradition" },
+      { perspective: "The Tesla analogy presupposes the creator/artifact disjunction it argues for; classical theism complicates it via immanence (Acts 17:28) — transcendence and immanence must both be held.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Romans 1:25", "Acts 17:24-28", "Pantheism/panentheism", "Divine transcendence and immanence", "Relationship vs. religion"],
+    tension: "The polemic targets a real confusion (Romans 1:25) but the analogy's clean creator/artifact split sits uneasily with the Bible's own immanence language — where is the line between distinguishing God from creation and distancing him from it?",
+    inquiryExpansion: [
+      "How does Romans 1:25 diagnose the creature/Creator exchange, and what motivates it relationally?",
+      "What does Acts 17:28 concede to immanence?",
+      "How do panentheist frameworks differ from the confusion the speaker targets?",
+      "Does 'the universe' function in contemporary speech as evasion, reverence, or both?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["Relational Theology", "proposed:Creator-Creation Distinction"],
+    tags: ["creator", "pantheism", "romans-1", "immanence", "transcendence"],
+    _meta: prismSeedMeta("SR-012", "jc")
+  },
+  {
+    signal: "The speaker reads Philippians 2:5-8 as a charter for stable identity — 'you are who God says you are' — explicitly rejecting the reading that believers should claim equality with God.",
+    sourceContext: "You don't have to shrink around people who want you to be smaller... Jesus knew who he was even if you didn't know who he was.",
+    speakerInterpretation: "Christ's refusal to grasp at equality (because he had it) and refusal of self-diminishment models identity anchored in the Father's declaration rather than others' recognition.",
+    alternativePerspectives: [
+      { perspective: "The harpagmos debate divides over whether Christ possessed equality and did not exploit it, or did not seize what he lacked; modern consensus favors 'did not exploit,' which supports the speaker's reading.", provenance: "named-tradition" },
+      { perspective: "The pastoral application (identity stability) extends beyond Paul's stated purpose (humility unto self-emptying); the hymn's center is kenosis, which the identity reading risks inverting into self-possession.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Philippians 2:5-11", "Kenosis", "Harpagmos debate", "John 13:3-5", "Image of God", "Identity and recognition"],
+    tension: "The hymn's trajectory is downward (self-emptying), yet the speaker extracts an account of secure selfhood — are these the same movement (security enables descent, per John 13:3) or opposite ones?",
+    inquiryExpansion: [
+      "How does John 13:3-5 link secure identity to voluntary descent?",
+      "What turns on the harpagmos translation decision?",
+      "Where is the boundary between image-of-God identity claims and the self-deification the speaker rejects?",
+      "Does kenosis describe Christ uniquely or prescribe a pattern for believers?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Identity By Declaration", "Relational Theology"],
+    tags: ["philippians-2", "kenosis", "identity", "harpagmos", "imago-dei"],
+    _meta: prismSeedMeta("SR-013", "jc")
+  },
+  {
+    signal: "The speaker asserts that while Hebrew scripts changed across history, 'the letters themselves have not changed and the meaning of the letters have not changed.'",
+    sourceContext: "The Hebrew language — how they write the letters — has changed, but the letters themselves have not changed and the meaning of the letters have not changed.",
+    speakerInterpretation: "Letter-meanings are a stable semantic substrate across three millennia, licensing pictographic readings of texts composed in earlier scripts.",
+    alternativePerspectives: [
+      { perspective: "Paleography: the square script is borrowed from Aramaic (post-exilic); letter names persisted as labels, but letters function phonetically, and no period of Hebrew literature treats letter-meanings as components of word semantics.", provenance: "named-tradition" },
+      { perspective: "The claim is load-bearing for the entire pictographic method and internally strained: the 'two hands and a nail' reading requires the late square form of aleph rather than the ox-head form the continuity claim would privilege.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["SR-002", "SR-004", "SR-007", "Paleo-Hebrew to square script transition", "Acrophony", "Scribal tradition"],
+    tension: "The method requires meaning-stability across script changes, yet selectively uses whichever script form yields the theological reading — what would a consistent application look like, and would it survive?",
+    inquiryExpansion: [
+      "When and why did Hebrew adopt the Aramaic square script?",
+      "Is there pre-modern evidence of letter-meanings being used to interpret word semantics?",
+      "Which script was Genesis first written in, and does that constrain letterform readings?",
+      "Can the hermeneutic survive an internal consistency audit across its own applications?"
+    ],
+    coherenceStatus: "Decohering",
+    conceptNodeCandidates: ["proposed:Letterform Continuity", "proposed:Pictographic Hermeneutics"],
+    tags: ["paleo-hebrew", "square-script", "letterforms", "hermeneutics", "consistency"],
+    _meta: prismSeedMeta("SR-014", "jc")
+  },
+  {
+    signal: "The speaker frames the Bible as a book about a king, a kingdom, a royal family, and the culturalization of Earth — asserting a kingdom is a governmental entity, not a religious one.",
+    sourceContext: "The Bible contains religion, but it's not about religion... so he could expand his heavenly authority — his kingdom — to the earth through you and through me.",
+    speakerInterpretation: "Creation theology grounds total jurisdiction: because Christ created everything ex nihilo, his claim is governmental and comprehensive, not confined to a religious sphere; redemption is reconnection to the King.",
+    alternativePerspectives: [
+      { perspective: "Kingdom-as-government framing is characteristic of Myles Munroe's kingdom theology; basileia scholarship similarly stresses reign over institution, though most scholars resist a clean religion/government binary as anachronistic for the ancient world.", provenance: "named-tradition" },
+      { perspective: "The framing converges with reading Scripture as relational/covenantal architecture rather than religious text — but governmental and relational are not identical frames: one centers authority, the other covenant bond. The transcript fuses them via sonship language without distinguishing them.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["SR-012", "Genesis 1:26-28", "Daniel 2:44", "Matthew 6:10", "Basileia tou theou", "Covenant vs. contract", "Relationship vs. religion", "KS-002", "KS-003"],
+    tension: "Is the kingdom frame's center of gravity authority (jurisdiction over particles and peoples) or relationship (a royal family one is adopted into) — and does the governmental metaphor, pressed alone, reproduce the impersonal distance it was deployed to escape?",
+    inquiryExpansion: [
+      "How does basileia function in the Gospels — territory, reign, or relational allegiance?",
+      "What does the Genesis 1:26-28 dominion mandate delegate, and to whom, after the fall?",
+      "Where do covenant and kingdom frames converge and diverge in the Tanakh?",
+      "Is 'religion' as a separable category even available to the biblical authors?",
+      "What does 'the culturalization of a foreign land' imply about Earth's present governance?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Kingdom As Government", "Relationship vs Religion", "Hebraic Eschatology"],
+    tags: ["kingdom", "religion", "basileia", "government", "covenant"],
+    _meta: prismSeedMeta("SR-015", "jc")
+  },
+
+  // ── KS series — "How To Seek The Kingdom Of God First" ──────────
+
+  {
+    signal: "The speaker distinguishes knowing what the Bible says from understanding what it says, and makes definitional clarity a precondition for seeking the kingdom.",
+    sourceContext: "If you don't know what the kingdom of God is and you're looking for it, when you find it, how will you know you found it? (Illustrated by the 8x8=64 childhood anecdote.)",
+    speakerInterpretation: "Matthew 6:33 is a mandate believers emotionally think they're obeying but practically ignore, because the object of the seeking has never been defined; recitation without comprehension produces the illusion of obedience.",
+    alternativePerspectives: [
+      { perspective: "Wisdom literature supports the distinction (Proverbs 4:7; Matthew 13:19's 'hears the word and understands it not').", provenance: "named-tradition" },
+      { perspective: "A counter-tradition holds practice precedes comprehension — obedience as the organ of understanding (John 7:17) — inverting the define-first sequence.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Matthew 6:33", "Matthew 13:19", "Proverbs 4:7", "John 7:17", "Hosea 4:6", "SR-001"],
+    tension: "Must definition precede seeking, or does seeking produce the definition? If recognition requires a prior concept, how does anyone find what they have never seen — yet without one, what stops a seeker from misidentifying the first plausible candidate?",
+    inquiryExpansion: [
+      "How does Jesus handle definitional requests about the kingdom — does he define, or does he parable?",
+      "What does John 7:17 imply about the order of obedience and understanding?",
+      "Why are the kingdom parables framed as hiddenness rather than definition?",
+      "What distinguishes recognition from confirmation bias in spiritual seeking?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Knowing Vs Understanding"],
+    tags: ["epistemology", "matthew-6-33", "understanding", "recognition", "kingdom"],
+    _meta: prismSeedMeta("KS-001", "ks")
+  },
+  {
+    signal: "The speaker defines religion as anything people say you must do to appease God, asserting God cannot be appeased by humans — 'God can only be appeased by God.'",
+    sourceContext: "The Bible is not a book of religion and it's not a book about religion — it contains religion.",
+    speakerInterpretation: "Religion and gospel are categorically distinct: religion is human-initiated appeasement (always inadequate); the gospel is God satisfying God, received by trust in the death, burial, and resurrection rather than performance.",
+    alternativePerspectives: [
+      { perspective: "Recognizably the Reformation solus Christus frame and the contemporary gospel-vs-religion formulation (e.g., Keller).", provenance: "named-tradition" },
+      { perspective: "'God appeased by God' presupposes a propitiation model; Christus Victor, moral influence, and Hebraic-covenantal readings frame the cross as victory, revelation, or covenant renewal — some argue 'appeasement' imports a pagan category the Hebrew kipper does not carry.", provenance: "named-tradition" },
+      { perspective: "The definition makes 'religion' pejorative by construction; James 1:27 uses the word positively, so the categorical claim depends on a stipulated definition the canon itself does not consistently observe.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["SR-015", "Romans 3:25", "James 1:27", "Leviticus 17:11", "Propitiation vs. expiation", "Christus Victor", "Relationship vs. religion", "Hebraic kipper"],
+    tension: "'God appeased by God' resolves the human-inadequacy problem but raises an intra-divine one: if appeasement is required, who requires it — and does the Hebrew sacrificial vocabulary even carry appeasement as a category?",
+    inquiryExpansion: [
+      "Does kipper denote appeasing wrath, covering sin, or purifying space — and how do the options change the gospel's grammar?",
+      "How does Romans 3:25's hilasterion function in this debate?",
+      "What does James 1:27's positive use of 'religion' do to the religion/gospel binary?",
+      "Is 'God can only be appeased by God' a claim about God's nature or about human incapacity?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["Relationship vs Religion", "proposed:Atonement Grammar"],
+    tags: ["religion", "appeasement", "atonement", "kipper", "gospel"],
+    _meta: prismSeedMeta("KS-002", "ks")
+  },
+  {
+    signal: "The speaker derives a kingdom definition from English word formation — 'kingdom comes from King's Dominion' — yielding: the kingdom is when I yield my life to God as sovereign king.",
+    sourceContext: "Conceptually it's not in a sentence in the Bible... I could be wrong but I don't think I am.",
+    speakerInterpretation: "The kingdom is not primarily a place, institution, or eschatological event but a jurisdiction — constituted wherever and to the degree that God's rule is yielded to.",
+    alternativePerspectives: [
+      { perspective: "Folk etymology: 'kingdom' is Old English cyningdom, where -dom means state/condition (freedom, wisdom), not the Latin-derived 'dominion.' The resemblance is coincidental.", provenance: "extractor-supplied" },
+      { perspective: "The conclusion converges with mainstream basileia scholarship: basileia and malkuth denote kingship/reign rather than territory. A defensible destination by an indefensible route.", provenance: "named-tradition" },
+      { perspective: "The speaker flags his own epistemic status: a conceptual synthesis, not a textual citation.", provenance: "in-transcript" }
+    ],
+    coherenceLinks: ["SR-015", "Basileia tou theou", "Malkuth shamayim", "Luke 17:21", "Daniel 4:25", "KS-009"],
+    tension: "Derivation/conclusion split (recurring source pattern): the etymology is false, the semantic conclusion broadly correct. Does credibility survive when supporting arguments fail while conclusions stand — and should the graph weight the conclusion or the argument?",
+    inquiryExpansion: [
+      "What do basileia and malkuth actually denote across their canonical distribution — reign, realm, or both?",
+      "Where does Jesus locate the kingdom spatially and temporally?",
+      "How does the reign-not-realm reading change what seeking the kingdom means operationally?",
+      "What is the epistemological status of true conclusions reached through false derivations?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Kingdom As Reign", "Relationship vs Religion"],
+    tags: ["kingdom", "etymology", "basileia", "malkuth", "derivation-split"],
+    _meta: prismSeedMeta("KS-003", "ks")
+  },
+  {
+    signal: "The speaker proposes a three-stage kingdom structure: yield your life to God as sovereign king; God makes you sovereign ruler over an assignment; use the assignment to serve every person you encounter.",
+    sourceContext: "If I am resisting yielding to God, or resisting ruling over my assignment, or resisting using that assignment to serve other people, then I am resisting the kingdom of God. Authority is always an alignment issue.",
+    speakerInterpretation: "The kingdom is a delegation chain — divine sovereignty flowing into vocational authority flowing into service — and resistance at any link is resistance to the kingdom. A misaligned life produces a rebelling assignment.",
+    alternativePerspectives: [
+      { perspective: "Structurally parallel to Myles Munroe's kingdom-dominion teaching and Reformed vocation theology (Luther's stations, Kuyper's sphere sovereignty).", provenance: "named-tradition" },
+      { perspective: "The strong form — 'my assignment cannot rebel against me and win if I'm yielded' — is a prosperity-adjacent guarantee the wisdom literature complicates: Job and Ecclesiastes present righteous laborers whose work fails for reasons unrelated to misalignment.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["KS-005", "Genesis 1:28", "Matthew 25:14-30", "Luther on vocation", "Sphere sovereignty", "SR-015"],
+    strainLinks: ["KS-011"],
+    tension: "The framework makes alignment legible through outcomes — but if assignment-rebellion always signals misalignment, it cannot account for Job, and every suffering worker stands accused. What distinguishes a delegation chain from a prosperity mechanism?",
+    inquiryExpansion: [
+      "How does the parable of the talents distribute authority, risk, and accountability?",
+      "Does the canon anywhere guarantee vocational success conditional on yieldedness?",
+      "How would Job answer 'authority is always an alignment issue'?",
+      "Where does this formulation sit relative to Munroe's kingdom teaching and to the prosperity gospel?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Yield-Rule-Serve Structure", "proposed:Kingdom As Reign"],
+    tags: ["yielding", "assignment", "vocation", "authority", "alignment"],
+    _meta: prismSeedMeta("KS-004", "ks")
+  },
+  {
+    signal: "From Psalm 8, the speaker bounds delegated authority: dominion is over works, not people — 'the king of your thing, not the king of other people.'",
+    sourceContext: "God made you to be the ruler over an assignment, not the ruler over the masses. This is where human beings get messed up.",
+    speakerInterpretation: "The dominion mandate authorizes rule over domains, not persons; inter-human domination is a corruption, and the kingdom's authority structure is horizontal among humans under one vertical sovereignty.",
+    alternativePerspectives: [
+      { perspective: "Psalm 8 and Genesis 1:26-28 do enumerate non-human objects of dominion; yet the canon also institutes inter-human authority — kings, judges, elders, parents (Romans 13:1) — which the strong horizontal reading must accommodate or integrate.", provenance: "named-tradition" },
+      { perspective: "The speaker himself occupies authority over employees and frames it as service-ordering, suggesting the operative distinction is authority-as-service vs. authority-as-ownership (Matthew 20:25-28) rather than a prohibition on inter-human authority as such.", provenance: "in-transcript" }
+    ],
+    coherenceLinks: ["Psalm 8:4-6", "Genesis 1:26-28", "Matthew 20:25-28", "Romans 13:1", "1 Samuel 8", "KS-004", "Servant leadership"],
+    tension: "The original mandate names no human objects of dominion, yet the canonical story is saturated with sanctioned human authority — is inter-human rule a concession to decoherence, a legitimate development, or a different category the dominion language never addressed?",
+    inquiryExpansion: [
+      "What does 1 Samuel 8 frame as lost when Israel demands a human king?",
+      "How does Matthew 20:25-28 reconstitute authority inside the kingdom?",
+      "Is Romans 13:1 a creation ordinance or a providential accommodation?",
+      "Can 'king of your thing' coexist with employment hierarchies without contradiction, and on what terms?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Dominion Boundaries", "proposed:Yield-Rule-Serve Structure"],
+    tags: ["dominion", "psalm-8", "authority", "servant-leadership", "hierarchy"],
+    _meta: prismSeedMeta("KS-005", "ks")
+  },
+  {
+    signal: "The speaker locates the force of Matthew 6:19 in 'for yourselves': the prohibition targets self-directed accumulation, not wealth creation — wealth laid up for descendants fulfills the command.",
+    sourceContext: "A good man leaves an inheritance to his children's children... my descendants don't have to start from ground zero.",
+    speakerInterpretation: "Matthew 6:19-21 and the inheritance mandates (Proverbs 13:22, 1 Timothy 5:8) form one ethic: treasure oriented beyond the self is sanctioned; treasure terminating in the self is the corruption.",
+    alternativePerspectives: [
+      { perspective: "Much of the tradition reads Matthew 6:19-24 as a sharper warning against accumulation as such — the Mammon saying, the rich fool (Luke 12:16-21), and 'sell your possessions' (Luke 12:33) resist a reading that relocates rather than limits treasure.", provenance: "named-tradition" },
+      { perspective: "The rich fool is the hard case: his plan was provision for years ahead, structurally similar to multigenerational security, and the parable condemns it — the variable must lie elsewhere ('rich toward God'), which a beneficiary-based reading does not yet supply.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Matthew 6:19-21", "Proverbs 13:22", "1 Timothy 5:8", "Luke 12:16-21", "Luke 12:33", "KS-009", "Generational wealth ethics"],
+    tension: "The canon commands inheritance and condemns accumulation in adjacent breaths — the beneficiary-based harmonization handles the inheritance texts but not the rich fool; what is the actual variable that flips storage from faithfulness to folly?",
+    inquiryExpansion: [
+      "What does Luke 12:21 mean by 'rich toward God,' and can stored wealth qualify?",
+      "How did Second Temple Judaism hold almsgiving and inheritance together?",
+      "Does 'for yourselves' (heautois) carry the exegetical weight assigned to it?",
+      "Where is the line between provision and accumulation drawn in the text rather than in application?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Treasure Ethics"],
+    tags: ["wealth", "inheritance", "matthew-6", "rich-fool", "treasure"],
+    _meta: prismSeedMeta("KS-006", "ks")
+  },
+  {
+    signal: "The speaker distinguishes nice (withholding painful truth) from kind (truth with compassion), reading Matthew 6:23's light-that-is-darkness as a culture whose perceived virtue (niceness) is darkness.",
+    sourceContext: "Nice means I'm going to lie to you to keep from hurting your feelings... honest is always kind.",
+    speakerInterpretation: "Truthfulness is constitutive of kindness; comfort-preserving dishonesty is a counterfeit virtue, and a moral system organized around feeling-protection is light-labeled darkness.",
+    alternativePerspectives: [
+      { perspective: "Ephesians 4:15 ('speaking the truth in love') is the classic anchor; the tradition broadly agrees truth and love are co-requirements. But Matthew 6:22-23 in context concerns the single eye — generosity or undivided perception in many readings — not social honesty norms; the application is a homiletical transfer.", provenance: "named-tradition" },
+      { perspective: "'Honest is always kind' holds only under idealized honesty; the canon regulates timing, audience, and motive (1 Corinthians 13:1 — truth without love as noise), so honesty is necessary but not sufficient for kindness.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Matthew 6:22-23", "Ephesians 4:15", "Proverbs 27:6", "1 Corinthians 13:1", "Emet/met insight", "Pseudo-coherence"],
+    tension: "The nice/kind distinction names a real counterfeit (comfort masquerading as love) — but its absolute form can launder cruelty as virtue; what conditions must honesty satisfy before it is kindness rather than merely accuracy?",
+    inquiryExpansion: [
+      "What does the single eye denote in its Second Temple idiom?",
+      "How does Ephesians 4:15 coordinate truth and love grammatically?",
+      "When does the canon command silence or delay rather than disclosure?",
+      "Is 'niceness culture' a fair description of the inversion Matthew 6:23 targets, or a contemporary overlay?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Truth And Kindness", "Emet Test"],
+    tags: ["honesty", "kindness", "truth", "matthew-6", "emet"],
+    _meta: prismSeedMeta("KS-007", "ks")
+  },
+  {
+    signal: "The speaker argues tolerance is logically side-taking: every tolerance regime enforces a boundary, so the question is never whether to be intolerant but what one's intolerance is calibrated to.",
+    sourceContext: "If I tolerate morality then I don't tolerate immorality... everybody who's tolerant is tolerant on one side of the equation and intolerant on the other.",
+    speakerInterpretation: "'Tolerance' as a neutral virtue is incoherent, and labeling dissenters intolerant is itself intolerance plus ad hominem evasion.",
+    alternativePerspectives: [
+      { perspective: "Mirrors the paradox-of-tolerance literature (Popper): unlimited tolerance self-destructs; tolerance is necessarily bounded. The structural point has mainstream philosophical standing.", provenance: "named-tradition" },
+      { perspective: "Defenders of tolerance distinguish tolerating persons from endorsing positions, and tolerating conduct from tolerating coercion — distinctions under which tolerance remains meaningful without claiming neutrality. The flowers/weeds analogy collapses person and position.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Paradox of tolerance", "Ad hominem fallacy", "KS-007", "Romans 14", "Pluralism and conviction"],
+    tension: "If all tolerance is calibrated intolerance, the dispute is over calibration, not virtue — but the framing dissolves the person/position distinction that makes coexistence-without-endorsement possible; can that distinction be recovered inside the frame?",
+    inquiryExpansion: [
+      "How does Romans 14 structure tolerance between convinced parties inside one community?",
+      "What is the difference between tolerating a person, a position, and a practice?",
+      "Does the paradox of tolerance support or undercut the speaker's application?",
+      "When the canon commands both conviction and forbearance, what arbitrates between them?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Calibrated Tolerance"],
+    tags: ["tolerance", "popper", "pluralism", "romans-14", "conviction"],
+    _meta: prismSeedMeta("KS-008", "ks")
+  },
+  {
+    signal: "The speaker claims Mammon is not money but 'the name of the false god of prosperity' — an idol — while adding money should be servant, not master.",
+    sourceContext: "You cannot serve God and Mammon... Mammon is an idol.",
+    speakerInterpretation: "Matthew 6:24 opposes God to a rival deity, not to currency: the prohibition targets allegiance to a prosperity-power, reframing the saying from wealth warning to worship question.",
+    alternativePerspectives: [
+      { perspective: "Lexically, mamonas is Aramaic for wealth/property — not attested as a deity name in Semitic sources. Jesus personifies wealth as a master; the personification is rhetorical.", provenance: "named-tradition" },
+      { perspective: "Mammon-as-demon is a post-biblical development (patristic personification hardening through medieval demonology into Milton). The claim reads later mythology back into the saying.", provenance: "named-tradition" },
+      { perspective: "Derivation/conclusion split: the named-idol etymology is unsupported, but the functional conclusion — the saying concerns servitude/worship rather than possession — is close to scholarly consensus on the personification's force.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Matthew 6:24", "Luke 16:9-13", "KS-003", "KS-006", "Personification in Jesus' rhetoric", "Idolatry as misdirected service"],
+    tension: "Whether Mammon is god or metaphor changes little functionally but much methodologically — the claim asserts as lexical fact what is later mythology; how should the graph treat signals whose force survives their factual correction?",
+    inquiryExpansion: [
+      "What does mamon mean across its Aramaic and rabbinic attestations?",
+      "How does Luke 16:9 complicate a deity reading?",
+      "When does personification in Jesus' teaching harden into ontology in later tradition, and with what effects?",
+      "Does the worship-framing change the saying's application relative to the possession-framing?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Mammon Personification", "proposed:Treasure Ethics"],
+    tags: ["mammon", "idolatry", "matthew-6", "aramaic", "derivation-split"],
+    _meta: prismSeedMeta("KS-009", "ks")
+  },
+  {
+    signal: "The speaker corrects the KJV's 'take no thought' (Matthew 6:25-34): the Greek term equals 'be anxious for nothing' (Philippians 4:6) — the command prohibits anxiety, not planning.",
+    sourceContext: "It doesn't mean don't think about it, doesn't mean don't prepare for it... it means don't have anxious care over tomorrow. (Extended in-transcript: worry is waste; your worry makes the feared thing happen by robbing you of the energy to prevent it.)",
+    speakerInterpretation: "Matthew 6:25-34 commands freedom from anxiety while permitting provision; worry is not merely useless but counter-productive.",
+    alternativePerspectives: [
+      { perspective: "The lexical correction is uncontroversial: merimnao denotes anxious care, and modern translations render it 'do not be anxious.' Archaic KJV idiom, not a disputed reading.", provenance: "named-tradition" },
+      { perspective: "The extension — worry makes it happen — is an empirical-psychological claim, not textual; stated as mechanism it exceeds both text and evidence, and pastorally risks blaming the anxious for their outcomes.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Matthew 6:25-34", "Philippians 4:6", "Merimnao word study", "1 Peter 5:7", "KS-006", "KS-011"],
+    tension: "The text grounds anxiety-freedom in the Father's knowledge and provision; the speaker adds a self-fulfilling-prophecy mechanism the text does not assert — does importing a psychological enforcement mechanism strengthen the command or quietly replace trust with technique?",
+    inquiryExpansion: [
+      "How does merimnao distribute across the NT, and where is it used positively (1 Corinthians 12:25)?",
+      "What is the actual ground Matthew 6 gives for not worrying, and how does it differ from outcome-management?",
+      "What does the evidence say about worry's effect on outcomes, and where does the claim exceed it?",
+      "How does 6:34 bound the command temporally?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["proposed:Merimnao Correction"],
+    tags: ["worry", "merimnao", "anxiety", "translation", "matthew-6"],
+    _meta: prismSeedMeta("KS-010", "ks")
+  },
+  {
+    signal: "The speaker grounds peace in exhaustive divine authorship: God 'wrote the lines of every character and created the scenes of every experience' — God never says uh-oh because everything is ordained.",
+    sourceContext: "The blockbuster-premiere analogy: the producer watches cliffhangers calmly because what unfolds in real time has already been fully produced. 'I am not going to win — I have already won.'",
+    speakerInterpretation: "Peace follows from meticulous providence: nothing occurs outside sovereign authorship, therefore nothing warrants anxiety; trust replaces comprehension ('when I can't trace his hand I can trust his heart').",
+    alternativePerspectives: [
+      { perspective: "Meticulous-providence theology in cinematic idiom. The classical objection from within the tradition: if God wrote every line, he wrote the sinful lines — authorship of evil — which confessional Calvinism itself guards against (Westminster: 'neither is God the author of sin').", provenance: "named-tradition" },
+      { perspective: "Open and relational theologies, and much Hebraic-covenantal reading, hold genuine creaturely agency: the canon depicts God grieving, relenting, responding (Genesis 6:6, Exodus 32:14, Jeremiah 18), which the script metaphor must render as scripted self-dialogue.", provenance: "named-tradition" },
+      { perspective: "The same sermon requires real human yielding — resistance must be possible and culpable — which strains against every-line authorship within the speaker's own teaching.", provenance: "in-transcript" }
+    ],
+    coherenceLinks: ["Romans 8:37", "Isaiah 46:10", "Genesis 6:6", "Jeremiah 18", "Meticulous providence vs. open theism", "Theodicy pressure", "KS-010"],
+    strainLinks: ["KS-004"],
+    tension: "The script metaphor purchases total peace at the price of total authorship — including authorship of the sin the speaker elsewhere holds humans culpable for; can the comfort survive being stated precisely, or does it depend on not pressing the metaphor?",
+    inquiryExpansion: [
+      "How does the canon hold 'I have ordained it' (Isaiah 46) together with 'it never entered my mind' (Jeremiah 19:5)?",
+      "What work does the author/character distinction do in classical treatments of providence and evil?",
+      "Does peace require exhaustive determinism, or only covenant faithfulness within an open field?",
+      "How does this signal interact with culpable resistance — can both be held without equivocation?",
+      "What did the Hebraic frame mean by sovereignty before the philosophical category of determinism arrived?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Divine Authorship", "Theodicy Pressure Protocol"],
+    tags: ["sovereignty", "providence", "determinism", "theodicy", "peace"],
+    _meta: prismSeedMeta("KS-011", "ks")
+  },
+  {
+    signal: "The speaker reads Romans 14:17 as the Bible's own kingdom definition, mapping righteousness/peace/joy to God ruling one's example, experience, and expression, with 1 Corinthians 4:20 adding execution.",
+    sourceContext: "The kingdom of God is not meat and drink... the kingdom of God is not physical. Joy distinguished from happiness: happiness is based on happenings.",
+    speakerInterpretation: "The kingdom is non-physical and presently operative as a four-domain rule of God over the yielded person — conduct, circumstance-response, affect, and empowered action (Philippians 2:13).",
+    alternativePerspectives: [
+      { perspective: "Romans 14:17 in context adjudicates food disputes — Paul relativizes diet against kingdom realities; commentators affirm the triad as kingdom characteristics while cautioning against treating the verse as exhaustive definition.", provenance: "named-tradition" },
+      { perspective: "'Not meat and drink' yielding 'the kingdom is not physical' proves too much: the canon anticipates bodily resurrection and renewed creation (Romans 8:21), and Jesus frames eating within the kingdom (Luke 22:16-18) — the contrast targets dietary scruple, not materiality.", provenance: "extractor-supplied" },
+      { perspective: "The fourfold example/experience/expression/execution mapping is the speaker's homiletic architecture, openly constructed rather than claimed as textual.", provenance: "in-transcript" }
+    ],
+    coherenceLinks: ["Romans 14:17", "1 Corinthians 4:20", "Philippians 2:13", "Romans 8:21", "Luke 22:16-18", "KS-003", "KS-011", "Already/not-yet kingdom"],
+    tension: "A verse written to relativize food fights is promoted to the kingdom's definition, and 'not meat and drink' is generalized to 'not physical' — does the promotion preserve Paul's point at a higher register or replace a contrast with a metaphysic the embodied-kingdom texts contradict?",
+    inquiryExpansion: [
+      "What work does Romans 14:17 do inside the strong/weak argument it belongs to?",
+      "How do the embodied-kingdom texts constrain 'the kingdom is not physical'?",
+      "Is the righteousness/peace/joy triad descriptive of kingdom citizens, constitutive of the kingdom, or both?",
+      "Where does the already/not-yet structure place these characteristics temporally?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Kingdom Characteristics Triad", "Hebraic Eschatology"],
+    tags: ["romans-14", "kingdom", "righteousness", "peace", "joy"],
+    _meta: prismSeedMeta("KS-012", "ks")
+  },
+  {
+    signal: "The speaker argues Matthew 6:9-13 is misnamed the Lord's Prayer — since Christ had no debts needing forgiveness, it is the model prayer; the true Lord's Prayer is John 17.",
+    sourceContext: "Christ didn't have any debts that needed to be forgiven, so therefore that's not the Lord's Prayer. Plus the 'Our Father' observation: the plural levels all access to God.",
+    speakerInterpretation: "Relabeling clarifies function: Matthew 6 is prescriptive template whose first petition makes kingdom-seeking the leading content of prayer; John 17 is Christ's own intercession.",
+    alternativePerspectives: [
+      { perspective: "The terminological point is common in evangelical teaching, and scholarship already calls John 17 the High Priestly Prayer; 'Lord's Prayer' traditionally means the prayer the Lord taught, not the prayer he prayed — the correction targets a misreading of the label.", provenance: "named-tradition" },
+      { perspective: "The debt argument assumes a template's every clause must be prayable by its giver, which prescriptive texts do not require; the relabeling's real yield is functional clarity, not error-correction.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Matthew 6:9-13", "John 17", "Luke 11:1-4", "High Priestly Prayer", "KS-012", "Prayer as kingdom-seeking"],
+    tension: "The correction is rhetorically framed as exposing an error, but the tradition never claimed Jesus prayed Matthew 6 for himself — what is gained and lost when teaching sharpens engagement by manufacturing a correction?",
+    inquiryExpansion: [
+      "What does 'after this manner' (houtos) prescribe — words, structure, or priorities?",
+      "How does Luke 11's shorter form bear on the template question?",
+      "What does John 17 reveal about Christ's intercession that Matthew 6 doesn't model?",
+      "Does 'Our Father' ground the egalitarian-access claim, and how far does it extend?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Model Prayer Function"],
+    tags: ["lords-prayer", "john-17", "model-prayer", "matthew-6", "intercession"],
+    _meta: prismSeedMeta("KS-013", "ks")
+  },
+  {
+    signal: "The speaker converts 'seek' into three operations — seek the kingdom in prayer, in priority (grounded in Genesis 1:28 as humanity's first commission), and in practice.",
+    sourceContext: "So many people do all the praying and all the prioritizing and then they don't do anything about what they prayed about... following the orders from headquarters, not just picking them up.",
+    speakerInterpretation: "Seeking is not search but enactment: petition aligns desire, prioritization orders life, practice executes — with Genesis 1:28 identifying the assignment-ruling, people-serving life as what is sought.",
+    alternativePerspectives: [
+      { perspective: "The triad is standard homiletic structuring; its substance (hearing plus doing) is canonical bedrock (Matthew 7:24-27, James 1:22).", provenance: "named-tradition" },
+      { perspective: "Reading Genesis 1:28 as the content of Matthew 6:33's seeking fuses creation mandate with kingdom petition — coherent within the dominion frame, but it quietly defines the kingdom as vocational faithfulness, leaving basileia's eschatological and communal registers outside the operationalization.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Matthew 6:33", "Genesis 1:28", "Matthew 7:24-27", "James 1:22", "KS-001", "KS-004", "KS-012"],
+    tension: "Operationalizing seeking makes it actionable but individual — the kingdom of the petition is cosmic and communal; can a three-step personal practice carry a petition whose object is God's own act?",
+    inquiryExpansion: [
+      "Is 'thy kingdom come' something God does, something we do, or a participation structure joining both?",
+      "How does the hearing/doing axis relate to the knowing/understanding axis?",
+      "What does seeking look like communally rather than individually in the canon?",
+      "Where does operationalization clarify obedience, and where does it shrink the object to the operator's scale?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Seeking Operationalized"],
+    tags: ["seeking", "prayer", "practice", "genesis-1-28", "enactment"],
+    _meta: prismSeedMeta("KS-014", "ks")
+  },
+  {
+    signal: "The speaker claims human fulfillment requires creating, connecting, and contributing (giving to what cannot give back), because these are when 'we are being most like God.'",
+    sourceContext: "The very first thing God tells about God is that he's creative, and the first thing he tells about us is he created us in his image... God sent his son — contribution restoring connection. Children as the paradigm: joy precisely because they can't do anything for themselves.",
+    speakerInterpretation: "The fulfillment triad is anthropology derived from theology proper: imago Dei means capacities for creativity, relationship, and self-giving; unfulfillment is diagnostic of operating in fewer than all three.",
+    alternativePerspectives: [
+      { perspective: "Imago Dei interpretation divides across substantive (capacities), functional (dominion/representation), and relational readings; the triad blends all three without distinguishing them.", provenance: "named-tradition" },
+      { perspective: "The triad maps closely onto well-being psychology (competence, relatedness, generativity), which cuts both ways: convergence as corroboration, or a contemporary framework retro-fitted onto Genesis 1.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Genesis 1:26-28", "Imago Dei traditions", "John 3:16", "Luke 14:13-14", "KS-004", "KS-005", "Relational ontology"],
+    tension: "The triad is either exegesis of the image or a psychology baptized into it — the test case is contribution-to-the-helpless as godlikeness, which is genuinely canonical (Luke 14:13-14) but arrives via an anthropological claim about fulfillment rather than a textual one; which direction does the derivation run?",
+    inquiryExpansion: [
+      "What does the image denote in its ANE context — capacities, office, or presence?",
+      "Where does the canon ground giving-without-return as divine likeness?",
+      "Does convergence with well-being research corroborate the triad or expose its provenance?",
+      "Is unfulfillment a reliable diagnostic of triad-deficiency, or does Ecclesiastes complicate the instrument?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Fulfillment Triad", "Relational Theology"],
+    tags: ["imago-dei", "creativity", "connection", "contribution", "fulfillment"],
+    _meta: prismSeedMeta("KS-015", "ks")
+  },
+  {
+    signal: "The speaker claims universal scope: the kingdom of God is the answer to all social problems — universal yielding, ruling, and serving would produce no wars, no arguments, no fights.",
+    sourceContext: "If every single person in humanity was yielded to God completely, ruled over their assignment diligently, and served other people passionately, what social problems would we have? None.",
+    speakerInterpretation: "Social pathology is aggregated kingdom-resistance; universal yielding would dissolve it, because conflict originates in misalignment, not in structure, scarcity, or tragedy.",
+    alternativePerspectives: [
+      { perspective: "The counterfactual is canonically gestured at (Isaiah 2:4, Micah 4:3) but located there as God's eschatological act, not the aggregate of individual yieldings; Augustinian anthropology adds that yielded people remain finite and partially sinful this side of the eschaton.", provenance: "named-tradition" },
+      { perspective: "'No arguments' overshoots the NT's own record: Acts 15 depicts yielded apostles in sharp dispute resolved through process, and Paul and Barnabas part over disagreement — the canon models conflict-under-yieldedness, not conflict's absence; some tension may be generative rather than pathological.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Isaiah 2:4", "Acts 15", "KS-004", "KS-011", "Already/not-yet eschatology", "Generative vs. decoherent tension", "Social theology"],
+    tension: "The claim treats all conflict as decoherence — but the canon and the speaker's own framework (truth-telling that hurts) require generative tension; if even fully yielded agents argue (Acts 15), is the kingdom the elimination of tension or the right ordering of it?",
+    inquiryExpansion: [
+      "Does Acts 15 model kingdom conflict-resolution, and what does its existence imply for the no-arguments claim?",
+      "How do the swords-to-plowshares texts locate the end of war — in human aggregation or divine act?",
+      "Is there a canonical distinction between generative tension and sinful conflict, and where is the line?",
+      "What do the claim's truth-conditions require about finitude, not just sin?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Kingdom Social Scope", "Hebraic Eschatology"],
+    tags: ["social-problems", "conflict", "eschatology", "acts-15", "tension"],
+    _meta: prismSeedMeta("KS-016", "ks")
+  }
+];
+
+/**
+ * getSeedSignalRecords
+ * --------------------
+ * Access path for seed Signal Records. Returns deep copies so callers
+ * cannot mutate the seed corpus.
+ *
+ * @param {object} filter - optional, all criteria AND-combined:
+ *   {
+ *     source: string,   // "jc" | "ks" | a source URL
+ *     status: string,   // one of PRISM_COHERENCE_STATUSES
+ *     tag: string,      // matches any tag (lowercase)
+ *     recordId: string  // e.g. "SR-008"
+ *   }
+ * @returns {object[]} matching Signal Records
+ *
+ * MIGRATION: when records move to Supabase (signal_records table),
+ * replace this function's internals with the query. Callers unchanged.
+ */
+export function getSeedSignalRecords(filter = {}) {
+  let results = PRISM_SEED_SIGNAL_RECORDS;
+
+  if (filter.source) {
+    const bySrcKey = PRISM_SEED_SOURCES[filter.source];
+    const srcUrl = bySrcKey ? bySrcKey.source : filter.source;
+    results = results.filter((r) => r._meta.source === srcUrl);
+  }
+  if (filter.status) {
+    results = results.filter((r) => r.coherenceStatus === filter.status);
+  }
+  if (filter.tag) {
+    const tag = String(filter.tag).toLowerCase();
+    results = results.filter((r) => r.tags.includes(tag));
+  }
+  if (filter.recordId) {
+    results = results.filter((r) => r._meta.recordId === filter.recordId);
+  }
+
+  return results.map((r) => JSON.parse(JSON.stringify(r)));
+}
+
+// ------------------------------------------------------------
+// Example invocations (comment only - do not execute at module load)
+//
+// All 31 seed records:
+//   const all = getSeedSignalRecords();
+//
+// Only the contested signals from the Genesis sermon:
+//   const contested = getSeedSignalRecords({ source: "jc", status: "Contested" });
+//
+// One record by ID:
+//   const [alephTav] = getSeedSignalRecords({ recordId: "SR-008" });
+//
+// Embed seed records into corpus_embeddings (call-site wiring, using
+// embedQuery() defined earlier in this file):
+//   for (const rec of getSeedSignalRecords()) {
+//     const embedding = await embedQuery(rec.signal + " " + rec.tension);
+//     // insert { content: rec, embedding, source_type: "signal_record" }
+//   }
+// ------------------------------------------------------------
+
+// ============================================================
+// END RAG Inquiry Artifact Extraction — Seed Records
+// ============================================================
+
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
