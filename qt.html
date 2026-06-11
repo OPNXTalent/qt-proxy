@@ -5727,8 +5727,8 @@ function openShareModal() {
   if (!window._lastParsedResult) return;
   // Reset to step 1 each time unless a share already exists
   if (!_currentSharedSessionId) {
-    _shareMode = 'personal';
-    selectShareMode('personal');
+    _shareMode = 'read_only';
+    selectShareMode('read_only');
     document.getElementById('shareStep1').style.display = 'block';
     document.getElementById('shareStep2').style.display = 'none';
     document.getElementById('shareStep3').style.display = 'none';
@@ -5750,23 +5750,61 @@ function closeShareModal() {
 
 function selectShareMode(mode) {
   _shareMode = mode;
-  var personal = document.getElementById('shareModePersonal');
-  var collab   = document.getElementById('shareModeCollab');
-  if (!personal || !collab) return;
-  if (mode === 'personal') {
-    personal.style.borderColor = 'var(--gold-dim)';
-    personal.style.background  = 'rgba(201,168,76,0.04)';
-    personal.querySelector('div').style.color = 'var(--gold-pale)';
-    collab.style.borderColor = 'var(--border)';
-    collab.style.background  = 'transparent';
-    collab.querySelector('div').style.color = 'var(--text-dim)';
-  } else {
-    collab.style.borderColor = 'rgba(80,180,120,0.6)';
-    collab.style.background  = 'rgba(80,180,120,0.04)';
-    collab.querySelector('div').style.color = 'rgba(80,180,120,0.9)';
-    personal.style.borderColor = 'var(--border)';
-    personal.style.background  = 'transparent';
-    personal.querySelector('div').style.color = 'var(--text-dim)';
+  var modes = {
+    read_only:     { id: 'shareModeReadOnly',     border: 'var(--gold-dim)', bg: 'rgba(201,168,76,0.04)', color: 'var(--gold-pale)' },
+    asymmetrical:  { id: 'shareModeAsymmetrical', border: 'rgba(80,180,120,0.5)', bg: 'rgba(80,180,120,0.04)', color: 'rgba(80,180,120,0.9)' },
+    bidirectional: { id: 'shareModeBidirectional', border: 'rgba(120,160,220,0.5)', bg: 'rgba(120,160,220,0.04)', color: 'rgba(120,160,220,0.9)' }
+  };
+  Object.keys(modes).forEach(function(m) {
+    var el = document.getElementById(modes[m].id);
+    if (!el) return;
+    if (m === mode) {
+      el.style.borderColor = modes[m].border;
+      el.style.background  = modes[m].bg;
+      el.querySelector('div').style.color = modes[m].color;
+    } else {
+      el.style.borderColor = 'var(--border)';
+      el.style.background  = 'transparent';
+      el.querySelector('div').style.color = 'var(--text-dim)';
+    }
+  });
+}
+
+async function setShareMode(mode) {
+  if (!_currentSharedSessionId) return;
+  var statusEl = document.getElementById('shareModeStatus');
+  if (statusEl) statusEl.textContent = 'Updating…';
+  try {
+    var res = await fetch('/api/share', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shareId: _currentSharedSessionId, collaborationMode: mode })
+    });
+    var data = await res.json();
+    if (data.ok) {
+      _shareMode = mode;
+      _collabOpen = (mode === 'bidirectional');
+      // Update button styles
+      var labels = { read_only: 'Read Only', asymmetrical: 'Read + Explore', bidirectional: 'Collaborate' };
+      ['read_only', 'asymmetrical', 'bidirectional'].forEach(function(m) {
+        var btn = document.getElementById('mode' + m.split('_').map(function(w){return w[0].toUpperCase()+w.slice(1)}).join('') + 'Btn');
+        if (!btn) return;
+        if (m === mode) {
+          btn.style.borderColor = m === 'read_only' ? 'var(--gold-dim)' : m === 'asymmetrical' ? 'rgba(80,180,120,0.5)' : 'rgba(120,160,220,0.5)';
+          btn.style.background  = m === 'read_only' ? 'rgba(201,168,76,0.04)' : m === 'asymmetrical' ? 'rgba(80,180,120,0.04)' : 'rgba(120,160,220,0.04)';
+          btn.style.color       = m === 'read_only' ? 'var(--gold-pale)' : m === 'asymmetrical' ? 'rgba(80,180,120,0.9)' : 'rgba(120,160,220,0.9)';
+        } else {
+          btn.style.borderColor = 'var(--border)';
+          btn.style.background  = 'transparent';
+          btn.style.color       = 'var(--text-muted)';
+        }
+      });
+      if (statusEl) statusEl.textContent = 'Flow set to: ' + ({ read_only: 'Read Only', asymmetrical: 'Read + Explore', bidirectional: 'Collaborate' }[mode] || mode);
+    } else {
+      if (statusEl) statusEl.textContent = 'Could not update. Please try again.';
+    }
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Error updating flow.';
   }
 }
 
@@ -5787,10 +5825,11 @@ async function proceedToShareDelivery() {
       headers: { 'Content-Type': 'application/json', 'x-user-email': senderEmail || '' },
       body: JSON.stringify({
         snapshot,
-        subject:           currentSubject,
+        subject:            currentSubject,
         senderEmail,
         threadId,
-        collaborationOpen: _shareMode === 'collab'
+        collaborationOpen:  _shareMode === 'bidirectional',
+        collaborationMode:  _shareMode || 'read_only'
       })
     });
     var data = await res.json();
@@ -5804,7 +5843,7 @@ async function proceedToShareDelivery() {
     _shareStatus = 'on';
     window._currentShareUrl = data.shareUrl;
 
-    if (_shareMode === 'collab') {
+    if (_shareMode === 'bidirectional') {
       _collabOpen = true;
     }
 
@@ -6631,15 +6670,20 @@ document.addEventListener('DOMContentLoaded', function() {
     <div id="shareStep1">
       <div style="font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">How would you like to share?</div>
       <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
-        <button onclick="selectShareMode('personal')" id="shareModePersonal"
+        <button onclick="selectShareMode('read_only')" id="shareModeReadOnly"
           style="text-align:left; padding:16px 20px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.04); cursor:pointer; transition:all 0.2s;">
-          <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:4px;">Share This Reflection</div>
-          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-dim); font-style:italic;">Recipient sees the interpretation and can ask their own questions. Your session is unchanged.</div>
+          <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:4px;">Read Only</div>
+          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-dim); font-style:italic;">Recipient reads the interpretation. No follow-up input. Your session is unchanged.</div>
         </button>
-        <button onclick="selectShareMode('collab')" id="shareModeCollab"
+        <button onclick="selectShareMode('asymmetrical')" id="shareModeAsymmetrical"
           style="text-align:left; padding:16px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s;">
-          <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Open a Discussion</div>
-          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-muted); font-style:italic;">A live discussion channel opens alongside the reflection. You can close it at any time.</div>
+          <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Read + Explore</div>
+          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-muted); font-style:italic;">Recipient can open their own thread seeded from this interpretation. Your session is unchanged.</div>
+        </button>
+        <button onclick="selectShareMode('bidirectional')" id="shareModeBidirectional"
+          style="text-align:left; padding:16px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s;">
+          <div style="font-family:var(--cinzel); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Collaborate</div>
+          <div style="font-family:var(--crimson); font-size:14px; color:var(--text-muted); font-style:italic;">Recipient contributes follow-ups to this shared thread. You control the flow — close it at any time.</div>
         </button>
       </div>
       <div style="display:flex; gap:10px; justify-content:flex-end;">
@@ -6693,13 +6737,19 @@ document.addEventListener('DOMContentLoaded', function() {
           <button id="shareOnOffBtn" onclick="toggleShareOnOff()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-pale); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0; margin-left:12px;">Share Active — Turn Off</button>
         </div>
 
-        <!-- Collaboration toggle -->
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border:1px solid var(--border); background:var(--surface);">
-          <div>
-            <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text); margin-bottom:3px;">Discussion</div>
-            <div style="font-family:var(--crimson); font-size:13px; color:var(--text-muted); font-style:italic;">Open a live channel alongside the shared reflection</div>
+        <!-- Collaboration mode toggle -->
+        <div style="padding:14px 16px; border:1px solid var(--border); background:var(--surface);">
+          <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text); margin-bottom:3px;">Recipient Flow</div>
+          <div style="font-family:var(--crimson); font-size:13px; color:var(--text-muted); font-style:italic; margin-bottom:12px;">Control how recipients engage with this share</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="modeReadOnlyBtn" onclick="setShareMode('read_only')"
+              style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; padding:7px 12px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.04); color:var(--gold-pale); cursor:pointer; transition:all 0.2s; white-space:nowrap;">Read Only</button>
+            <button id="modeAsymmetricalBtn" onclick="setShareMode('asymmetrical')"
+              style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; padding:7px 12px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s; white-space:nowrap;">Read + Explore</button>
+            <button id="modeBidirectionalBtn" onclick="setShareMode('bidirectional')"
+              style="font-family:var(--mono); font-size:9px; letter-spacing:0.14em; text-transform:uppercase; padding:7px 12px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s; white-space:nowrap;">Collaborate</button>
           </div>
-          <button id="collabManageBtn" onclick="toggleCollaboration()" style="font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0; margin-left:12px;">Refractions</button>
+          <div id="shareModeStatus" style="margin-top:10px; font-family:var(--mono); font-size:9px; letter-spacing:0.12em; color:var(--text-muted);"></div>
         </div>
 
       </div>
