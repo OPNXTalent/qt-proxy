@@ -1844,13 +1844,13 @@ async function updateQueryCount({ userId, tier, threadId }) {
 
 // ── SHARED SESSION HELPERS ────────────────────────────────────────────────────
 
-async function createSharedSession({ snapshot, subject, senderEmail, threadId, collaborationOpen }) {
+async function createSharedSession({ snapshot, subject, senderEmail, threadId, collaborationOpen, collaborationMode }) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90-day independent retention
   const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
   const archiveEndsAt = new Date(expiresAt.getTime() + 90 * 24 * 60 * 60 * 1000);
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/shared_sessions`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/shares`, {
     method: 'POST',
     headers: {
       'apikey':        SUPABASE_SERVICE_ROLE_KEY,
@@ -1864,6 +1864,7 @@ async function createSharedSession({ snapshot, subject, senderEmail, threadId, c
       subject:             subject || '',
       response:            snapshot,
       collaboration_open:  collaborationOpen || false,
+      collaboration_mode:  collaborationMode || 'read_only',
       status:              'active',
       expires_at:          expiresAt.toISOString(),
       grace_ends_at:       graceEndsAt.toISOString(),
@@ -1880,7 +1881,7 @@ async function createSharedSession({ snapshot, subject, senderEmail, threadId, c
 
 async function getSharedSession(shareId) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}&select=*&limit=1`,
+    `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}&select=*&limit=1`,
     {
       headers: {
         'apikey':        SUPABASE_SERVICE_ROLE_KEY,
@@ -1895,7 +1896,7 @@ async function getSharedSession(shareId) {
 
 async function updateSharedSessionCollaboration(shareId, collaborationOpen) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}`,
+    `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}`,
     {
       method: 'PATCH',
       headers: {
@@ -1910,13 +1911,30 @@ async function updateSharedSessionCollaboration(shareId, collaborationOpen) {
   return res.ok;
 }
 
+async function updateSharedSessionMode(shareId, collaborationMode) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
+      },
+      body: JSON.stringify({ collaboration_mode: collaborationMode })
+    }
+  );
+  return res.ok;
+}
+
 async function resetSharedSessionClock(shareId) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
   const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
   const archiveEndsAt = new Date(expiresAt.getTime() + 90 * 24 * 60 * 60 * 1000);
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}`,
+    `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}`,
     {
       method: 'PATCH',
       headers: {
@@ -1953,8 +1971,8 @@ async function recordSharedSessionArrival(shareId, referrer) {
 }
 
 async function saveSharedFollowUp({ shareId, question, response, userEmail }) {
-  // Save to shared_followups table and reset the clock
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/shared_followups`, {
+  // Save recipient follow-up to follow_ups table
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/follow_ups`, {
     method: 'POST',
     headers: {
       'apikey':        SUPABASE_SERVICE_ROLE_KEY,
@@ -1963,27 +1981,28 @@ async function saveSharedFollowUp({ shareId, question, response, userEmail }) {
       'Prefer':        'return=minimal'
     },
     body: JSON.stringify({
-      shared_session_id: shareId,
-      question:          question,
-      response:          response,
-      user_email:        userEmail || null,
-      created_at:        new Date().toISOString()
+      share_id:     shareId,
+      query:        question,
+      response:     typeof response === 'string' ? { text: response } : (response || null),
+      submitted_in: 'share',
+      source:       'recipient',
+      query_cost:   1,
+      created_at:   new Date().toISOString()
     })
   });
   // Reset clock on any follow-up engagement
   await resetSharedSessionClock(shareId);
-  // Increment followup_count
+  // Increment followup_count via RPC
   await fetch(
-    `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}`,
+    `${SUPABASE_URL}/rest/v1/rpc/increment_share_followup`,
     {
-      method: 'PATCH',
+      method: 'POST',
       headers: {
         'apikey':        SUPABASE_SERVICE_ROLE_KEY,
         'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal'
+        'Content-Type':  'application/json'
       },
-      body: JSON.stringify({ followup_count: null }) // use RPC increment in production
+      body: JSON.stringify({ p_share_id: shareId })
     }
   ).catch(() => {});
   return res.ok;
@@ -2019,7 +2038,7 @@ async function registerEmail({ email, shareId }) {
   if (shareId) {
     await resetSharedSessionClock(shareId);
     await fetch(
-      `${SUPABASE_URL}/rest/v1/shared_sessions?id=eq.${encodeURIComponent(shareId)}`,
+      `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}`,
       {
         method: 'PATCH',
         headers: {
@@ -2111,6 +2130,20 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { shareId, question, response, userEmail: fuEmail } = body || {};
     if (!shareId || !question) return res.status(400).json({ error: 'Missing fields' });
+
+    // Check collaboration mode before allowing the follow-up
+    const session = await getSharedSession(shareId);
+    if (!session) return res.status(404).json({ error: 'Share not found' });
+    const mode = session.collaboration_mode || (session.collaboration_open ? 'bidirectional' : 'read_only');
+
+    if (mode === 'read_only') {
+      return res.status(403).json({ error: 'read_only', message: 'This share is in read-only mode.' });
+    }
+    if (mode === 'asymmetrical') {
+      return res.status(403).json({ error: 'asymmetrical', message: 'Recipient follow-ups open a new thread from this context.' });
+    }
+
+    // mode === 'bidirectional' — proceed
     await saveSharedFollowUp({ shareId, question, response, userEmail: fuEmail });
     return res.status(200).json({ ok: true });
   }
@@ -2118,8 +2151,14 @@ export default async function handler(req, res) {
   // PATCH /api/share — toggle collaboration
   if (req.method === 'PATCH' && urlPath.endsWith('/share')) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { shareId, collaborationOpen } = body || {};
+    const { shareId, collaborationOpen, collaborationMode } = body || {};
     if (!shareId) return res.status(400).json({ error: 'Missing shareId' });
+    if (collaborationMode !== undefined) {
+      const ok = await updateSharedSessionMode(shareId, collaborationMode);
+      // Keep collaboration_open in sync — bidirectional = open, others = closed
+      await updateSharedSessionCollaboration(shareId, collaborationMode === 'bidirectional');
+      return res.status(ok ? 200 : 500).json({ ok });
+    }
     const ok = await updateSharedSessionCollaboration(shareId, collaborationOpen);
     return res.status(ok ? 200 : 500).json({ ok });
   }
@@ -2137,10 +2176,10 @@ export default async function handler(req, res) {
   // POST /api/share — create shared session
   if (req.method === 'POST' && urlPath.endsWith('/share')) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { snapshot, subject, senderEmail, threadId, collaborationOpen } = body || {};
+    const { snapshot, subject, senderEmail, threadId, collaborationOpen, collaborationMode } = body || {};
     if (!snapshot) return res.status(400).json({ error: 'Missing snapshot' });
     try {
-      const record = await createSharedSession({ snapshot, subject, senderEmail, threadId, collaborationOpen });
+      const record = await createSharedSession({ snapshot, subject, senderEmail, threadId, collaborationOpen, collaborationMode });
       if (!record) return res.status(500).json({ error: 'Could not create shared session' });
       const host = req.headers.host || 'quantumtheology.app';
       const protocol = host.includes('localhost') ? 'http' : 'https';
