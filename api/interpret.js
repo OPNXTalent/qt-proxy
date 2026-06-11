@@ -2056,6 +2056,482 @@ async function registerEmail({ email, shareId }) {
 }
 
 
+// ============================================================
+// RAG Inquiry Artifact Extraction
+// ------------------------------------------------------------
+// Self-contained section. References no other function in this
+// file and modifies no existing state. Shared resources:
+// process.env.ANTHROPIC_API_KEY (already used by handler).
+//
+// Public surface: extractInquiryArtifacts(transcriptText, sourceMetadata)
+// Exported as a named export — coexists with the default handler
+// export. Import elsewhere as:
+//   import { extractInquiryArtifacts } from './interpret.js';
+//
+// Implements The Prism RAG Extraction Protocol v1, with v1.1
+// amendments: provenance-tagged alternative perspectives,
+// coherence-status definitions (so "Strongly Coherent" cannot be
+// read as "settled"), and a 3-5 question ceiling on inquiry
+// expansion. The mandatory-tension rule is enforced in CODE, not
+// just in the prompt: records arriving without a tension field are
+// discarded and counted in meta.discarded, never silently kept.
+//
+// TIMEOUT NOTE: this file's config sets maxDuration: 60. A full
+// sermon transcript (~30k chars) is ~3 chunks and fits comfortably.
+// Long transcripts (1hr+ content) may exceed 60s with sequential
+// extraction calls — either raise maxDuration, or invoke this from
+// a separate route/background job per chunk. Do not parallelize
+// blindly; sequential keeps rate-limit behavior predictable.
+// ============================================================
+
+const PRISM_EXTRACTION_MODEL =
+  process.env.PRISM_EXTRACTION_MODEL || 'claude-sonnet-4-6'; // matches handler's model
+const PRISM_EXTRACTION_MAX_TOKENS = 8000;
+const PRISM_EXTRACTION_CHUNK_CHARS = 12000;   // ~3k tokens of transcript per call
+const PRISM_EXTRACTION_CHUNK_OVERLAP = 800;   // preserves signals spanning chunk seams
+const PRISM_COHERENCE_STATUSES = [
+  'Open',
+  'Emerging',
+  'Contested',
+  'Strongly Coherent',
+  'Decohering'
+];
+
+const PRISM_EXTRACTION_SYSTEM_PROMPT = [
+  'You are the extraction layer of The Prism. You are not building a summary,',
+  'not building doctrine, and not determining truth. You extract inquiry',
+  'artifacts from transcripts for The Prism knowledge graph.',
+  '',
+  'PRIMARY RULE: Do NOT collapse interpretive tension. Do NOT determine which',
+  'interpretation is correct. Do NOT resolve theological disputes. Preserve',
+  'the signal, the interpretations, and the inquiry.',
+  '',
+  'For every meaningful concept, claim, observation, pattern, or interpretive',
+  'framework in the transcript chunk, produce one Signal Record with EXACTLY',
+  'these fields:',
+  '',
+  '  signal               string. Concise statement of what was observed.',
+  '  sourceContext        string. Brief relevant excerpt or paraphrase of',
+  '                       surrounding transcript context.',
+  '  speakerInterpretation string. How the speaker interprets the signal.',
+  '  alternativePerspectives array of objects, each:',
+  '                       { perspective: string,',
+  '                         provenance: "in-transcript" | "named-tradition" | "extractor-supplied" }',
+  '                       in-transcript: the speaker themselves voices it.',
+  '                       named-tradition: attributable to a known school,',
+  '                       tradition, or scholarly consensus - name it.',
+  '                       extractor-supplied: you are adding it - flag it.',
+  '                       Never invent a tradition to fill the field. If no',
+  '                       alternative genuinely exists, return an empty array.',
+  '  coherenceLinks       array of strings. Related passages, concepts,',
+  '                       traditions, frameworks.',
+  '  tension              string. MANDATORY. The unresolved tension the signal',
+  '                       carries. A record without genuine tension will be',
+  '                       discarded downstream. Do not write filler tension.',
+  '  inquiryExpansion     array of 3 to 5 strings. Fewer, sharper questions',
+  '                       outrank coverage. Questions deepen exploration',
+  '                       rather than seek closure.',
+  '  coherenceStatus      one of: "Open", "Emerging", "Contested",',
+  '                       "Strongly Coherent", "Decohering".',
+  '                       This is NOT a truth rating. It reflects the current',
+  '                       relational stability of the signal across sources.',
+  '                       Strongly Coherent signals STILL carry tension;',
+  '                       coherence describes relational stability, not',
+  '                       closure of the question. Decohering means the',
+  '                       signal is destabilized by its own dependents or',
+  '                       internal contradictions, not that it is false.',
+  '  conceptNodeCandidates array of strings. Canonical knowledge-graph nodes',
+  '                       this record should attach to. If a list of canonical',
+  '                       nodes is provided below, prefer exact names from that',
+  '                       list; you may also propose new candidates prefixed',
+  '                       with "proposed:".',
+  '  tags                 array of short lowercase strings for retrieval',
+  '                       (e.g. "hebrew-letterforms", "logos", "typology").',
+  '',
+  'EXTRACTION PRIORITIES',
+  'High: scriptural connections, recurring patterns, symbolic structures,',
+  'linguistic observations, interpretive frameworks, kingdom concepts,',
+  'relationship-vs-religion concepts, creation theology, Logos concepts,',
+  'narrative coherence claims.',
+  'Medium: historical claims, theological claims, Hebrew word studies.',
+  'Low (generally exclude): personal anecdotes, humor, repetition, sermon',
+  'filler, audience management.',
+  '',
+  'CRITICAL PRINCIPLE',
+  'The Prism does not exist to provide answers. It exists to preserve',
+  'meaningful inquiry. Every extracted signal must leave behind a productive',
+  'question. A signal without inquiry is incomplete. A conclusion without',
+  'tension is discarded.',
+  '',
+  'OUTPUT FORMAT - ABSOLUTE REQUIREMENT',
+  'Return ONLY a raw JSON array of Signal Record objects. No markdown, no',
+  'code fences, no preamble, no commentary, no trailing text. Use straight',
+  'ASCII double quotes for all JSON structure. The first character of your',
+  'response must be [ and the last character must be ].',
+  'If the chunk contains no extractable signals, return [].'
+].join('\n');
+
+/**
+ * Split a transcript into overlapping chunks, breaking on paragraph or
+ * sentence boundaries where possible so signals are not bisected mid-thought.
+ */
+function prismChunkTranscript(text, chunkChars, overlapChars) {
+  const clean = String(text || '').trim();
+  if (clean.length <= chunkChars) return clean ? [clean] : [];
+
+  const chunks = [];
+  let start = 0;
+  while (start < clean.length) {
+    let end = Math.min(start + chunkChars, clean.length);
+    if (end < clean.length) {
+      // Prefer a paragraph break, then a sentence break, inside the last 20%
+      const windowStart = end - Math.floor(chunkChars * 0.2);
+      const slice = clean.slice(windowStart, end);
+      const paraBreak = slice.lastIndexOf('\n\n');
+      const sentBreak = Math.max(
+        slice.lastIndexOf('. '),
+        slice.lastIndexOf('? '),
+        slice.lastIndexOf('! ')
+      );
+      if (paraBreak > -1) end = windowStart + paraBreak;
+      else if (sentBreak > -1) end = windowStart + sentBreak + 1;
+    }
+    chunks.push(clean.slice(start, end).trim());
+    if (end >= clean.length) break;
+    start = Math.max(end - overlapChars, start + 1);
+  }
+  return chunks.filter(Boolean);
+}
+
+/**
+ * Harden model output for JSON.parse. Known failure modes on this stack:
+ * markdown fences despite instructions, smart quotes used as STRUCTURAL
+ * quotes (the mobile bug class), and trailing commas. Repairs are attempted
+ * only after a clean parse fails, so valid unicode inside string values
+ * (Hebrew text, em dashes) is never mangled on the happy path.
+ */
+function prismSafeParseRecords(rawText) {
+  let text = String(rawText || '').trim();
+
+  // Strip code fences if present
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // Isolate the outermost JSON array if the model added stray prose
+  const first = text.indexOf('[');
+  const last = text.lastIndexOf(']');
+  if (first > -1 && last > first) text = text.slice(first, last + 1);
+
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (firstErr) {
+    // Repair pass: structural smart quotes and trailing commas
+    const repaired = text
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/,\s*([\]}])/g, '$1');
+    try {
+      const parsed = JSON.parse(repaired);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch (secondErr) {
+      return null;
+    }
+  }
+}
+
+/**
+ * Validate and normalize one record against the schema.
+ * Returns { record } on success or { discardReason } on failure.
+ * The mandatory-tension rule lives HERE, mechanically, because prompt-level
+ * rules are not self-enforcing.
+ */
+function prismValidateRecord(raw, sourceMetadata, chunkIndex) {
+  if (!raw || typeof raw !== 'object') {
+    return { discardReason: 'not-an-object' };
+  }
+
+  const signal = typeof raw.signal === 'string' ? raw.signal.trim() : '';
+  if (!signal) return { discardReason: 'missing-signal' };
+
+  const tension = typeof raw.tension === 'string' ? raw.tension.trim() : '';
+  // "A conclusion without tension is discarded." Enforced, not requested.
+  if (tension.length < 15) return { discardReason: 'missing-or-filler-tension' };
+
+  const toStringArray = (v) =>
+    Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()) : [];
+
+  const inquiryExpansion = toStringArray(raw.inquiryExpansion).slice(0, 5);
+  if (inquiryExpansion.length < 3) return { discardReason: 'insufficient-inquiry' };
+
+  const alternativePerspectives = Array.isArray(raw.alternativePerspectives)
+    ? raw.alternativePerspectives
+        .map((p) => {
+          if (typeof p === 'string') {
+            // Tolerate flat strings from the model; flag as extractor-supplied
+            return { perspective: p.trim(), provenance: 'extractor-supplied' };
+          }
+          if (p && typeof p === 'object' && typeof p.perspective === 'string') {
+            const prov = ['in-transcript', 'named-tradition', 'extractor-supplied'].includes(p.provenance)
+              ? p.provenance
+              : 'extractor-supplied';
+            return { perspective: p.perspective.trim(), provenance: prov };
+          }
+          return null;
+        })
+        .filter(Boolean)
+    : [];
+
+  const coherenceStatus = PRISM_COHERENCE_STATUSES.includes(raw.coherenceStatus)
+    ? raw.coherenceStatus
+    : 'Open'; // unknown statuses degrade to Open, never to a stability claim
+
+  return {
+    record: {
+      signal,
+      sourceContext: typeof raw.sourceContext === 'string' ? raw.sourceContext.trim() : '',
+      speakerInterpretation:
+        typeof raw.speakerInterpretation === 'string' ? raw.speakerInterpretation.trim() : '',
+      alternativePerspectives,
+      coherenceLinks: toStringArray(raw.coherenceLinks),
+      tension,
+      inquiryExpansion,
+      coherenceStatus,
+      conceptNodeCandidates: toStringArray(raw.conceptNodeCandidates),
+      tags: toStringArray(raw.tags).map((t) => t.toLowerCase()),
+      _meta: {
+        chunkIndex,
+        source: sourceMetadata.source || null,
+        sourceTitle: sourceMetadata.title || null,
+        extractedAt: new Date().toISOString(),
+        extractionModel: PRISM_EXTRACTION_MODEL,
+        protocolVersion: 'prism-rag-extraction-v1.1'
+      }
+    }
+  };
+}
+
+/**
+ * Cross-chunk dedupe. Overlapping chunks will re-extract seam signals;
+ * collapse records whose signal text is near-identical by token overlap.
+ * Keeps the earlier record and merges inquiry questions from the duplicate
+ * (inquiry pathways are the asset; never discard them with the duplicate).
+ */
+function prismDedupeRecords(records) {
+  const kept = [];
+  const tokenize = (s) =>
+    new Set(
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\u0590-\u05FF\s]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 2)
+    );
+
+  for (const rec of records) {
+    const recTokens = tokenize(rec.signal);
+    let duplicateOf = null;
+    for (const existing of kept) {
+      const exTokens = tokenize(existing.signal);
+      let overlap = 0;
+      for (const t of recTokens) if (exTokens.has(t)) overlap++;
+      const denom = Math.min(recTokens.size, exTokens.size) || 1;
+      if (overlap / denom >= 0.7) {
+        duplicateOf = existing;
+        break;
+      }
+    }
+    if (duplicateOf) {
+      const merged = new Set([...duplicateOf.inquiryExpansion, ...rec.inquiryExpansion]);
+      duplicateOf.inquiryExpansion = Array.from(merged).slice(0, 5);
+    } else {
+      kept.push(rec);
+    }
+  }
+  return kept;
+}
+
+/**
+ * One extraction call against the Anthropic API for a single chunk.
+ * Non-streaming, unlike the handler's call — extraction returns structured
+ * JSON, not user-facing prose.
+ */
+async function prismCallExtractionModel(chunkText, sourceMetadata) {
+  const canonicalNodes = Array.isArray(sourceMetadata.canonicalNodes)
+    ? sourceMetadata.canonicalNodes
+    : null;
+
+  const userContent = [
+    sourceMetadata.title ? 'Transcript title: ' + sourceMetadata.title : null,
+    sourceMetadata.source ? 'Transcript source: ' + sourceMetadata.source : null,
+    canonicalNodes && canonicalNodes.length
+      ? 'Canonical knowledge-graph nodes (prefer exact names for conceptNodeCandidates):\n' +
+        canonicalNodes.map((n) => '- ' + n).join('\n')
+      : null,
+    '',
+    'TRANSCRIPT CHUNK:',
+    chunkText
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: PRISM_EXTRACTION_MODEL,
+      max_tokens: PRISM_EXTRACTION_MAX_TOKENS,
+      system: PRISM_EXTRACTION_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userContent }]
+    })
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '');
+    throw new Error(
+      'Extraction API call failed: ' + response.status + ' ' + errBody.slice(0, 300)
+    );
+  }
+
+  const data = await response.json();
+  const text = (data.content || [])
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+  return text;
+}
+
+/**
+ * extractInquiryArtifacts
+ * -----------------------
+ * Process a transcript into Prism-ready inquiry artifacts.
+ *
+ * @param {string} transcriptText - full transcript text
+ * @param {object} sourceMetadata - optional:
+ *   {
+ *     source: string,          // e.g. URL
+ *     title: string,           // e.g. video/sermon title
+ *     canonicalNodes: string[] // canonical knowledge-graph node names,
+ *                              // to anchor conceptNodeCandidates
+ *   }
+ * @returns {Promise<{records: object[], meta: object}>}
+ *   records: validated, deduped Signal Records (schema above)
+ *   meta: { chunkCount, rawRecordCount, discarded: [{chunkIndex, reason}],
+ *           failedChunks: number[], model, protocolVersion }
+ *
+ * Failure posture: a chunk whose API call or parse fails is recorded in
+ * meta.failedChunks and skipped; one bad chunk never voids the whole
+ * extraction. Caller decides whether failedChunks.length > 0 warrants retry.
+ *
+ * Persistence note: records are returned, not stored. To embed them into
+ * corpus_embeddings, the embedQuery() function already defined above in
+ * this file can embed each record's signal + tension text — wire that at
+ * the call site, deliberately, rather than inside this function.
+ */
+export async function extractInquiryArtifacts(transcriptText, sourceMetadata = {}) {
+  if (!transcriptText || typeof transcriptText !== 'string' || !transcriptText.trim()) {
+    return {
+      records: [],
+      meta: {
+        chunkCount: 0,
+        rawRecordCount: 0,
+        discarded: [],
+        failedChunks: [],
+        model: PRISM_EXTRACTION_MODEL,
+        protocolVersion: 'prism-rag-extraction-v1.1',
+        warning: 'empty-transcript'
+      }
+    };
+  }
+
+  const chunks = prismChunkTranscript(
+    transcriptText,
+    PRISM_EXTRACTION_CHUNK_CHARS,
+    PRISM_EXTRACTION_CHUNK_OVERLAP
+  );
+
+  const allRecords = [];
+  const discarded = [];
+  const failedChunks = [];
+  let rawRecordCount = 0;
+
+  // Sequential, not parallel: predictable rate-limit behavior on Vercel,
+  // and chunk order is preserved in record _meta for traceability.
+  for (let i = 0; i < chunks.length; i++) {
+    let rawText;
+    try {
+      rawText = await prismCallExtractionModel(chunks[i], sourceMetadata);
+    } catch (err) {
+      failedChunks.push(i);
+      continue;
+    }
+
+    const parsed = prismSafeParseRecords(rawText);
+    if (!parsed) {
+      failedChunks.push(i);
+      continue;
+    }
+
+    rawRecordCount += parsed.length;
+    for (const raw of parsed) {
+      const result = prismValidateRecord(raw, sourceMetadata, i);
+      if (result.record) allRecords.push(result.record);
+      else discarded.push({ chunkIndex: i, reason: result.discardReason });
+    }
+  }
+
+  const records = prismDedupeRecords(allRecords);
+
+  return {
+    records,
+    meta: {
+      chunkCount: chunks.length,
+      rawRecordCount,
+      discarded,
+      failedChunks,
+      model: PRISM_EXTRACTION_MODEL,
+      protocolVersion: 'prism-rag-extraction-v1.1'
+    }
+  };
+}
+
+// ------------------------------------------------------------
+// Example invocation (comment only - do not execute at module load)
+//
+// const { records, meta } = await extractInquiryArtifacts(transcriptText, {
+//   source: 'https://www.youtube.com/watch?v=IDMkpljdrrA',
+//   title: 'Jesus Is The Creator Of The Universe',
+//   canonicalNodes: ['Second Temple Cosmology', 'Logos Theology', /* ... */]
+// });
+//
+// Expected record shape (Aleph-Tav example):
+// {
+//   "signal": "Genesis 1:1 contains the Hebrew particle Aleph-Tav.",
+//   "speakerInterpretation": "The speaker associates Aleph-Tav with Jesus as Alpha and Omega.",
+//   "alternativePerspectives": [
+//     { "perspective": "Hebrew grammar treats Aleph-Tav as a direct-object marker.",
+//       "provenance": "named-tradition" }
+//   ],
+//   "tension": "Can a grammatical marker also carry theological signal within a divinely authored canon?",
+//   "inquiryExpansion": [
+//     "How is Aleph-Tav used elsewhere in Hebrew Scripture?",
+//     "Why does Revelation use Alpha and Omega language?",
+//     "How should typology and grammar relate?"
+//   ],
+//   "coherenceStatus": "Contested",
+//   "conceptNodeCandidates": ["Logos Theology", "proposed:Aleph-Tav Particle"],
+//   "tags": ["aleph-tav", "genesis-1", "alpha-omega", "hebrew-grammar"]
+// }
+// ------------------------------------------------------------
+
+// ============================================================
+// END RAG Inquiry Artifact Extraction
+// ============================================================
+
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
