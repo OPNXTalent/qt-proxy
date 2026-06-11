@@ -3322,6 +3322,914 @@ export function getSeedSignalRecords(filter = {}) {
 // ============================================================
 
 
+// ============================================================
+// RAG Artifact Pack: The Problem of Evil
+// ------------------------------------------------------------
+// Self-contained section, with ONE documented exception: the
+// getAllSignalRecords() aggregator calls getSeedSignalRecords()
+// from the Seed Records section above (read-only). Nothing else
+// in this section references other file code; no existing state
+// is modified.
+//
+// Public surface:
+//   getProblemOfEvilArtifacts(filter)  - this pack's 21 records
+//   getProblemOfEvilGuidance()         - retrieval triggers,
+//                                        interpreter guidance,
+//                                        pastoral guardrail (data)
+//   getAllSignalRecords(filter)        - seed (31) + POE (21) +
+//                                        Blood Covenant (10) = 62
+//
+// Source: "Science Meets Sovereignty: From Aristotle to Quantum
+// Theology — The Problem of Evil and the Resolution of Echad
+// b'Emet" by Keenan D. Hogg. Imported from the document pack
+// problem_of_evil_rag_extract_for_claude.md and normalized to the
+// v1.1 record schema:
+//   - alternativePerspectives converted to {perspective, provenance}
+//   - compound coherence statuses normalized to the enum; the
+//     document's original status string is preserved verbatim in
+//     _meta.sourceStatus (nothing silently overwritten)
+//   - "within framework" status qualifiers normalize to Emerging:
+//     internal consistency is not cross-source stability
+//   - tags lowercased
+//   - cross-links added into the existing SR/KS graph (POE-011 to
+//     SR-004; POE-013 to KS-011; POE-014 to KS-004 and KS-011 —
+//     the pack's attempted resolution of the recorded strain)
+//
+// These are inquiry artifacts, not doctrine locks. Per the pack's
+// own instruction, retrieval-favoring is NOT wired into
+// getRetrievedContext(); triggers are exposed as data via
+// getProblemOfEvilGuidance() and wiring is a call-site decision.
+// ============================================================
+
+const PRISM_POE_SOURCE = {
+  source: "opnx:problem-of-evil-essay",
+  title: "Science Meets Sovereignty: From Aristotle to Quantum Theology — The Problem of Evil and the Resolution of Echad b'Emet"
+};
+
+function prismPoeMeta(recordId, sourceStatus) {
+  return {
+    recordId,
+    source: PRISM_POE_SOURCE.source,
+    sourceTitle: PRISM_POE_SOURCE.title,
+    extractedAt: "2026-06-11",
+    extractedBy: "document-import",
+    importedFrom: "problem_of_evil_rag_extract_for_claude.md",
+    sourceStatus,
+    protocolVersion: "prism-rag-extraction-v1.1"
+  };
+}
+
+const PRISM_POE_ARTIFACTS = [
+  {
+    signal: "Neil deGrasse Tyson's critique of divine benevolence is presented as Epicurus' trilemma wearing a modern scientific frame.",
+    sourceContext: "Tyson sees hurricanes, viruses, entropy, and birth defects as evidence against benevolent omnipotence.",
+    speakerInterpretation: "Modern empiricism assumes measurable reality is total reality and that divine goodness must mirror human sentiment.",
+    alternativePerspectives: [
+      { perspective: "Empiricists may argue that observable suffering legitimately challenges traditional claims about God's goodness and power.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Tyson", "Epicurus", "Hume", "Empirical totality", "Human centrality", "Faith and evidence", "POE-005"],
+    tension: "Does scientific observation reveal the absence of benevolence, or does it reveal the limits of human perception?",
+    inquiryExpansion: [
+      "What counts as evidence when discussing God?",
+      "Can science measure meaning or only phenomena?",
+      "Does suffering disprove benevolence or expose interpretive limitation?",
+      "Is empiricism humble before data or arrogant about what counts as data?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Empirical Totality", "proposed:Human Centrality", "proposed:Epistemic Arrogance"],
+    tags: ["problem-of-evil", "empiricism", "tyson", "evidence", "faith", "science"],
+    _meta: prismPoeMeta("POE-001", "Contested")
+  },
+  {
+    signal: "Aristotle understood evil as failure to reach proper form rather than as a separate substance.",
+    sourceContext: "Every acorn aims at oak; evil is a thing missing its telos.",
+    speakerInterpretation: "Aristotle's model sees purpose in motion but begins from human observation rather than divine self-disclosure.",
+    alternativePerspectives: [
+      { perspective: "Aristotelian teleology remains useful for understanding order, form, and purpose in creation.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Aristotle", "Telos", "Unmoved Mover", "Aquinas", "Purpose", "Form", "POE-016"],
+    tension: "Can a teleological model explain suffering if the divine is abstract and unmoved by particular tears?",
+    inquiryExpansion: [
+      "Is evil best understood as failure of form?",
+      "What does Aristotle contribute to Christian theodicy?",
+      "Where does teleology become abstraction?",
+      "Can purpose be inferred without relationship?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Teleological Observer", "proposed:Purpose Without Affection"],
+    tags: ["aristotle", "teleology", "evil", "form", "purpose"],
+    _meta: prismPoeMeta("POE-002", "Emerging")
+  },
+  {
+    signal: "Augustine reframes evil as privation of good and sin as disordered affection.",
+    sourceContext: "Evil is not rival substance but a hole where ordered good should be.",
+    speakerInterpretation: "Augustine's model is morally powerful but remains linear, historical, and centered on creaturely will rather than perception within divine coherence.",
+    alternativePerspectives: [
+      { perspective: "Augustine's privatio boni remains a major Christian framework for denying evil independent ontology.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Augustine", "Privation", "Ordered love", "Fall", "Desire", "Moral interiority", "POE-008"],
+    tension: "Is evil absence, disordered love, or misaligned perception — and is the privation account incomplete rather than incorrect?",
+    inquiryExpansion: [
+      "What does Augustine explain well about evil?",
+      "Does privation adequately address suffering?",
+      "How does disordered love relate to misalignment?",
+      "Is the Fall primarily moral, epistemic, relational, or perceptual?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["proposed:Disordered Affection", "proposed:Privation Vs Misalignment"],
+    tags: ["augustine", "privatio-boni", "sin", "desire", "theodicy"],
+    _meta: prismPoeMeta("POE-003", "Strongly Coherent / Incomplete")
+  },
+  {
+    signal: "Aquinas argues evil is privation permitted by God for greater good; the document identifies 'allows' as the soft underbelly of the system.",
+    sourceContext: "'Allows' imports temporal contingency into sovereignty.",
+    speakerInterpretation: "Permission language implies God manages risk rather than composes completion.",
+    alternativePerspectives: [
+      { perspective: "Classical theists may argue that divine permission is analogical language preserving creaturely freedom and divine goodness.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Aquinas", "Analogy of being", "Privation", "Providence", "Sovereignty", "Permission", "POE-013", "POE-016"],
+    tension: "Does God 'allow' evil, or does all variance already reside within divine composition?",
+    inquiryExpansion: [
+      "Is permission language unavoidable in temporal theology?",
+      "Does 'allow' weaken sovereignty?",
+      "Can freedom exist inside completed coherence?",
+      "How does Aquinas' analogy invert or preserve truth?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Permission Vs Completion", "proposed:Inverted Ladder"],
+    tags: ["aquinas", "sovereignty", "permission", "analogy", "theodicy"],
+    _meta: prismPoeMeta("POE-004", "Contested")
+  },
+  {
+    signal: "Hume's trilemma challenges divine omnipotence and goodness but assumes evil is a measurable thing and presupposes a moral standard.",
+    sourceContext: "Hume asks whether God is willing and able to prevent evil; if so, whence evil?",
+    speakerInterpretation: "Hume dismantles theology using a moral intuition his own framework cannot explain.",
+    alternativePerspectives: [
+      { perspective: "Hume's trilemma remains a powerful logical challenge to simplistic theodicies.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Hume", "Epicurus", "Trilemma", "Moral standard", "Empiricism", "Theodicy", "POE-001"],
+    tension: "Can one call something evil without borrowing from a transcendent standard of good?",
+    inquiryExpansion: [
+      "Does the concept of evil require God?",
+      "Is Hume's trilemma valid if evil is misalignment rather than substance?",
+      "What does moral protest reveal about the protester's metaphysics?",
+      "Does skepticism depend on the coherence it denies?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Borrowed Moral Standard", "proposed:Dissonance Vs Discord"],
+    tags: ["hume", "trilemma", "skepticism", "morality", "evil"],
+    _meta: prismPoeMeta("POE-005", "Contested")
+  },
+  {
+    signal: "Aeternitas is not endless time but the absence of time, where all outcomes are present in divine simultaneity.",
+    sourceContext: "Before creation, there was no sequence, no duration, no before or after.",
+    speakerInterpretation: "Duality has no meaning in Aeternitas; evil appears only when coherence is translated into temporal perception.",
+    alternativePerspectives: [
+      { perspective: "Classical theology also speaks of God's timelessness (Boethian eternity), though not always with quantum or perceptual language.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Aeternitas", "2 Peter 3:8", "Sovereignty", "Time", "Simultaneity", "POE-013", "POE-014", "KS-011"],
+    tension: "If God is outside time, are 'permission,' 'prevention,' and 'reaction' valid theological categories?",
+    inquiryExpansion: [
+      "What does timeless sovereignty imply for evil?",
+      "Can temporal beings understand eternal simultaneity?",
+      "How does Aeternitas alter free will debates?",
+      "Is evil real in eternity or only in temporal perception?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["proposed:Divine Simultaneity", "proposed:Timeless Coherence", "Aeternitas"],
+    tags: ["aeternitas", "eternity", "sovereignty", "time", "evil"],
+    _meta: prismPoeMeta("POE-006", "Strongly Coherent")
+  },
+  {
+    signal: "Creation is described as the projection or translation of divine unity into dimensions where observation becomes possible.",
+    sourceContext: "Creation refracts divine unity like a prism breaks white light into color.",
+    speakerInterpretation: "Contrast is not imperfection but the condition required for recognition.",
+    alternativePerspectives: [
+      { perspective: "Some traditions may reject the prism analogy as too metaphysical or insufficiently textual.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Genesis 1", "Light and dark", "Prism", "Perception", "Creation", "Echad", "POE-009", "SR-001"],
+    tension: "Is contrast necessary for perception without becoming contradiction in God?",
+    inquiryExpansion: [
+      "Why does creation require contrast?",
+      "Is duality ontological or perceptual?",
+      "How does Genesis 1 establish contrast without opposition?",
+      "Can suffering be contrast without being morally minimized?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Contrast For Recognition", "proposed:Prism Of Creation"],
+    tags: ["creation", "contrast", "genesis", "perception", "coherence"],
+    _meta: prismPoeMeta("POE-007", "Emerging")
+  },
+  {
+    signal: "Humanity's first sin is framed not as theft but as interpretation: the creature claiming the authority to define good and evil.",
+    sourceContext: "You shall be as gods, knowing good and evil.",
+    speakerInterpretation: "The Fall introduced epistemic pride: knowledge became possession rather than participation.",
+    alternativePerspectives: [
+      { perspective: "Traditional readings emphasize disobedience, rebellion, desire, or pride.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Genesis 3:5", "Knowledge", "Epistemology", "Fall", "Perception", "Serpent", "POE-003", "POE-010"],
+    tension: "Was the Fall primarily moral rebellion, epistemic inversion, or relational misalignment?",
+    inquiryExpansion: [
+      "What does it mean to know good and evil?",
+      "Did the Fall create evil or distort perception?",
+      "How does self-reference produce moral entropy?",
+      "Is modern empiricism an echo of the Fall?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["proposed:Epistemic Pride", "proposed:Knowledge As Possession"],
+    tags: ["fall", "genesis", "epistemology", "pride", "good-and-evil"],
+    _meta: prismPoeMeta("POE-008", "Strongly Coherent")
+  },
+  {
+    signal: "Scientific observation is compared to quantum measurement: to observe is to collapse potential; to define is to reduce.",
+    sourceContext: "The document links measurement, observation, and interference with 'seeing through a glass darkly.'",
+    speakerInterpretation: "Objectivity is collective subjectivity averaged across instruments; telescopes extend eyes but not vision.",
+    alternativePerspectives: [
+      { perspective: "Science may reply that methodological limits do not invalidate disciplined empirical knowledge.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Quantum mechanics", "Observer effect", "1 Corinthians 13:12", "Science", "Epistemology", "POE-007", "POE-018"],
+    tension: "Does measurement reveal reality or reduce reality to what the instrument can register?",
+    inquiryExpansion: [
+      "How does observation alter the observed?",
+      "What is the difference between eyes and vision?",
+      "Can scientific objectivity coexist with epistemic humility?",
+      "Where does measurement become idolatry?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Observation Collapse", "proposed:Instrumental Humility"],
+    tags: ["science", "quantum", "observation", "epistemology", "measurement"],
+    _meta: prismPoeMeta("POE-009", "Emerging")
+  },
+  {
+    signal: "Evil is described as graded decoherence: the greater the self-reference, the greater the distortion of good.",
+    sourceContext: "Perfect alignment mirrors Creator coherence; partial alignment carries interference; total disalignment is autonomy.",
+    speakerInterpretation: "Sin is not rebellion by nature but misidentification by perspective.",
+    alternativePerspectives: [
+      { perspective: "Traditional theology may insist rebellion remains essential to sin's nature.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Decoherence", "Sin", "Autonomy", "Fall", "Re-entanglement", "Moral entropy", "POE-008", "POE-011", "RCT decoherence"],
+    tension: "Can sin be described as misidentification without minimizing culpability?",
+    inquiryExpansion: [
+      "How does self-reference create moral entropy?",
+      "Is sin primarily rebellion, autonomy, or misalignment?",
+      "Can degrees of evil be modeled as degrees of decoherence?",
+      "How does redemption re-entangle the observer with God?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Moral Entropy", "proposed:Self-Reference", "proposed:Re-entanglement"],
+    tags: ["decoherence", "sin", "quantum-theology", "alignment", "entropy"],
+    _meta: prismPoeMeta("POE-010", "Emerging / Contested")
+  },
+  {
+    signal: "Vav means 'and,' 'hook,' or 'nail'; Christ is framed as the incarnate Vav joining heaven and earth.",
+    sourceContext: "The nails that pierced His hands are described as Vavs in flesh, closing the circuit.",
+    speakerInterpretation: "Calvary is not divine reaction but the built-in realignment event in creation's code.",
+    alternativePerspectives: [
+      { perspective: "Some may regard Hebrew letter-symbol readings as typological rather than doctrinally determinative.", provenance: "extractor-supplied" },
+      { perspective: "Vav's lexical sense is hook/peg (tabernacle hooks, Exodus 27:10); 'nail' in the crucifixion sense is an interpretive sharpening — the same move recorded against the aleph-composition reading in SR-004.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Vav", "John 1", "Colossians 1:17", "Cross", "Incarnation", "Resurrection", "SR-004", "POE-010"],
+    tension: "Is the Cross primarily repair after sin, or revelation of structure embedded from the beginning?",
+    inquiryExpansion: [
+      "What does Vav signify in Hebrew structure?",
+      "How does incarnation join ontology and analogy?",
+      "Is redemption repair, re-synchronization, or both?",
+      "How does Christ hold all things together?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Christ As Connector", "proposed:Cross As Field Correction"],
+    tags: ["christology", "vav", "cross", "incarnation", "coherence"],
+    _meta: prismPoeMeta("POE-011", "Strongly Coherent within framework")
+  },
+  {
+    signal: "The Red Sea event is one act perceived differently by Israel and Egypt: salvation from one vantage, catastrophe from another.",
+    sourceContext: "The sea was one act of Echad; the observers divided its meaning.",
+    speakerInterpretation: "Moral meaning bifurcates at the point of observer alignment.",
+    alternativePerspectives: [
+      { perspective: "Traditional readings emphasize judgment and deliverance as distinct divine acts within one event.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Exodus 14", "Red Sea", "Israel", "Egypt", "Salvation", "Judgment", "Moral parallax", "POE-006"],
+    tension: "Can one divine act be both mercy and judgment without contradiction — and does observer-position explain the bifurcation without sliding into moral relativism?",
+    inquiryExpansion: [
+      "What determines whether divine action is perceived as glory or threat?",
+      "How does alignment shape moral interpretation?",
+      "Is evil located in the act or in interpretive distance?",
+      "How does Exodus 14 illuminate the Problem of Evil?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["proposed:Moral Parallax", "proposed:One Act Two Readings"],
+    tags: ["red-sea", "exodus", "judgment", "salvation", "perception"],
+    _meta: prismPoeMeta("POE-012", "Strongly Coherent")
+  },
+  {
+    signal: "History appears pixelated from within time but forms a coherent mosaic from Aeternitas; evil is a dark tile viewed too closely.",
+    sourceContext: "Sovereignty incorporates every variance; God purposes rather than merely permits.",
+    speakerInterpretation: "The mosaic replaces permission language with divine composition and completion.",
+    alternativePerspectives: [
+      { perspective: "Critics may argue this risks minimizing suffering or collapsing evil into divine intention.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Sovereignty", "Mosaic", "Aeternitas", "Purpose", "Tragedy", "Providence", "POE-004", "POE-006", "KS-011"],
+    tension: "Can evil be incorporated into divine purpose without making God morally culpable?",
+    inquiryExpansion: [
+      "What does it mean to view tragedy as a tile in a mosaic?",
+      "How far can the art analogy go before it breaks?",
+      "Does divine purpose erase human responsibility?",
+      "How does one pastorally communicate this without cruelty?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Completed Mosaic", "proposed:Tile Viewed Too Closely"],
+    tags: ["sovereignty", "purpose", "evil", "mosaic", "providence"],
+    _meta: prismPoeMeta("POE-013", "Contested but central")
+  },
+  {
+    signal: "The framework rejects both fatalism and open theism: freedom is real within the field while coherence encompasses all trajectories.",
+    sourceContext: "A comparative table contrasts fatalism and open theism with Echad b'Emet; choice is contextualized within total divine sight.",
+    speakerInterpretation: "Choice is not erased; it is contextualized — improvisation within a written key.",
+    alternativePerspectives: [
+      { perspective: "Calvinist, Arminian, open theist, and process theologian frameworks will differ sharply here.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Free will", "Fatalism", "Open theism", "Sovereignty", "Probability", "Jazz/composer analogy", "KS-004", "KS-011", "POE-006", "POE-015"],
+    tension: "How can freedom be real if all outcomes already cohere in divine completion? This record is the framework's attempted resolution of the recorded strain between total divine authorship (KS-011) and culpable human yielding (KS-004).",
+    inquiryExpansion: [
+      "Is freedom incompatible with completed divine knowledge?",
+      "What is the difference between contextualized choice and illusion?",
+      "Can improvisation occur inside a written score?",
+      "How does Aeternitas change the free-will debate?",
+      "Does this resolution dissolve the KS-004/KS-011 strain or restate it at a higher register?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Freedom Inside The Field", "proposed:Improvisation Within Key"],
+    tags: ["free-will", "sovereignty", "fatalism", "open-theism", "determinacy"],
+    _meta: prismPoeMeta("POE-014", "Emerging / Contested")
+  },
+  {
+    signal: "What humans call chance is framed as choreography of variables in service to revelation.",
+    sourceContext: "Quantum probabilities exist within time; in Aeternitas there is no randomness.",
+    speakerInterpretation: "Probability is the language of divine artistry, allowing freedom without jeopardizing completion.",
+    alternativePerspectives: [
+      { perspective: "Physicists may distinguish mathematical probability from theological purpose.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Quantum mechanics", "Probability", "Aeternitas", "Sovereignty", "Design", "POE-014"],
+    tension: "Is probability ontological randomness or temporal language for divine complexity?",
+    inquiryExpansion: [
+      "Does quantum probability imply randomness to God?",
+      "Can chance serve purpose?",
+      "How does divine foreknowledge relate to probability?",
+      "Is uncertainty a feature of creation or perception?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Probability As Artistry", "proposed:Chance As Choreography"],
+    tags: ["quantum", "probability", "chance", "sovereignty", "design"],
+    _meta: prismPoeMeta("POE-015", "Emerging")
+  },
+  {
+    signal: "Aquinas' analogical ascent is reversed: God is not inferred from experience; experience is derived from God.",
+    sourceContext: "Analogy climbs; ontology radiates.",
+    speakerInterpretation: "Theology built on anthropology inevitably creates the courtroom where God is prosecuted.",
+    alternativePerspectives: [
+      { perspective: "Classical theology may defend analogy as necessary and orthodox given creaturely limitation.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Aquinas", "Analogy", "Ontology", "Incarnation", "Christ as Vav", "Revelation", "POE-004", "POE-011"],
+    tension: "Must theology begin from human categories, or can it begin from revealed ontology?",
+    inquiryExpansion: [
+      "What are the limits of analogy?",
+      "Is all theology anthropomorphic to some degree?",
+      "How does incarnation translate ontology into comprehension?",
+      "Does theodicy become doxology when ontology leads?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Analogy Climbs Ontology Radiates", "proposed:Inverted Ladder"],
+    tags: ["aquinas", "analogy", "ontology", "theology", "revelation"],
+    _meta: prismPoeMeta("POE-016", "Strongly Coherent within framework")
+  },
+  {
+    signal: "The document compares Tyson, Hume, Aquinas, and Echad b'Emet across starting point, definition of evil, epistemology, sovereignty, tension, and resolution.",
+    sourceContext: "The comparative table appears around pages 11-12 of the source essay.",
+    speakerInterpretation: "Human inquiry generally begins outward from perception; Echad b'Emet begins with coherence.",
+    alternativePerspectives: [
+      { perspective: "Some may see the comparison as too favorable to Echad b'Emet or too compressed in its treatment of historical thinkers.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Tyson", "Hume", "Aquinas", "Aristotle", "Augustine", "Echad b'Emet", "POE-001", "POE-002", "POE-003", "POE-004", "POE-005"],
+    tension: "Does beginning with coherence clarify the Problem of Evil, or risk assuming the conclusion?",
+    inquiryExpansion: [
+      "How do starting assumptions shape theodicy?",
+      "Which framework best accounts for suffering and meaning?",
+      "Does empiricism, skepticism, analogy, or ontology provide the strongest frame?",
+      "What does each thinker see and miss?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["proposed:Arc Of Inquiry", "proposed:Starting Point Determines Resolution"],
+    tags: ["comparative-theology", "theodicy", "tyson", "hume", "aquinas"],
+    _meta: prismPoeMeta("POE-017", "Strongly Coherent as comparative artifact")
+  },
+  {
+    signal: "Science is reframed as the study of God's handwriting, not a rival to theology.",
+    sourceContext: "Under Echad b'Emet, every formula becomes a hymn and every discovery a translation of eternal order.",
+    speakerInterpretation: "Science is dignified when it remains humble; it becomes idolatrous when it mistakes measurement for the whole.",
+    alternativePerspectives: [
+      { perspective: "Secular science may reject theological interpretation while still embracing humility before mystery.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Science", "Worship", "Measurement", "Humility", "Coherence", "Quantum mechanics", "POE-009"],
+    tension: "Can science function as worship without ceasing to be science?",
+    inquiryExpansion: [
+      "What does science reveal and what can it not reveal?",
+      "When does measurement become idolatry?",
+      "How can faith and reason operate as duet?",
+      "What would reverent science look like?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Science As Liturgy", "proposed:Formula As Hymn"],
+    tags: ["science", "faith", "worship", "coherence", "humility"],
+    _meta: prismPoeMeta("POE-018", "Emerging")
+  },
+  {
+    signal: "Faith is not escape from reason but realignment of perception.",
+    sourceContext: "Faith expands evidence by acknowledging finite limits before infinite reality; doubt becomes shadow giving faith dimension rather than threat destroying it.",
+    speakerInterpretation: "Faith re-centers the observer; alignment makes evidence visible that misalignment cannot register.",
+    alternativePerspectives: [
+      { perspective: "Some traditions define faith more propositionally or covenantally.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Faith", "Alignment", "Perception", "Evidence", "Doubt", "Orientation", "POE-009", "POE-001"],
+    tension: "Is faith primarily belief, trust, alignment, or participation?",
+    inquiryExpansion: [
+      "How does faith re-center the observer?",
+      "Can doubt strengthen rather than weaken faith?",
+      "What evidence becomes visible only through alignment?",
+      "How does faith relate to coherence rather than proof?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["proposed:Faith As Corrective Lens", "proposed:Alignment Not Escape"],
+    tags: ["faith", "doubt", "perception", "evidence", "alignment"],
+    _meta: prismPoeMeta("POE-019", "Strongly Coherent")
+  },
+  {
+    signal: "Morality is defined as resonance with divine frequency; sin is static born of self-reference.",
+    sourceContext: "Ethics becomes acoustics; repentance is recalibration; worship is sustained resonance.",
+    speakerInterpretation: "Christ does not merely prescribe morality; He embodies coherence.",
+    alternativePerspectives: [
+      { perspective: "Traditional ethics may prefer command, virtue, law, or telos frameworks.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Morality", "Resonance", "Sin", "Repentance", "Worship", "John 14:6", "POE-010", "POE-020 sin taxonomy"],
+    tension: "Does resonance language clarify morality or risk becoming too metaphorical?",
+    inquiryExpansion: [
+      "What does it mean to act in tune with divine order?",
+      "How does repentance recalibrate perception?",
+      "Is sin interference, rebellion, or both?",
+      "Can morality be relational rather than rule-based?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Ethics As Acoustics", "proposed:Sin As Static"],
+    tags: ["morality", "ethics", "sin", "resonance", "repentance"],
+    _meta: prismPoeMeta("POE-020", "Emerging")
+  },
+  {
+    signal: "The Problem of Evil is ultimately man's perception of divine perfection through time-bound distortion.",
+    sourceContext: "The conclusion states: 'There was never a problem at all. Only a plan.'",
+    speakerInterpretation: "Theodicy ends not in defense but in beholding completed coherence.",
+    alternativePerspectives: [
+      { perspective: "Critics may object that this risks sounding dismissive of real suffering.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Conclusion", "Coherence", "Suffering", "Aeternitas", "Plan", "Worship", "POE-006", "POE-013", "Pastoral guardrail"],
+    tension: "How can one affirm completed coherence while honoring the reality of suffering within time?",
+    inquiryExpansion: [
+      "How should this framework be used pastorally?",
+      "When does coherence language comfort, and when can it wound?",
+      "Can suffering be real within time while resolved in Aeternitas?",
+      "What does it mean to behold rather than defend?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Theodicy To Doxology", "proposed:Plan Not Problem"],
+    tags: ["conclusion", "suffering", "theodicy", "coherence", "pastoral-care"],
+    _meta: prismPoeMeta("POE-021", "Central / Pastorally Sensitive")
+  }
+];
+
+const PRISM_POE_GUIDANCE = {
+  retrievalTriggers: [
+    "the problem of evil", "why God allows suffering", "divine sovereignty and evil",
+    "Hume's trilemma", "Tyson's objections to God", "Aristotle on evil",
+    "Augustine on evil", "Aquinas on evil", "privation theory", "Aeternitas",
+    "Echad b'Emet", "whether evil is real", "whether God permits evil",
+    "faith vs science", "quantum theology", "observer effect and Genesis",
+    "decoherence and the Fall", "Red Sea as salvation and judgment",
+    "Christ as connector", "Christ as Vav", "free will vs sovereignty",
+    "fatalism vs open theism", "morality as alignment", "truth as coherence"
+  ],
+  interpreterGuidance: [
+    "Avoid flattening suffering into cliche.",
+    "Preserve pastoral sensitivity.",
+    "Distinguish between explanation, mystery, and orientation.",
+    "Ask whether the user is seeking comfort, argument, theological clarity, or philosophical exploration.",
+    "Avoid saying 'evil is not real' without clarifying 'evil remains real within temporal perception and human suffering.'",
+    "Frame Echad b'Emet as an interpretive pathway, not a forced conclusion.",
+    "Use the Red Sea example to show observer-position rather than moral relativism.",
+    "Use Christ as Vav only when Christological or Hebrew-symbolic exploration is appropriate.",
+    "Maintain the productive tension between divine coherence and lived suffering.",
+    "Let the inquiry move from courtroom theodicy toward reorientation, not dismissal."
+  ],
+  pastoralGuardrail: {
+    rule: "When a user is in active grief, trauma, or crisis, do not lead with abstract coherence language. Lead with human weight first; introduce the framework gently only if appropriate.",
+    recommendedFirstMove: "Before trying to explain this, it is worth saying plainly: this hurts, and explanations can become cruel when they arrive too early."
+  }
+};
+
+/**
+ * getProblemOfEvilArtifacts - this pack's 21 records.
+ * Same filter semantics as getSeedSignalRecords:
+ *   { status, tag, recordId } - source filter unnecessary (single source).
+ * Returns deep copies.
+ */
+export function getProblemOfEvilArtifacts(filter = {}) {
+  let results = PRISM_POE_ARTIFACTS;
+  if (filter.status) results = results.filter((r) => r.coherenceStatus === filter.status);
+  if (filter.tag) {
+    const tag = String(filter.tag).toLowerCase();
+    results = results.filter((r) => r.tags.includes(tag));
+  }
+  if (filter.recordId) results = results.filter((r) => r._meta.recordId === filter.recordId);
+  return results.map((r) => JSON.parse(JSON.stringify(r)));
+}
+
+/**
+ * getProblemOfEvilGuidance - the pack's retrieval triggers, interpreter
+ * guidance, and pastoral guardrail, as data. Wiring these into
+ * getRetrievedContext() or the system prompt is a deliberate call-site
+ * decision; this function only supplies the material.
+ */
+export function getProblemOfEvilGuidance() {
+  return JSON.parse(JSON.stringify(PRISM_POE_GUIDANCE));
+}
+
+/**
+ * getAllSignalRecords - unified access across every signal record in
+ * this file: seed records (SR + KS, 31) + Problem of Evil pack (POE,
+ * 21) + Blood Covenant pack (BC, 10) = 62.
+ * Accepts the same filter object as getSeedSignalRecords; the source
+ * filter additionally accepts "poe" and "bc" for the packs.
+ * (getBloodCovenantArtifacts is declared in the Blood Covenant section
+ * below; function declarations hoist module-wide, and this function
+ * executes only at call time, so the forward reference is safe.)
+ * When records migrate to Supabase, this becomes the single query point.
+ */
+export function getAllSignalRecords(filter = {}) {
+  const subFilter = { ...filter };
+  delete subFilter.source;
+
+  let includeSeed = true;
+  let includePoe = true;
+  let includeBc = true;
+
+  if (filter.source) {
+    includeSeed = false;
+    includePoe = false;
+    includeBc = false;
+    if (filter.source === "poe" || filter.source === PRISM_POE_SOURCE.source) {
+      includePoe = true;
+    } else if (filter.source === "bc" || filter.source === PRISM_BC_SOURCE.source) {
+      includeBc = true;
+    } else {
+      includeSeed = true; // "jc", "ks", or a seed URL - delegated to the seed filter
+    }
+  }
+
+  const seed = includeSeed ? getSeedSignalRecords(filter) : [];
+  const poe = includePoe ? getProblemOfEvilArtifacts(subFilter) : [];
+  const bc = includeBc ? getBloodCovenantArtifacts(subFilter) : [];
+  return [...seed, ...poe, ...bc];
+}
+
+// ------------------------------------------------------------
+// Example invocations (comment only - do not execute at module load)
+//
+// All 52 records across both corpora:
+//   const everything = getAllSignalRecords();
+//
+// All theodicy-adjacent contested signals, both corpora:
+//   const hot = getAllSignalRecords({ status: "Contested" });
+//
+// Just this pack, by tag:
+//   const sov = getProblemOfEvilArtifacts({ tag: "sovereignty" });
+//
+// The pastoral guardrail for suffering-related queries:
+//   const { pastoralGuardrail } = getProblemOfEvilGuidance();
+// ------------------------------------------------------------
+
+// ============================================================
+// END RAG Artifact Pack: The Problem of Evil
+// ============================================================
+
+
+// ============================================================
+// RAG Artifact Pack: Blood Covenant (Myron Golden)
+// ------------------------------------------------------------
+// Self-contained section: references no other function in this
+// file and modifies no existing state.
+//
+// Public surface:
+//   getBloodCovenantArtifacts(filter)  - this pack's 10 records
+//   getBloodCovenantGuidance()         - detection terms, inquiry
+//                                        prompts, proposed nodes
+//
+// Source: "The Power of the Blood Covenant" (Myron Golden).
+// PROVENANCE CAVEAT: this pack is derived from the extraction
+// SPECIFICATION document, not the full transcript — the spec
+// embeds the sermon's key tensions, symbols, structures, and
+// quotations, but sourceContext is correspondingly thin and most
+// alternative perspectives are extractor-supplied. Records are
+// marked extractedBy: "spec-import". A full transcript extraction
+// can supersede this pack record-for-record (same recordIds).
+//
+// Same speaker as the SR and KS corpora; cross-corpus links are
+// included accordingly. Per the spec's interpretive cautions,
+// speakerInterpretation fields use possibility framing ("is
+// presented as," "has been interpreted as"), never "this proves."
+// ============================================================
+
+const PRISM_BC_SOURCE = {
+  source: "spec:power-of-the-blood-covenant-myron-golden",
+  title: "The Power of the Blood Covenant (Myron Golden)"
+};
+
+function prismBcMeta(recordId) {
+  return {
+    recordId,
+    source: PRISM_BC_SOURCE.source,
+    sourceTitle: PRISM_BC_SOURCE.title,
+    extractedAt: "2026-06-11",
+    extractedBy: "spec-import",
+    importedFrom: "PRISM RAG EXTRACTION SPECIFICATION (chat document)",
+    protocolVersion: "prism-rag-extraction-v1.1"
+  };
+}
+
+const PRISM_BC_ARTIFACTS = [
+  {
+    signal: "Contract and covenant are distinguished structurally: contract is built on mutual distrust, covenant on mutual trust.",
+    sourceContext: "Contract: mutual distrust. Covenant: mutual trust. Are modern relationships contractual? Is marriage fundamentally covenantal?",
+    speakerInterpretation: "Modern relationships are presented as having drifted contractual; covenant — exemplified by the blood covenant — binds parties through trust rather than enforcement.",
+    alternativePerspectives: [
+      { perspective: "ANE treaty scholarship reads biblical covenants as having treaty form, including sanctions and curses — i.e., enforcement mechanisms — so the trust/distrust binary simplifies a spectrum in which trust and enforceable obligation coexisted.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Genesis 15", "Suzerainty treaties", "Marriage as covenant", "SR-015", "KS-002", "Covenant vs. contract"],
+    tension: "If ancient covenants carried enforceable curses, is the trust/distrust binary a real structural distinction or a rhetorical one — and can covenant exist without risk?",
+    inquiryExpansion: [
+      "Can covenant exist without trust?",
+      "Can trust exist without risk?",
+      "Are modern relationships contractual?",
+      "Is marriage fundamentally covenantal?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Covenant", "proposed:Contract", "proposed:Trust"],
+    tags: ["covenant", "contract", "trust", "marriage", "blood-covenant"],
+    _meta: prismBcMeta("BC-001")
+  },
+  {
+    signal: "Truth (emet, aleph-mem-tav) is presented as spanning the first, middle, and final letters of the Hebrew alphabet: truth requires beginning, middle, and end.",
+    sourceContext: "Aleph-Mem-Tav. Presented meaning: Truth. Truth requires visibility across the whole; fragmentation obscures truth.",
+    speakerInterpretation: "Truth is inherently holistic — the word's own letters enact the claim that truth must span the whole, so partial sight distorts.",
+    alternativePerspectives: [
+      { perspective: "The observation is rabbinic: the Talmud teaches that the seal of God is emet, whose letters span the alphabet's beginning, middle, and end (and contrasts sheker, 'lie,' whose adjacent letters stand on an unstable base) — the teaching has ancient Jewish pedigree as homiletics.", provenance: "named-tradition" },
+      { perspective: "Mem is the alphabet's middle by traditional reckoning rather than strict letter-count; the structure is homiletic rather than arithmetic.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Emet/met insight", "KS-007", "b. Shabbat 55a", "Sheker contrast", "BC-003", "Signal Integrity architecture"],
+    tension: "The same word grounds two different truth-claims — truth as holistic span (this teaching) and truth as divinely animated (the emet/met aleph-removal insight); are these complementary facets or competing readings of one word?",
+    inquiryExpansion: [
+      "Why beginning, middle, and end — what does spanning add to truth's definition?",
+      "Is truth inherently holistic, or can a fragment be true?",
+      "How does the emet span-teaching relate to the emet/met aleph-removal insight?",
+      "What does the sheker contrast contribute to the structure?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["Emet Test", "proposed:Truth As Span"],
+    tags: ["emet", "truth", "aleph-mem-tav", "hebrew-letterforms", "talmud"],
+    _meta: prismBcMeta("BC-002")
+  },
+  {
+    signal: "Truth requires visibility across the whole; fragmentation creates distortion — partial truth can become falsehood.",
+    sourceContext: "Truth requires the whole. Fragmentation creates distortion. Can partial truth become falsehood? What role does context play?",
+    speakerInterpretation: "Context is constitutive, not decorative: a true fragment deployed without its whole functions as a lie.",
+    alternativePerspectives: [
+      { perspective: "Finite knowers only ever possess parts (1 Corinthians 13:12) — if truth strictly requires the whole, truth is available only to God, and human truth-telling needs an account of sufficient rather than total context.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["BC-002", "1 Corinthians 13:12", "POE-009", "KS-007", "Pseudo-coherence", "Quote-mining"],
+    tension: "How much of the whole is necessary before partial sight stops distorting — and if truth requires totality, is human truth-telling possible at all?",
+    inquiryExpansion: [
+      "How much information is necessary for truth?",
+      "Can partial truth become falsehood, and at what threshold?",
+      "What role does context play in constituting rather than merely framing truth?",
+      "How does this claim interact with finite human knowing?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Truth As Span", "proposed:Fragmentation Distortion"],
+    tags: ["truth", "fragmentation", "context", "epistemology", "distortion"],
+    _meta: prismBcMeta("BC-003")
+  },
+  {
+    signal: "Abram receives the promise but fulfillment is delayed; delay is framed as producing faith rather than threatening it.",
+    sourceContext: "Abram receives promise. Fulfillment delayed. Why does delay strengthen faith? What is produced by waiting?",
+    speakerInterpretation: "Delay is presented as the design of the promise, not its defect — the gap between word and fulfillment is where trust becomes real.",
+    alternativePerspectives: [
+      { perspective: "The reading has canonical anchor: Romans 4 presents Abraham's faith as strengthened through the delay, and Hebrews 11 frames the patriarchs as dying without receiving the promises — delay as constitutive of faith is a developed biblical theme.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Genesis 15:6", "Romans 4:18-21", "Hebrews 11:13", "KS-010", "BC-009", "Promise and waiting"],
+    tension: "If certainty eliminates the conditions for trust, is delay a defect of the promise or its design — and what distinguishes faith-producing delay from promise-breaking?",
+    inquiryExpansion: [
+      "Why does delay strengthen faith?",
+      "Does certainty eliminate trust?",
+      "What is produced by waiting that immediate fulfillment could not produce?",
+      "How does one distinguish divine delay from absence?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Promise", "proposed:Faith Under Delay"],
+    tags: ["promise", "delay", "faith", "abraham", "waiting"],
+    _meta: prismBcMeta("BC-004")
+  },
+  {
+    signal: "The smoking furnace of Genesis 15:17, passing between the covenant pieces, is interpreted as God the Father.",
+    sourceContext: "Smoking Furnace. Presented meaning: God the Father. Why furnace imagery? Why smoke? Why passage between pieces?",
+    speakerInterpretation: "The furnace has been interpreted as the Father's presence enacting the covenant passage — one of two divine figures moving between the pieces.",
+    alternativePerspectives: [
+      { perspective: "The mainstream reading takes the smoking firepot and flaming torch together as a single theophany — God alone passing between the pieces in a self-maledictory oath (cf. Jeremiah 34:18's ritual background), making the covenant unilateral rather than depicting two divine persons.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Genesis 15:17", "Jeremiah 34:18", "ANE covenant ritual", "BC-006", "BC-010", "Theophany"],
+    tension: "Are the furnace and lamp two divine persons or one theophany — and what changes about the covenant's structure (bilateral, unilateral, substitutionary) depending on the answer?",
+    inquiryExpansion: [
+      "Why furnace imagery — what does the furnace evoke elsewhere in the canon?",
+      "Why smoke, and why passage between pieces?",
+      "What does the cutting ritual mean in its ANE setting?",
+      "What turns on reading one theophany versus two figures?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Genesis 15 Theophany", "proposed:Covenant Passage"],
+    tags: ["genesis-15", "smoking-furnace", "theophany", "covenant-ritual", "blood-covenant"],
+    _meta: prismBcMeta("BC-005")
+  },
+  {
+    signal: "The burning lamp (flaming torch) of Genesis 15:17 is interpreted as Messianic substitution.",
+    sourceContext: "Burning Lamp. Presented meaning: Messianic substitution. What relationship exists between light and covenant?",
+    speakerInterpretation: "The lamp has been interpreted as the pre-incarnate Son passing between the pieces — substitution embedded in the ritual itself: the covenant's death-penalty borne by God rather than Abram.",
+    alternativePerspectives: [
+      { perspective: "As with the furnace, the dominant reading treats firepot and torch as one theophany; the two-person Messianic identification is a typological proposal not stated by the text.", provenance: "named-tradition" },
+      { perspective: "This is the same interpretive move as the Barabbas substitution reading recorded at SR-011 — structural substitution discerned in narrative the text leaves uninterpreted; the speaker's substitution typology is a recurring pattern.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Genesis 15:17", "BC-005", "SR-011", "Isaiah 53", "Luke 22:20", "Lamp imagery", "Messianic Typology"],
+    tension: "Is the Cross read back into Genesis 15, or read out of it — and what criteria distinguish typological discernment from retrojection?",
+    inquiryExpansion: [
+      "Why lamp imagery — what relationship exists between light and covenant?",
+      "Where else does the canon connect lamp/torch with the Davidic or Messianic line?",
+      "What distinguishes typological discernment from retrojection?",
+      "How does the substitution reading change who bears the covenant's penalty?"
+    ],
+    coherenceStatus: "Open",
+    conceptNodeCandidates: ["proposed:Substitution", "Messianic Typology"],
+    tags: ["genesis-15", "burning-lamp", "substitution", "typology", "messiah"],
+    _meta: prismBcMeta("BC-006")
+  },
+  {
+    signal: "A recurring covenant architecture is presented: Call, then Trust, then Covenant, then Transformation, then Inheritance.",
+    sourceContext: "Covenant Structure: Call -> Trust -> Covenant -> Transformation -> Inheritance.",
+    speakerInterpretation: "Covenant is a relational sequence, not an event: Abram is called, trusts, the covenant is cut, identity is transformed (Abram to Abraham), inheritance is conferred — the order itself carries meaning.",
+    alternativePerspectives: [
+      { perspective: "Biblical covenants vary structurally — Noahic (unconditional, universal), Mosaic (conditional, national), Davidic (dynastic) — so a single five-stage chain may over-generalize from the Abrahamic case.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Genesis 12-17", "Covenant taxonomy", "KS-004", "BC-008", "Abrahamic covenant"],
+    tension: "Does the five-stage chain describe covenant as such, or the Abrahamic covenant in particular — and does the same speaker's habit of chain-structuring (cf. yield-rule-serve) reveal architecture in the text or impose it?",
+    inquiryExpansion: [
+      "Do the Noahic, Mosaic, and Davidic covenants follow this sequence?",
+      "Is transformation a stage of covenant or its consequence?",
+      "What happens to the chain when trust precedes call, or inheritance precedes transformation?",
+      "Where does the new covenant fit the structure?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Covenant Sequence", "proposed:Inheritance"],
+    tags: ["covenant", "structure", "call", "transformation", "inheritance"],
+    _meta: prismBcMeta("BC-007")
+  },
+  {
+    signal: "Covenant is framed as a call away from inherited identity: Old Identity, Departure, Trust, New Identity.",
+    sourceContext: "'The call of covenant is a call away from inherited identity.' Identity Structure: Old Identity -> Departure -> Trust -> New Identity.",
+    speakerInterpretation: "Abram's call out of country, kindred, and father's house — sealed by renaming — presents covenant identity as something received through departure and trust, not inherited by descent.",
+    alternativePerspectives: [
+      { perspective: "Continuity readings note covenant also honors lineage — God self-identifies as the God of Abraham, Isaac, and Jacob, and the covenant's content is precisely a transmissible inheritance — so departure and lineage coexist rather than oppose.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Genesis 12:1", "Genesis 17:5 (renaming)", "SR-013", "BC-007", "KS-006", "Identity and covenant"],
+    tension: "Covenant both severs inherited identity and creates a new inheritance to transmit — how do departure and lineage coexist without contradiction, and which is covenant's deeper grammar?",
+    inquiryExpansion: [
+      "What exactly does Abram leave, and what does he carry?",
+      "How does renaming function as identity transfer across the canon?",
+      "Does the new covenant repeat the departure structure (Matthew 10:37) or end it?",
+      "How does identity-by-declaration relate to identity-by-departure?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Identity By Departure", "proposed:Calling"],
+    tags: ["identity", "calling", "abraham", "renaming", "departure"],
+    _meta: prismBcMeta("BC-008")
+  },
+  {
+    signal: "Divine faithfulness is grounded in God's self-knowledge: 'God does not keep His word because you know what He said. He keeps His word because He knows what He said.'",
+    sourceContext: "Stored per spec as an inquiry seed, not an authoritative conclusion.",
+    speakerInterpretation: "Covenant security is presented as unilateral: God's keeping of his word depends on his own knowledge and character, not on human awareness, monitoring, or reminder.",
+    alternativePerspectives: [
+      { perspective: "Covenant traditions also assign real function to human remembering — memorial stones, 'remember' commands, conditional covenant clauses — so human awareness, while not the ground of God's faithfulness, is not covenantally inert either.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["2 Timothy 2:13", "BC-004", "BC-010", "Memorials and remembrance", "Witness", "KS-011"],
+    tension: "If covenant-keeping is independent of human awareness, what covenant role remains for human remembering, witness, and response — and does unilateral security risk rendering the human party a spectator?",
+    inquiryExpansion: [
+      "What does 2 Timothy 2:13 ('if we are faithless, he remains faithful') ground and what does it not?",
+      "What work do memorial commands do if God's keeping needs no reminder?",
+      "Is witness for God's benefit, the witness's, or the community's?",
+      "How does unilateral faithfulness coexist with conditional covenant clauses?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Faithfulness", "proposed:Witness"],
+    tags: ["faithfulness", "promise", "witness", "covenant", "self-knowledge"],
+    _meta: prismBcMeta("BC-009")
+  },
+  {
+    signal: "Genesis 15's covenant ritual is presented as an interpretive gateway: covenant rituals, ANE treaties, substitution, sacrifice, the new covenant, and identity formation form one branching pathway.",
+    sourceContext: "Inquiry pathway: Genesis 15 -> Covenant Rituals -> Ancient Near East Treaties -> Substitution -> Sacrifice -> New Covenant -> Identity Formation.",
+    speakerInterpretation: "The blood covenant pattern is presented as culminating in the new covenant, with substitution as the through-line from the cutting ritual to the cross.",
+    alternativePerspectives: [
+      { perspective: "Historical-critical treatment reads the Genesis 15 ritual as oath-enactment within its ANE treaty context (Hittite and first-millennium parallels); the christological telescoping is canonical-theological synthesis, a different mode of reading rather than a competing historical claim.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Genesis 15", "Jeremiah 34:18", "Hittite treaty parallels", "Luke 22:20", "Hebrews 9:16-22", "SR-011", "BC-005", "BC-006"],
+    tension: "Does the pathway from cutting ritual to cross trace one developing covenant institution or join two reading modes (historical and canonical) that answer different questions — and what is gained or lost by fusing them?",
+    inquiryExpansion: [
+      "What do the ANE treaty parallels establish and what do they leave open?",
+      "How does Jeremiah 34:18 attest the ritual's meaning within Israel?",
+      "What does Hebrews 9 do with covenant-and-death that Genesis 15 anticipates?",
+      "Where does identity formation enter the pathway — at covenant cutting or covenant keeping?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Blood Covenant", "proposed:Covenant Pathway"],
+    tags: ["genesis-15", "ane-treaties", "new-covenant", "sacrifice", "blood-covenant"],
+    _meta: prismBcMeta("BC-010")
+  }
+];
+
+const PRISM_BC_GUIDANCE = {
+  detectionTerms: [
+    "blood covenant", "covenant vs contract", "Genesis 15", "Abram", "Abraham",
+    "smoking furnace", "burning lamp", "flaming torch", "cutting covenant",
+    "covenant ritual", "promise and delay", "emet", "truth beginning middle end",
+    "inheritance", "substitution", "renaming", "inherited identity",
+    "witness", "faithfulness", "marriage covenant"
+  ],
+  inquiryExpansionPrompts: [
+    "Is this relationship structured by trust or by enforcement — and which does the person actually want?",
+    "What whole is this fragment missing, and who controls the missing context?",
+    "What is the delay in this promise producing that fulfillment could not?",
+    "Who bears the penalty in this covenant — and who passed between the pieces?",
+    "What identity is being departed from, and what inheritance is being formed?"
+  ],
+  proposedConceptNodes: [
+    "Covenant", "Contract", "Trust", "Truth", "Identity", "Transformation",
+    "Promise", "Witness", "Inheritance", "Substitution", "Constraint",
+    "Calling", "Relational Obligation", "Confidence", "Faithfulness",
+    "Blood Covenant"
+  ],
+  packCaveat: "Spec-derived pack: built from the extraction specification, not the full transcript. Treat sourceContext as compressed; supersede with a full-transcript extraction when available."
+};
+
+/**
+ * getBloodCovenantArtifacts - this pack's 10 records.
+ * Filter: { status, tag, recordId }. Returns deep copies.
+ */
+export function getBloodCovenantArtifacts(filter = {}) {
+  let results = PRISM_BC_ARTIFACTS;
+  if (filter.status) results = results.filter((r) => r.coherenceStatus === filter.status);
+  if (filter.tag) {
+    const tag = String(filter.tag).toLowerCase();
+    results = results.filter((r) => r.tags.includes(tag));
+  }
+  if (filter.recordId) results = results.filter((r) => r._meta.recordId === filter.recordId);
+  return results.map((r) => JSON.parse(JSON.stringify(r)));
+}
+
+/**
+ * getBloodCovenantGuidance - detection terms, cross-cutting inquiry
+ * prompts, the spec's candidate concept-node list, and the pack
+ * provenance caveat, as data. Wiring into retrieval is a call-site
+ * decision, consistent with the other packs.
+ */
+export function getBloodCovenantGuidance() {
+  return JSON.parse(JSON.stringify(PRISM_BC_GUIDANCE));
+}
+
+// ------------------------------------------------------------
+// Example invocations (comment only - do not execute at module load)
+//
+// Whole pack:                 getBloodCovenantArtifacts()
+// One record:                 getBloodCovenantArtifacts({ recordId: "BC-005" })
+// Unified across all packs:   getAllSignalRecords({ tag: "substitution" })
+// Detection terms:            getBloodCovenantGuidance().detectionTerms
+// ------------------------------------------------------------
+
+// ============================================================
+// END RAG Artifact Pack: Blood Covenant (Myron Golden)
+// ============================================================
+
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
