@@ -596,6 +596,9 @@
     <!-- Results from recipient's own queries — input lives below results -->
     <div id="resultContent"></div>
 
+    <!-- Flow notice — shown based on collaboration mode -->
+    <div id="shareFlowNotice" style="display:none; margin-top:32px; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); text-align:center; padding:14px 0; border-top:1px solid var(--border);"></div>
+
     <!-- Live input — always at the bottom of the conversation -->
     <div id="inputSection" style="margin-top:40px;">
       <textarea class="input-field" id="userInput"
@@ -652,6 +655,7 @@ var conversationHistory = []; // tracks full exchange for multi-turn context
 var shareId         = null;
 var channelId       = null;
 var collabOpen      = false;
+var collaborationMode = 'read_only';
 var sessionQueries  = 0;
 var QUERY_LIMIT     = 3;
 var currentSubject  = '';
@@ -1176,6 +1180,25 @@ function submitThread(text) {
 
 // ── Recipient query flow ──────────────────────────────────────────────────────
 async function runQuery() {
+  // Asymmetrical mode: open a new thread seeded from this interpretation
+  if (collaborationMode === 'asymmetrical') {
+    var input = document.getElementById('userInput').value.trim();
+    if (!input) return;
+    // Store the seed context and redirect to qt.html
+    var seedSummary = '';
+    var snap = window._currentSnapshot;
+    if (snap) {
+      if (snap.recognition) seedSummary += snap.recognition + ' ';
+      if (snap.core_insight) seedSummary += snap.core_insight;
+    }
+    seedSummary = seedSummary.trim().slice(0, 400);
+    sessionStorage.setItem('qt_thread_seed', seedSummary || currentSubject);
+    sessionStorage.setItem('qt_seed_query', input);
+    window.location.href = 'https://theprism.io/qt.html';
+    return;
+  }
+
+
   var input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
@@ -1513,6 +1536,7 @@ async function loadShare() {
     channelId   = data.channelId || null;
     shareId     = share.id;
     collabOpen  = share.collaboration_open;
+    collaborationMode = share.collaboration_mode || (collabOpen ? 'bidirectional' : 'read_only');
 
     var snapshot = share.snapshot;
     var subject  = share.subject || snapshot._subject || '';
@@ -1534,12 +1558,38 @@ async function loadShare() {
       startLiveThreadPolling(share.thread_id);
     }
 
-    // Show collaboration panel if open — shareId is now the channel identifier
-    if (collabOpen) {
+    // Show collaboration panel if bidirectional
+    if (collaborationMode === 'bidirectional') {
       var panel = document.getElementById('collabPanel');
       if (panel) panel.style.display = 'block';
       await loadCollabMessages();
       startChatRealtime(shareId);
+    }
+
+    // Gate the follow-up input section by collaboration mode
+    var inputSection = document.getElementById('inputSection');
+    var submitBtn    = document.getElementById('submitBtn');
+    var modeNotice   = document.getElementById('shareFlowNotice');
+
+    if (collaborationMode === 'read_only') {
+      if (inputSection) inputSection.style.display = 'none';
+      if (submitBtn) submitBtn.style.display = 'none';
+      if (modeNotice) {
+        modeNotice.textContent = 'This interpretation has been shared for reading. Follow-up exploration is not enabled on this link.';
+        modeNotice.style.display = 'block';
+      }
+    } else if (collaborationMode === 'asymmetrical') {
+      // Show input but redirect to new thread on submit — handled in runQuery()
+      if (inputSection) inputSection.style.display = 'block';
+      if (submitBtn) { submitBtn.style.display = 'block'; submitBtn.textContent = 'Open Your Thread →'; }
+      if (modeNotice) {
+        modeNotice.textContent = 'Your questions will open in your own exploration thread, seeded from this interpretation.';
+        modeNotice.style.display = 'block';
+      }
+    } else {
+      // bidirectional — full access
+      if (inputSection) inputSection.style.display = 'block';
+      if (submitBtn) { submitBtn.style.display = 'block'; submitBtn.textContent = 'Interpret →'; }
     }
 
     // Hide loading, show content
