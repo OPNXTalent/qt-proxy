@@ -3337,7 +3337,8 @@ export function getSeedSignalRecords(filter = {}) {
 //                                        interpreter guidance,
 //                                        pastoral guardrail (data)
 //   getAllSignalRecords(filter)        - seed (31) + POE (21) +
-//                                        Blood Covenant (10) = 62
+//                                        Blood Covenant (10) +
+//                                        Reversing Hermon (12) = 74
 //
 // Source: "Science Meets Sovereignty: From Aristotle to Quantum
 // Theology — The Problem of Evil and the Resolution of Echad
@@ -3862,13 +3863,13 @@ export function getProblemOfEvilGuidance() {
 
 /**
  * getAllSignalRecords - unified access across every signal record in
- * this file: seed records (SR + KS, 31) + Problem of Evil pack (POE,
- * 21) + Blood Covenant pack (BC, 10) = 62.
+ * this file: seed records (SR + KS, 31) + Problem of Evil (POE, 21) +
+ * Blood Covenant (BC, 10) + Reversing Hermon (RH, 12) = 74.
  * Accepts the same filter object as getSeedSignalRecords; the source
- * filter additionally accepts "poe" and "bc" for the packs.
- * (getBloodCovenantArtifacts is declared in the Blood Covenant section
- * below; function declarations hoist module-wide, and this function
- * executes only at call time, so the forward reference is safe.)
+ * filter additionally accepts "poe", "bc", and "rh" for the packs.
+ * (Pack accessors are declared in their sections below; function
+ * declarations hoist module-wide, and this function executes only at
+ * call time, so the forward references are safe.)
  * When records migrate to Supabase, this becomes the single query point.
  */
 export function getAllSignalRecords(filter = {}) {
@@ -3878,15 +3879,19 @@ export function getAllSignalRecords(filter = {}) {
   let includeSeed = true;
   let includePoe = true;
   let includeBc = true;
+  let includeRh = true;
 
   if (filter.source) {
     includeSeed = false;
     includePoe = false;
     includeBc = false;
+    includeRh = false;
     if (filter.source === "poe" || filter.source === PRISM_POE_SOURCE.source) {
       includePoe = true;
     } else if (filter.source === "bc" || filter.source === PRISM_BC_SOURCE.source) {
       includeBc = true;
+    } else if (filter.source === "rh" || filter.source === PRISM_RH_SOURCE.source) {
+      includeRh = true;
     } else {
       includeSeed = true; // "jc", "ks", or a seed URL - delegated to the seed filter
     }
@@ -3895,7 +3900,8 @@ export function getAllSignalRecords(filter = {}) {
   const seed = includeSeed ? getSeedSignalRecords(filter) : [];
   const poe = includePoe ? getProblemOfEvilArtifacts(subFilter) : [];
   const bc = includeBc ? getBloodCovenantArtifacts(subFilter) : [];
-  return [...seed, ...poe, ...bc];
+  const rh = includeRh ? getReversingHermonArtifacts(subFilter) : [];
+  return [...seed, ...poe, ...bc, ...rh];
 }
 
 // ------------------------------------------------------------
@@ -4227,6 +4233,373 @@ export function getBloodCovenantGuidance() {
 
 // ============================================================
 // END RAG Artifact Pack: Blood Covenant (Myron Golden)
+// ============================================================
+
+
+// ============================================================
+// RAG Artifact Pack: Reversing Hermon (Michael Heiser)
+// ------------------------------------------------------------
+// Self-contained section: references no other function in this
+// file and modifies no existing state.
+//
+// Public surface:
+//   getReversingHermonArtifacts(filter)  - this pack's 12 records
+//   getReversingHermonGuidance()         - detection terms, inquiry
+//                                          prompts, hidden-assumption
+//                                          catalog, context-recovery
+//                                          catalog
+//
+// Source: "Enoch, Watchers, and Reversing Hermon" (Michael Heiser).
+// PROVENANCE CAVEAT: spec-derived, not transcript-derived — same
+// ceiling as the Blood Covenant pack. Records marked
+// extractedBy: "spec-import"; supersede record-for-record from a
+// full transcript/book extraction when available.
+//
+// EPISTEMIC NOTE: unlike the sermon corpora, this source is
+// academic Semitics scholarship; several claims carry strong
+// scholarly footing (ancient-reception and text-critical claims)
+// and statuses are calibrated accordingly. Per the spec's
+// interpretive cautions, Enoch material is stored as context that
+// INFLUENCED interpretation, never as scripture or proof, and the
+// Scripture / Interpretation / Tradition / Speculation distinction
+// is preserved in record framing.
+// ============================================================
+
+const PRISM_RH_SOURCE = {
+  source: "spec:reversing-hermon-michael-heiser",
+  title: "Enoch, Watchers, and Reversing Hermon (Michael Heiser)"
+};
+
+function prismRhMeta(recordId) {
+  return {
+    recordId,
+    source: PRISM_RH_SOURCE.source,
+    sourceTitle: PRISM_RH_SOURCE.title,
+    extractedAt: "2026-06-11",
+    extractedBy: "spec-import",
+    importedFrom: "PRISM RAG EXTRACTION SPECIFICATION (chat document)",
+    protocolVersion: "prism-rag-extraction-v1.1"
+  };
+}
+
+const PRISM_RH_ARTIFACTS = [
+  {
+    signal: "Modern readers are presented as cut off from the Second Temple context the biblical writers inhabited; recovering that context is the interpretive method.",
+    sourceContext: "'Modern readers have been cut off from the context.' 'Biblical writers read books outside the Bible.' Primary extraction question: what assumptions would a Second Temple Jew possess that a modern reader may not?",
+    speakerInterpretation: "Interpretation should be governed by the conceptual world of the original audience; the assumptions ancients brought to a text are often more decisive than the words on its surface.",
+    alternativePerspectives: [
+      { perspective: "Context recovery presumes ancient assumptions can be reconstructed reliably, but reconstruction is itself interpretation — the hermeneutical circle means recovered context is a scholarly model, not direct access.", provenance: "extractor-supplied" },
+      { perspective: "Canonical and theological-interpretation traditions argue the church's reading history also carries interpretive authority, not only the original audience's assumptions.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Second Temple Cosmology", "Hermeneutics", "RH-011", "RH-012", "Context Recovery", "Orientation Layer"],
+    tension: "If meaning is governed by assumptions the original audience held, and those assumptions must be reconstructed by fallible scholarship, what arbitrates between competing reconstructions — and how much interpretive weight can a model bear?",
+    inquiryExpansion: [
+      "What assumptions would a Second Temple Jew bring to Genesis 6 that a modern reader does not?",
+      "How is recovered context validated rather than merely asserted?",
+      "Does context recovery relativize later interpretive tradition or correct it?",
+      "What does 'biblical writers read books outside the Bible' imply about inspiration?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Context Recovery", "proposed:Hidden Assumptions"],
+    tags: ["context-recovery", "second-temple", "hermeneutics", "assumptions", "heiser"],
+    _meta: prismRhMeta("RH-001")
+  },
+  {
+    signal: "Genesis 6:1-4's 'sons of God' are read as divine beings (Watchers) whose transgression produced the giants — presented as the dominant Second Temple reading.",
+    sourceContext: "Context Recovery nodes: Genesis 6, Watchers, Giants. Heiser argues modern readers have lost the context in which this reading was the default.",
+    speakerInterpretation: "Some Second Temple Jews understood Genesis 6 through the Watchers tradition (1 Enoch); the supernatural reading was the ancient mainstream, and its modern marginalization is context loss rather than exegetical progress.",
+    alternativePerspectives: [
+      { perspective: "The Sethite interpretation (sons of God as Seth's line) became dominant from Augustine onward, and the royal/dynastic-rulers reading also has advocates — both deliberately demythologize the passage.", provenance: "named-tradition" },
+      { perspective: "Second Temple scholarship broadly confirms the supernatural reading was the ancient default (1 Enoch, Jubilees, LXX, Philo, Josephus, earliest church fathers) — the reception-history claim is well-evidenced independent of whether one adopts the reading theologically.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Genesis 6:1-4", "1 Enoch 6-11", "Jude 6", "2 Peter 2:4", "RH-003", "RH-006", "RH-012"],
+    tension: "The historical claim (ancients read it supernaturally) is strongly evidenced; the normative claim (therefore moderns should) does not follow automatically — should interpretation be governed by the original audience's assumptions even where later tradition deliberately rejected them?",
+    inquiryExpansion: [
+      "What is the actual evidence distribution for the supernatural vs. Sethite readings before Augustine?",
+      "Why did the church's reading shift, and what was at stake in the shift?",
+      "How do Jude 6 and 2 Peter 2:4 relate to the Enochic Watchers narrative?",
+      "Does adopting the ancient reading require adopting Enoch's authority?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["proposed:Watchers", "Second Temple Cosmology"],
+    tags: ["genesis-6", "watchers", "sons-of-god", "nephilim", "reception-history"],
+    _meta: prismRhMeta("RH-002")
+  },
+  {
+    signal: "Evil is presented as entering through multiple distinct but related rebellions — Eden, the Watchers, and Babel — rather than a single Fall.",
+    sourceContext: "Multi-layered rebellion: Eden -> Watchers -> Babel as distinct but related rebellions. 'Why do Second Temple Jews view evil through multiple rebellions?'",
+    speakerInterpretation: "The Second Temple frame treats corruption as layered: human transgression (Eden), divine-human boundary violation (Genesis 6), and corporate rebellion ending in the nations' disinheritance (Babel) — each contributing something the others do not.",
+    alternativePerspectives: [
+      { perspective: "The Augustinian tradition centers a single Fall in Eden, treating Genesis 6 and Babel as consequences within one corruption rather than rebellions of distinct kind — the layered model redistributes explanatory weight that Western theology concentrated.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Genesis 3", "Genesis 6", "Genesis 11", "RH-004", "RH-005", "POE-008", "Layered decoherence"],
+    tension: "Does Scripture present layered corruption or one Fall with sequelae — and what changes about sin, evil, and redemption when Genesis 6 carries independent theological weight?",
+    inquiryExpansion: [
+      "What does each rebellion corrupt that the others do not?",
+      "Why does the Watchers rebellion drop out of Western hamartiology?",
+      "How does layered rebellion change what the Messiah must reverse?",
+      "Does the layered model map onto graded decoherence, or is the resemblance superficial?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Multi-Layered Rebellion", "proposed:Rebellion"],
+    tags: ["rebellion", "eden", "watchers", "babel", "fall"],
+    _meta: prismRhMeta("RH-003")
+  },
+  {
+    signal: "Deuteronomy 32:8-9 is read as the nations being allotted to lesser divine beings at Babel while Israel is retained as Yahweh's own portion — the 'Deuteronomy 32 worldview.'",
+    sourceContext: "Context Recovery nodes: Babel, Deuteronomy 32, Divine Council, Most High language, Nations, Inheritance.",
+    speakerInterpretation: "Babel ends not just in scattering but in disinheritance: territorial divine administration over the nations, with Israel's election as the counter-move — cosmic geography with juridical structure.",
+    alternativePerspectives: [
+      { perspective: "Text-critically, the Masoretic Text reads 'sons of Israel' while Dead Sea Scrolls (4QDeut-j) and the Septuagint support 'sons of God'; many modern translations and most text critics favor the divine-beings reading — the textual case is strong independent of the worldview built on it.", provenance: "named-tradition" },
+      { perspective: "Some scholars accept 'sons of God' textually while resisting the territorial-administration theology as over-systematized from sparse data (Daniel 10's princes, Psalm 82).", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Deuteronomy 32:8-9", "Psalm 82", "Daniel 10:13,20", "Genesis 11", "Acts 17:26", "RH-003", "RH-005", "RH-009"],
+    tension: "The textual reading is strongly supported; the worldview erected on it (territorial divine administration) is a synthesis — how much architecture can one restored verse bear, and where does synthesis become speculation?",
+    inquiryExpansion: [
+      "What is the manuscript evidence for 'sons of God' in Deuteronomy 32:8?",
+      "How do Psalm 82 and Daniel 10 corroborate or complicate territorial administration?",
+      "What does Israel as 'Yahweh's portion' imply about the other nations' status?",
+      "How does Acts 17:26-27 engage the allotment of nations?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Divine Council", "proposed:Deuteronomy 32 Worldview", "proposed:Cosmic Geography"],
+    tags: ["deuteronomy-32", "divine-council", "babel", "nations", "text-criticism"],
+    _meta: prismRhMeta("RH-004")
+  },
+  {
+    signal: "The Messiah is presented as reversing each prior rebellion: Eden to new creation, the Watchers' corruption undone, Babel's scattered nations reclaimed.",
+    sourceContext: "Reversal architecture: Eden -> New Creation; Watchers -> Reversal of Corruption; Babel -> Reclaiming Nations. 'The Messiah reverses multiple rebellions.' Store as architecture, not proof.",
+    speakerInterpretation: "Redemption has the same layered structure as corruption: Pentecost has been interpreted as Babel's reversal (the nations hearing in their own tongues), the Great Commission as reclaiming the disinherited nations, and new creation as Eden restored.",
+    alternativePerspectives: [
+      { perspective: "The Acts 2 / Genesis 11 echo and the table-of-nations resonance are widely noted in scholarship; the full three-fold reversal schema is Heiser's synthesis and is stored here as architecture per the spec, not as textual assertion.", provenance: "named-tradition" },
+      { perspective: "Reversal schemas risk imposing symmetry the texts do not claim — corruption and redemption may rhyme without mirroring, and a schema that needs every rebellion reversed may over-fit.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Acts 2", "Genesis 10-11", "Matthew 28:18-20", "Revelation 21-22", "RH-003", "RH-006", "SR-011"],
+    tension: "Does the reversal architecture surface a design the texts carry implicitly, or impose a symmetry they never assert — and what evidence would distinguish discerned architecture from constructed schema?",
+    inquiryExpansion: [
+      "What are the concrete textual echoes between Acts 2 and Genesis 11?",
+      "How does the Great Commission's 'all nations' engage the Deuteronomy 32 allotment?",
+      "Where does the New Testament explicitly frame redemption as reversal?",
+      "What would falsify the reversal schema?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Reversal Architecture", "proposed:Eden Restoration"],
+    tags: ["reversal", "pentecost", "babel", "new-creation", "messiah"],
+    _meta: prismRhMeta("RH-005")
+  },
+  {
+    signal: "Mount Hermon functions as charged geography: the Watchers' descent point in Enochic tradition, with Jesus' activity at Caesarea Philippi ('gates of hades') and possibly the transfiguration read as deliberate confrontation at that site.",
+    sourceContext: "Context Recovery nodes: Hermon, Abyss. Cosmic geography: why do locations matter?",
+    speakerInterpretation: "Geography carries theology: Jesus declaring the church against the 'gates of hades' at Hermon's base, and (on this reading) being transfigured on Hermon itself, has been interpreted as announcing reversal at the rebellion's landing site.",
+    alternativePerspectives: [
+      { perspective: "The transfiguration's traditional site is Mount Tabor; the Hermon identification is inference from narrative geography (Caesarea Philippi proximity), and the confrontation reading is circumstantial rather than stated.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["1 Enoch 6:6", "Matthew 16:13-18", "Matthew 17:1-8", "RH-002", "RH-005", "RH-009"],
+    tension: "The geographic argument is suggestive and unprovable in equal measure — if locations carry theological intent, how is intended geography distinguished from incidental setting?",
+    inquiryExpansion: [
+      "Why does 1 Enoch locate the Watchers' oath at Hermon?",
+      "What did 'gates of hades' evoke at Caesarea Philippi specifically?",
+      "What is the evidence for Hermon vs. Tabor as the transfiguration site?",
+      "Where else does the canon use location as theological statement?"
+    ],
+    coherenceStatus: "Open",
+    conceptNodeCandidates: ["proposed:Hermon", "proposed:Cosmic Geography"],
+    tags: ["hermon", "transfiguration", "caesarea-philippi", "geography", "gates-of-hades"],
+    _meta: prismRhMeta("RH-006")
+  },
+  {
+    signal: "Disorder is presented as resulting from improper crossing of categories — heaven/earth, divine/human, sacred/profane, knowledge/corruption — making boundary violation the grammar of evil.",
+    sourceContext: "Boundary Violation category: 'Why are boundaries important? Is evil often described as category violation? What role do constraints play in creation?' Related Prism concepts: Constraint, Coherence, Decoherence, Relational Order.",
+    speakerInterpretation: "Creation order is constituted by boundaries; the Watchers' sin is paradigmatic not because of its content alone but because it is category transgression — disorder enters where constraint is violated.",
+    alternativePerspectives: [
+      { perspective: "The category proves too much without a sanctioned/transgressive distinction: the incarnation is the supreme heaven-earth crossing, theophany crosses divine/human, and holiness language manages rather than forbids sacred/profane contact — what evil violates must be specified as unauthorized crossing, not crossing as such.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Genesis 6:1-4", "Leviticus 10:1-3", "Constraint (RCT)", "Coherence/Decoherence", "POE-010", "KS-005", "Relational Order"],
+    tension: "If boundaries are constitutive of created order, and the incarnation is itself a boundary crossing, what distinguishes sanctioned crossing from transgression — authorization, direction, telos, or something else the framework must name?",
+    inquiryExpansion: [
+      "Why are boundaries important — what do constraints constitute rather than merely restrict?",
+      "Is evil characteristically described as category violation across the canon?",
+      "What makes the incarnation lawful crossing where the Watchers' descent is transgression?",
+      "How does this map onto coherence-under-constraint, and where does the mapping strain?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Boundary Violation", "proposed:Category Transgression", "Constraint"],
+    tags: ["boundaries", "constraint", "category-violation", "decoherence", "order"],
+    _meta: prismRhMeta("RH-007")
+  },
+  {
+    signal: "A set of New Testament passages is presented as suffering context collapse — opaque or moralized when read without the Watchers backdrop: 1 Corinthians 11:10, the Legion episode, baptism imagery in 1 Peter 3, Galatians 3:19, Revelation 12.",
+    sourceContext: "Context Collapse category: Genesis 6, Head Covering Passage, Legion, Baptism Imagery, Galatians 3:19, Revelation 12. 'This category is high value.'",
+    speakerInterpretation: "Each passage has been interpreted through Second Temple angelology: 'because of the angels' (1 Cor 11:10) as Watchers-aware; Legion begging not to be sent to the abyss as Watcher-imprisonment awareness; baptism in 1 Peter 3 as enacted declaration to the imprisoned spirits; the law 'ordained through angels' and Revelation 12's dragon-war as the same conceptual world.",
+    alternativePerspectives: [
+      { perspective: "Each passage is an established interpretive crux with mainstream non-Enochic readings: head coverings as propriety/order, 1 Peter 3's 'spirits in prison' as humans of Noah's day or Christ's preaching through Noah, Galatians 3:19 as mediation emphasis — the Enochic frame is one solution among standing options, strongest for 1 Peter 3 in recent scholarship.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["1 Corinthians 11:10", "Mark 5:1-13", "Luke 8:31", "1 Peter 3:18-22", "Galatians 3:19", "Revelation 12", "RH-002", "RH-012"],
+    tension: "These passages were cruxes before the Enochic frame and remain cruxes with it — does the frame dissolve their difficulty (evidence of recovered context) or merely relocate it (evidence of an attractive master-key)?",
+    inquiryExpansion: [
+      "What does 'because of the angels' do in 1 Corinthians 11:10 under each major reading?",
+      "Why does Legion fear the abyss, and what did the abyss hold in Second Temple imagination?",
+      "How does the Enochic reading of 1 Peter 3:18-22 compare with the Augustinian one?",
+      "What is the cost of a master-key hermeneutic even when individual readings succeed?"
+    ],
+    coherenceStatus: "Contested",
+    conceptNodeCandidates: ["proposed:Context Collapse", "proposed:Abyss"],
+    tags: ["context-collapse", "1-peter-3", "legion", "head-covering", "revelation-12"],
+    _meta: prismRhMeta("RH-008")
+  },
+  {
+    signal: "Geography is presented as theologically structured: heaven, earth, abyss, Hermon, Eden, the nations, and sacred space form a charged cosmic map rather than neutral setting.",
+    sourceContext: "Cosmic Geography category: 'Why do locations matter? What role does geography play in theology? Are locations symbolic, literal, or both?'",
+    speakerInterpretation: "Territory carries jurisdiction and meaning — sacred space is qualitatively distinct, the abyss is a real address in the Second Temple map, and the nations' lands sit under the Deuteronomy 32 allotment.",
+    alternativePerspectives: [
+      { perspective: "Modern readers tend to binarize symbolic vs. literal; ancient cosmology held locations as simultaneously physical and charged, so the question 'symbolic or literal' may itself be the anachronism.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["Eden", "Hermon", "Abyss", "Sacred space", "RH-004", "RH-006", "RH-010", "SR-009"],
+    tension: "If the symbolic/literal binary is anachronistic, what third category did the ancients actually operate with — and can modern interpretation inhabit it or only describe it?",
+    inquiryExpansion: [
+      "Why do locations matter in the Second Temple map?",
+      "What makes space sacred — presence, dedication, or event?",
+      "Are Eden, Hermon, and the abyss locations, conditions, or both?",
+      "How does cosmic geography survive translation into a disenchanted cosmology?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Cosmic Geography", "proposed:Sacred Space"],
+    tags: ["cosmic-geography", "sacred-space", "abyss", "eden", "territory"],
+    _meta: prismRhMeta("RH-009")
+  },
+  {
+    signal: "Reality is presented as overlapping domains: Olam HaZeh (present human experience), Shamayim (hidden divine domain), and Olam HaBa (restored fulfilled reality).",
+    sourceContext: "Domain pathways: 'Are these locations or relational domains? What boundaries exist between them? Can domains overlap? How does perception affect access?' Preserve ambiguity. Do not resolve.",
+    speakerInterpretation: "The three domains are presented as simultaneously real with permeable boundaries — the hidden domain interpenetrates present experience, and the future domain is anticipated rather than merely awaited; perception conditions access.",
+    alternativePerspectives: [
+      { perspective: "Rabbinic usage of olam hazeh / olam haba is primarily temporal (this age / the age to come); reading the triad as spatial-relational domains blends temporal eschatology with cosmic geography — a synthesis the sources permit but do not compel.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Second Temple Cosmology", "SR-009", "POE-006", "RH-009", "Already/not-yet eschatology", "Hidden domain"],
+    tension: "Are the three domains places, ages, or relational standings — and per the spec's own instruction, this record preserves the ambiguity rather than resolving it: each resolution changes what 'thy kingdom come on earth as in heaven' asks for.",
+    inquiryExpansion: [
+      "Are these locations or relational domains?",
+      "What boundaries exist between them, and can domains overlap?",
+      "How does perception affect access to the hidden domain?",
+      "How does the domain triad relate to Aeternitas — complement, rival, or different register?"
+    ],
+    coherenceStatus: "Open",
+    conceptNodeCandidates: ["Second Temple Cosmology", "proposed:Domain Triad"],
+    tags: ["olam-hazeh", "olam-haba", "shamayim", "domains", "eschatology"],
+    _meta: prismRhMeta("RH-010")
+  },
+  {
+    signal: "The claim 'Messiah reverses the corruption of the Watchers' rests on a hidden assumption: that Genesis 6 remained an active theological concern in the first century.",
+    sourceContext: "Hidden assumptions category: 'Why did ancient Jews care about Genesis 6? Why do modern readers largely ignore it?' Priority order: Context > Assumptions > Architecture > Conclusions.",
+    speakerInterpretation: "The assumptions beneath arguments are presented as more valuable than the conclusions: the reversal claim is only intelligible inside a world where the Watchers narrative was live — recovering that liveness is the actual work.",
+    alternativePerspectives: [
+      { perspective: "An assumption being historically live does not make it theologically binding; conversely, modern neglect does not make it false — liveness and validity are separate questions the catalog should keep distinct.", provenance: "extractor-supplied" }
+    ],
+    coherenceLinks: ["RH-001", "RH-002", "RH-005", "Hidden Assumptions", "Reception history"],
+    tension: "Assumptions are load-bearing precisely because they are invisible — once surfaced, does an assumption become an argument to evaluate, and what happens to architectures built on assumptions their builders never examined?",
+    inquiryExpansion: [
+      "Why did ancient Jews care about Genesis 6?",
+      "Why do modern readers largely ignore it, and when did the neglect begin?",
+      "What other New Testament arguments carry Enochic assumptions silently?",
+      "How should the graph store assumptions distinctly from claims?"
+    ],
+    coherenceStatus: "Emerging",
+    conceptNodeCandidates: ["proposed:Hidden Assumptions"],
+    tags: ["hidden-assumptions", "genesis-6", "watchers", "reception-history", "method"],
+    _meta: prismRhMeta("RH-011")
+  },
+  {
+    signal: "1 Enoch is handled as context, not canon: 'used to explain,' 'influenced interpretation of,' quoted by Jude — preserving the distinction between Scripture, Interpretation, Tradition, and Speculation.",
+    sourceContext: "Interpretive cautions: never store 'Enoch proves X'; store 'Enoch was used to explain X,' 'Some Second Temple Jews understood X through Enoch.'",
+    speakerInterpretation: "Enoch's value is evidential about the ancient conceptual world, not authoritative about doctrine — it shows what assumptions readers brought, which is exactly the context-recovery payload.",
+    alternativePerspectives: [
+      { perspective: "The Ethiopian Orthodox Tewahedo canon includes 1 Enoch, and some argue Jude's citation (Jude 14-15) confers authority; the standard counter is that citation is not canonization — Paul quotes pagan poets without canonizing them.", provenance: "named-tradition" }
+    ],
+    coherenceLinks: ["Jude 14-15", "1 Enoch", "Canon formation", "RH-001", "RH-002", "Tier hierarchy (governing source hierarchy)"],
+    tension: "A text can be indispensable for interpretation while remaining non-authoritative for doctrine — but in practice, can a frame built on Enoch's narrative avoid quietly granting it the authority the method formally withholds?",
+    inquiryExpansion: [
+      "What does Jude's citation of Enoch establish and what does it not?",
+      "How did 1 Enoch's standing differ across Second Temple communities?",
+      "Where is the line between context that informs and tradition that governs?",
+      "How should the source hierarchy tier Enochic material?"
+    ],
+    coherenceStatus: "Strongly Coherent",
+    conceptNodeCandidates: ["proposed:Scripture-Interpretation-Tradition-Speculation", "Governing Source Hierarchy"],
+    tags: ["1-enoch", "canon", "jude", "authority", "method"],
+    _meta: prismRhMeta("RH-012")
+  }
+];
+
+const PRISM_RH_GUIDANCE = {
+  detectionTerms: [
+    "Watchers", "nephilim", "giants", "sons of God", "Genesis 6",
+    "divine council", "Deuteronomy 32", "Psalm 82", "1 Enoch", "Book of Enoch",
+    "Mount Hermon", "gates of hades", "gates of hell", "abyss", "Babel",
+    "table of nations", "cosmic geography", "spirits in prison",
+    "because of the angels", "Legion", "Reversing Hermon", "Heiser",
+    "olam haba", "second temple"
+  ],
+  inquiryExpansionPrompts: [
+    "What assumptions would a Second Temple reader bring to this passage that a modern reader does not?",
+    "Is this difficulty in the text, or in the distance between the text's world and ours?",
+    "Which rebellion — Eden, Watchers, Babel — does this passage assume, if any?",
+    "Is this boundary crossing sanctioned or transgressive, and what makes the difference?",
+    "Is this claim Scripture, interpretation, tradition, or speculation — and is the record keeping those distinct?"
+  ],
+  hiddenAssumptionCatalog: [
+    { claim: "Messiah reverses the corruption of the Watchers.", assumption: "Genesis 6 remained an active theological concern in the first century." },
+    { claim: "The nations sit under hostile divine administration.", assumption: "Deuteronomy 32:8 originally read 'sons of God' and carries territorial theology." },
+    { claim: "Jesus' Caesarea Philippi declaration confronts the rebellion at its site.", assumption: "Geography carries deliberate theological intent in the gospel narratives." },
+    { claim: "Baptism declares victory to imprisoned spirits.", assumption: "1 Peter's audience knew the Enochic imprisonment narrative." },
+    { claim: "Modern interpretation should recover the ancient context.", assumption: "Ancient assumptions are reconstructible with sufficient reliability to govern interpretation." }
+  ],
+  contextRecoveryCatalog: [
+    { contextLost: "Supernatural reading of Genesis 6 as the ancient default", passagesAffected: ["Genesis 6:1-4", "Jude 6", "2 Peter 2:4"] },
+    { contextLost: "Babel as disinheritance of the nations to lesser elohim", passagesAffected: ["Deuteronomy 32:8-9", "Genesis 11", "Acts 17:26"] },
+    { contextLost: "Divine council as the throne-room governance frame", passagesAffected: ["Psalm 82", "1 Kings 22:19-23", "Job 1-2"] },
+    { contextLost: "The abyss as the Watchers' prison", passagesAffected: ["Luke 8:31", "2 Peter 2:4", "Revelation 9:1-2"] },
+    { contextLost: "Hermon as the rebellion's landing site", passagesAffected: ["Matthew 16:13-18", "Matthew 17:1-8"] },
+    { contextLost: "Enochic angelology behind apostolic asides", passagesAffected: ["1 Corinthians 11:10", "1 Peter 3:18-22", "Galatians 3:19", "Revelation 12"] }
+  ],
+  packCaveat: "Spec-derived pack: built from the extraction specification, not the full Heiser transcript or book text. Statuses calibrate historical/text-critical claims (well-evidenced) separately from theological syntheses (emerging). Supersede with a full extraction when available."
+};
+
+/**
+ * getReversingHermonArtifacts - this pack's 12 records.
+ * Filter: { status, tag, recordId }. Returns deep copies.
+ */
+export function getReversingHermonArtifacts(filter = {}) {
+  let results = PRISM_RH_ARTIFACTS;
+  if (filter.status) results = results.filter((r) => r.coherenceStatus === filter.status);
+  if (filter.tag) {
+    const tag = String(filter.tag).toLowerCase();
+    results = results.filter((r) => r.tags.includes(tag));
+  }
+  if (filter.recordId) results = results.filter((r) => r._meta.recordId === filter.recordId);
+  return results.map((r) => JSON.parse(JSON.stringify(r)));
+}
+
+/**
+ * getReversingHermonGuidance - detection terms, inquiry prompts, the
+ * hidden-assumption catalog, and the context-recovery catalog (the
+ * spec's requested outputs 7 and 8), as data. Wiring into retrieval
+ * is a call-site decision, consistent with the other packs.
+ */
+export function getReversingHermonGuidance() {
+  return JSON.parse(JSON.stringify(PRISM_RH_GUIDANCE));
+}
+
+// ------------------------------------------------------------
+// Example invocations (comment only - do not execute at module load)
+//
+// Whole pack:               getReversingHermonArtifacts()
+// One record:               getReversingHermonArtifacts({ recordId: "RH-007" })
+// Unified across packs:     getAllSignalRecords({ tag: "watchers" })
+// Hidden assumptions:       getReversingHermonGuidance().hiddenAssumptionCatalog
+// Context recovery catalog: getReversingHermonGuidance().contextRecoveryCatalog
+// ------------------------------------------------------------
+
+// ============================================================
+// END RAG Artifact Pack: Reversing Hermon (Michael Heiser)
 // ============================================================
 
 
