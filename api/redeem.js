@@ -87,8 +87,10 @@ async function handleRegister(req, res) {
   }
 
   try {
-    // Service role key bypasses RLS — safe for server-side inserts only
-    const supaRes = await fetch(`${SUPABASE_URL}/rest/v1/subscribers`, {
+    // Service role key bypasses RLS — safe for server-side inserts only.
+    // on_conflict=email merges on the email unique constraint so re-registration
+    // updates the existing row instead of throwing a duplicate-key 500.
+    const supaRes = await fetch(`${SUPABASE_URL}/rest/v1/subscribers?on_conflict=email`, {
       method: 'POST',
       headers: {
         'apikey':        SERVICE_ROLE_KEY,
