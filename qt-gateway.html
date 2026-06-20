@@ -938,7 +938,7 @@ const regRes = await fetch('/api/redeem?action=register', {
   async function handleForgot() {
     var email = document.getElementById('ru-email').value.trim();
     if (!email) return;
-    await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://quantumtheology.app/reset-password' });
+    await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://theprism.io/reset-password' });
     alert('Password reset email sent to ' + email);
   }
 
