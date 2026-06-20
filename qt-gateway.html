@@ -860,7 +860,7 @@ var flowCopies = {
       return;
     }
 
-const regRes = await fetch('/api/register', {
+const regRes = await fetch('/api/redeem?action=register', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ email: email, display_name: displayName, tier: 'free', status: 'active' })
