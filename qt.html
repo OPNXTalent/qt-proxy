@@ -4727,23 +4727,27 @@ function initSidebar() {
     return;
   }
 
-  // Anonymous / free users — show sidebar open with the banner visible immediately
-  if (!email || CURRENT_TIER === 'free') {
+  // Anonymous — no identity at all — lightweight sidebar, nothing to fetch
+  if (!email) {
     allThreads = [];
     renderThreads(allThreads);
     if (sidebar) { sidebar.classList.add('visible'); sidebar.classList.add('open'); }
     if (toggle)  { toggle.classList.add('visible'); toggle.textContent = '‹'; }
-    var mc = document.getElementById('mainContent');
-    if (mc) mc.classList.add('sidebar-open');
+    var mcAnon = document.getElementById('mainContent');
+    if (mcAnon) mcAnon.classList.add('sidebar-open');
     sidebarOpen = true;
     sidebarHasAppeared = true;
-    // Show Keep Questioning for logged-in Observer users
-    if (email) {
-      var kqBox = document.getElementById('keepQuestioningBox');
-      if (kqBox) kqBox.style.display = 'block';
-    }
     loadSidebarCreditsAnon();
     return;
+  }
+
+  // Registered — including free tier — always fetches real thread history
+  // below. Free tier used to be treated identically to anonymous visitors
+  // here, which meant a logged-in Observer's sidebar always came up empty
+  // no matter how much history actually existed server-side for their email.
+  if (CURRENT_TIER === 'free') {
+    var kqBox = document.getElementById('keepQuestioningBox');
+    if (kqBox) kqBox.style.display = 'block';
   }
 
   var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
