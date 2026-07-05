@@ -1972,27 +1972,27 @@
         <div id="limitEmailStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:#b85c5c; margin-top:10px;"></div>
       </div>
 
-      <!-- Four-option wall -->
-      <div id="limitPromptOptions" style="display:none; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
+      <!-- Four-option wall — visible immediately; registration only interrupts on actual click -->
+      <div id="limitPromptOptions" style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
 
         <!-- Signal Bank bundles -->
         <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface);">
           <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Query Bundles</div>
           <div style="font-family:var(--crimson); font-size:14px; color:var(--text-dim); line-height:1.6; margin-bottom:16px;">No subscription required. Credits never expire.</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" class="signal-bank-link" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:14px; color:var(--text);">10 queries</span>
               <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$2.99 →</span>
             </a>
-            <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" class="signal-bank-link" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:14px; color:var(--text);">25 queries</span>
               <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$6.99 →</span>
             </a>
-            <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" class="signal-bank-link" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:14px; color:var(--text);">50 queries</span>
               <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$12.99 →</span>
             </a>
-            <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" class="signal-bank-link" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:14px; color:var(--text);">100 queries</span>
               <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$19.99 →</span>
             </a>
@@ -2008,7 +2008,7 @@
             <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Subscribe</div>
             <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale); margin-bottom:4px;">from $9.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
             <div style="font-family:var(--crimson); font-size:14px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">Full framework access. Session history. Choose the plan that fits.</div>
-            <a href="/purchase.html" id="subscribeSeePlansLink" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">See Plans →</a>
+            <a href="/purchase.html" id="subscribeSeePlansLink" onclick="return handlePurchaseLinkClick(event, this)" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">See Plans →</a>
           </div>
 
           <!-- Free -->
@@ -6418,18 +6418,32 @@ function showFreeAccountModal() {
 // sessions have somewhere to attach to.
 
 function checkLimitEmailGate() {
+  // Grid is visible immediately — this just makes sure the registration
+  // panel starts hidden and any known email is already applied to links.
   var gate = document.getElementById('limitPromptEmailGate');
-  var opts = document.getElementById('limitPromptOptions');
+  if (gate) gate.style.display = 'none';
   var existingEmail = localStorage.getItem('qt_user_email');
-  if (!gate || !opts) return;
-  if (existingEmail) {
-    gate.style.display = 'none';
-    opts.style.display = 'grid';
-    applyLimitEmailToOptions(existingEmail);
-  } else {
+  if (existingEmail) applyLimitEmailToOptions(existingEmail);
+}
+
+// Intercepts a click on any purchase link (Signal Bank bundle or Subscribe).
+// If the visitor already has an account, lets the click through normally.
+// If not, stops the navigation, remembers where they were headed, and shows
+// the registration form — completing it will continue on to that same link.
+function handlePurchaseLinkClick(event, anchorEl) {
+  var email = localStorage.getItem('qt_user_email');
+  if (email) return true; // already registered — proceed to Stripe/purchase.html as normal
+
+  event.preventDefault();
+  window._limitPendingHref = anchorEl.getAttribute('href');
+  window._limitPendingIsStripe = anchorEl.classList.contains('signal-bank-link');
+
+  var gate = document.getElementById('limitPromptEmailGate');
+  if (gate) {
     gate.style.display = 'block';
-    opts.style.display = 'none';
+    gate.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+  return false;
 }
 
 function applyLimitEmailToOptions(email) {
@@ -6521,11 +6535,19 @@ async function submitLimitRegistration() {
       body: JSON.stringify({ email: email })
     }).catch(function() {});
 
-    var gate = document.getElementById('limitPromptEmailGate');
-    var opts = document.getElementById('limitPromptOptions');
-    if (gate) gate.style.display = 'none';
-    if (opts) opts.style.display = 'grid';
     applyLimitEmailToOptions(email);
+
+    // Continue on to whichever purchase link the person originally clicked
+    if (window._limitPendingHref) {
+      var dest = window._limitPendingHref;
+      var param = window._limitPendingIsStripe ? 'prefilled_email' : 'email';
+      var sep = dest.indexOf('?') === -1 ? '?' : '&';
+      window.location.href = dest + sep + param + '=' + encodeURIComponent(email);
+      return;
+    }
+
+    var gate = document.getElementById('limitPromptEmailGate');
+    if (gate) gate.style.display = 'none';
 
   } catch (e) {
     if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
