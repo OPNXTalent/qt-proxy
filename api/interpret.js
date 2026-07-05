@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export const config = {
   api: {
     bodyParser: {
@@ -1313,12 +1315,14 @@ async function getCodeRedemption(email) {
   return null;
 }
 
-// ── ANONYMOUS IP RATE LIMITING ────────────────────────────────────────────────
-async function getQueryLog(ip) {
+// ── ANONYMOUS VISITOR RATE LIMITING ───────────────────────────────────────────
+// Keyed on a persistent visitor cookie (stable across IP changes) rather than
+// IP address alone. `key` is expected to already be prefixed, e.g. `visitor:<uuid>`.
+async function getQueryLog(key) {
   const windowStart = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
   const url = `${SUPABASE_URL}/rest/v1/query_log?select=id,query_type,cost,created_at` +
     `&user_id=is.null` +
-    `&query_type=eq.${encodeURIComponent(`ip:${ip}`)}` +
+    `&query_type=eq.${encodeURIComponent(key)}` +
     `&created_at=gte.${encodeURIComponent(windowStart.toISOString())}` +
     `&order=created_at.desc`;
 
@@ -1332,14 +1336,14 @@ async function getQueryLog(ip) {
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '(no body)');
-    console.error(`[getQueryLog] Supabase returned ${res.status} for ip=${ip}: ${errText}`);
+    console.error(`[getQueryLog] Supabase returned ${res.status} for key=${key}: ${errText}`);
     throw new Error(`getQueryLog: Supabase request failed with status ${res.status}`);
   }
 
   const data = await res.json();
 
   if (!Array.isArray(data)) {
-    console.error(`[getQueryLog] Non-array response for ip=${ip}: ${JSON.stringify(data)}`);
+    console.error(`[getQueryLog] Non-array response for key=${key}: ${JSON.stringify(data)}`);
     throw new Error('getQueryLog: malformed Supabase response');
   }
 
@@ -1352,7 +1356,7 @@ async function getQueryLog(ip) {
 
 
 
-async function insertQueryLog(ip) {
+async function insertQueryLog(key) {
   await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
     method: 'POST',
     headers: {
@@ -1362,7 +1366,7 @@ async function insertQueryLog(ip) {
       'Prefer': 'return=minimal'
     },
     body: JSON.stringify({
-      query_type: `ip:${ip}`,
+      query_type: key,
       credit_source: 'free_tier',
       cost: 1,
       channel_context: 'solo'
@@ -1370,12 +1374,58 @@ async function insertQueryLog(ip) {
   });
 }
 
-async function incrementQueryLog(ip) {
-  await insertQueryLog(ip);
+async function incrementQueryLog(key) {
+  await insertQueryLog(key);
 }
 
-async function resetQueryLog(ip) {
+async function resetQueryLog(key) {
   // No-op — rows are immutable, window is time-based
+}
+
+// ── VISITOR IDENTITY (persistent cookie, survives IP changes) ────────────────
+// IP address alone is not a stable identity: mobile carriers rotate IPs on
+// NAT lease renewal, WiFi/cellular handoff, and app backgrounding/foregrounding
+// all change the visible IP without the visitor actually being "new". A
+// long-lived first-party cookie is a far more stable identity signal.
+const VISITOR_COOKIE_NAME = 'prism_vid';
+const VISITOR_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365; // 1 year
+
+function parseCookies(req) {
+  const header = req.headers?.cookie;
+  if (!header) return {};
+  return header.split(';').reduce((acc, pair) => {
+    const idx = pair.indexOf('=');
+    if (idx === -1) return acc;
+    const key = pair.slice(0, idx).trim();
+    const val = pair.slice(idx + 1).trim();
+    if (key) acc[key] = decodeURIComponent(val);
+    return acc;
+  }, {});
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Reads the visitor cookie if present/valid; otherwise mints a new one and
+// queues a Set-Cookie header on the response. Returns { visitorId, isNew }.
+function getOrCreateVisitorId(req, res) {
+  const cookies = parseCookies(req);
+  const existing = cookies[VISITOR_COOKIE_NAME];
+
+  if (existing && UUID_RE.test(existing)) {
+    return { visitorId: existing, isNew: false };
+  }
+
+  const visitorId = crypto.randomUUID();
+  const cookieParts = [
+    `${VISITOR_COOKIE_NAME}=${visitorId}`,
+    `Max-Age=${VISITOR_COOKIE_MAX_AGE_SECONDS}`,
+    'Path=/',
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax'
+  ];
+  res.setHeader('Set-Cookie', cookieParts.join('; '));
+  return { visitorId, isNew: true };
 }
 
 // ── PRE-FLIGHT SUBSCRIBER QUOTA CHECK ────────────────────────────────────────
@@ -1414,7 +1464,7 @@ async function getLiveQueryCount(userId, tier) {
   }
 }
 
-async function checkSubscriberQuota(subscriber, ip) {
+async function checkSubscriberQuota(subscriber, visitorKey) {
   const tier = normalizeTier(subscriber.tier);
   const limit = TIER_LIMITS[tier];
 
@@ -1425,17 +1475,18 @@ async function checkSubscriberQuota(subscriber, ip) {
   const liveCount = await getLiveQueryCount(subscriber.id, tier);
   let used = liveCount !== null ? liveCount : (subscriber.query_count || 0);
 
-  // Free tier shares its 24-hour window with the anonymous IP quota — a user
-  // who burns through anonymous queries and then logs in should not get a
-  // fresh allotment on the same IP. Fold any recent anonymous usage in.
-  if (tier === 'free' && ip && ip !== 'unknown') {
+  // Free tier shares its 24-hour window with the anonymous visitor quota — a
+  // user who burns through anonymous queries and then logs in should not get
+  // a fresh allotment on the same device. Fold any recent anonymous usage in,
+  // keyed on the persistent visitor cookie rather than IP.
+  if (tier === 'free' && visitorKey) {
     try {
-      const anonLog = await getQueryLog(ip);
+      const anonLog = await getQueryLog(visitorKey);
       if (anonLog && anonLog.query_count > 0) {
         used += anonLog.query_count;
       }
     } catch (err) {
-      console.error(`[SUBSCRIBER QUOTA FAIL-OPEN] Anonymous usage lookup failed for ip=${ip}: ${err.message}`);
+      console.error(`[SUBSCRIBER QUOTA FAIL-OPEN] Anonymous usage lookup failed for key=${visitorKey}: ${err.message}`);
     }
   }
 
@@ -1821,7 +1872,8 @@ export default async function handler(req, res) {
 
   // ── GET — preflight status check ─────────────────────────────────────────
   if (req.method === 'GET') {
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+    const { visitorId } = getOrCreateVisitorId(req, res);
+    const visitorKey = `visitor:${visitorId}`;
     const urlObj = new URL(req.url, 'https://' + req.headers.host);
     const email = urlObj.searchParams.get('email');
 
@@ -1836,7 +1888,7 @@ export default async function handler(req, res) {
     }
 
     try {
-      const log = await getQueryLog(ip);
+      const log = await getQueryLog(visitorKey);
       if (log) {
         const firstQuery = new Date(log.first_query_at);
         const hoursSinceFirst = (Date.now() - firstQuery.getTime()) / (1000 * 60 * 60);
@@ -1929,7 +1981,8 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+  const { visitorId } = getOrCreateVisitorId(req, res);
+  const visitorKey = `visitor:${visitorId}`;
 
   let prompt, messages, userEmail, rawQuery, isFollowUp;
   try {
@@ -1997,7 +2050,7 @@ export default async function handler(req, res) {
 
         const isFollowUpCheck = isFollowUp || (messages && messages.length > 1);
         if (!isFollowUpCheck && subscriber) {
-          const quota = await checkSubscriberQuota(subscriber, ip);
+          const quota = await checkSubscriberQuota(subscriber, visitorKey);
           if (!quota.allowed) {
             return res.status(200).json({
               quota_exceeded: true,
@@ -2125,12 +2178,12 @@ export default async function handler(req, res) {
 
   // ── FREE / ANONYMOUS PATH ─────────────────────────────────────────────────
   try {
-    const log = await getQueryLog(ip);
+    const log = await getQueryLog(visitorKey);
     if (log) {
       const firstQuery = new Date(log.first_query_at);
       const hoursSinceFirst = (Date.now() - firstQuery.getTime()) / (1000 * 60 * 60);
       if (hoursSinceFirst >= WINDOW_HOURS) {
-        await resetQueryLog(ip);
+        await resetQueryLog(visitorKey);
       } else if (log.query_count >= QUERY_LIMIT) {
         const hoursRemaining = Math.ceil(WINDOW_HOURS - hoursSinceFirst);
         return res.status(429).json({
@@ -2139,13 +2192,13 @@ export default async function handler(req, res) {
           hoursRemaining
         });
       } else {
-        await incrementQueryLog(ip, log.query_count);
+        await incrementQueryLog(visitorKey);
       }
     } else {
-      await insertQueryLog(ip);
+      await insertQueryLog(visitorKey);
     }
   } catch (err) {
-    console.error(`[ANONYMOUS PATH FAIL-OPEN] Rate limit check failed for ip=${ip}: ${err.message}`);
+    console.error(`[ANONYMOUS PATH FAIL-OPEN] Rate limit check failed for key=${visitorKey}: ${err.message}`);
   }
 
   const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
