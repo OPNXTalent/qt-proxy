@@ -6553,6 +6553,17 @@ async function submitFreeAccount() {
   if (statusEl) statusEl.style.display = 'none';
 
   try {
+    // Create the actual Supabase Auth account — the same call the gateway's
+    // "I'm new here" flow uses. Without this, a subscribers row gets
+    // created but there's no real account behind it: no login, no password
+    // reset, nothing in Supabase Auth to actually authenticate against.
+    var client = getSupabaseClient();
+    var signUpResult = await client.auth.signUp({ email: email, password: password });
+    if (signUpResult.error) {
+      if (statusEl) { statusEl.textContent = signUpResult.error.message; statusEl.style.display = 'block'; }
+      return;
+    }
+
     var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
     var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
     await fetch(sbUrl + '/rest/v1/subscribers', {
@@ -6630,6 +6641,15 @@ async function submitAnonSave() {
     if (statusEl) { statusEl.textContent = 'Password must be at least 6 characters.'; statusEl.style.display = 'block'; } return;
   }
   try {
+    // Same fix as submitFreeAccount — create the real Auth account first,
+    // so this isn't just a database row with no way to log in.
+    var client = getSupabaseClient();
+    var signUpResult = await client.auth.signUp({ email: email, password: password });
+    if (signUpResult.error) {
+      if (statusEl) { statusEl.textContent = signUpResult.error.message; statusEl.style.display = 'block'; }
+      return;
+    }
+
     var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
     var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
     await fetch(sbUrl + '/rest/v1/subscribers', {
