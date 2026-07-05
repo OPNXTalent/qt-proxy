@@ -4821,18 +4821,12 @@ function initSidebar() {
       .catch(function() {});
     })(allThreads);
 
-    // Auto-restore last active thread on page load — skipped if we already
-    // restored an in-progress conversation from a pre-purchase snapshot,
-    // since that reflects more recent state than whatever's saved server-side.
-    if (!window._resumedFromSnapshot) {
-      var lastId = localStorage.getItem('qt_last_thread_id');
-      if (lastId && allThreads.find(function(t) { return t.id === lastId; })) {
-        selectThread(lastId);
-      } else if (allThreads.length > 0) {
-        // Fall back to most recent thread
-        selectThread(allThreads[0].id);
-      }
-    }
+    // Sidebar Archive is already populated above via renderThreads(). No
+    // thread is auto-opened here anymore — signing in (or any ordinary
+    // page load) now lands on a blank "New Subject" state by default. The
+    // one deliberate exception is a resumed post-purchase conversation
+    // (window._resumedFromSnapshot), which is restored separately and
+    // takes precedence over this — nothing further needed here for that.
   })
   .catch(function(err) {
     console.error('initSidebar error:', err.message);
