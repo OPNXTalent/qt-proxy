@@ -91,7 +91,7 @@ async function upsertSubscriber(email, customerId, subscriptionId, tier, limit, 
   const resetAt = new Date();
   resetAt.setMonth(resetAt.getMonth() + 1);
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers?on_conflict=email`, {
     method: 'POST',
     headers: {
       ...supabaseHeaders(),
@@ -158,7 +158,7 @@ async function creditSignalSessions(email, credits) {
 
   if (!rows || rows.length === 0) {
     // No subscriber record yet — create one with credits
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers?on_conflict=email`, {
       method: 'POST',
       headers: { ...supabaseHeaders(), 'Prefer': 'resolution=merge-duplicates' },
       body: JSON.stringify({
