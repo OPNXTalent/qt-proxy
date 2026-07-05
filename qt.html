@@ -967,7 +967,7 @@
     font-size:13px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: var(--text-muted);
+    color: var(--gold-pale);
     margin-bottom: 12px;
   }
   .qt-thread-btn {
@@ -1046,20 +1046,19 @@
     width: 100%;
     text-align: center;
     background: transparent;
-    border: 1px solid var(--border-lit);
-    color: var(--text-muted);
-    font-family: var(--mono);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-pale);
+    font-family: var(--cinzel);
     font-size:13px;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     padding: 12px 20px;
     cursor: pointer;
     margin-bottom: 32px;
-    transition: border-color 0.2s, color 0.2s;
+    transition: all 0.25s;
   }
   .qt-framework-toggle:hover {
-    border-color: var(--gold-dim);
-    color: var(--gold-pale);
+    border-color: var(--gold);
   }
   .qt-framework-body {
     display: none;
@@ -1299,21 +1298,20 @@
   }
 
   .new-query-btn {
-    font-family: var(--mono);
+    font-family: var(--cinzel);
     font-size:20px;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--gold-pale);
     background: transparent;
-    border: 1px solid var(--border-lit);
+    border: 1px solid var(--gold-dim);
     padding: 12px 24px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.25s;
   }
 
   .new-query-btn:hover {
-    border-color: var(--gold-dim);
-    color: var(--gold-pale);
+    border-color: var(--gold);
   }
 
   /* Mic button active state */
@@ -1931,7 +1929,7 @@
 
   <!-- SUBMIT ROW — lives outside inputSection so opacity fade never affects it -->
   <div class="submit-row" id="submitRow">
-    <button id="newSubjectTopBtn" onclick="resetForm()" onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'" onmouseout="this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'" style="display:none;font-family:var(--mono);font-size:16px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-dim);background:transparent;border:1px solid var(--border-lit);padding:16px 28px;cursor:pointer;transition:all 0.2s;">↺ New Subject</button>
+    <button id="newSubjectTopBtn" onclick="resetForm()" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--gold-dim)'" style="display:none;font-family:var(--cinzel);font-size:16px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-pale);background:transparent;border:1px solid var(--gold-dim);padding:16px 28px;cursor:pointer;transition:all 0.25s;">↺ New Subject</button>
     <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
   </div>
 
