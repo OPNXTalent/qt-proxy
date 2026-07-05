@@ -2512,7 +2512,11 @@ async function runInterpretation() {
     updateSessionGovernanceUI();
 
     sessionQueryCount++;
-    decrementSidebarCounter();
+    // Live refresh from the server — this is what actually reflects a
+    // Signal Bank credit draw-down, not just the free-tier count. The
+    // local-only decrement was leaving Signal Bank stale until a manual
+    // page refresh, since it never re-reads purchased_credits.
+    loadSidebarCredits();
     // Only lock the UI for free/anonymous users — paid subscribers are gated server-side
     const _isAnonPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
     const _isPaidPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
@@ -2710,7 +2714,7 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
 
     // Increment counter and apply lock for non-subscribers after successful follow-up
     sessionQueryCount++;
-    decrementSidebarCounter();
+    loadSidebarCredits();
     const _isAnonFUPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
     const _isPaidFUPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
     if ((_isAnonFUPost || !_isPaidFUPost) && sessionQueryCount >= QUERY_LIMIT) {
@@ -3457,6 +3461,7 @@ async function downloadPDF(mode) {
 function resetForm() {
   conversationHistory = [];
   currentSubject = '';
+  localStorage.removeItem('qt_resume_snapshot');
   document.getElementById('resultBlock').classList.remove('visible');
   document.getElementById('downloadRow').style.display = 'none';
   document.getElementById('followUpSection').style.display = 'none';
@@ -4637,11 +4642,9 @@ async function loadSidebarCredits() {
       );
       const data = await res.json();
       const credits = data?.[0]?.purchased_credits || 0;
-      if (credits > 0) {
-        setQueryCredits(credits);
-        const wrapEl = document.getElementById('sidebarCredits');
-        if (wrapEl) wrapEl.style.display = 'flex';
-      }
+      setQueryCredits(credits);
+      const wrapEl = document.getElementById('sidebarCredits');
+      if (wrapEl) wrapEl.style.display = 'flex';
     } catch {}
     loadSidebarCreditsAnon();
     return;
@@ -6832,7 +6835,17 @@ document.addEventListener('DOMContentLoaded', function() {
     window.location.href = 'https://theprism.io/share.html?t=' + encodeURIComponent(returnShare);
     return;
   }
-  restoreResumeSnapshot();
+  // Only restore a saved conversation when actually returning from a Stripe
+  // purchase — restoring it on every ordinary refresh was causing an old
+  // conversation to resurface even after starting a fresh session. Any
+  // leftover snapshot from an abandoned/incomplete purchase click gets
+  // cleared here instead of lingering to reappear on some later visit.
+  var _urlParams = new URLSearchParams(window.location.search);
+  if (_urlParams.get('credits_added') === '1') {
+    restoreResumeSnapshot();
+  } else {
+    localStorage.removeItem('qt_resume_snapshot');
+  }
   initSidebar();
   runPreflightCheck();
   handleCreditsAdded();
