@@ -824,7 +824,7 @@ var flowCopies = {
       }
 
       setTimeout(function() {
-        window.location.href = 'https://quantumtheology.app/qt.html?tier=' + tier;
+        window.location.href = '/qt.html?tier=' + tier;
       }, 2000);
     })
     .catch(function(err) {
@@ -832,7 +832,7 @@ var flowCopies = {
       // Fallback — redirect with free tier
       localStorage.setItem('qt_user_email', email);
       setTimeout(function() {
-        window.location.href = 'https://quantumtheology.app/qt.html?tier=free';
+        window.location.href = '/qt.html?tier=free';
       }, 2000);
     });
   }
@@ -932,14 +932,14 @@ const regRes = await fetch('/api/register', {
     sessionStorage.setItem('qt_anon', '1');
     sessionStorage.setItem('qt_anon_queries', '0');
     sessionStorage.setItem('qt_anon_mode', '1');
-    window.location.href = 'https://quantumtheology.app/qt.html?mode=anon';
+    window.location.href = '/qt.html?mode=anon';
   }
 
   /* ── Forgot Password ── */
   async function handleForgot() {
     var email = document.getElementById('ru-email').value.trim();
     if (!email) return;
-    await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://quantumtheology.app/reset-password' });
+    await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://theprism.io/reset-password' });
     alert('Password reset email sent to ' + email);
   }
 
