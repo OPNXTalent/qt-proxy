@@ -2105,8 +2105,12 @@ export default async function handler(req, res) {
         const tier = normalizeTier(subscriber?.tier || 'free');
         const userId = subscriber?.id || null;
 
-        const isFollowUpCheck = isFollowUp || (messages && messages.length > 1);
-        if (!isFollowUpCheck && subscriber) {
+        // Quota (and Signal Bank credit draw-down) applies to every real
+        // query — first message of a thread or a follow-up. Exempting
+        // follow-ups here previously meant anyone mid-conversation could
+        // ask unlimited follow-ups forever with no quota or credit check
+        // at all, since runFollowUp() always sends isFollowUp: true.
+        if (subscriber) {
           const quota = await checkSubscriberQuota(subscriber, visitorKey);
           if (!quota.allowed) {
             return res.status(200).json({
