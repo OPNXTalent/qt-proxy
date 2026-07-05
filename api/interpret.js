@@ -1316,28 +1316,40 @@ async function getCodeRedemption(email) {
 // ── ANONYMOUS IP RATE LIMITING ────────────────────────────────────────────────
 async function getQueryLog(ip) {
   const windowStart = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/query_log?select=id,query_type,cost,created_at` +
+  const url = `${SUPABASE_URL}/rest/v1/query_log?select=id,query_type,cost,created_at` +
     `&user_id=is.null` +
     `&query_type=eq.${encodeURIComponent(`ip:${ip}`)}` +
     `&created_at=gte.${encodeURIComponent(windowStart.toISOString())}` +
-    `&order=created_at.desc`,
-    {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      }
+    `&order=created_at.desc`;
+
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json'
     }
-  );
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '(no body)');
+    console.error(`[getQueryLog] Supabase returned ${res.status} for ip=${ip}: ${errText}`);
+    throw new Error(`getQueryLog: Supabase request failed with status ${res.status}`);
+  }
+
   const data = await res.json();
-  const recent = data || [];
-  if (recent.length === 0) return null;
+
+  if (!Array.isArray(data)) {
+    console.error(`[getQueryLog] Non-array response for ip=${ip}: ${JSON.stringify(data)}`);
+    throw new Error('getQueryLog: malformed Supabase response');
+  }
+
+  if (data.length === 0) return null;
   return {
-    query_count: recent.length,
-    first_query_at: recent[recent.length - 1].created_at
+    query_count: data.length,
+    first_query_at: data[data.length - 1].created_at
   };
 }
+
 
 
 async function insertQueryLog(ip) {
@@ -1423,7 +1435,7 @@ async function checkSubscriberQuota(subscriber, ip) {
         used += anonLog.query_count;
       }
     } catch (err) {
-      console.error('Anonymous usage lookup failed:', err.message);
+      console.error(`[SUBSCRIBER QUOTA FAIL-OPEN] Anonymous usage lookup failed for ip=${ip}: ${err.message}`);
     }
   }
 
@@ -2133,7 +2145,7 @@ export default async function handler(req, res) {
       await insertQueryLog(ip);
     }
   } catch (err) {
-    console.error('Rate limit check failed:', err.message);
+    console.error(`[ANONYMOUS PATH FAIL-OPEN] Rate limit check failed for ip=${ip}: ${err.message}`);
   }
 
   const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
