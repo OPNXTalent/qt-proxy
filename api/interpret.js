@@ -1643,7 +1643,7 @@ async function updateQueryCount({ userId, tier, threadId }) {
         user_id:        userId,
         thread_id:      threadId || null,
         query_type:     'subscriber',
-        credit_source:  'tier_allocation',
+        credit_source:  'monthly',
         cost:           1,
         channel_context:'solo'
       })
