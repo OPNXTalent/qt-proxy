@@ -2185,11 +2185,14 @@ export default async function handler(req, res) {
       if (hoursSinceFirst >= WINDOW_HOURS) {
         await resetQueryLog(visitorKey);
       } else if (log.query_count >= QUERY_LIMIT) {
-        const hoursRemaining = Math.ceil(WINDOW_HOURS - hoursSinceFirst);
+        const exactHoursRemaining = WINDOW_HOURS - hoursSinceFirst;
+        const hoursRemaining = Math.ceil(exactHoursRemaining);
+        const secondsRemaining = Math.max(0, Math.floor(exactHoursRemaining * 3600));
         return res.status(429).json({
           error: 'Query limit reached',
           message: `You've used all ${QUERY_LIMIT} free queries. Access resets in ${hoursRemaining} hour${hoursRemaining !== 1 ? 's' : ''}.`,
-          hoursRemaining
+          hoursRemaining,
+          secondsRemaining
         });
       } else {
         await incrementQueryLog(visitorKey);
