@@ -1947,32 +1947,7 @@
         The Prism is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
       </div>
 
-      <!-- Registration gate — captures a real account before any purchase path is usable -->
-      <div id="limitPromptEmailGate" style="display:none; border:1px solid var(--gold-dim); padding:24px 28px; background:rgba(201,168,76,0.04); margin-bottom:32px; text-align:left;">
-        <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Create Your Account First</div>
-        <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:18px;">This holds your purchase, credits, and session history under your identity — same account you'd create anywhere else on The Prism.</div>
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          <input id="limitRegEmail" type="email" placeholder="your@email.com" autocomplete="email"
-            style="background:var(--deep); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:15px; padding:11px 14px; outline:none; transition:border-color 0.2s;"
-            onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'" />
-          <input id="limitRegDisplayName" type="text" placeholder="Display name (3–30 characters)" autocomplete="username" maxlength="30"
-            style="background:var(--deep); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:15px; padding:11px 14px; outline:none; transition:border-color 0.2s;"
-            onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'" />
-          <input id="limitRegPassword" type="password" placeholder="Password (8 characters minimum)" autocomplete="new-password"
-            style="background:var(--deep); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:15px; padding:11px 14px; outline:none; transition:border-color 0.2s;"
-            onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'" />
-          <input id="limitRegConfirm" type="password" placeholder="Confirm password" autocomplete="new-password"
-            style="background:var(--deep); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:15px; padding:11px 14px; outline:none; transition:border-color 0.2s;"
-            onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
-            onkeydown="if(event.key==='Enter') submitLimitRegistration();" />
-          <button id="limitRegSubmitBtn" onclick="submitLimitRegistration()"
-            style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); background:var(--gold-dim); border:1px solid var(--gold-dim); padding:12px 20px; cursor:pointer; transition:all 0.2s; margin-top:4px;"
-            onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Create Account →</button>
-        </div>
-        <div id="limitEmailStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:#b85c5c; margin-top:10px;"></div>
-      </div>
-
-      <!-- Four-option wall — visible immediately; registration only interrupts on actual click -->
+      <!-- Four-option wall — visible immediately; account creation only interrupts on actual purchase click, via the existing "Create Your Free Account" modal -->
       <div id="limitPromptOptions" style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
 
         <!-- Signal Bank bundles -->
@@ -6418,31 +6393,24 @@ function showFreeAccountModal() {
 // sessions have somewhere to attach to.
 
 function checkLimitEmailGate() {
-  // Grid is visible immediately — this just makes sure the registration
-  // panel starts hidden and any known email is already applied to links.
-  var gate = document.getElementById('limitPromptEmailGate');
-  if (gate) gate.style.display = 'none';
+  // Applies a known email to the purchase links if one's already on file.
   var existingEmail = localStorage.getItem('qt_user_email');
   if (existingEmail) applyLimitEmailToOptions(existingEmail);
 }
 
-// Intercepts a click on any purchase link (Signal Bank bundle or Subscribe).
-// If the visitor already has an account, lets the click through normally.
-// If not, stops the navigation, remembers where they were headed, and shows
-// the registration form — completing it will continue on to that same link.
+// Intercepts a click on any purchase link (Signal Bank bundle). If the
+// visitor already has an account, lets the click through normally. If not,
+// stops the navigation, remembers where they were headed, and opens the
+// existing "Create Your Free Account" modal — completing it continues on
+// to that same link automatically.
 function handlePurchaseLinkClick(event, anchorEl) {
   var email = localStorage.getItem('qt_user_email');
-  if (email) return true; // already registered — proceed to Stripe/purchase.html as normal
+  if (email) return true; // already registered — proceed to Stripe as normal
 
   event.preventDefault();
   window._limitPendingHref = anchorEl.getAttribute('href');
   window._limitPendingIsStripe = anchorEl.classList.contains('signal-bank-link');
-
-  var gate = document.getElementById('limitPromptEmailGate');
-  if (gate) {
-    gate.style.display = 'block';
-    gate.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
+  showFreeAccountModal();
   return false;
 }
 
@@ -6462,97 +6430,13 @@ function applyLimitEmailToOptions(email) {
     var sep2 = subBase.indexOf('?') === -1 ? '?' : '&';
     subLink.href = subBase + sep2 + 'email=' + encodeURIComponent(email);
   }
-  // The subscriber row already exists at this point (created in
-  // submitLimitEmail) — no need to make them go through Create Free
-  // Account again, so swap that button for a confirmation state.
+  // The subscriber row already exists at this point (created via the
+  // Create Free Account modal or prior visit) — no need to make them go
+  // through account creation again, so swap that button for a confirmation.
   var acctBtn = document.getElementById('createFreeAccountBtn');
   var acctActive = document.getElementById('freeAccountAlreadyActive');
   if (acctBtn) acctBtn.style.display = 'none';
   if (acctActive) { acctActive.style.display = 'block'; acctActive.textContent = '✓ Account active — ' + email; }
-}
-
-async function submitLimitRegistration() {
-  var email       = (document.getElementById('limitRegEmail') || {}).value || '';
-  var displayName = (document.getElementById('limitRegDisplayName') || {}).value || '';
-  var password    = (document.getElementById('limitRegPassword') || {}).value || '';
-  var confirm     = (document.getElementById('limitRegConfirm') || {}).value || '';
-  var statusEl    = document.getElementById('limitEmailStatus');
-  var btn         = document.getElementById('limitRegSubmitBtn');
-  var re          = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  email = email.trim(); displayName = displayName.trim();
-
-  if (!re.test(email)) {
-    if (statusEl) { statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; }
-    return;
-  }
-  if (displayName.length < 3 || displayName.length > 30) {
-    if (statusEl) { statusEl.textContent = 'Display name must be 3–30 characters.'; statusEl.style.display = 'block'; }
-    return;
-  }
-  if (password.length < 8) {
-    if (statusEl) { statusEl.textContent = 'Password must be at least 8 characters.'; statusEl.style.display = 'block'; }
-    return;
-  }
-  if (password !== confirm) {
-    if (statusEl) { statusEl.textContent = 'Passwords do not match.'; statusEl.style.display = 'block'; }
-    return;
-  }
-  if (statusEl) statusEl.style.display = 'none';
-  if (btn) { btn.disabled = true; btn.textContent = 'Creating Account…'; }
-
-  try {
-    // Same Supabase Auth signUp the gateway's "I'm new here" flow uses
-    var client = getSupabaseClient();
-    var signUpResult = await client.auth.signUp({ email: email, password: password });
-    if (signUpResult.error) {
-      if (statusEl) { statusEl.textContent = signUpResult.error.message; statusEl.style.display = 'block'; }
-      if (btn) { btn.disabled = false; btn.textContent = 'Create Account →'; }
-      return;
-    }
-
-    // Same registration endpoint the gateway flow calls — creates the
-    // subscribers row with display_name, validated and deduped server-side
-    var regRes = await fetch('/api/redeem?action=register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, display_name: displayName, tier: 'free', status: 'active' })
-    });
-    var regData = await regRes.json();
-    if (!regRes.ok) {
-      if (statusEl) { statusEl.textContent = regData.error || 'Display name already taken.'; statusEl.style.display = 'block'; }
-      if (btn) { btn.disabled = false; btn.textContent = 'Create Account →'; }
-      return;
-    }
-
-    localStorage.setItem('qt_user_email', email);
-    localStorage.setItem('qt_display_name', displayName);
-
-    // Fire the welcome email — best-effort, don't block on it
-    fetch('/api/welcome', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email })
-    }).catch(function() {});
-
-    applyLimitEmailToOptions(email);
-
-    // Continue on to whichever purchase link the person originally clicked
-    if (window._limitPendingHref) {
-      var dest = window._limitPendingHref;
-      var param = window._limitPendingIsStripe ? 'prefilled_email' : 'email';
-      var sep = dest.indexOf('?') === -1 ? '?' : '&';
-      window.location.href = dest + sep + param + '=' + encodeURIComponent(email);
-      return;
-    }
-
-    var gate = document.getElementById('limitPromptEmailGate');
-    if (gate) gate.style.display = 'none';
-
-  } catch (e) {
-    if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
-    if (btn) { btn.disabled = false; btn.textContent = 'Create Account →'; }
-  }
 }
 
 async function submitFreeAccount() {
@@ -6590,6 +6474,17 @@ async function submitFreeAccount() {
         body: JSON.stringify({ email: email })
       });
     } catch(e) {}
+
+    // If this modal was opened from a purchase click, continue straight on
+    // to that link now — carrying the new account's email into it — rather
+    // than showing the generic "Account Created" confirmation.
+    if (window._limitPendingHref) {
+      var dest = window._limitPendingHref;
+      var param = window._limitPendingIsStripe ? 'prefilled_email' : 'email';
+      var sep = dest.indexOf('?') === -1 ? '?' : '&';
+      window.location.href = dest + sep + param + '=' + encodeURIComponent(email);
+      return;
+    }
 
     var modal = document.getElementById('freeAccountModal');
     if (modal) {
