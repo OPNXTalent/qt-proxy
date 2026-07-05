@@ -1398,7 +1398,7 @@ async function getLiveQueryCount(userId, tier) {
   }
 }
 
-async function checkSubscriberQuota(subscriber) {
+async function checkSubscriberQuota(subscriber, ip) {
   const tier = normalizeTier(subscriber.tier);
   const limit = TIER_LIMITS[tier];
 
@@ -1407,7 +1407,21 @@ async function checkSubscriberQuota(subscriber) {
 
   // Prefer live count from query_log over stale subscriber.query_count
   const liveCount = await getLiveQueryCount(subscriber.id, tier);
-  const used = liveCount !== null ? liveCount : (subscriber.query_count || 0);
+  let used = liveCount !== null ? liveCount : (subscriber.query_count || 0);
+
+  // Free tier shares its 24-hour window with the anonymous IP quota — a user
+  // who burns through anonymous queries and then logs in should not get a
+  // fresh allotment on the same IP. Fold any recent anonymous usage in.
+  if (tier === 'free' && ip && ip !== 'unknown') {
+    try {
+      const anonLog = await getQueryLog(ip);
+      if (anonLog && anonLog.query_count > 0) {
+        used += anonLog.query_count;
+      }
+    } catch (err) {
+      console.error('Anonymous usage lookup failed:', err.message);
+    }
+  }
 
   if (used < limit) return { allowed: true, queriesUsed: used };
 
@@ -1967,7 +1981,7 @@ export default async function handler(req, res) {
 
         const isFollowUpCheck = isFollowUp || (messages && messages.length > 1);
         if (!isFollowUpCheck && subscriber) {
-          const quota = await checkSubscriberQuota(subscriber);
+          const quota = await checkSubscriberQuota(subscriber, ip);
           if (!quota.allowed) {
             return res.status(200).json({
               quota_exceeded: true,
