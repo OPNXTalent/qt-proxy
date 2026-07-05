@@ -1363,12 +1363,15 @@ async function resetQueryLog(ip) {
 }
 
 // ── PRE-FLIGHT SUBSCRIBER QUOTA CHECK ────────────────────────────────────────
-async function getLiveQueryCount(userId) {
+async function getLiveQueryCount(userId, tier) {
   // Read live query count directly from query_log rather than the
   // stale cached value on the subscriber record.
   try {
     const now = new Date();
-    const cycleStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    // Free tier uses a 24-hour rolling window. Paid tiers use monthly cycle.
+    const cycleStart = (tier === 'free')
+      ? new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+      : new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/query_log?user_id=eq.${encodeURIComponent(userId)}&created_at=gte.${encodeURIComponent(cycleStart)}&select=id`,
       {
@@ -1403,7 +1406,7 @@ async function checkSubscriberQuota(subscriber) {
   if (limit === null || limit === undefined) return { allowed: true };
 
   // Prefer live count from query_log over stale subscriber.query_count
-  const liveCount = await getLiveQueryCount(subscriber.id);
+  const liveCount = await getLiveQueryCount(subscriber.id, tier);
   const used = liveCount !== null ? liveCount : (subscriber.query_count || 0);
 
   if (used < limit) return { allowed: true, queriesUsed: used };
