@@ -2989,7 +2989,7 @@ async function callProxy(messages, rawQuery) {
   if (tierFromStream && tierFromStream !== 'trial' && tierFromStream !== 'free') {
     localStorage.setItem('qt_user_tier', tierFromStream);
     CURRENT_TIER = tierFromStream;
-    var tierLabelsMap = { refraction: 'Refraction · 60 Day Archive', full_spectrum: 'Full Spectrum · 90 Day Archive', scholar: 'Refraction · 60 Day Archive', theologian: 'Full Spectrum · 90 Day Archive', free: 'Observer · Free Access' };
+    var tierLabelsMap = { refraction: 'Refraction', full_spectrum: 'Full Spectrum', scholar: 'Refraction', theologian: 'Full Spectrum', free: 'Observer · Free Access' };
     var labelEl = document.getElementById('sidebarTierLabel');
     if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
@@ -3705,11 +3705,11 @@ if (CURRENT_TIER !== 'free') localStorage.setItem('qt_user_tier', CURRENT_TIER);
 // Set tier label immediately so it never shows the wrong value
 (function() {
   var tierLabels = {
-    refraction:    'Refraction · 60 Day Archive',
-    full_spectrum: 'Full Spectrum · 90 Day Archive',
-    scholar:       'Refraction · 60 Day Archive',
-    theologian:    'Full Spectrum · 90 Day Archive',
-    companion:     'Full Spectrum · 90 Day Archive',
+    refraction:    'Refraction',
+    full_spectrum: 'Full Spectrum',
+    scholar:       'Refraction',
+    theologian:    'Full Spectrum',
+    companion:     'Full Spectrum',
     free:          'Observer · Free Access'
   };
   var labelEl = document.getElementById('sidebarTierLabel');
@@ -4694,8 +4694,8 @@ function updateSidebarCredits(newCredits) {
 }
 
 function initSidebar() {
-  var tierLabels = { refraction: 'Refraction · 60 Day Archive', full_spectrum: 'Full Spectrum · 90 Day Archive',
-    scholar: 'Refraction · 60 Day Archive', theologian: 'Full Spectrum · 90 Day Archive',
+  var tierLabels = { refraction: 'Refraction', full_spectrum: 'Full Spectrum',
+    scholar: 'Refraction', theologian: 'Full Spectrum',
     free: 'Observer · Free Access' };
   var labelEl = document.getElementById('sidebarTierLabel');
   if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || tierLabels['free'];
@@ -6776,11 +6776,11 @@ async function handleCreditsAdded() {
       localStorage.setItem('qt_user_tier', latestTier);
       if (typeof CURRENT_TIER !== 'undefined') CURRENT_TIER = latestTier;
       const tierLabels = {
-        refraction: 'Refraction · 60 Day Archive',
-        full_spectrum: 'Full Spectrum · 90 Day Archive',
-        scholar: 'Refraction · 60 Day Archive',
-        theologian: 'Full Spectrum · 90 Day Archive',
-        companion: 'Full Spectrum · 90 Day Archive',
+        refraction: 'Refraction',
+        full_spectrum: 'Full Spectrum',
+        scholar: 'Refraction',
+        theologian: 'Full Spectrum',
+        companion: 'Full Spectrum',
         free: 'Observer · Free Access'
       };
       const labelEl = document.getElementById('sidebarTierLabel');
