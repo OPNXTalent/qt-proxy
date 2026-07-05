@@ -2374,7 +2374,19 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
       followUp.parentNode.insertBefore(prompt, followUp);
     }
     prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    checkLimitEmailGate();
+
+    // Registered users already have the sidebar's "Keep Questioning" box
+    // covering Signal Bank / Subscribe purchases — showing the full
+    // four-option wall on top of that is redundant, so just the reset
+    // message and countdown are shown for them.
+    var registeredEmail = localStorage.getItem('qt_user_email');
+    var optionsGrid = document.getElementById('limitPromptOptions');
+    if (registeredEmail) {
+      if (optionsGrid) optionsGrid.style.display = 'none';
+    } else {
+      if (optionsGrid) optionsGrid.style.display = 'grid';
+      checkLimitEmailGate();
+    }
   }
 function applyQuotaLock(message) {
     document.getElementById('submitBtn').style.display = 'none';
@@ -4579,9 +4591,13 @@ function setQueryCredits(n) {
 }
 
 async function loadSidebarCreditsAnon() {
-  // Show IP-based query count for anonymous/free users
+  // Show query count for anonymous/free-tier users — if a registered email
+  // is on file, pass it along so the server can factor in Signal Bank
+  // credits rather than just the raw anonymous visitor count.
   try {
-    const res = await fetch(API_BASE + '/api/interpret', { method: 'GET' });
+    var email = localStorage.getItem('qt_user_email');
+    var url = API_BASE + '/api/interpret' + (email ? '?email=' + encodeURIComponent(email) : '');
+    const res = await fetch(url, { method: 'GET' });
     const data = await res.json();
     const countEl = document.getElementById('sidebarQueryCountText');
     const wrapEl  = document.getElementById('sidebarCredits');
@@ -4798,13 +4814,17 @@ function initSidebar() {
       .catch(function() {});
     })(allThreads);
 
-    // Auto-restore last active thread on page load
-    var lastId = localStorage.getItem('qt_last_thread_id');
-    if (lastId && allThreads.find(function(t) { return t.id === lastId; })) {
-      selectThread(lastId);
-    } else if (allThreads.length > 0) {
-      // Fall back to most recent thread
-      selectThread(allThreads[0].id);
+    // Auto-restore last active thread on page load — skipped if we already
+    // restored an in-progress conversation from a pre-purchase snapshot,
+    // since that reflects more recent state than whatever's saved server-side.
+    if (!window._resumedFromSnapshot) {
+      var lastId = localStorage.getItem('qt_last_thread_id');
+      if (lastId && allThreads.find(function(t) { return t.id === lastId; })) {
+        selectThread(lastId);
+      } else if (allThreads.length > 0) {
+        // Fall back to most recent thread
+        selectThread(allThreads[0].id);
+      }
     }
   })
   .catch(function(err) {
@@ -6398,12 +6418,89 @@ function checkLimitEmailGate() {
   if (existingEmail) applyLimitEmailToOptions(existingEmail);
 }
 
+// ── RESUME-IN-PLACE ACROSS A STRIPE PURCHASE ─────────────────────────────────
+// Buying a Signal Bank bundle means a full navigation away to Stripe and back
+// — every bit of in-memory JS state (conversationHistory, currentSubject, the
+// rendered result) is gone on return. This snapshots exactly what's on screen
+// right before that navigation, and restores it the moment the person lands
+// back on qt.html?credits_added=1, regardless of whether they were already
+// registered or just created an account to complete the purchase.
+
+function collectCurrentFollowUps() {
+  var blocks = document.querySelectorAll('#resultContent .fu-block');
+  var out = [];
+  blocks.forEach(function(el) {
+    var qEl = el.querySelector('.fu-question');
+    var bEl = el.querySelector('.fu-body');
+    if (qEl && bEl) {
+      out.push({ question: qEl.textContent || '', bodyHtml: bEl.innerHTML || '' });
+    }
+  });
+  return out;
+}
+
+function saveResumeSnapshot() {
+  // Nothing to save if no interpretation has actually been run yet.
+  if (!window._lastParsedResult) return;
+  try {
+    var snapshot = {
+      subject: currentSubject || '',
+      parsed: window._lastParsedResult,
+      followUps: collectCurrentFollowUps(),
+      threadId: activeThreadId || null,
+      savedAt: Date.now()
+    };
+    localStorage.setItem('qt_resume_snapshot', JSON.stringify(snapshot));
+  } catch (e) { /* storage full or unavailable — resume just won't be available */ }
+}
+
+function restoreResumeSnapshot() {
+  var raw = localStorage.getItem('qt_resume_snapshot');
+  if (!raw) return false;
+  localStorage.removeItem('qt_resume_snapshot'); // one-time use
+
+  var snap;
+  try { snap = JSON.parse(raw); } catch (e) { return false; }
+  if (!snap || !snap.parsed) return false;
+
+  currentSubject = snap.subject || '';
+  activeThreadId = snap.threadId || null;
+  window._lastParsedResult = snap.parsed;
+
+  renderResult(snap.parsed);
+  showResult();
+
+  var sText = document.getElementById('subjectText');
+  if (sText) sText.textContent = currentSubject;
+  var sBan = document.getElementById('subjectBanner');
+  if (sBan) sBan.style.display = 'block';
+  var fuSec = document.getElementById('followUpSection');
+  if (fuSec) fuSec.style.display = 'block';
+  var govBar = document.getElementById('sessionGovernance');
+  if (govBar) govBar.style.display = 'flex';
+
+  var container = document.getElementById('resultContent');
+  (snap.followUps || []).forEach(function(fu) {
+    var el = document.createElement('div');
+    el.className = 'fu-block';
+    el.innerHTML = '<div class="fu-question">' + escHtml(fu.question || '') + '</div><div class="fu-body">' + fu.bodyHtml + '</div>';
+    if (container) container.appendChild(el);
+  });
+
+  window._resumedFromSnapshot = true;
+  var rb = document.getElementById('resultBlock');
+  if (rb) rb.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return true;
+}
+
 // Intercepts a click on any purchase link (Signal Bank bundle). If the
 // visitor already has an account, lets the click through normally. If not,
 // stops the navigation, remembers where they were headed, and opens the
 // existing "Create Your Free Account" modal — completing it continues on
 // to that same link automatically.
 function handlePurchaseLinkClick(event, anchorEl) {
+  saveResumeSnapshot(); // preserve the in-progress conversation either way
+
   var email = localStorage.getItem('qt_user_email');
   if (email) return true; // already registered — proceed to Stripe as normal
 
@@ -6570,7 +6667,8 @@ async function runPreflightCheck() {
 
   if (userEmail && !_anonMode && _paidTier) return;
   try {
-    var res = await fetch('/api/interpret', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+    var url = '/api/interpret' + (userEmail ? '?email=' + encodeURIComponent(userEmail) : '');
+    var res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
     if (!res.ok) return;
     var data = await res.json();
     if (data.locked) {
@@ -6714,6 +6812,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.location.href = 'https://theprism.io/share.html?t=' + encodeURIComponent(returnShare);
     return;
   }
+  restoreResumeSnapshot();
   initSidebar();
   runPreflightCheck();
   handleCreditsAdded();
