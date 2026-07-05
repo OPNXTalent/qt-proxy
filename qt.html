@@ -6716,36 +6716,48 @@ async function handleCreditsAdded() {
   const statusEl = document.createElement('div');
   statusEl.id = 'creditsStatus';
   statusEl.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999;';
-  statusEl.textContent = 'Confirming your Signal Bank…';
+  statusEl.textContent = 'Confirming your purchase…';
   document.body.appendChild(statusEl);
 
-  // Poll Supabase up to 8 times (every 1.5s) waiting for webhook to land
+  // Poll Supabase up to 8 times (every 1.5s) waiting for the webhook to land.
+  // This covers two distinct outcomes: a Signal Bank purchase (purchased_credits
+  // goes up) or a subscription purchase (tier changes away from 'free'/prior
+  // tier). Either one on its own counts as a confirmed purchase.
   const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
   const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
 
+  const priorTier = localStorage.getItem('qt_user_tier') || 'free';
   let credits = 0;
+  let latestTier = priorTier;
+  let confirmed = false;
+
   for (let i = 0; i < 8; i++) {
     await new Promise(r => setTimeout(r, 1500));
     try {
       const res = await fetch(
-        `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=purchased_credits&limit=1`,
+        `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=purchased_credits,tier&limit=1&_ts=${Date.now()}`,
         {
           headers: {
             'apikey': sbAnon,
             'Authorization': `Bearer ${sbAnon}`
-          }
+          },
+          cache: 'no-store'
         }
       );
       const data = await res.json();
       credits = data?.[0]?.purchased_credits || 0;
-      if (credits > 0) break;
+      latestTier = data?.[0]?.tier || priorTier;
+      const tierChanged = latestTier !== priorTier && latestTier !== 'free';
+      if (credits > 0 || tierChanged) { confirmed = true; break; }
     } catch {}
   }
 
   // Dismiss status
   statusEl.remove();
 
-  if (credits > 0) {
+  const tierActuallyChanged = latestTier !== priorTier && latestTier !== 'free';
+
+  if (confirmed) {
     // Dismiss quota wall, restore submit button
     const quotaPrompt = document.getElementById('quotaPrompt');
     if (quotaPrompt) quotaPrompt.style.display = 'none';
@@ -6756,17 +6768,47 @@ async function handleCreditsAdded() {
     const newSubjectBtn = document.getElementById('newSubjectTopBtn');
     if (newSubjectBtn) newSubjectBtn.style.display = '';
 
-    // Show confirmation toast
+    // If a subscription just activated, the page's notion of the current
+    // tier (set once, early in page load, from localStorage/URL) is now
+    // stale — nothing else would ever notice the upgrade. Update it here:
+    // localStorage, the in-memory CURRENT_TIER, and the visible tier label.
+    if (tierActuallyChanged) {
+      localStorage.setItem('qt_user_tier', latestTier);
+      if (typeof CURRENT_TIER !== 'undefined') CURRENT_TIER = latestTier;
+      const tierLabels = {
+        refraction: 'Refraction · 60 Day Archive',
+        full_spectrum: 'Full Spectrum · 90 Day Archive',
+        scholar: 'Refraction · 60 Day Archive',
+        theologian: 'Full Spectrum · 90 Day Archive',
+        companion: 'Full Spectrum · 90 Day Archive',
+        free: 'Observer · Free Access'
+      };
+      const labelEl = document.getElementById('sidebarTierLabel');
+      if (labelEl) labelEl.textContent = tierLabels[latestTier] || tierLabels['free'];
+    }
+
+    // Refresh the sidebar's query count / Signal Bank display — it was
+    // fetched once early in page load, likely before the webhook had even
+    // landed, and nothing else re-triggers it once the purchase lands.
+    if (typeof loadSidebarCredits === 'function') loadSidebarCredits();
+
+    // Show a confirmation toast matching what actually happened
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999; transition:opacity 0.5s;';
-    toast.textContent = `Signal Bank confirmed — ${credits} quer${credits === 1 ? 'y' : 'ies'} available`;
+    if (tierActuallyChanged && credits > 0) {
+      toast.textContent = `Subscription active — ${latestTier} · ${credits} quer${credits === 1 ? 'y' : 'ies'} available`;
+    } else if (tierActuallyChanged) {
+      toast.textContent = `Subscription active — welcome to ${latestTier}`;
+    } else {
+      toast.textContent = `Signal Bank confirmed — ${credits} quer${credits === 1 ? 'y' : 'ies'} available`;
+    }
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 4000);
   } else {
-    // Credits didn't land yet — webhook may still be in flight
+    // Nothing landed yet — webhook may still be in flight
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--border-lit); padding:14px 28px; font-family:var(--mono); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); z-index:999; transition:opacity 0.5s;';
-    toast.textContent = 'Credits are being processed — refresh in a moment';
+    toast.textContent = 'Your purchase is being processed — refresh in a moment';
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 5000);
   }
