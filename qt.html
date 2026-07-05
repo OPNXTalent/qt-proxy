@@ -102,15 +102,15 @@
     letter-spacing: 0.16em;
     text-transform: uppercase;
     padding: 6px 12px;
-    border: 1px solid rgba(42,42,64,0.6);
+    border: 1px solid rgba(90,88,120,0.7);
     background: transparent;
-    color: rgba(120,118,140,0.6);
+    color: rgba(170,168,190,0.85);
     cursor: pointer;
     transition: color 0.2s, border-color 0.2s;
     white-space: nowrap;
   }
-  .node-ctrl-btn:hover { color: var(--text-muted); border-color: rgba(80,80,100,0.8); }
-  .node-ctrl-btn.share-active { color: rgba(80,180,120,0.8); border-color: rgba(80,180,120,0.35); }
+  .node-ctrl-btn:hover { color: rgba(220,215,200,0.95); border-color: rgba(201,168,76,0.5); }
+  .node-ctrl-btn.share-active { color: rgba(80,180,120,0.9); border-color: rgba(80,180,120,0.5); }
 
   #discussionPanel {
     position: fixed;
@@ -2086,16 +2086,16 @@
 
         <!-- Save -->
         <button onclick="downloadPDF('dark')"
-            style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;"
-            onmouseover="this.style.color='var(--text-dim)'" onmouseout="this.style.color='var(--text-muted)'"
-            title="Export as archival PDF">↓ Archive</button>
+            style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.2s;"
+            onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border-lit)'"
+            title="Export as archival PDF">↓ Print</button>
 
         <!-- Share -->
         <div style="position:relative; display:inline-flex; align-items:center; gap:6px;">
           <button id="shareBtn" onclick="handleShareBtn()"
-            style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 16px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.25s;"
+            style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 16px; border:1px solid var(--border-lit); background:transparent; color:var(--text); cursor:pointer; transition:all 0.25s;"
             onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'"
-            onmouseout="if(!window._shareActive){this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'}">
+            onmouseout="if(!window._shareActive){this.style.borderColor='var(--border-lit)';this.style.color='var(--text)'}">
             Share
           </button>
           <div id="presenceDot" style="display:none; width:7px; height:7px; border-radius:50%; background:rgba(80,180,120,0.5); transition:background 0.5s;" title="Live"></div>
@@ -2103,9 +2103,9 @@
 
         <!-- Discussion trigger — only visible when shared -->
         <button id="collabToggleBtn" onclick="toggleCollaboration()"
-          style="display:none; font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s;"
-          onmouseover="this.style.borderColor='rgba(80,180,120,0.5)';this.style.color='rgba(80,180,120,0.8)'"
-          onmouseout="if(!_collabOpen){this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'}">
+          style="display:none; font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.2s;"
+          onmouseover="this.style.borderColor='rgba(80,180,120,0.5)';this.style.color='rgba(80,180,120,0.9)'"
+          onmouseout="if(!_collabOpen){this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'}">
           Refractions
         </button>
 
@@ -5491,10 +5491,10 @@ function buildNodeControls(nodeId, queryText) {
   wrap.className = 'node-controls';
   wrap.dataset.nodeId = nodeId;
 
-  // Archive
+  // Print
   var archBtn = document.createElement('button');
   archBtn.className = 'node-ctrl-btn';
-  archBtn.textContent = '↓ Archive';
+  archBtn.textContent = '↓ Print';
   archBtn.title = 'Export as archival PDF';
   archBtn.addEventListener('click', function(e) { e.stopPropagation(); downloadPDF('dark'); });
   wrap.appendChild(archBtn);
