@@ -1881,8 +1881,65 @@ export default async function handler(req, res) {
       try {
         const subscriber = await getSubscriber(email);
         const redemption = await getCodeRedemption(email);
-        if ((subscriber && subscriber.status === 'active') || redemption) {
+
+        if (redemption) {
           return res.status(200).json({ locked: false });
+        }
+
+        if (subscriber && subscriber.status === 'active') {
+          const tier = normalizeTier(subscriber.tier);
+          const limit = TIER_LIMITS[tier];
+
+          // No limit defined for this tier — fully unlocked
+          if (limit === null || limit === undefined) {
+            return res.status(200).json({ locked: false });
+          }
+
+          const liveCount = await getLiveQueryCount(subscriber.id, tier);
+          let used = liveCount !== null ? liveCount : (subscriber.query_count || 0);
+
+          // Free tier shares its 24-hour window with anonymous usage on this
+          // same device — same folding checkSubscriberQuota does at POST time.
+          if (tier === 'free') {
+            try {
+              const anonLog = await getQueryLog(visitorKey);
+              if (anonLog && anonLog.query_count > 0) used += anonLog.query_count;
+            } catch {}
+          }
+
+          const credits = subscriber.purchased_credits || 0;
+
+          if (used < limit) {
+            return res.status(200).json({ locked: false, queriesUsed: used, limit, creditsAvailable: credits });
+          }
+
+          // Over the tier limit, but Signal Bank credits cover it — a credit
+          // is only actually drawn when a real query is submitted (POST),
+          // never here, since this is just a status check.
+          if (credits > 0) {
+            return res.status(200).json({ locked: false, queriesUsed: used, limit, creditsAvailable: credits, willUseCredit: true });
+          }
+
+          // Truly locked. Free tier gets a live countdown to the next window;
+          // paid tiers reset on their monthly cycle, so just report locked.
+          if (tier === 'free') {
+            try {
+              const log = await getQueryLog(visitorKey);
+              if (log) {
+                const firstQuery = new Date(log.first_query_at);
+                const hoursSinceFirst = (Date.now() - firstQuery.getTime()) / (1000 * 60 * 60);
+                const hoursRemaining = Math.max(0, WINDOW_HOURS - hoursSinceFirst);
+                return res.status(200).json({
+                  locked: true,
+                  hoursRemaining: Math.ceil(hoursRemaining),
+                  secondsRemaining: Math.floor(hoursRemaining * 3600),
+                  queriesUsed: used,
+                  creditsAvailable: 0
+                });
+              }
+            } catch {}
+          }
+          return res.status(200).json({ locked: true, queriesUsed: used, limit, creditsAvailable: 0 });
         }
       } catch {}
     }
