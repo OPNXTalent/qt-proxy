@@ -4625,7 +4625,28 @@ async function loadSidebarCreditsAnon() {
 
 async function loadSidebarCredits() {
   const email = localStorage.getItem('qt_user_email');
-  if (!email || CURRENT_TIER === 'free') {
+  if (!email) {
+    loadSidebarCreditsAnon();
+    return;
+  }
+
+  // For free/Observer tier — check if they have purchased Signal Bank credits
+  if (CURRENT_TIER === 'free') {
+    try {
+      const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+      const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+      const res = await fetch(
+        `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=purchased_credits&limit=1`,
+        { headers: { 'apikey': sbAnon, 'Authorization': `Bearer ${sbAnon}` } }
+      );
+      const data = await res.json();
+      const credits = data?.[0]?.purchased_credits || 0;
+      if (credits > 0) {
+        setQueryCredits(credits);
+        const wrapEl = document.getElementById('sidebarCredits');
+        if (wrapEl) wrapEl.style.display = 'flex';
+      }
+    } catch {}
     loadSidebarCreditsAnon();
     return;
   }
