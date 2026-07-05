@@ -860,7 +860,7 @@ var flowCopies = {
       return;
     }
 
-const regRes = await fetch('/api/redeem?action=register', {
+const regRes = await fetch('/api/register', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ email: email, display_name: displayName, tier: 'free', status: 'active' })
@@ -926,8 +926,9 @@ const regRes = await fetch('/api/redeem?action=register', {
 
   /* ── Anonymous ── */
   function handleAnonymous() {
-    // Override tier to anonymous — don't clear Supabase Auth session
-    // to avoid redirect loops. qt.html reads qt_anon_mode to enforce free tier.
+    // Clear stored identity so qt.html treats this as a genuinely anonymous session
+    localStorage.removeItem('qt_user_email');
+    localStorage.removeItem('qt_user_tier');
     sessionStorage.setItem('qt_anon', '1');
     sessionStorage.setItem('qt_anon_queries', '0');
     sessionStorage.setItem('qt_anon_mode', '1');
@@ -938,7 +939,7 @@ const regRes = await fetch('/api/redeem?action=register', {
   async function handleForgot() {
     var email = document.getElementById('ru-email').value.trim();
     if (!email) return;
-    await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://theprism.io/reset-password' });
+    await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://quantumtheology.app/reset-password' });
     alert('Password reset email sent to ' + email);
   }
 
