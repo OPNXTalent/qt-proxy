@@ -1947,27 +1947,43 @@
         The Prism is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
       </div>
 
+      <!-- Email gate — captures identity before any purchase path is usable -->
+      <div id="limitPromptEmailGate" style="display:none; border:1px solid var(--gold-dim); padding:24px 28px; background:rgba(201,168,76,0.04); margin-bottom:32px; text-align:left;">
+        <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">One Step Before Continuing</div>
+        <div style="font-family:var(--crimson); font-size:15px; color:var(--text-dim); line-height:1.6; margin-bottom:16px;">Enter your email so we can set up your account — this holds your purchase, credits, and session history under your identity.</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <input id="limitEmailInput" type="email" placeholder="your@email.com" autocomplete="email"
+            style="flex:1; min-width:200px; background:var(--deep); border:1px solid var(--border); color:var(--text); font-family:var(--crimson); font-size:15px; padding:11px 14px; outline:none; transition:border-color 0.2s;"
+            onfocus="this.style.borderColor='var(--gold-dim)'" onblur="this.style.borderColor='var(--border)'"
+            onkeydown="if(event.key==='Enter') submitLimitEmail();" />
+          <button id="limitEmailSubmitBtn" onclick="submitLimitEmail()"
+            style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); background:var(--gold-dim); border:1px solid var(--gold-dim); padding:11px 20px; cursor:pointer; transition:all 0.2s; white-space:nowrap;"
+            onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Continue →</button>
+        </div>
+        <div id="limitEmailStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:#b85c5c; margin-top:10px;"></div>
+      </div>
+
       <!-- Four-option wall -->
-      <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
+      <div id="limitPromptOptions" style="display:none; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
 
         <!-- Signal Bank bundles -->
         <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface);">
           <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Query Bundles</div>
           <div style="font-family:var(--crimson); font-size:14px; color:var(--text-dim); line-height:1.6; margin-bottom:16px;">No subscription required. Credits never expire.</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" class="signal-bank-link" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:14px; color:var(--text);">10 queries</span>
               <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$2.99 →</span>
             </a>
-            <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" class="signal-bank-link" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:14px; color:var(--text);">25 queries</span>
               <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$6.99 →</span>
             </a>
-            <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" class="signal-bank-link" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:14px; color:var(--text);">50 queries</span>
               <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$12.99 →</span>
             </a>
-            <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" class="signal-bank-link" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:14px; color:var(--text);">100 queries</span>
               <span style="font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--gold-dim);">$19.99 →</span>
             </a>
@@ -1983,7 +1999,7 @@
             <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Subscribe</div>
             <div style="font-family:var(--cinzel); font-size:20px; color:var(--gold-pale); margin-bottom:4px;">from $9.99<span style="font-size:13px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
             <div style="font-family:var(--crimson); font-size:14px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">Full framework access. Session history. Choose the plan that fits.</div>
-            <a href="/purchase.html" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">See Plans →</a>
+            <a href="/purchase.html" id="subscribeSeePlansLink" style="font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">See Plans →</a>
           </div>
 
           <!-- Free -->
@@ -1992,7 +2008,8 @@
             <div style="font-family:var(--cinzel); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:4px;">Free Account</div>
             <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:13px; color:var(--text-dim); line-height:1.5; margin-bottom:10px;">3 queries every 24 hours. History saved 30 days. No subscription ever.</div>
             <div id="resetTicker" style="font-family:var(--mono); font-size:18px; letter-spacing:0.18em; color:var(--gold-dim); margin-bottom:10px; display:none;">--:--:--</div>
-            <button onclick="showFreeAccountModal()" style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); border:1px solid var(--gold-dim); background:var(--gold-dim); padding:9px 16px; width:100%; text-align:center; cursor:pointer; transition:all 0.25s; margin-bottom:6px;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Create Free Account →</button>
+            <div id="freeAccountAlreadyActive" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.1em; color:rgba(80,180,120,0.8); margin-bottom:6px;">✓ Account active</div>
+            <button id="createFreeAccountBtn" onclick="showFreeAccountModal()" style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); border:1px solid var(--gold-dim); background:var(--gold-dim); padding:9px 16px; width:100%; text-align:center; cursor:pointer; transition:all 0.25s; margin-bottom:6px;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Create Free Account →</button>
             <div id="returnTomorrowLabel" style="display:none;"></div>
             <a href="/" style="font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; border:1px solid var(--border); padding:8px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--border-lit)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
           </div>
@@ -2373,6 +2390,7 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
       followUp.parentNode.insertBefore(prompt, followUp);
     }
     prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    checkLimitEmailGate();
   }
 function applyQuotaLock(message) {
     document.getElementById('submitBtn').style.display = 'none';
@@ -6382,6 +6400,95 @@ function showFreeAccountModal() {
   modal.appendChild(box);
   document.body.appendChild(modal);
   setTimeout(function() { emailInp.focus(); }, 100);
+}
+
+// ── LIMIT PROMPT EMAIL GATE ──────────────────────────────────────────────────
+// Anonymous "Just Exploring" visitors have no identity on file. Before any
+// purchase option (Signal Bank, Subscribe) is usable, capture an email and
+// create the subscriber row immediately, so the Stripe webhook and future
+// sessions have somewhere to attach to.
+
+function checkLimitEmailGate() {
+  var gate = document.getElementById('limitPromptEmailGate');
+  var opts = document.getElementById('limitPromptOptions');
+  var existingEmail = localStorage.getItem('qt_user_email');
+  if (!gate || !opts) return;
+  if (existingEmail) {
+    gate.style.display = 'none';
+    opts.style.display = 'grid';
+    applyLimitEmailToOptions(existingEmail);
+  } else {
+    gate.style.display = 'block';
+    opts.style.display = 'none';
+  }
+}
+
+function applyLimitEmailToOptions(email) {
+  // Carry the email into Stripe Checkout so it already knows the buyer,
+  // and into the Subscribe link for the same reason.
+  document.querySelectorAll('.signal-bank-link').forEach(function(a) {
+    var base = a.dataset.baseHref || a.getAttribute('href');
+    a.dataset.baseHref = base;
+    var sep = base.indexOf('?') === -1 ? '?' : '&';
+    a.href = base + sep + 'prefilled_email=' + encodeURIComponent(email);
+  });
+  var subLink = document.getElementById('subscribeSeePlansLink');
+  if (subLink) {
+    var subBase = subLink.dataset.baseHref || subLink.getAttribute('href');
+    subLink.dataset.baseHref = subBase;
+    var sep2 = subBase.indexOf('?') === -1 ? '?' : '&';
+    subLink.href = subBase + sep2 + 'email=' + encodeURIComponent(email);
+  }
+  // The subscriber row already exists at this point (created in
+  // submitLimitEmail) — no need to make them go through Create Free
+  // Account again, so swap that button for a confirmation state.
+  var acctBtn = document.getElementById('createFreeAccountBtn');
+  var acctActive = document.getElementById('freeAccountAlreadyActive');
+  if (acctBtn) acctBtn.style.display = 'none';
+  if (acctActive) { acctActive.style.display = 'block'; acctActive.textContent = '✓ Account active — ' + email; }
+}
+
+async function submitLimitEmail() {
+  var inp = document.getElementById('limitEmailInput');
+  var statusEl = document.getElementById('limitEmailStatus');
+  var btn = document.getElementById('limitEmailSubmitBtn');
+  var email = (inp ? inp.value : '').trim();
+  var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!re.test(email)) {
+    if (statusEl) { statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; }
+    return;
+  }
+  if (statusEl) statusEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  try {
+    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    await fetch(sbUrl + '/rest/v1/subscribers', {
+      method: 'POST',
+      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
+      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+    });
+    localStorage.setItem('qt_user_email', email);
+
+    // Fire the welcome email — best-effort, don't block on it
+    fetch('/api/welcome', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email })
+    }).catch(function() {});
+
+    var gate = document.getElementById('limitPromptEmailGate');
+    var opts = document.getElementById('limitPromptOptions');
+    if (gate) gate.style.display = 'none';
+    if (opts) opts.style.display = 'grid';
+    applyLimitEmailToOptions(email);
+
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Continue →'; }
+  }
 }
 
 async function submitFreeAccount() {
