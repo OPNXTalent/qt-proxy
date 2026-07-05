@@ -35,7 +35,6 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* ── Background texture ── */
   body::before {
     content: '';
     position: fixed;
@@ -55,7 +54,6 @@
     padding: 60px 40px 100px;
   }
 
-  /* ── Nav ── */
   .nav {
     display: flex;
     justify-content: space-between;
@@ -83,7 +81,6 @@
     text-transform: uppercase;
   }
 
-  /* ── Header ── */
   .heading {
     text-align: center;
     margin-bottom: 16px;
@@ -117,7 +114,6 @@
     margin: 0 auto 48px;
   }
 
-  /* ── Billing toggle ── */
   .toggle-row {
     display: flex;
     align-items: center;
@@ -155,7 +151,6 @@
     transition: left 0.3s;
   }
 
-  /* ── Subscription tiers ── */
   .tiers {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -289,7 +284,6 @@
     border-color: var(--gold);
   }
 
-  /* ── Divider ── */
   .section-divider {
     display: flex;
     align-items: center;
@@ -314,7 +308,6 @@
     white-space: nowrap;
   }
 
-  /* ── Signal Bank ── */
   .signal-header {
     text-align: center;
     margin-bottom: 24px;
@@ -402,7 +395,6 @@
     margin-bottom: 64px;
   }
 
-  /* ── Footer ── */
   .footer {
     border-top: 1px solid var(--border);
     padding-top: 32px;
@@ -435,15 +427,15 @@
   #prePurchaseModal.active { display:flex; }
   .pre-purchase-card { background:#0d0d14; border:1px solid #4a4a70; padding:2rem 2.25rem; max-width:400px; width:90%; position:relative; }
   .pre-purchase-card::before { content:''; position:absolute; top:0; left:10%; right:10%; height:1px; background:linear-gradient(90deg,transparent,#7a6230,transparent); }
+  .pre-purchase-close { position:absolute; top:12px; right:14px; background:transparent; border:none; color:#7a7890; font-size:20px; line-height:1; cursor:pointer; padding:4px; transition:color 0.2s; }
+  .pre-purchase-close:hover { color:#e8d5a0; }
   .pre-purchase-title { font-family:'Cinzel',serif; font-size:13px; letter-spacing:0.2em; color:#e8d5a0; text-transform:uppercase; margin-bottom:0.75rem; }
   .pre-purchase-copy { font-family:'Crimson Pro',Georgia,serif; font-style:italic; font-size:16px; color:#7a7890; line-height:1.65; margin-bottom:1.25rem; }
-  .pre-purchase-input { width:100%; background:#13131e; border:1px solid #2a2a40; color:#d8d4e8; font-family:'Crimson Pro',Georgia,serif; font-size:16px; padding:10px 12px; outline:none; transition:border-color 0.2s; margin-bottom:0.75rem; box-sizing:border-box; }
+  .pre-purchase-input { width:100%; background:#13131e; border:1px solid #4a4a70; color:#d8d4e8; font-family:'Crimson Pro',Georgia,serif; font-size:16px; padding:10px 12px; outline:none; transition:border-color 0.2s; margin-bottom:0.75rem; box-sizing:border-box; }
   .pre-purchase-input:focus { border-color:#7a6230; }
-  .pre-purchase-input::placeholder { color:#3a384a; font-style:italic; }
+  .pre-purchase-input::placeholder { color:#7a7890; font-style:italic; }
   .pre-purchase-btn { width:100%; background:transparent; border:1px solid #7a6230; color:#c9a84c; font-family:'Cinzel',serif; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; padding:12px; cursor:pointer; transition:all 0.2s; margin-bottom:0.5rem; }
   .pre-purchase-btn:hover { background:#7a6230; color:#06060a; }
-  .pre-purchase-skip { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:#3a384a; background:none; border:none; cursor:pointer; padding:0; transition:color 0.2s; display:block; margin:0 auto; }
-  .pre-purchase-skip:hover { color:#7a7890; }
 </style>
 
 </head>
@@ -574,11 +566,11 @@
 <!-- Pre-purchase email capture modal -->
 <div id="prePurchaseModal" style="display:none;">
   <div class="pre-purchase-card">
+    <button class="pre-purchase-close" onclick="closePrePurchaseModal()" aria-label="Cancel and return to plans" title="Cancel">✕</button>
     <div class="pre-purchase-title">One More Step</div>
     <div class="pre-purchase-copy" id="prePurchaseCopy">Drop your email so we can credit your account the moment payment clears. Your queries will be waiting when you return.</div>
     <input class="pre-purchase-input" type="email" id="prePurchaseEmail" placeholder="your@email.com" />
     <button class="pre-purchase-btn" onclick="handlePrePurchaseContinue()">Continue to Checkout →</button>
-    <button class="pre-purchase-skip" onclick="handlePrePurchaseSkip()">Skip — continue without saving email</button>
   </div>
 </div>
 
@@ -616,37 +608,48 @@ function interceptPurchase(stripeUrl) {
   }, 100);
 }
 
+// Closes the modal without navigating anywhere and without granting any
+// access — a genuine "I changed my mind" escape, not a way to acquire
+// queries without registering. Pending purchase intent is cleared so a
+// later unrelated click can't accidentally resume it.
+function closePrePurchaseModal() {
+  var modal = document.getElementById('prePurchaseModal');
+  if (modal) modal.style.display = 'none';
+  _pendingStripeUrl = null;
+}
+
 async function handlePrePurchaseContinue() {
-  var email = document.getElementById('prePurchaseEmail').value.trim();
-  if (email) {
-    localStorage.setItem('qt_user_email', email);
-    try {
-      var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-      var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-      await fetch(sbUrl + '/rest/v1/subscribers', {
-        method: 'POST',
-        headers: {
-          'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon,
-          'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates'
-        },
-        body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
-      });
-    } catch(e) {}
+  var emailInput = document.getElementById('prePurchaseEmail');
+  var email = emailInput ? emailInput.value.trim() : '';
+  var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!re.test(email)) {
+    if (emailInput) {
+      emailInput.style.borderColor = '#b85c5c';
+      emailInput.placeholder = 'Please enter a valid email address';
+      emailInput.focus();
+    }
+    return;
   }
+  localStorage.setItem('qt_user_email', email);
+  try {
+    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    await fetch(sbUrl + '/rest/v1/subscribers', {
+      method: 'POST',
+      headers: {
+        'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon,
+        'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates'
+      },
+      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
+    });
+  } catch(e) {}
   var modal = document.getElementById('prePurchaseModal');
   if (modal) modal.style.display = 'none';
   if (_pendingStripeUrl) {
     var dest = _pendingStripeUrl;
-    var savedEmail = localStorage.getItem('qt_user_email');
-    if (savedEmail) dest += '?prefilled_email=' + encodeURIComponent(savedEmail);
+    dest += (dest.indexOf('?') === -1 ? '?' : '&') + 'prefilled_email=' + encodeURIComponent(email);
     window.location.href = dest;
   }
-}
-
-function handlePrePurchaseSkip() {
-  var modal = document.getElementById('prePurchaseModal');
-  if (modal) modal.style.display = 'none';
-  if (_pendingStripeUrl) window.location.href = _pendingStripeUrl;
 }
 
 function toggleBilling() {
@@ -685,15 +688,10 @@ function toggleBilling() {
 }
 
 // ── Return to shared thread after purchase ───────────────────────────────────
-// Stripe doesn't redirect back automatically — but if the user returns to
-// this page after payment (via browser back or manual navigation), show a
-// quiet banner offering to return to the conversation.
-
 (function() {
   var ret = _returnUrl || sessionStorage.getItem('prism_purchase_return');
   if (!ret) return;
 
-  // Show return banner at top of page
   var banner  = document.createElement('div');
   banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:300;background:rgba(13,13,20,0.97);border-top:1px solid rgba(201,168,76,0.2);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;backdrop-filter:blur(12px);';
   var label = document.createElement('span');
@@ -710,6 +708,18 @@ function toggleBilling() {
   banner.appendChild(label); banner.appendChild(link); banner.appendChild(dismiss);
   document.body.appendChild(banner);
 })();
+
+document.addEventListener('DOMContentLoaded', function() {
+  var modal = document.getElementById('prePurchaseModal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) closePrePurchaseModal();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && modal.style.display === 'flex') closePrePurchaseModal();
+    });
+  }
+});
 </script>
 
 </body>
