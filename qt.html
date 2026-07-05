@@ -2360,6 +2360,11 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
     if (secondsRemaining != null) {
       startTicker(secondsRemaining);
     }
+    // Ensure the containing result block is visible — this panel gets moved
+    // inside it below, and resultBlock is display:none until a query has
+    // actually rendered a response in this session (e.g. a fresh preflight
+    // lock, before any query has run at all).
+    document.getElementById('resultBlock').classList.add('visible');
     prompt.style.display = 'block';
     // Hide follow-up section and show limit prompt in its place
     const followUp = document.getElementById('followUpSection');
@@ -2377,6 +2382,9 @@ function applyQuotaLock(message) {
       const msgEl = document.getElementById('quotaMessage');
       if (msgEl) msgEl.textContent = message;
     }
+    // Same fix as applyQueryLock — this panel is moved inside resultBlock
+    // below, which is otherwise display:none until a query has rendered.
+    document.getElementById('resultBlock').classList.add('visible');
     prompt.style.display = 'block';
     const followUp = document.getElementById('followUpSection');
     if (followUp) {
