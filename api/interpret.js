@@ -1750,7 +1750,6 @@ async function registerEmail({ email, shareId }) {
       email,
       tier:        'free',
       status:      'active',
-      query_count: 0,
       query_limit: 3,
       expires_at:  expiresAt.toISOString(),
       grace_ends_at: graceEndsAt.toISOString(),
