@@ -4593,15 +4593,15 @@ async function loadSidebarCreditsAnon() {
 async function loadSidebarCredits() {
   const email = localStorage.getItem('qt_user_email');
   if (!email) {
-    // Show Keep Questioning for Observer users with email
-    var kqBox = document.getElementById('keepQuestioningBox');
-    if (kqBox) kqBox.style.display = 'block';
     loadSidebarCreditsAnon();
     return;
   }
 
   // For free/Observer tier — check if they have purchased Signal Bank credits
   if (CURRENT_TIER === 'free') {
+    // Show Keep Questioning for logged-in Observer users
+    var kqBox = document.getElementById('keepQuestioningBox');
+    if (kqBox) kqBox.style.display = 'block';
     try {
       const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
       const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
@@ -4708,8 +4708,11 @@ function initSidebar() {
     if (mc) mc.classList.add('sidebar-open');
     sidebarOpen = true;
     sidebarHasAppeared = true;
-    var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
+    // Show Keep Questioning for logged-in Observer users
+    if (email) {
+      var kqBox = document.getElementById('keepQuestioningBox');
+      if (kqBox) kqBox.style.display = 'block';
+    }
     loadSidebarCreditsAnon();
     return;
   }
