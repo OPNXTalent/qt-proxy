@@ -500,7 +500,7 @@
         <li>90-day archive</li>
         <li>Follow-up exploration</li>
       </ul>
-      <a id="refraction-btn" href="https://buy.stripe.com/8x214n9j88qY09P6aJ18c04" class="tier-btn">Subscribe →</a>
+      <a id="refraction-btn" href="#" onclick="interceptPurchase('https://buy.stripe.com/8x214n9j88qY09P6aJ18c04'); return false;" class="tier-btn">Subscribe →</a>
     </div>
 
     <!-- Full Spectrum -->
@@ -514,7 +514,7 @@
         <li>180-day archive</li>
         <li>Follow-up exploration</li>
       </ul>
-      <a id="fullspectrum-btn" href="https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05" class="tier-btn">Subscribe →</a>
+      <a id="fullspectrum-btn" href="#" onclick="interceptPurchase('https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05'); return false;" class="tier-btn">Subscribe →</a>
     </div>
 
   </div>
@@ -601,7 +601,12 @@ var _returnUrl         = null;
 
 function interceptPurchase(stripeUrl) {
   var email = localStorage.getItem('qt_user_email');
-  if (email) { window.location.href = stripeUrl; return; }
+  if (email) {
+    var dest = stripeUrl;
+    dest += (dest.indexOf('?') === -1 ? '?' : '&') + 'prefilled_email=' + encodeURIComponent(email);
+    window.location.href = dest;
+    return;
+  }
   _pendingStripeUrl = stripeUrl;
   var modal = document.getElementById('prePurchaseModal');
   if (modal) modal.style.display = 'flex';
