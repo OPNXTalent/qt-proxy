@@ -1315,8 +1315,13 @@ async function getCodeRedemption(email) {
 
 // ── ANONYMOUS IP RATE LIMITING ────────────────────────────────────────────────
 async function getQueryLog(ip) {
+  const windowStart = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/query_log?select=id,query_type,cost,created_at&user_id=is.null&order=created_at.desc&limit=200`,
+    `${SUPABASE_URL}/rest/v1/query_log?select=id,query_type,cost,created_at` +
+    `&user_id=is.null` +
+    `&query_type=eq.${encodeURIComponent(`ip:${ip}`)}` +
+    `&created_at=gte.${encodeURIComponent(windowStart.toISOString())}` +
+    `&order=created_at.desc`,
     {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -1326,15 +1331,14 @@ async function getQueryLog(ip) {
     }
   );
   const data = await res.json();
-  const ipEntries = (data || []).filter(r => r.query_type === `ip:${ip}`);
-  const windowStart = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
-  const recent = ipEntries.filter(r => new Date(r.created_at) > windowStart);
+  const recent = data || [];
   if (recent.length === 0) return null;
   return {
     query_count: recent.length,
     first_query_at: recent[recent.length - 1].created_at
   };
 }
+
 
 async function insertQueryLog(ip) {
   await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
