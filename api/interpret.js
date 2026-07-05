@@ -1624,9 +1624,14 @@ async function saveThread({ userId, query, queryType, response, tier }) {
 
 // ── SUBSCRIBER QUERY COUNT ────────────────────────────────────────────────────
 async function updateQueryCount({ userId, tier, threadId }) {
+  console.log(`[updateQueryCount] called with userId=${userId}, tier=${tier}, threadId=${threadId}`);
+  if (!userId) {
+    console.error('[updateQueryCount] ABORTED — userId is missing/null, nothing will be recorded');
+    return;
+  }
   try {
     // 1. Write to query_log — the authoritative usage record
-    await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
+    const logRes = await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
       method: 'POST',
       headers: {
         'apikey':        SUPABASE_SERVICE_ROLE_KEY,
@@ -1644,6 +1649,13 @@ async function updateQueryCount({ userId, tier, threadId }) {
       })
     });
 
+    if (!logRes.ok) {
+      const errBody = await logRes.text().catch(() => '(no body)');
+      console.error(`[updateQueryCount] query_log INSERT FAILED — status ${logRes.status}: ${errBody}`);
+    } else {
+      console.log('[updateQueryCount] query_log insert OK');
+    }
+
     // 2. Also attempt draw_query RPC to keep subscriber.query_count in sync
     //    Non-blocking — query_log is the source of truth for quota checks
     const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_query`, {
@@ -1660,12 +1672,14 @@ async function updateQueryCount({ userId, tier, threadId }) {
       const err = await rpcRes.text();
       // Log but don't fail — query_log already recorded the usage
       if (!err.includes('INSUFFICIENT_QUERIES')) {
-        console.error('draw_query RPC failed (non-blocking):', err);
+        console.error(`[updateQueryCount] draw_query RPC failed — status ${rpcRes.status}: ${err}`);
       }
+    } else {
+      console.log('[updateQueryCount] draw_query RPC OK');
     }
 
   } catch (err) {
-    console.error('updateQueryCount error:', err.message);
+    console.error('[updateQueryCount] THREW:', err.message);
   }
 }
 
@@ -2214,6 +2228,7 @@ export default async function handler(req, res) {
           }
         }
 
+        console.log(`[interpret POST] end-of-stream check: streamDone=${streamDone}, userId=${userId}`);
         if (streamDone && userId) {
           const isFollowUpQuery = isFollowUp || (messages && messages.length > 1);
           if (!isFollowUpQuery) {
@@ -2228,6 +2243,8 @@ export default async function handler(req, res) {
           } else {
             await updateQueryCount({ userId, tier, threadId: null });
           }
+        } else {
+          console.error(`[interpret POST] SKIPPED updateQueryCount — streamDone=${streamDone}, userId=${userId}`);
         }
 
         return res.end();
