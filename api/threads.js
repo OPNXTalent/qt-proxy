@@ -239,22 +239,25 @@ export default async function handler(req, res) {
       if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
       const { id: userId, tier } = subscriber;
 
-      // ── Toggle thread-level visibility (owner only) ─────────────────────
-      // Assumption, flagged for confirmation: only the original creator can
-      // flip a thread between Private and Trust Circle. Other participant-
-      // level controls (mute, step back, per-contribution visibility) are
-      // NOT owner-gated — this is the one action that is.
+      // ── Toggle thread-level visibility ──────────────────────────────────
+      // No special privileges for the creator here, same as everywhere
+      // else — any owner or participant can flip this.
       if (action === 'set_visibility') {
         const { visibility } = req.body || {};
         if (!['private', 'trust_circle'].includes(visibility)) {
           return res.status(400).json({ error: 'visibility must be private or trust_circle' });
         }
-        const threadRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${userId}&select=id&limit=1`,
-          { headers: sbHeaders() }
-        );
+        const [threadRes, partRes] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&select=id,user_id&limit=1`, { headers: sbHeaders() }),
+          fetch(`${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&user_id=eq.${userId}&select=id&limit=1`, { headers: sbHeaders() })
+        ]);
         const threadRows = await threadRes.json();
-        if (!threadRows?.length) return res.status(403).json({ error: 'Only the thread creator can change its visibility' });
+        const partRows = await partRes.json();
+        const isOwner = threadRows?.[0]?.user_id === userId;
+        const isParticipant = Array.isArray(partRows) && partRows.length > 0;
+        if (!threadRows?.length || (!isOwner && !isParticipant)) {
+          return res.status(403).json({ error: 'Must own or participate in this thread to change its visibility' });
+        }
 
         await fetch(
           `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}`,
