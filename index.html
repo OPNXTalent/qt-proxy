@@ -114,6 +114,8 @@ nav {
   color: var(--gold-pale);
 }
 
+.cta-text-short { display: none; }
+
 /* ── HERO ── */
 .hero {
   position: relative;
@@ -1101,8 +1103,31 @@ footer {
 
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) {
-  nav { padding: 20px 28px; }
+  nav { padding: 16px 20px; }
   .nav-links { display: none; }
+
+  /* Nav logo + CTA were wrapping onto multiple lines at phone widths
+     (nav-mark's "The Prism" text and nav-cta's full label both competing
+     for the same narrow row), which — combined with nav being fixed on
+     top of the hero section — visually collided with the large seal
+     image at the top of the hero. Shrinking both, and swapping to a
+     short CTA label, keeps this to a single line in the common case. */
+  .nav-mark {
+    font-size:13px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+  }
+  .nav-mark img { width: 26px !important; height: 26px !important; margin-right: 6px !important; }
+  .nav-cta {
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    padding: 7px 12px;
+  }
+  .cta-text-full { display: none; }
+  .cta-text-short { display: inline; }
+
   .what-grid, .book-grid { grid-template-columns: 1fr; gap: 48px; }
   .tiers { grid-template-columns: 1fr 1fr; }
   .how-steps { grid-template-columns: 1fr; gap: 48px; }
@@ -1117,7 +1142,13 @@ footer {
 
 @media (max-width: 600px) {
   .tiers { grid-template-columns: 1fr; }
-  .hero { padding: 100px 24px 80px; }
+  /* Generous top padding here isn't just for the default single-line nav
+     — it's a safety margin for the share-return scenario, where JS
+     overwrites the CTA's text via textContent (losing the short-label
+     span split above) with the longer "← Return to Interpretation",
+     which can still wrap to two lines. This padding ensures even a
+     wrapped 2-line nav can never overlap the seal image below it. */
+  .hero { padding: 150px 24px 80px; }
 }
 
 
@@ -1211,7 +1242,7 @@ function dismissReturnBar() {
     <li><a href="#book">The Book</a></li>
     <li><a href="/author.html">The Author</a></li>
   </ul>
-  <a href="/qt-gateway.html" class="nav-cta">Open the Interpreter →</a>
+  <a href="/qt-gateway.html" class="nav-cta"><span class="cta-text-full">Open the Interpreter →</span><span class="cta-text-short">Enter →</span></a>
 </nav>
 
 <!-- ── HERO ── -->
