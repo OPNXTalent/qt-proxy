@@ -3012,7 +3012,7 @@ async function callProxy(messages, rawQuery) {
   if (tierFromStream && tierFromStream !== 'trial' && tierFromStream !== 'free') {
     localStorage.setItem('qt_user_tier', tierFromStream);
     CURRENT_TIER = tierFromStream;
-    var tierLabelsMap = { refraction: 'Refraction', full_spectrum: 'Full Spectrum', scholar: 'Refraction', theologian: 'Full Spectrum', free: 'Observer · Free Access' };
+    var tierLabelsMap = { refraction: 'Examiner', full_spectrum: 'Full Spectrum', scholar: 'Examiner', theologian: 'Full Spectrum', free: 'Observer · Free Access' };
     var labelEl = document.getElementById('sidebarTierLabel');
     if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
@@ -3795,9 +3795,9 @@ if (CURRENT_TIER !== 'free') localStorage.setItem('qt_user_tier', CURRENT_TIER);
 // Set tier label immediately so it never shows the wrong value
 (function() {
   var tierLabels = {
-    refraction:    'Refraction',
+    refraction:    'Examiner',
     full_spectrum: 'Full Spectrum',
-    scholar:       'Refraction',
+    scholar:       'Examiner',
     theologian:    'Full Spectrum',
     companion:     'Full Spectrum',
     free:          'Observer · Free Access'
@@ -4810,8 +4810,8 @@ function updateSidebarCredits(newCredits) {
 }
 
 function initSidebar() {
-  var tierLabels = { refraction: 'Refraction', full_spectrum: 'Full Spectrum',
-    scholar: 'Refraction', theologian: 'Full Spectrum',
+  var tierLabels = { refraction: 'Examiner', full_spectrum: 'Full Spectrum',
+    scholar: 'Examiner', theologian: 'Full Spectrum',
     free: 'Observer · Free Access' };
   var labelEl = document.getElementById('sidebarTierLabel');
   if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || tierLabels['free'];
@@ -6911,9 +6911,9 @@ async function handleCreditsAdded() {
       localStorage.setItem('qt_user_tier', latestTier);
       if (typeof CURRENT_TIER !== 'undefined') CURRENT_TIER = latestTier;
       const tierLabels = {
-        refraction: 'Refraction',
+        refraction: 'Examiner',
         full_spectrum: 'Full Spectrum',
-        scholar: 'Refraction',
+        scholar: 'Examiner',
         theologian: 'Full Spectrum',
         companion: 'Full Spectrum',
         free: 'Observer · Free Access'
