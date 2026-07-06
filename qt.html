@@ -3997,6 +3997,10 @@ function renderThreads(threads) {
     var ri = document.getElementById('rename-input-' + renameOpenId);
     if (ri) { ri.focus(); ri.select(); }
   }
+
+  // Always start the Archive list scrolled to the top (newest thread)
+  // rather than wherever it happened to be scrolled from a prior render.
+  list.scrollTop = 0;
 }
 
 // SELECT THREAD
@@ -4541,6 +4545,10 @@ function toggleSidebar() {
   if (main)    main.classList.toggle('sidebar-open', sidebarOpen);
   if (toggle)  toggle.textContent = sidebarOpen ? '‹' : '☰';
   localStorage.setItem('qt_sidebar_open', sidebarOpen ? '1' : '0');
+  if (sidebarOpen) {
+    var list = document.getElementById('sidebarThreads');
+    if (list) list.scrollTop = 0;
+  }
 }
 
 // INIT SIDEBAR
