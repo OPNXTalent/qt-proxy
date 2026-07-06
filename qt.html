@@ -3108,7 +3108,7 @@ function renderResult(d) {
     if (threads.length > 0) {
       html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
       threads.forEach(function(t) {
-        html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
+        html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
       });
       html += '</div>';
     }
@@ -3151,9 +3151,21 @@ function toggleFramework(btn) {
   btn.textContent = isOpen ? 'Hide framework interpretation' : 'View full framework interpretation';
 }
 
-function submitSuggestedThread(text) {
+function submitSuggestedThread(text, btnEl) {
   const fuInput = document.getElementById('followUpInput');
   if (!fuInput) return;
+
+  // Only disable the button that was actually clicked — the other two
+  // suggestions stay available in case more than one path is genuinely
+  // worth exploring. This still prevents the one narrow failure mode that
+  // actually wastes a query: clicking the exact same suggestion twice.
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.style.opacity = '0.4';
+    btnEl.style.cursor = 'default';
+    btnEl.style.pointerEvents = 'none';
+  }
+
   fuInput.value = text;
   fuInput.focus();
   fuInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3525,258 +3537,183 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
 
 // ── VOICE / MIC ──────────────────────────────────────────────────────────────
 (function initMic() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) return; // not supported — mic button stays hidden
+  // ── Voice input — OpenAI batch transcription ────────────────────────────
+  // Replaces the browser's built-in Web Speech API, which produced
+  // unreliable, duplicated transcripts on Android (words and phrases
+  // repeating, e.g. "I am I am I am thinking I am thinking about") due to
+  // how that browser's continuous-recognition implementation re-fires
+  // results. This records a clip locally, sends it to /api/transcribe
+  // (which forwards to OpenAI) once recording stops, and drops the
+  // returned text into the field. Trade-off: no live word-by-word display
+  // while speaking — there's a brief pause after stopping while the clip
+  // uploads and transcribes — in exchange for consistent, non-duplicated
+  // results across every browser/device, including iOS Safari.
 
-  const micBtn = document.getElementById('micBtn');
-  const micStatus = document.getElementById('micStatus');
-  const textarea = document.getElementById('userInput');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    return; // not supported — mic buttons stay hidden
+  }
 
-  micBtn.style.display = 'block'; // reveal only when supported
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
 
-  const recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-US';
+  // Creates one recorder instance wired to a specific button/status/textarea
+  // trio. onDone fires after the transcript has been inserted, so callers
+  // can auto-submit (matching the old auto-submit-on-capture behavior).
+  function createVoiceRecorder(opts) {
+    let mediaRecorder = null;
+    let chunks = [];
+    let recording = false;
+    let stream = null;
 
-  let listening = false;
-  let baseText = '';
-  let finalChunks = [];
-
-  recognition.onstart = () => {
-    listening = true;
-    baseText = textarea.value; // whatever's already in the box before dictation starts
-    finalChunks = [];
-    micBtn.classList.add('listening');
-    micBtn.title = 'Tap to stop and interpret';
-    micStatus.style.display = 'block';
-    micStatus.textContent = '● Listening — speak freely, tap 🎙 when done';
-  };
-
-  recognition.onresult = (e) => {
-    // Track each finalized result BY INDEX and overwrite that slot rather
-    // than concatenating — some Android implementations re-fire the same
-    // result index as final more than once, which would otherwise stack
-    // the same word/phrase repeatedly (e.g. "the the the").
-    let interim = '';
-    for (let i = 0; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) finalChunks[i] = t;
-      else interim += t;
-    }
-    const committed = finalChunks.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-    textarea.value = (baseText ? baseText.trimEnd() + ' ' : '') + committed;
-    updateCharCount();
-    if (interim) {
-      micStatus.textContent = '● ' + interim;
-    }
-  };
-
-  recognition.onerror = (e) => {
-    if (e.error === 'no-speech') return; // ignore no-speech in continuous mode
-    micStatus.textContent = e.error === 'not-allowed'
-      ? 'Microphone access denied — enable it in browser settings'
-      : 'Could not hear input — please try again';
-    micStatus.style.color = 'rgba(200,80,70,0.8)';
-    listening = false;
-    micBtn.classList.remove('listening');
-  };
-
-  recognition.onend = () => {
-    // In continuous mode, onend only fires when we explicitly call stop()
-    listening = false;
-    micBtn.classList.remove('listening');
-    micBtn.title = 'Speak your input';
-    if (textarea.value.trim()) {
-      micStatus.textContent = '✓ Captured — interpreting…';
-      setTimeout(() => {
-        micStatus.style.display = 'none';
-        micStatus.style.color = 'var(--gold-dim)';
-        runInterpretation();
-      }, 600);
-    } else {
-      micStatus.style.display = 'none';
-    }
-  };
-
-  window.toggleMic = function() {
-    if (listening) {
-      recognition.stop(); // user taps to stop — triggers onend → auto-submit
-    } else {
-      micStatus.style.color = 'var(--gold-dim)';
-      textarea.value = '';
-      updateCharCount();
+    async function start() {
       try {
-        recognition.start();
-      } catch(e) {
-        micStatus.style.display = 'block';
-        micStatus.textContent = 'Could not start microphone — try again';
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        chunks = [];
+        opts.textarea.value = ''; // fresh dictation, matching prior clear-then-speak behavior
+
+        const options = MediaRecorder.isTypeSupported('audio/webm')
+          ? { mimeType: 'audio/webm' }
+          : undefined;
+        mediaRecorder = new MediaRecorder(stream, options);
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          if (stream) stream.getTracks().forEach((t) => t.stop());
+          handleStop();
+        };
+
+        mediaRecorder.start();
+        recording = true;
+        opts.btn.classList.add('listening');
+        opts.btn.title = 'Tap to stop and transcribe';
+        opts.statusEl.style.display = 'block';
+        opts.statusEl.style.color = 'var(--gold-dim)';
+        opts.statusEl.textContent = '● Recording — tap 🎙 when done';
+      } catch (err) {
+        opts.statusEl.style.display = 'block';
+        opts.statusEl.textContent = err && err.name === 'NotAllowedError'
+          ? 'Microphone access denied — enable it in browser settings'
+          : 'Could not access microphone — please try again';
+        opts.statusEl.style.color = 'rgba(200,80,70,0.8)';
       }
     }
-  };
 
-  // ── FOLLOW-UP MIC ─────────────────────────────────────────────────────────
-  const followUpMicBtn = document.getElementById('followUpMicBtn');
-  const followUpMicStatus = document.getElementById('followUpMicStatus');
-  const followUpTextarea = document.getElementById('followUpInput');
-
-  followUpMicBtn.style.display = 'block';
-
-  const followUpRecognition = new SpeechRecognition();
-  followUpRecognition.continuous = true;
-  followUpRecognition.interimResults = true;
-  followUpRecognition.lang = 'en-US';
-
-  let followUpListening = false;
-  let followUpBaseText = '';
-  let followUpFinalChunks = [];
-
-  followUpRecognition.onstart = () => {
-    followUpListening = true;
-    followUpBaseText = followUpTextarea.value;
-    followUpFinalChunks = [];
-    followUpMicBtn.classList.add('listening');
-    followUpMicBtn.title = 'Tap to stop and submit';
-    followUpMicStatus.style.display = 'block';
-    followUpMicStatus.textContent = '● Listening — speak freely, tap 🎙 when done';
-  };
-
-  followUpRecognition.onresult = (e) => {
-    let interim = '';
-    for (let i = 0; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) followUpFinalChunks[i] = t;
-      else interim += t;
+    function stop() {
+      if (mediaRecorder && recording) {
+        recording = false;
+        opts.btn.classList.remove('listening');
+        opts.btn.title = 'Speak';
+        mediaRecorder.stop(); // fires onstop → handleStop()
+      }
     }
-    const committed = followUpFinalChunks.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-    followUpTextarea.value = (followUpBaseText ? followUpBaseText.trimEnd() + ' ' : '') + committed;
-    if (interim) followUpMicStatus.textContent = '● ' + interim;
-  };
 
-  followUpRecognition.onerror = (e) => {
-    if (e.error === 'no-speech') return;
-    followUpMicStatus.textContent = e.error === 'not-allowed'
-      ? 'Microphone access denied — enable it in browser settings'
-      : 'Could not hear input — please try again';
-    followUpMicStatus.style.color = 'rgba(200,80,70,0.8)';
-    followUpListening = false;
-    followUpMicBtn.classList.remove('listening');
-  };
+    async function handleStop() {
+      if (chunks.length === 0) {
+        opts.statusEl.style.display = 'none';
+        return;
+      }
+      opts.statusEl.textContent = '● Transcribing…';
+      opts.statusEl.style.color = 'var(--gold-dim)';
 
-  followUpRecognition.onend = () => {
-    followUpListening = false;
-    followUpMicBtn.classList.remove('listening');
-    followUpMicBtn.title = 'Speak your follow-up';
-    if (followUpTextarea.value.trim()) {
-      followUpMicStatus.textContent = '✓ Captured — submitting…';
-      setTimeout(() => {
-        followUpMicStatus.style.display = 'none';
-        followUpMicStatus.style.color = 'var(--gold-dim)';
-        runFollowUp();
-      }, 600);
-    } else {
-      followUpMicStatus.style.display = 'none';
-    }
-  };
+      const blob = new Blob(chunks, { type: (chunks[0] && chunks[0].type) || 'audio/webm' });
 
-  window.toggleFollowUpMic = function() {
-    if (followUpListening) {
-      followUpRecognition.stop(); // user taps to stop — triggers onend → auto-submit
-    } else {
-      followUpMicStatus.style.color = 'var(--gold-dim)';
-      followUpTextarea.value = '';
       try {
-        followUpRecognition.start();
-      } catch(e) {
-        followUpMicStatus.style.display = 'block';
-        followUpMicStatus.textContent = 'Could not start microphone — try again';
-      }
-    }
-  };
+        const base64 = await blobToBase64(blob);
+        const res = await fetch('/api/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audio: base64, mimeType: blob.type })
+        });
+        const data = await res.json().catch(() => ({}));
 
-  // ── REFRACTIONS (CHAT) MIC ────────────────────────────────────────────────
-  const chatMicBtn = document.getElementById('chatMicBtn');
-  const chatMicStatus = document.getElementById('chatMicStatus');
-  const chatTextarea = document.getElementById('chatInput');
-
-  if (chatMicBtn && chatMicStatus && chatTextarea) {
-    chatMicBtn.style.display = 'block';
-
-    const chatRecognition = new SpeechRecognition();
-    chatRecognition.continuous = true;
-    chatRecognition.interimResults = true;
-    chatRecognition.lang = 'en-US';
-
-    let chatListening = false;
-    let chatBaseText = '';
-    let chatFinalChunks = [];
-
-    chatRecognition.onstart = () => {
-      chatListening = true;
-      chatBaseText = chatTextarea.value;
-      chatFinalChunks = [];
-      chatMicBtn.classList.add('listening');
-      chatMicBtn.title = 'Tap to stop and send';
-      chatMicStatus.style.display = 'block';
-      chatMicStatus.textContent = '● Listening — speak freely, tap 🎙 when done';
-    };
-
-    chatRecognition.onresult = (e) => {
-      let interim = '';
-      for (let i = 0; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) chatFinalChunks[i] = t;
-        else interim += t;
-      }
-      const committed = chatFinalChunks.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-      chatTextarea.value = (chatBaseText ? chatBaseText.trimEnd() + ' ' : '') + committed;
-      chatTextarea.style.height = 'auto';
-      chatTextarea.style.height = Math.min(chatTextarea.scrollHeight, 120) + 'px';
-      if (interim) chatMicStatus.textContent = '● ' + interim;
-    };
-
-    chatRecognition.onerror = (e) => {
-      if (e.error === 'no-speech') return;
-      chatMicStatus.textContent = e.error === 'not-allowed'
-        ? 'Microphone access denied — enable it in browser settings'
-        : 'Could not hear input — please try again';
-      chatMicStatus.style.color = 'rgba(200,80,70,0.8)';
-      chatListening = false;
-      chatMicBtn.classList.remove('listening');
-    };
-
-    chatRecognition.onend = () => {
-      chatListening = false;
-      chatMicBtn.classList.remove('listening');
-      chatMicBtn.title = 'Speak your refraction';
-      if (chatTextarea.value.trim()) {
-        chatMicStatus.textContent = '✓ Captured — sending…';
-        setTimeout(() => {
-          chatMicStatus.style.display = 'none';
-          chatMicStatus.style.color = 'var(--gold-dim)';
-          sendChatMessage();
-        }, 600);
-      } else {
-        chatMicStatus.style.display = 'none';
-      }
-    };
-
-    window.toggleChatMic = function() {
-      if (chatListening) {
-        chatRecognition.stop(); // user taps to stop — triggers onend → auto-send
-      } else {
-        chatMicStatus.style.color = 'var(--gold-dim)';
-        chatTextarea.value = '';
-        try {
-          chatRecognition.start();
-        } catch(e) {
-          chatMicStatus.style.display = 'block';
-          chatMicStatus.textContent = 'Could not start microphone — try again';
+        if (!res.ok || !data.text) {
+          opts.statusEl.textContent = 'Could not transcribe — please try again';
+          opts.statusEl.style.color = 'rgba(200,80,70,0.8)';
+          setTimeout(() => { opts.statusEl.style.display = 'none'; }, 2500);
+          return;
         }
+
+        const current = opts.textarea.value;
+        opts.textarea.value = (current ? current.trimEnd() + ' ' : '') + data.text.trim();
+        // Fire a synthetic input event so existing oninput handlers (char
+        // count, auto-resize) run the same as they would for real typing.
+        opts.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+        opts.statusEl.textContent = '✓ Captured';
+        opts.statusEl.style.color = 'var(--gold-dim)';
+        setTimeout(() => {
+          opts.statusEl.style.display = 'none';
+          if (opts.onDone) opts.onDone();
+        }, 400);
+
+      } catch (err) {
+        opts.statusEl.textContent = 'Something went wrong — please try again';
+        opts.statusEl.style.color = 'rgba(200,80,70,0.8)';
+        setTimeout(() => { opts.statusEl.style.display = 'none'; }, 2500);
+      }
+    }
+
+    return {
+      toggle: function() {
+        if (recording) stop(); else start();
       }
     };
   }
+
+  // ── Main input mic ────────────────────────────────────────────────────
+  const micBtn = document.getElementById('micBtn');
+  const micStatus = document.getElementById('micStatus');
+  const textarea = document.getElementById('userInput');
+  if (micBtn && micStatus && textarea) {
+    micBtn.style.display = 'block';
+    const mainRecorder = createVoiceRecorder({
+      btn: micBtn,
+      statusEl: micStatus,
+      textarea: textarea,
+      onDone: function() { runInterpretation(); }
+    });
+    window.toggleMic = function() { mainRecorder.toggle(); };
+  }
+
+  // ── Follow-up mic ─────────────────────────────────────────────────────
+  const followUpMicBtn = document.getElementById('followUpMicBtn');
+  const followUpMicStatus = document.getElementById('followUpMicStatus');
+  const followUpTextarea = document.getElementById('followUpInput');
+  if (followUpMicBtn && followUpMicStatus && followUpTextarea) {
+    followUpMicBtn.style.display = 'block';
+    const followUpRecorder = createVoiceRecorder({
+      btn: followUpMicBtn,
+      statusEl: followUpMicStatus,
+      textarea: followUpTextarea,
+      onDone: function() { runFollowUp(); }
+    });
+    window.toggleFollowUpMic = function() { followUpRecorder.toggle(); };
+  }
+
+  // ── Refractions (chat) mic ────────────────────────────────────────────
+  const chatMicBtn = document.getElementById('chatMicBtn');
+  const chatMicStatus = document.getElementById('chatMicStatus');
+  const chatTextarea = document.getElementById('chatInput');
+  if (chatMicBtn && chatMicStatus && chatTextarea) {
+    chatMicBtn.style.display = 'block';
+    const chatRecorder = createVoiceRecorder({
+      btn: chatMicBtn,
+      statusEl: chatMicStatus,
+      textarea: chatTextarea,
+      onDone: function() { sendChatMessage(); }
+    });
+    window.toggleChatMic = function() { chatRecorder.toggle(); };
+  }
 })();
+
 
 // ── SIDEBAR SYSTEM ──
 
