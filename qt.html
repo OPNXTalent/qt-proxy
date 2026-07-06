@@ -2204,12 +2204,29 @@
 
     <!-- Compose -->
     <div id="chatMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); padding:0 16px 8px; text-transform:uppercase;"></div>
+
+    <!-- Per-entry visibility toggle — governs THIS specific refraction only,
+         not the thread as a whole. Defaults to Private every time; tap to
+         flip before sending. -->
+    <div style="padding:10px 16px 0;">
+      <button id="entryVisibilityToggle" onclick="toggleEntryVisibility()" type="button"
+        data-visibility="private"
+        style="display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-dim); background:transparent; border:1px solid var(--border-lit); border-radius:20px; padding:7px 16px; cursor:pointer; transition:all 0.2s;">
+        <svg id="entryVisibilityIcon" width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;">
+          <rect x="4" y="6" width="6" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1"/>
+          <path d="M 5 6 L 5 4.3 A 2 2 0 0 1 9 4.3 L 9 6" fill="none" stroke="currentColor" stroke-width="1"/>
+          <circle cx="7" cy="8.3" r="0.6" fill="currentColor"/>
+        </svg>
+        <span id="entryVisibilityLabel">Private View</span>
+      </button>
+    </div>
+
     <div class="chat-compose" style="padding:12px 16px;border-top:1px solid rgba(42,42,64,0.5);display:flex;gap:8px;align-items:flex-end;">
       <textarea class="chat-input" id="chatInput" placeholder="Add your refraction…" rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
       <button id="chatMicBtn" onclick="toggleChatMic()" title="Speak your refraction" style="display:none; flex-shrink:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:15px; line-height:1; transition:all 0.2s; padding:0; align-self:flex-end;">🎙</button>
-      <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
+      <button class="chat-send-btn" onclick="sendChatMessage()">Enter →</button>
     </div>
   </div>
 
@@ -4185,7 +4202,7 @@ function selectThread(id) {
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-          if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
+          if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false);
         })
         .catch(function() {});
 
@@ -4306,7 +4323,7 @@ function restoreFollowUps(id) {
   if (!id.startsWith('pending-') && userEmail()) {
     fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-user-email': userEmail() } })
     .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps); })
+    .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false); })
     .catch(function() {});
   }
 }
@@ -4328,7 +4345,7 @@ function startFollowUpPolling(threadId) {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps);
+      if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false);
     })
     .catch(function() {});
   }, 8000);
@@ -4380,7 +4397,8 @@ function startFollowUpRealtime(threadId) {
   }
 }
 
-function renderFUWithSource(list) {
+function renderFUWithSource(list, shouldScroll) {
+  if (shouldScroll === undefined) shouldScroll = true; // default: live single-item arrival still auto-scrolls
   if (!list || !list.length) return;
 
   var fuSec = document.getElementById('followUpSection');
@@ -4442,7 +4460,7 @@ function renderFUWithSource(list) {
     el.appendChild(buildNodeControls(nodeId, fu.query || ''));
 
     container.appendChild(el);
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (shouldScroll) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 }
 
@@ -6047,7 +6065,7 @@ function startLiveSync() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.followUps && data.followUps.length > 0 && typeof renderFUWithSource === 'function') {
-        renderFUWithSource(data.followUps);
+        renderFUWithSource(data.followUps, false);
       }
     })
     .catch(function() {});
