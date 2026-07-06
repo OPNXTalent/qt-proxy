@@ -1537,6 +1537,14 @@
     .shell { padding: 40px 20px 80px; }
     .header h1 { font-size:29px; }
     .input-selector { grid-template-columns: repeat(2, 1fr); }
+
+    /* Refractions panel — the 420px fixed width overflows any phone
+       viewport (typically 360–430px CSS pixels). Full-screen takeover on
+       small screens instead of a partial slide-over. */
+    #discussionPanel {
+      width: 100vw;
+      right: -100vw;
+    }
   }
 
   /* ── Concept Exploration Cards ─────────────────────────────────────────── */
