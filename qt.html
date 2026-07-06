@@ -3618,26 +3618,49 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
     async function handleStop() {
       if (chunks.length === 0) {
         opts.statusEl.style.display = 'none';
+        opts.statusEl.textContent = 'No audio was captured — please try again';
+        opts.statusEl.style.color = 'rgba(200,80,70,0.8)';
+        opts.statusEl.style.display = 'block';
+        setTimeout(() => { opts.statusEl.style.display = 'none'; }, 3500);
         return;
       }
       opts.statusEl.textContent = '● Transcribing…';
       opts.statusEl.style.color = 'var(--gold-dim)';
 
-      const blob = new Blob(chunks, { type: (chunks[0] && chunks[0].type) || 'audio/webm' });
+      const actualMime = (mediaRecorder && mediaRecorder.mimeType) || (chunks[0] && chunks[0].type) || 'audio/webm';
+      const blob = new Blob(chunks, { type: actualMime });
 
       try {
         const base64 = await blobToBase64(blob);
         const res = await fetch('/api/transcribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio: base64, mimeType: blob.type })
+          body: JSON.stringify({ audio: base64, mimeType: actualMime })
         });
-        const data = await res.json().catch(() => ({}));
+
+        const rawText = await res.text();
+        let data = {};
+        let parseFailed = false;
+        try { data = JSON.parse(rawText); } catch (e) { parseFailed = true; }
 
         if (!res.ok || !data.text) {
-          opts.statusEl.textContent = 'Could not transcribe — please try again';
-          opts.statusEl.style.color = 'rgba(200,80,70,0.8)';
-          setTimeout(() => { opts.statusEl.style.display = 'none'; }, 2500);
+          // Show the real diagnostic info directly on screen — status code,
+          // recorded format/size, and whatever the server actually said
+          // (or the raw response if it wasn't even JSON, which usually
+          // means something upstream of our own code intercepted the
+          // request — a firewall/WAF/CDN block, not our transcription
+          // logic itself).
+          const bodyPreview = parseFailed
+            ? rawText.replace(/<[^>]*>/g, ' ').trim().slice(0, 120)
+            : (data.error || JSON.stringify(data)).slice(0, 120);
+          opts.statusEl.innerHTML =
+            'Transcribe failed — HTTP ' + res.status + '<br>' +
+            'format: ' + actualMime + ', size: ' + blob.size + 'b<br>' +
+            (bodyPreview || '(empty response)');
+          opts.statusEl.style.color = 'rgba(200,80,70,0.85)';
+          opts.statusEl.style.display = 'block';
+          console.error('[voice] transcribe failed', { status: res.status, actualMime, size: blob.size, rawText });
+          setTimeout(() => { opts.statusEl.style.display = 'none'; opts.statusEl.innerHTML = ''; }, 9000);
           return;
         }
 
@@ -3655,9 +3678,11 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
         }, 400);
 
       } catch (err) {
-        opts.statusEl.textContent = 'Something went wrong — please try again';
+        opts.statusEl.textContent = 'Network error: ' + (err && err.message ? err.message : 'unknown');
         opts.statusEl.style.color = 'rgba(200,80,70,0.8)';
-        setTimeout(() => { opts.statusEl.style.display = 'none'; }, 2500);
+        opts.statusEl.style.display = 'block';
+        console.error('[voice] fetch threw', err);
+        setTimeout(() => { opts.statusEl.style.display = 'none'; }, 6000);
       }
     }
 
