@@ -2206,16 +2206,24 @@
     <div id="chatMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); padding:0 16px 8px; text-transform:uppercase;"></div>
 
     <!-- Per-entry visibility toggle — governs THIS specific refraction only,
-         not the thread as a whole. Defaults to Private every time; tap to
-         flip before sending. -->
+         not the thread as a whole. Sticky: stays wherever it was last left,
+         rather than resetting after each send. -->
     <div style="padding:10px 16px 0;">
       <button id="entryVisibilityToggle" onclick="toggleEntryVisibility()" type="button"
         data-visibility="private"
-        style="display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-dim); background:transparent; border:1px solid var(--border-lit); border-radius:20px; padding:7px 16px; cursor:pointer; transition:all 0.2s;">
-        <svg id="entryVisibilityIcon" width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;">
+        style="display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); background:rgba(122,98,48,0.06); border:1px solid var(--gold-dim); border-radius:20px; padding:7px 16px; cursor:pointer; transition:all 0.2s;">
+        <svg id="iconPrivate" width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;">
           <rect x="4" y="6" width="6" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1"/>
           <path d="M 5 6 L 5 4.3 A 2 2 0 0 1 9 4.3 L 9 6" fill="none" stroke="currentColor" stroke-width="1"/>
           <circle cx="7" cy="8.3" r="0.6" fill="currentColor"/>
+        </svg>
+        <svg id="iconTrustCircle" width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0; display:none;">
+          <circle cx="7" cy="3.2" r="1.4" fill="none" stroke="currentColor" stroke-width="1"/>
+          <circle cx="3.5" cy="9.6" r="1.4" fill="none" stroke="currentColor" stroke-width="1"/>
+          <circle cx="10.5" cy="9.6" r="1.4" fill="none" stroke="currentColor" stroke-width="1"/>
+          <path d="M 6.1 4.3 A 4 4 0 0 0 4 8.3" fill="none" stroke="currentColor" stroke-width="0.8"/>
+          <path d="M 7.9 4.3 A 4 4 0 0 1 10 8.3" fill="none" stroke="currentColor" stroke-width="0.8"/>
+          <path d="M 4.9 9.6 A 3.2 3.2 0 0 0 9.1 9.6" fill="none" stroke="currentColor" stroke-width="0.8"/>
         </svg>
         <span id="entryVisibilityLabel">Private View</span>
       </button>
@@ -5515,6 +5523,38 @@ function updateChatBarUI() {
   if (!count) return;
   var n = _chatMessages.length;
   count.textContent = n > 0 ? n + (n === 1 ? ' message' : ' messages') : '';
+}
+
+// Per-entry Private View / Trust Circle toggle for Refractions. Sticky —
+// stays wherever it was last left rather than resetting after every send,
+// so someone contributing several entries in a row doesn't have to touch
+// it each time unless they actually want to switch.
+function toggleEntryVisibility() {
+  var btn = document.getElementById('entryVisibilityToggle');
+  var label = document.getElementById('entryVisibilityLabel');
+  var iconPrivate = document.getElementById('iconPrivate');
+  var iconTrustCircle = document.getElementById('iconTrustCircle');
+  if (!btn || !label || !iconPrivate || !iconTrustCircle) return;
+
+  var isPrivate = btn.dataset.visibility === 'private';
+  var next = isPrivate ? 'trust_circle' : 'private';
+  btn.dataset.visibility = next;
+
+  if (next === 'trust_circle') {
+    label.textContent = 'Trust Circle';
+    iconPrivate.style.display = 'none';
+    iconTrustCircle.style.display = '';
+    btn.style.color = 'var(--blue-lit)';
+    btn.style.background = 'rgba(74,106,170,0.08)';
+    btn.style.borderColor = 'var(--blue-lit)';
+  } else {
+    label.textContent = 'Private View';
+    iconTrustCircle.style.display = 'none';
+    iconPrivate.style.display = '';
+    btn.style.color = 'var(--gold-dim)';
+    btn.style.background = 'rgba(122,98,48,0.06)';
+    btn.style.borderColor = 'var(--gold-dim)';
+  }
 }
 
 async function sendChatMessage() {
