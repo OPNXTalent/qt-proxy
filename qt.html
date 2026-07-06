@@ -5567,9 +5567,11 @@ async function sendChatMessage() {
   input.disabled = true;
 
   var name = getChatParticipantName();
+  var visToggle = document.getElementById('entryVisibilityToggle');
+  var currentVisibility = (visToggle && visToggle.dataset.visibility) || 'private';
 
   // Optimistic render
-  var msg = { id: Date.now(), name: name, text: text, mine: true };
+  var msg = { id: Date.now(), name: name, text: text, mine: true, visibility: currentVisibility };
   _chatMessages.push(msg);
   // Track fingerprint so Realtime skips re-rendering our own send
   _sentByMe.add(name + '::' + text);
@@ -5815,6 +5817,18 @@ function renderChatMessage(msg) {
   div.className = 'chat-msg ' + (msg.mine ? 'mine' : 'theirs');
   if (!msg.mine) {
     div.style.borderLeftColor = getParticipantColor(msg.name, msg.messageType || 'recipient', msg.sessionToken);
+  }
+  // Color the box to match whichever visibility state was active when this
+  // was sent — same gold/blue used on the toggle itself. Only known for
+  // messages sent this session by the current person (visibility isn't
+  // persisted yet); older or other people's messages fall back to the
+  // default look until that lands.
+  if (msg.visibility === 'trust_circle') {
+    div.style.borderColor = 'var(--blue-lit)';
+    div.style.background = 'rgba(74,106,170,0.05)';
+  } else if (msg.visibility === 'private') {
+    div.style.borderColor = 'var(--gold-dim)';
+    div.style.background = 'rgba(122,98,48,0.04)';
   }
   var time = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
   div.innerHTML =
