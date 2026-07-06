@@ -4263,21 +4263,39 @@ function selectThread(id) {
 // RESTORE FOLLOW-UPS
 function restoreFollowUps(id) {
   function renderFU(list) {
-    list.forEach(function(fu) {
+    list.forEach(function(fu, idx) {
       var el = document.createElement('div');
       el.className = 'fu-block';
       var question = fu.question || fu.query || '';
       var resp = (fu.response && typeof fu.response === 'object') ? (fu.response.text || '') : (fu.response || '');
-      var label = document.createElement('div');
-      label.className = 'fu-question';
-      label.textContent = question;
-      var body = document.createElement('div');
-      body.className = 'fu-body';
-      body.innerHTML = resp.split(/\n\n/).map(function(p) {
+
+      // Same node-attachment pattern used by the other two follow-up render
+      // paths (live-streamed, and server-fetched via renderFUWithSource) —
+      // this path was the only one of the three that skipped it, which is
+      // why Print/Share/Refractions could be present on one device/session
+      // and missing on another for the exact same saved thread.
+      var nodeId = fu.id || (id + '-local-' + idx);
+      el.dataset.nodeId = nodeId;
+      el.style.cursor = 'pointer';
+      el.title = 'Focus refractions for this response';
+      el.addEventListener('click', (function(nid, q) {
+        return function(e) {
+          if (e.target.closest('.node-controls')) return;
+          focusRefractionNode(nid, q);
+        };
+      })(nodeId, question));
+
+      var label = assignNodeLabel(nodeId);
+      var bodyHtml = resp.split(/\n\n/).map(function(p) {
         return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
       }).join('');
-      el.appendChild(label);
-      el.appendChild(body);
+
+      el.innerHTML =
+        '<div class="fu-question" data-label="' + label + ' — ">' + escHtml(question) + '</div>' +
+        '<div class="fu-body">' + bodyHtml + '</div>';
+
+      el.appendChild(buildNodeControls(nodeId, question));
+
       var rc = document.getElementById('resultContent');
       if (rc) rc.appendChild(el);
     });
