@@ -3953,7 +3953,7 @@ function renderThreads(threads) {
     // ── Layer B: Timestamp ────────────────────────────────────────────────
     var tsEl = document.createElement('div');
     tsEl.className = 'thread-timestamp';
-    tsEl.textContent = thread.lastVisited || '';
+    tsEl.textContent = formatThreadTimestamp(thread.createdAt) || thread.lastVisited || '';
     item.appendChild(tsEl);
 
     // ── Layer C: Status row — dot (left) + expiry (right) ────────────────
@@ -6402,6 +6402,25 @@ function formatNow() {
   var day   = now.getDate();
   var hours = now.getHours();
   var mins  = String(now.getMinutes()).padStart(2, '0');
+  var ampm  = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12 || 12;
+  return month + ' ' + day + ' \u00b7 ' + hours + ':' + mins + ' ' + ampm;
+}
+
+// Same style as formatNow(), but for an arbitrary past timestamp (e.g. a
+// thread's createdAt) rather than the current moment. This runs in the
+// browser, so `new Date(ms)` and the getHours()/getDate() calls below
+// automatically use the visitor's own local timezone — unlike the old
+// server-formatted lastVisited string, which used the server's timezone
+// (Vercel defaults to UTC) and was wrong by however many hours separated
+// the visitor from UTC.
+function formatThreadTimestamp(ms) {
+  if (!ms) return '';
+  var d     = new Date(ms);
+  var month = d.toLocaleString('en-US', { month: 'short' });
+  var day   = d.getDate();
+  var hours = d.getHours();
+  var mins  = String(d.getMinutes()).padStart(2, '0');
   var ampm  = hours >= 12 ? 'pm' : 'am';
   hours = hours % 12 || 12;
   return month + ' ' + day + ' \u00b7 ' + hours + ':' + mins + ' ' + ampm;
