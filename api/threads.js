@@ -1,9 +1,38 @@
 // api/threads.js
-// Returns thread list for authenticated subscriber
-// Called by qt.html sidebar on load
+// Returns thread list for authenticated subscriber, plus Trust Circle management:
+// toggling a thread's visibility, joining a shared thread into your own Archive,
+// the silent step-back toggle, and per-thread muting.
+//
+// Trust Circle model, for reference (see project notes for the full design
+// conversation): a thread is Private by default. An owner can flip it to
+// Trust Circle, which makes it reachable via direct link only — there is no
+// discovery mechanism anywhere. Anyone who reaches it can join, which adds
+// them to thread_participants as a LIVE SHARED REFERENCE, not a copy — the
+// same thread_id shows up in every participant's Archive. A database trigger
+// (ensure_creator_is_participant) makes the original creator symmetrical with
+// everyone else the moment a thread becomes Trust Circle, which is what makes
+// "delete from my Archive" safe for anyone to do without destroying the
+// thread for other participants — see the DELETE handler below.
 
-const SUPABASE_URL            = process.env.SUPABASE_URL;
+const SUPABASE_URL              = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+function sbHeaders(extra) {
+  return {
+    'apikey':        SUPABASE_SERVICE_ROLE_KEY,
+    'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    ...extra
+  };
+}
+
+async function getSubscriberId(userEmail) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id,tier,display_name&limit=1`,
+    { headers: sbHeaders() }
+  );
+  const subs = await res.json();
+  return subs?.[0] || null;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,58 +47,94 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // ── GET — fetch thread list ───────────────────────────────────────────────
+  // ── GET — fetch thread list (owned + Trust Circle threads joined) ─────────
   if (req.method === 'GET') {
     try {
-      // Look up subscriber id by email
-      const subRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id,tier,display_name&limit=1`,
-        {
-          headers: {
-            'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      const subscriber = await getSubscriberId(userEmail);
+      if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
+      const { id: userId, tier, display_name } = subscriber;
+
+      // Threads this person owns — unchanged query, now also pulling visibility.
+      const ownedRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/threads?user_id=eq.${userId}&order=created_at.desc&limit=100&select=*`,
+        { headers: sbHeaders() }
+      );
+      const owned = await ownedRes.json();
+      if (!Array.isArray(owned)) return res.status(500).json({ error: 'Failed to fetch threads' });
+
+      // Threads this person has joined as a participant (their own or someone
+      // else's Trust Circle thread). Owned Trust Circle threads will ALSO
+      // appear here, via the trigger-created participant row — deduped below.
+      const participantRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/thread_participants?user_id=eq.${userId}&select=thread_id,active,last_seen_at,threads(*)`,
+        { headers: sbHeaders() }
+      );
+      const participantRows = await participantRes.json();
+      const participantList = Array.isArray(participantRows) ? participantRows : [];
+
+      // Merge, deduping by thread id. Owned threads take priority for the
+      // base record; participant rows layer in participation-specific fields.
+      const byId = new Map();
+      for (const t of owned) {
+        byId.set(t.id, { thread: t, isOwner: true, active: true, lastSeenAt: null });
+      }
+      for (const row of participantList) {
+        if (!row.threads) continue; // thread may have been hard-deleted already
+        const existing = byId.get(row.thread_id);
+        if (existing) {
+          existing.active = row.active;
+          existing.lastSeenAt = row.last_seen_at;
+        } else {
+          byId.set(row.thread_id, {
+            thread: row.threads,
+            isOwner: row.threads.user_id === userId,
+            active: row.active,
+            lastSeenAt: row.last_seen_at
+          });
+        }
+      }
+
+      // For each Trust Circle thread, count contributions made by OTHERS
+      // since this person's last_seen_at — the passive "3 new" indicator for
+      // someone who has stepped back or just hasn't opened it in a while.
+      // Only worth querying for threads that actually have participants.
+      const trustCircleIds = [...byId.values()]
+        .filter(v => v.thread.visibility === 'trust_circle')
+        .map(v => v.thread.id);
+
+      const unseenCounts = {};
+      if (trustCircleIds.length > 0) {
+        const idsFilter = trustCircleIds.map(id => `"${id}"`).join(',');
+        const fuRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/follow_ups?thread_id=in.(${idsFilter})&select=id,thread_id,user_id,created_at`,
+          { headers: sbHeaders() }
+        );
+        const allFu = await fuRes.json();
+        if (Array.isArray(allFu)) {
+          for (const tcId of trustCircleIds) {
+            const entry = byId.get(tcId);
+            const since = entry.lastSeenAt ? new Date(entry.lastSeenAt).getTime() : 0;
+            unseenCounts[tcId] = allFu.filter(f =>
+              f.thread_id === tcId &&
+              f.user_id !== userId &&
+              new Date(f.created_at).getTime() > since
+            ).length;
           }
         }
-      );
+      }
 
-      const subs = await subRes.json();
-      if (!subs?.length) return res.status(404).json({ error: 'Subscriber not found' });
-
-      const { id: userId, tier, display_name } = subs[0];
-
-      // Fetch threads — exclude hard-deleted (past grace_ends_at handled by cron)
-      const threadsRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/threads?user_id=eq.${userId}&order=created_at.desc&limit=100`,
-        {
-          headers: {
-            'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          }
-        }
-      );
-
-      const threads = await threadsRes.json();
-      if (!Array.isArray(threads)) return res.status(500).json({ error: 'Failed to fetch threads' });
-
-      // Map to the shape qt.html expects
       const now = Date.now();
-      const mapped = threads.map(t => {
-        const expiresAt  = new Date(t.expires_at).getTime();
+      const mapped = [...byId.values()].map(({ thread: t, isOwner, active, lastSeenAt }) => {
+        const expiresAt   = new Date(t.expires_at).getTime();
         const graceEndsAt = new Date(t.grace_ends_at).getTime();
-        const msLeft     = expiresAt - now;
-        const daysLeft   = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
-        const expired    = now > expiresAt;
-        const inGrace    = expired && now < graceEndsAt;
-        // No server-side "lastVisited" string here anymore — toLocaleDateString()
-        // on the server formats using the server's own timezone (Vercel's
-        // functions default to UTC), not the visitor's. The raw createdAt
-        // timestamp below is all the client needs; qt.html formats it using
-        // the browser's local timezone, which is the only place that
-        // actually knows what timezone the visitor is in.
+        const msLeft      = expiresAt - now;
+        const daysLeft    = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+        const expired     = now > expiresAt;
+        const inGrace      = expired && now < graceEndsAt;
 
         return {
           id:           t.id,
-          supabaseId:   t.id,   // preserve uuid
+          supabaseId:   t.id,
           title:        t.title || t.query?.substring(0, 60) || 'Untitled',
           query:        t.query || '',
           response:     t.response || null,
@@ -82,8 +147,14 @@ export default async function handler(req, res) {
           retentionDays: t.retention_days,
           expiresAt:    t.expires_at,
           graceEndsAt:  t.grace_ends_at,
+          visibility:   t.visibility || 'private',
+          isOwner,
+          participantActive: active,
+          unseenCount:  unseenCounts[t.id] || 0
         };
       });
+
+      mapped.sort((a, b) => b.createdAt - a.createdAt);
 
       return res.status(200).json({ threads: mapped, tier, userId, display_name: display_name || null });
     } catch (err) {
@@ -92,30 +163,64 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── DELETE — soft delete a thread ─────────────────────────────────────────
+  // ── DELETE — remove from my Archive ───────────────────────────────────────
+  // For a thread that has never been shared (no thread_participants rows at
+  // all), this is a real, permanent delete — nothing else could possibly be
+  // affected. For anything that HAS been shared, deletion is symmetrical for
+  // everyone including the original owner: it only ever removes YOUR OWN
+  // thread_participants row. The thread and every contribution stay fully
+  // intact for anyone else still attached to it. The underlying threads row
+  // only actually gets deleted once literally no one remains — i.e. this
+  // was the last participant standing.
   if (req.method === 'DELETE') {
     try {
       const { threadId } = req.body || {};
       if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
-      // Verify ownership
-      const subRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id&limit=1`,
-        { headers: { 'apikey': SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
+      const subscriber = await getSubscriberId(userEmail);
+      if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
+      const userId = subscriber.id;
+
+      const participantsRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&select=id,user_id`,
+        { headers: sbHeaders() }
       );
-      const subs = await subRes.json();
-      if (!subs?.length) return res.status(404).json({ error: 'Subscriber not found' });
+      const participants = await participantsRes.json();
+      const hasEverBeenShared = Array.isArray(participants) && participants.length > 0;
+
+      if (!hasEverBeenShared) {
+        // Never shared — safe to hard-delete, exactly as before.
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${userId}`,
+          { method: 'DELETE', headers: sbHeaders() }
+        );
+        return res.status(200).json({ success: true });
+      }
+
+      // Has participants — remove only this person's own row.
+      const ownRow = participants.find(p => p.user_id === userId);
+      if (!ownRow) {
+        return res.status(403).json({ error: 'Not a participant on this thread' });
+      }
 
       await fetch(
-        `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${subs[0].id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          }
-        }
+        `${SUPABASE_URL}/rest/v1/thread_participants?id=eq.${ownRow.id}`,
+        { method: 'DELETE', headers: sbHeaders() }
       );
+
+      // If that was the last remaining participant, the thread has no one
+      // left attached to it at all — genuinely safe to clean up now.
+      const remainingRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&select=id&limit=1`,
+        { headers: sbHeaders() }
+      );
+      const remaining = await remainingRes.json();
+      if (Array.isArray(remaining) && remaining.length === 0) {
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}`,
+          { method: 'DELETE', headers: sbHeaders() }
+        );
+      }
 
       return res.status(200).json({ success: true });
     } catch (err) {
@@ -124,30 +229,122 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── PATCH — rename or reset expiry ──────────────────────────────────────────
+  // ── PATCH — rename, reset expiry, or Trust Circle actions ──────────────────
   if (req.method === 'PATCH') {
     try {
-      const { threadId, title, action } = req.body || {};
+      const { threadId, title, action, targetUserId } = req.body || {};
       if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
-      const subRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id,tier,query_count&limit=1`,
-        { headers: { 'apikey': SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
-      );
-      const subs = await subRes.json();
-      if (!subs?.length) return res.status(404).json({ error: 'Subscriber not found' });
-      const { id: userId, tier } = subs[0];
+      const subscriber = await getSubscriberId(userEmail);
+      if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
+      const { id: userId, tier } = subscriber;
 
-      // ── Reset expiry clock (costs 1 query) ───────────────────────────────
+      // ── Toggle thread-level visibility (owner only) ─────────────────────
+      // Assumption, flagged for confirmation: only the original creator can
+      // flip a thread between Private and Trust Circle. Other participant-
+      // level controls (mute, step back, per-contribution visibility) are
+      // NOT owner-gated — this is the one action that is.
+      if (action === 'set_visibility') {
+        const { visibility } = req.body || {};
+        if (!['private', 'trust_circle'].includes(visibility)) {
+          return res.status(400).json({ error: 'visibility must be private or trust_circle' });
+        }
+        const threadRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${userId}&select=id&limit=1`,
+          { headers: sbHeaders() }
+        );
+        const threadRows = await threadRes.json();
+        if (!threadRows?.length) return res.status(403).json({ error: 'Only the thread creator can change its visibility' });
+
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}`,
+          {
+            method: 'PATCH',
+            headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+            body: JSON.stringify({ visibility })
+          }
+        );
+        return res.status(200).json({ success: true, visibility });
+      }
+
+      // ── Join a Trust Circle thread into my own Archive ──────────────────
+      if (action === 'join') {
+        const threadRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&visibility=eq.trust_circle&select=id&limit=1`,
+          { headers: sbHeaders() }
+        );
+        const threadRows = await threadRes.json();
+        if (!threadRows?.length) return res.status(404).json({ error: 'Thread not found or not shareable' });
+
+        await fetch(`${SUPABASE_URL}/rest/v1/thread_participants`, {
+          method: 'POST',
+          headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }),
+          body: JSON.stringify({ thread_id: threadId, user_id: userId, active: true })
+        });
+        return res.status(200).json({ success: true });
+      }
+
+      // ── Silent step-back toggle — on/off, reversible, no announcement ───
+      if (action === 'toggle_active') {
+        const { active } = req.body || {};
+        const partRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&user_id=eq.${userId}&select=id&limit=1`,
+          { headers: sbHeaders() }
+        );
+        const partRows = await partRes.json();
+        if (!partRows?.length) return res.status(403).json({ error: 'Not a participant on this thread' });
+
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/thread_participants?id=eq.${partRows[0].id}`,
+          {
+            method: 'PATCH',
+            headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+            body: JSON.stringify({ active: !!active })
+          }
+        );
+        return res.status(200).json({ success: true, active: !!active });
+      }
+
+      // ── Update last_seen_at — call when the person actually opens the
+      //    thread, so the unseen-contribution count resets for them ───────
+      if (action === 'mark_seen') {
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&user_id=eq.${userId}`,
+          {
+            method: 'PATCH',
+            headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+            body: JSON.stringify({ last_seen_at: new Date().toISOString() })
+          }
+        );
+        return res.status(200).json({ success: true });
+      }
+
+      // ── Mute / unmute a participant — purely personal, scoped to this
+      //    one thread. No effect on anyone else, no notification sent ────
+      if (action === 'mute' || action === 'unmute') {
+        if (!targetUserId) return res.status(400).json({ error: 'targetUserId required' });
+        if (targetUserId === userId) return res.status(400).json({ error: 'Cannot mute yourself' });
+
+        if (action === 'mute') {
+          await fetch(`${SUPABASE_URL}/rest/v1/thread_mutes`, {
+            method: 'POST',
+            headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }),
+            body: JSON.stringify({ thread_id: threadId, muter_user_id: userId, muted_user_id: targetUserId })
+          });
+        } else {
+          await fetch(
+            `${SUPABASE_URL}/rest/v1/thread_mutes?thread_id=eq.${threadId}&muter_user_id=eq.${userId}&muted_user_id=eq.${targetUserId}`,
+            { method: 'DELETE', headers: sbHeaders() }
+          );
+        }
+        return res.status(200).json({ success: true });
+      }
+
+      // ── Reset expiry clock (costs 1 query) — unchanged from before ──────
       if (action === 'reset_expiry') {
-        // Draw 1 query via RPC
         const drawRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_query`, {
           method: 'POST',
-          headers: {
-            'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            'Content-Type':  'application/json'
-          },
+          headers: sbHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ p_user_id: userId, p_cost: 1 })
         });
 
@@ -159,7 +356,6 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: 'Failed to draw query' });
         }
 
-        // Calculate new expiry from today
         const retentionDays = { scholar: 90, theologian: 180, trial: 30, free: 1 }[tier] || 90;
         const now = new Date();
         const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
@@ -169,12 +365,7 @@ export default async function handler(req, res) {
           `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${userId}`,
           {
             method: 'PATCH',
-            headers: {
-              'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-              'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-              'Content-Type':  'application/json',
-              'Prefer':        'return=minimal'
-            },
+            headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
             body: JSON.stringify({
               expires_at:    expiresAt.toISOString(),
               grace_ends_at: graceEndsAt.toISOString(),
@@ -186,19 +377,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, expiresAt: expiresAt.toISOString(), daysLeft: retentionDays });
       }
 
-      // ── Rename ───────────────────────────────────────────────────────────
+      // ── Rename — unchanged from before ──────────────────────────────────
       if (!title) return res.status(400).json({ error: 'title required for rename' });
 
       await fetch(
         `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${userId}`,
         {
           method: 'PATCH',
-          headers: {
-            'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            'Content-Type':  'application/json',
-            'Prefer':        'return=minimal'
-          },
+          headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
           body: JSON.stringify({ title: title.substring(0, 60) })
         }
       );
