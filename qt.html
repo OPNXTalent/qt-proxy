@@ -408,14 +408,16 @@
 
   .sidebar-toggle {
     position: fixed; top: 20px; left: 20px; z-index: 300;
-    width: 36px; height: 36px;
-    background: rgba(6,6,10,0.9); border: 1px solid var(--border);
-    color: var(--gold-dim); cursor: pointer;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: rgba(6,6,10,0.55); border: 1px solid rgba(122,98,48,0.3);
+    color: rgba(201,168,76,0.65); cursor: pointer;
     display: none; align-items: center; justify-content: center;
-    font-size:17px; transition: all 0.2s; backdrop-filter: blur(8px);
+    font-family: var(--mono); font-size:15px; line-height: 1;
+    transition: all 0.25s; backdrop-filter: blur(10px);
   }
   .sidebar-toggle.visible { display: flex; }
-  .sidebar-toggle:hover { border-color: var(--gold-dim); color: var(--gold); }
+  .sidebar-toggle:hover { border-color: var(--gold-dim); color: var(--gold); background: rgba(6,6,10,0.8); }
 
   .sidebar-header { padding: 68px 20px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .sidebar-logo { font-family: var(--cinzel); font-size:16px; letter-spacing: 0.18em; color: var(--gold-pale); text-transform: uppercase; margin-bottom: 4px; }
@@ -3472,10 +3474,26 @@ async function downloadPDF(mode) {
   doc.save(filename);
 }
 
+// Closes the Archive sidebar overlay without hiding it permanently — used
+// whenever the person has just made a selection (New Subject, or picking a
+// thread from Archive) and the sidebar's job is done for the moment.
+function closeSidebarOverlay() {
+  if (!sidebarOpen) return;
+  sidebarOpen = false;
+  var sidebar = document.getElementById('sidebar');
+  var main    = document.getElementById('mainContent');
+  var toggle  = document.getElementById('sidebarToggle');
+  if (sidebar) sidebar.classList.remove('open');
+  if (main)    main.classList.remove('sidebar-open');
+  if (toggle)  toggle.textContent = '☰';
+  localStorage.setItem('qt_sidebar_open', '0');
+}
+
 function resetForm() {
   conversationHistory = [];
   currentSubject = '';
   localStorage.removeItem('qt_resume_snapshot');
+  closeSidebarOverlay();
   document.getElementById('resultBlock').classList.remove('visible');
   document.getElementById('downloadRow').style.display = 'none';
   document.getElementById('followUpSection').style.display = 'none';
@@ -3985,6 +4003,7 @@ function renderThreads(threads) {
 function selectThread(id) {
   var thread = allThreads.find(function(t) { return t.id === id; });
   if (!thread) return;
+  closeSidebarOverlay();
   console.log('[selectThread]', id, {
     inOpenThreadIds: _openThreadIds.has(id),
     collaboration_open: thread.collaboration_open,
@@ -4505,11 +4524,10 @@ function showSidebarAfterQuery(queryText) {
     sidebarHasAppeared = true;
     if (localStorage.getItem('qt_user_email')) localStorage.setItem('qt_sidebar_appeared', '1');
   }
-  if (!sidebarOpen) {
-    sidebarOpen = true; sidebar.classList.add('open');
-    var mc = document.getElementById('mainContent'); if (mc) mc.classList.add('sidebar-open');
-    if (toggle) toggle.textContent = '‹'; localStorage.setItem('qt_sidebar_open', '1');
-  }
+  // Intentionally not auto-opening the sidebar here — a completed query
+  // shouldn't pull focus away onto the Archive. The toggle button (made
+  // visible above) is enough for the person to open it themselves if
+  // they want to see their session history.
   addThreadToSidebar(queryText);
 }
 
