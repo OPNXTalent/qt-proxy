@@ -906,6 +906,13 @@ section {
   align-items: center;
 }
 
+.rct-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 100px;
+  align-items: start;
+}
+
 .book-visual {
   position: relative;
   display: flex;
@@ -1128,7 +1135,16 @@ footer {
   .cta-text-full { display: none; }
   .cta-text-short { display: inline; }
 
-  .what-grid, .book-grid { grid-template-columns: 1fr; gap: 48px; }
+  .what-grid, .book-grid, .rct-grid { grid-template-columns: 1fr; gap: 48px; }
+  /* .what-left is intentionally position:sticky on desktop, where it's the
+     left column of a two-column layout and stays in view while the longer
+     accordion list on the right scrolls past it. Once the grid collapses
+     to a single stacked column on mobile, that same sticky positioning
+     pins it in place directly on top of the accordion list stacked below
+     it, which then scrolls up underneath/behind it — producing exactly
+     the overlapping mess seen on mobile. Sticky only makes sense next to
+     a second scrolling column, so it's switched off here. */
+  .what-left { position: static; top: auto; z-index: auto; }
   .tiers { grid-template-columns: 1fr 1fr; }
   .how-steps { grid-template-columns: 1fr; gap: 48px; }
   .how-step { border-right: none; border-bottom: 0.5px solid var(--border); padding: 0 0 40px; }
@@ -1351,7 +1367,7 @@ function dismissReturnBar() {
         Open the Interpreter
         <span class="btn-arrow">→</span>
       </a>
-      <a href="#book" class="btn-secondary">The Book — Coming Soon</a>
+      <a href="#book" class="btn-secondary">The Book — Fall 2026</a>
     </div>
 
     <!-- Three pillars -->
@@ -1766,14 +1782,14 @@ function dismissReturnBar() {
       <div style="display:flex; align-items:center; gap:28px;">
         <img src="ThePrism.png" alt="The Prism" style="width:56px; height:56px; object-fit:contain; opacity:0.7; filter:drop-shadow(0 0 8px rgba(212,175,95,0.2)); flex-shrink:0;">
         <div>
-          <div style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.35em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">The Book · Coming Soon</div>
+          <div style="font-family:var(--sans); font-size:7px; font-weight:500; letter-spacing:0.35em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">The Book · Releasing Fall 2026</div>
           <div style="font-family:var(--cinzel); font-size:22px; font-weight:300; color:var(--text); margin-bottom:4px;">The Prism <span style="color:var(--gold); font-style:italic;">· Echad B'Emet</span></div>
-          <div style="font-family:var(--cinzel); font-size:14px; font-style:italic; color:var(--text-muted); line-height:1.6;">The complete framework. The foundation beneath the Interpreter. Available on Amazon.</div>
+          <div style="font-family:var(--cinzel); font-size:14px; font-style:italic; color:var(--text-muted); line-height:1.6;">The complete framework. The foundation beneath the Interpreter. Releasing Fall 2026.</div>
         </div>
       </div>
       <div style="display:flex; flex-direction:column; align-items:flex-end; gap:12px; flex-shrink:0;">
         <a href="/coming-soon.html" class="btn-primary" style="font-size:9px; padding:15px 28px; white-space:nowrap;">
-          Order on Amazon
+          Notify Me
           <span class="btn-arrow">→</span>
         </a>
         <span style="font-family:var(--sans); font-size:7px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted);"></span>
@@ -1807,7 +1823,7 @@ function dismissReturnBar() {
 <section style="padding:140px 0 120px; background:var(--deep); border-top:0.5px solid var(--border);" id="rct">
   <div class="section-inner">
 
-    <div style="display:grid; grid-template-columns:1.1fr 1fr; gap:100px; align-items:start;">
+    <div class="rct-grid">
 
       <!-- Left: content -->
       <div class="reveal">
@@ -1824,7 +1840,8 @@ function dismissReturnBar() {
         </p>
 
         <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
-          <a href="/coming-soon.html" class="btn-primary" style="font-size:9px; padding:16px 32px;">
+          <a href="https://www.amazon.com/RELATIONAL-COHERENCE-THEORY-Descriptive-Constraint/dp/B0H4PL9BK2/ref=sr_1_1?crid=1SGJ4QGUV5J0Y&dib=eyJ2IjoiMSJ9.pwaPZv4RRoZJYysxX6zvfFHpP2giidgf8PYrrsRy8nbftH-zLovlEwR4dDye1KtB1-BvsLGCTmYFbc0QZjWVWi9JPUy873fPO_ezFKV-3_mAqBB84yoarDwexhHvB5N5M4cISyp6KM9OHXnp6cZaUT1VuEO2NH3Ib73BKKfumS1ZqJaTKC5UwmMuH6Jc6RrgMZEZ2U1vHfxcSotPlTtXid8XQ2Oc--HuTm5xcab9ibk.ocSybPywqEkkfsghQetdcAbovErdDmhsJookZBx7yL4&dib_tag=se&keywords=relational+coherence+theory&qid=1783354728&sprefix=relational+cohere%2Caps%2C156&sr=8-1"
+             class="btn-primary" style="font-size:9px; padding:16px 32px;" target="_blank" rel="noopener">
             Order on Amazon
             <span class="btn-arrow">→</span>
           </a>
@@ -2187,7 +2204,7 @@ function dismissReturnBar() {
       <div class="book-right reveal reveal-delay-2">
         <div class="book-release">
           <span class="book-release-dot"></span>
-          Coming Soon
+          Releasing Fall 2026
         </div>
 
         <p class="section-eyebrow">The Book</p>
@@ -2201,7 +2218,7 @@ function dismissReturnBar() {
 
         <div style="margin-top:40px; display:flex; gap:16px; flex-wrap:wrap;">
           <a href="/coming-soon.html" class="btn-primary" style="font-size:9px; padding:16px 32px;">
-            Order on Amazon
+            Notify Me
             <span class="btn-arrow">→</span>
           </a>
           <a href="/qt-gateway.html" class="btn-secondary" style="align-self:center;">Or start with the Interpreter</a>
