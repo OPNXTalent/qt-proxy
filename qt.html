@@ -2203,10 +2203,15 @@
     </div>
 
     <!-- Compose -->
+    <div id="chatMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); padding:0 16px 8px; text-transform:uppercase;"></div>
     <div class="chat-compose" style="padding:12px 16px;border-top:1px solid rgba(42,42,64,0.5);display:flex;gap:8px;align-items:flex-end;">
-      <textarea class="chat-input" id="chatInput" placeholder="Add your refraction…" rows="1"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
-        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+      <div style="position:relative; flex:1;">
+        <textarea class="chat-input" id="chatInput" placeholder="Add your refraction…" rows="1"
+          style="width:100%; padding-right:44px;"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button id="chatMicBtn" onclick="toggleChatMic()" title="Speak your refraction" style="display:none; position:absolute; bottom:8px; right:8px; width:28px; height:28px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:15px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+      </div>
       <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
     </div>
   </div>
@@ -3685,6 +3690,88 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
       }
     }
   };
+
+  // ── REFRACTIONS (CHAT) MIC ────────────────────────────────────────────────
+  const chatMicBtn = document.getElementById('chatMicBtn');
+  const chatMicStatus = document.getElementById('chatMicStatus');
+  const chatTextarea = document.getElementById('chatInput');
+
+  if (chatMicBtn && chatMicStatus && chatTextarea) {
+    chatMicBtn.style.display = 'block';
+
+    const chatRecognition = new SpeechRecognition();
+    chatRecognition.continuous = true;
+    chatRecognition.interimResults = true;
+    chatRecognition.lang = 'en-US';
+
+    let chatListening = false;
+
+    chatRecognition.onstart = () => {
+      chatListening = true;
+      chatMicBtn.classList.add('listening');
+      chatMicBtn.title = 'Tap to stop and send';
+      chatMicStatus.style.display = 'block';
+      chatMicStatus.textContent = '● Listening — speak freely, tap 🎙 when done';
+    };
+
+    chatRecognition.onresult = (e) => {
+      let interim = '';
+      let final = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t;
+        else interim += t;
+      }
+      if (final) {
+        const current = chatTextarea.value;
+        chatTextarea.value = (current ? current.trimEnd() + ' ' : '') + final.trim();
+        chatTextarea.style.height = 'auto';
+        chatTextarea.style.height = Math.min(chatTextarea.scrollHeight, 120) + 'px';
+      }
+      if (interim) chatMicStatus.textContent = '● ' + interim;
+    };
+
+    chatRecognition.onerror = (e) => {
+      if (e.error === 'no-speech') return;
+      chatMicStatus.textContent = e.error === 'not-allowed'
+        ? 'Microphone access denied — enable it in browser settings'
+        : 'Could not hear input — please try again';
+      chatMicStatus.style.color = 'rgba(200,80,70,0.8)';
+      chatListening = false;
+      chatMicBtn.classList.remove('listening');
+    };
+
+    chatRecognition.onend = () => {
+      chatListening = false;
+      chatMicBtn.classList.remove('listening');
+      chatMicBtn.title = 'Speak your refraction';
+      if (chatTextarea.value.trim()) {
+        chatMicStatus.textContent = '✓ Captured — sending…';
+        setTimeout(() => {
+          chatMicStatus.style.display = 'none';
+          chatMicStatus.style.color = 'var(--gold-dim)';
+          sendChatMessage();
+        }, 600);
+      } else {
+        chatMicStatus.style.display = 'none';
+      }
+    };
+
+    window.toggleChatMic = function() {
+      if (chatListening) {
+        chatRecognition.stop(); // user taps to stop — triggers onend → auto-send
+      } else {
+        chatMicStatus.style.color = 'var(--gold-dim)';
+        chatTextarea.value = '';
+        try {
+          chatRecognition.start();
+        } catch(e) {
+          chatMicStatus.style.display = 'block';
+          chatMicStatus.textContent = 'Could not start microphone — try again';
+        }
+      }
+    };
+  }
 })();
 
 // ── SIDEBAR SYSTEM ──
