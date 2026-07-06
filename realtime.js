@@ -98,8 +98,15 @@
   }
 
   // ── renderFUWithSource ────────────────────────────────────────────────────
-  function renderFUWithSource(list) {
+  // shouldScroll defaults to true, matching the original behavior for a
+  // genuine live single-item arrival (someone's comment appearing in real
+  // time while you're watching). Bulk restores (opening a thread fresh from
+  // Archive) explicitly pass false — without this, the last item in a
+  // multi-item restore would always drag the view back down to the bottom,
+  // undoing the scroll-to-top that selectThread() already tries to do.
+  function renderFUWithSource(list, shouldScroll) {
     if (!list || !list.length) return;
+    if (shouldScroll === undefined) shouldScroll = true;
 
     var fuSec = document.getElementById('followUpSection');
     if (fuSec) fuSec.style.display = 'block';
@@ -139,7 +146,7 @@
         '<div class="fu-body">' + (paras || '<p>' + esc(bodyText) + '</p>') + '</div>';
 
       container.appendChild(el);
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (shouldScroll) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }
 
