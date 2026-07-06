@@ -60,10 +60,12 @@ export default async function handler(req, res) {
         const daysLeft   = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
         const expired    = now > expiresAt;
         const inGrace    = expired && now < graceEndsAt;
-        const created    = new Date(t.created_at);
-        const lastVisited = created.toLocaleDateString('en-US', {
-          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-        });
+        // No server-side "lastVisited" string here anymore — toLocaleDateString()
+        // on the server formats using the server's own timezone (Vercel's
+        // functions default to UTC), not the visitor's. The raw createdAt
+        // timestamp below is all the client needs; qt.html formats it using
+        // the browser's local timezone, which is the only place that
+        // actually knows what timezone the visitor is in.
 
         return {
           id:           t.id,
@@ -73,7 +75,6 @@ export default async function handler(req, res) {
           response:     t.response || null,
           queryType:    t.query_type || 'free_text',
           createdAt:    new Date(t.created_at).getTime(),
-          lastVisited,
           daysLeft,
           expired,
           inGrace,
