@@ -3660,7 +3660,15 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         chunks = [];
-        opts.textarea.value = ''; // fresh dictation, matching prior clear-then-speak behavior
+        // Clearing on start matches the original clear-then-dictate behavior
+        // for single-shot compose boxes (main input, follow-up, chat) —
+        // each recording there IS a fresh message. Notes are different: a
+        // note can already have real content, and tapping the mic to add
+        // more via voice should never silently erase what's already
+        // written. opts.preserveExisting opts out of the clear for those.
+        if (!opts.preserveExisting) {
+          opts.textarea.value = '';
+        }
 
         const options = MediaRecorder.isTypeSupported('audio/webm')
           ? { mimeType: 'audio/webm' }
@@ -3777,6 +3785,11 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
       }
     };
   }
+
+  // Exposed globally — note blocks are created dynamically (highlighting,
+  // "+ New section"), so each one needs its own recorder instance wired up
+  // at creation time, not just the static textareas already on the page.
+  window.createVoiceRecorder = createVoiceRecorder;
 
   // ── Main input mic ────────────────────────────────────────────────────
   const micBtn = document.getElementById('micBtn');
@@ -5802,6 +5815,44 @@ async function renderNotesView() {
   updateChatBarUI();
 }
 
+// Shared textarea builder — wires up voice-to-text and manual resize once,
+// reused by both existing note blocks and freshly-started sections. Manual
+// resize (drag the corner) replaced the earlier auto-grow-on-type behavior,
+// since the two fight each other — auto-grow snapping back to fit content
+// on every keystroke made it impossible to ever deliberately shrink a box.
+function buildNoteTextarea(initialContent, onInput) {
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative;';
+
+  var textarea = document.createElement('textarea');
+  textarea.value = initialContent || '';
+  textarea.placeholder = 'Write freely — saves as you go';
+  textarea.style.cssText = 'width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:var(--crimson); font-size:15px; line-height:1.5; padding:0 32px 4px 0; resize:vertical; display:block;';
+  textarea.addEventListener('input', function() { onInput(textarea.value); });
+
+  var micBtn = document.createElement('button');
+  micBtn.innerHTML = '🎙';
+  micBtn.title = 'Speak';
+  micBtn.style.cssText = 'position:absolute; bottom:6px; right:0; width:26px; height:26px; border-radius:50%; border:1px solid var(--border-lit); background:var(--deep); color:var(--text-dim); cursor:pointer; font-size:12px; line-height:1; padding:0; display:none; z-index:2;';
+
+  var micStatus = document.createElement('div');
+  micStatus.style.cssText = 'display:none; font-family:var(--mono); font-size:10px; color:var(--gold-dim); margin-top:4px;';
+
+  wrap.appendChild(textarea);
+  wrap.appendChild(micBtn);
+  wrap.appendChild(micStatus);
+
+  if (window.createVoiceRecorder) {
+    micBtn.style.display = 'flex';
+    micBtn.style.alignItems = 'center';
+    micBtn.style.justifyContent = 'center';
+    var recorder = window.createVoiceRecorder({ btn: micBtn, statusEl: micStatus, textarea: textarea, preserveExisting: true });
+    micBtn.onclick = function() { recorder.toggle(); };
+  }
+
+  return { wrap: wrap, textarea: textarea };
+}
+
 function buildNoteBlock(n) {
   var div = document.createElement('div');
   div.className = 'chat-msg mine';
@@ -5816,7 +5867,7 @@ function buildNoteBlock(n) {
     heading.textContent = n.quote;
   } else {
     var titleInput = document.createElement('input');
-    titleInput.type = 'value';
+    titleInput.type = 'text';
     titleInput.value = n.title || '';
     titleInput.placeholder = 'Section title';
     titleInput.style.cssText = 'width:100%; font-family:var(--crimson); font-weight:600; font-size:15px; color:var(--text); background:transparent; border:none; border-bottom:1px solid rgba(122,98,48,0.25); padding:0 0 6px; margin-bottom:8px;';
@@ -5836,16 +5887,10 @@ function buildNoteBlock(n) {
   delBtn.style.cssText = 'float:right; background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:16px; line-height:1; padding:0 0 0 8px;';
   delBtn.onclick = function() { deletePrivateNote(n.id); };
 
-  var textarea = document.createElement('textarea');
-  textarea.value = n.content || '';
-  textarea.placeholder = 'Write freely — saves as you go';
-  textarea.style.cssText = 'width:100%; min-height:50px; background:transparent; border:none; color:var(--text); font-family:var(--crimson); font-size:15px; line-height:1.5; padding:0; resize:vertical;';
-  textarea.addEventListener('input', function() {
-    textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
-    scheduleNoteAutosave(n.id, { content: textarea.value });
+  var built = buildNoteTextarea(n.content, function(value) {
+    scheduleNoteAutosave(n.id, { content: value });
   });
-  textarea.addEventListener('blur', function() {
+  built.textarea.addEventListener('blur', function() {
     flushNoteAutosave(n.id);
   });
 
@@ -5857,7 +5902,7 @@ function buildNoteBlock(n) {
 
   div.appendChild(delBtn);
   div.appendChild(heading);
-  div.appendChild(textarea);
+  div.appendChild(built.wrap);
   if (n.edited_at) div.appendChild(editedTag);
   return div;
 }
@@ -5884,20 +5929,21 @@ function startNewSection(wrap) {
   titleInput.type = 'text';
   titleInput.placeholder = 'Section title';
   titleInput.style.cssText = 'width:100%; font-family:var(--crimson); font-weight:600; font-size:15px; color:var(--text); background:transparent; border:none; border-bottom:1px solid rgba(122,98,48,0.25); padding:0 0 6px; margin-bottom:8px;';
-  var textarea = document.createElement('textarea');
-  textarea.placeholder = 'Write freely — saves as you go';
-  textarea.style.cssText = 'width:100%; min-height:50px; background:transparent; border:none; color:var(--text); font-family:var(--crimson); font-size:15px; line-height:1.5; padding:0; resize:vertical;';
+  var created = false;
+  var createdId = null;
+
+  var built = buildNoteTextarea('', function(value) {
+    if (created && createdId) scheduleNoteAutosave(createdId, { content: value });
+  });
+  var textarea = built.textarea;
 
   var container = document.createElement('div');
   container.className = 'chat-msg mine';
   container.style.borderColor = 'var(--gold-dim)';
   container.style.background = 'rgba(122,98,48,0.04)';
   container.appendChild(titleInput);
-  container.appendChild(textarea);
+  container.appendChild(built.wrap);
   wrap.parentNode.insertBefore(container, wrap);
-
-  var created = false;
-  var createdId = null;
 
   async function commit() {
     var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
@@ -5922,13 +5968,6 @@ function startNewSection(wrap) {
   }
 
   titleInput.addEventListener('blur', commit);
-  textarea.addEventListener('input', function() {
-    textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
-    if (created && createdId) {
-      scheduleNoteAutosave(createdId, { content: textarea.value });
-    }
-  });
   textarea.addEventListener('blur', async function() {
     await commit(); // in case they typed content before ever leaving the title field
     if (createdId) flushNoteAutosave(createdId);
