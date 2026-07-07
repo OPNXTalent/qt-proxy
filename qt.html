@@ -2286,7 +2286,7 @@
     <!-- Compose -->
     <div id="chatMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); padding:0 16px 8px; text-transform:uppercase;"></div>
 
-    <div class="chat-compose" style="padding:12px 16px;border-top:1px solid rgba(42,42,64,0.5);display:flex;flex-direction:column;gap:8px;">
+    <div class="chat-compose" id="chatComposeBar" style="padding:12px 16px;border-top:1px solid rgba(42,42,64,0.5);display:flex;flex-direction:column;gap:8px;">
       <textarea class="chat-input" id="chatInput" placeholder="Add your refraction…" rows="2"
         style="width:100%;"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
@@ -5677,11 +5677,15 @@ function toggleEntryVisibility() {
 // Renders whichever view is currently active — called on toggle switch,
 // and whenever the panel opens or focuses a different response.
 function renderActiveRefractionView() {
-  var input = document.getElementById('chatInput');
+  var composeBar = document.getElementById('chatComposeBar');
   if (_refractionView === 'private') {
-    if (input) input.placeholder = 'Write a private thought…';
+    // Notes are edited directly in place, with their own "+ New section"
+    // control at the bottom of the stream — no separate compose bar needed.
+    if (composeBar) composeBar.style.display = 'none';
     renderNotesView();
   } else {
+    if (composeBar) composeBar.style.display = 'flex';
+    var input = document.getElementById('chatInput');
     if (input) input.placeholder = 'Add your refraction…';
     renderDiscussionView();
   }
@@ -5694,92 +5698,71 @@ async function sendChatMessage() {
   if (!text) return;
 
   var name = getChatParticipantName();
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
 
-  if (_refractionView === 'private') {
-    if (!email) {
-      showQueryActionConfirm && showQueryActionConfirm('Sign in to save private notes');
-      return;
-    }
-    input.value = '';
-    input.style.height = 'auto';
-    input.disabled = true;
-
-    try {
-      await fetch('/api/followups?kind=note', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-email': email },
-        body: JSON.stringify({
-          threadId: activeThreadId,
-          nodeId:   _activeNodeId,
-          content:  text
-        })
-      });
-    } catch(e) { console.error('Private note save error:', e); }
-
-    _notesLastCount = -1; // force reload so the new note actually appears
-    await renderNotesView();
-
-  } else {
-    if (!_currentChannelId) {
-      // Trust Circle with nothing to discuss yet — this thread has never
-      // been shared, so there's no discussion to add to. Guide toward
-      // Share rather than silently failing.
-      showQueryActionConfirm && showQueryActionConfirm('Share this first to start a discussion');
-      return;
-    }
-    input.value = '';
-    input.style.height = 'auto';
-    input.disabled = true;
-
-    // Optimistic render
-    var msg = { id: Date.now(), name: name, text: text, mine: true };
-    _chatMessages.push(msg);
-    _sentByMe.add(name + '::' + text);
-    renderChatMessage(msg);
-
-    var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-    try {
-      var sendRes = await fetch(SUPA_URL + '/rest/v1/share_chat_messages', {
-        method: 'POST',
-        headers: {
-          'apikey': SUPA_ANON,
-          'Authorization': 'Bearer ' + SUPA_ANON,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify({
-          share_id:     _currentChannelId,
-          content:      text,
-          message_type: 'sender',
-          display_name: name,
-          node_id:      _activeNodeId,
-          visibility:   'trust_circle'
-        })
-      });
-      if (sendRes.ok) {
-        var rows = await sendRes.json();
-        if (rows && rows[0] && rows[0].id) {
-          _renderedChatIds.add(rows[0].id);
-        }
-      }
-    } catch(e) { console.error('Chat send error:', e); }
+  // This only ever runs for Trust Circle now — the compose bar is hidden
+  // entirely in Private View, since notes are created and edited directly
+  // in place (see buildNoteBlock / startNewSection), not through a
+  // type-then-send flow.
+  if (!_currentChannelId) {
+    // Nothing to discuss yet — this thread has never been shared, so
+    // there's no discussion to add to. Guide toward Share rather than
+    // silently failing.
+    showQueryActionConfirm && showQueryActionConfirm('Share this first to start a discussion');
+    return;
   }
+  input.value = '';
+  input.style.height = 'auto';
+  input.disabled = true;
+
+  // Optimistic render
+  var msg = { id: Date.now(), name: name, text: text, mine: true };
+  _chatMessages.push(msg);
+  _sentByMe.add(name + '::' + text);
+  renderChatMessage(msg);
+
+  var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
+  var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  try {
+    var sendRes = await fetch(SUPA_URL + '/rest/v1/share_chat_messages', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_ANON,
+        'Authorization': 'Bearer ' + SUPA_ANON,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        share_id:     _currentChannelId,
+        content:      text,
+        message_type: 'sender',
+        display_name: name,
+        node_id:      _activeNodeId,
+        visibility:   'trust_circle'
+      })
+    });
+    if (sendRes.ok) {
+      var rows = await sendRes.json();
+      if (rows && rows[0] && rows[0].id) {
+        _renderedChatIds.add(rows[0].id);
+      }
+    }
+  } catch(e) { console.error('Chat send error:', e); }
 
   input.disabled = false;
   input.focus();
 }
 
-// Placeholder — real markdown-style formatting (**bold**, *italic*, bullets)
-// is a separate, not-yet-built piece of the notes spec. For now this just
-// escapes safely so nothing renders unsafely in the meantime.
-function renderNoteMarkdown(text) {
-  return escapeHtml(text);
-}
-
 // ── Private View — your own notes for this response ──────────────────────
 var _notesLastCount = -1;
+
+// ── Private View — a document of blocks, not a chat log ──────────────────
+// Each block is anchored either by a highlighted quote (fixed — it's an
+// excerpt of the actual response, not something to rewrite) or a
+// user-typed title (freely editable, since the person wrote it themselves
+// and might want to rename it). Beneath either, a single plain textarea
+// that's always in edit mode — no lock, no separate Edit button, no send
+// step. Autosaves on pause and on blur.
+var _noteAutosaveTimers = {};
 
 async function renderNotesView() {
   var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
@@ -5806,40 +5789,193 @@ async function renderNotesView() {
 
   stream.innerHTML = '';
   if (notes.length === 0) {
-    stream.innerHTML = '<div class="chat-empty">No private notes yet.<br>Write your first thought below.</div>';
-    updateChatBarUI();
-    return;
+    var emptyMsg = document.createElement('div');
+    emptyMsg.className = 'chat-empty';
+    emptyMsg.innerHTML = 'No private notes yet.<br>Start a section below, or highlight text in the response.';
+    stream.appendChild(emptyMsg);
+  } else {
+    notes.forEach(function(n) { stream.appendChild(buildNoteBlock(n)); });
   }
 
-  notes.forEach(function(n) {
-    var div = document.createElement('div');
-    div.className = 'chat-msg mine';
-    div.style.borderColor = 'var(--gold-dim)';
-    div.style.background = 'rgba(122,98,48,0.04)';
-    div.dataset.noteId = n.id;
-
-    var time = new Date(n.created_at).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-    var editedTag = n.edited_at ? ' (edited)' : '';
-    var quoteHtml = n.quote
-      ? '<div class="chat-msg-quote" style="border-left:2px solid var(--gold-dim); padding-left:10px; margin-bottom:8px; font-style:italic; color:var(--text-dim); font-size:14px;">' + escapeHtml(n.quote) + '</div>'
-      : '';
-    var controls =
-      '<span class="note-controls" style="display:flex; gap:10px; flex-shrink:0;">' +
-        '<button onclick="editPrivateNote(\'' + n.id + '\')" style="background:transparent;border:1px solid var(--gold-dim);color:var(--gold-pale);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;border-radius:3px;">Edit</button>' +
-        '<button onclick="deletePrivateNote(\'' + n.id + '\')" style="background:transparent;border:1px solid var(--gold-dim);color:var(--gold-pale);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;border-radius:3px;">Delete</button>' +
-      '</span>';
-
-    div.innerHTML =
-      '<div class="chat-msg-name" style="display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--gold-dim);">' +
-        '<span>Thoughts · ' + time + editedTag + '</span>' +
-        controls +
-      '</div>' +
-      quoteHtml +
-      '<div class="chat-msg-bubble" id="note-body-' + n.id + '">' + renderNoteMarkdown(n.content) + '</div>';
-    stream.appendChild(div);
-  });
+  stream.appendChild(buildNewSectionButton());
   stream.scrollTop = stream.scrollHeight;
   updateChatBarUI();
+}
+
+function buildNoteBlock(n) {
+  var div = document.createElement('div');
+  div.className = 'chat-msg mine';
+  div.style.borderColor = 'var(--gold-dim)';
+  div.style.background = 'rgba(122,98,48,0.04)';
+  div.dataset.noteId = n.id;
+
+  // Heading — quote (fixed) or title (editable), never both
+  var heading = document.createElement('div');
+  if (n.quote) {
+    heading.style.cssText = 'border-left:2px solid var(--gold-dim); padding-left:10px; margin-bottom:8px; font-style:italic; color:var(--text-dim); font-size:14px;';
+    heading.textContent = n.quote;
+  } else {
+    var titleInput = document.createElement('input');
+    titleInput.type = 'value';
+    titleInput.value = n.title || '';
+    titleInput.placeholder = 'Section title';
+    titleInput.style.cssText = 'width:100%; font-family:var(--crimson); font-weight:600; font-size:15px; color:var(--text); background:transparent; border:none; border-bottom:1px solid rgba(122,98,48,0.25); padding:0 0 6px; margin-bottom:8px;';
+    titleInput.addEventListener('input', function() {
+      scheduleNoteAutosave(n.id, { title: titleInput.value });
+    });
+    titleInput.addEventListener('blur', function() {
+      flushNoteAutosave(n.id);
+    });
+    heading = titleInput;
+  }
+
+  // Delete — small, quiet, corner control rather than a loud button
+  var delBtn = document.createElement('button');
+  delBtn.innerHTML = '&times;';
+  delBtn.title = 'Delete this section';
+  delBtn.style.cssText = 'float:right; background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:16px; line-height:1; padding:0 0 0 8px;';
+  delBtn.onclick = function() { deletePrivateNote(n.id); };
+
+  var textarea = document.createElement('textarea');
+  textarea.value = n.content || '';
+  textarea.placeholder = 'Write freely — saves as you go';
+  textarea.style.cssText = 'width:100%; min-height:50px; background:transparent; border:none; color:var(--text); font-family:var(--crimson); font-size:15px; line-height:1.5; padding:0; resize:vertical;';
+  textarea.addEventListener('input', function() {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+    scheduleNoteAutosave(n.id, { content: textarea.value });
+  });
+  textarea.addEventListener('blur', function() {
+    flushNoteAutosave(n.id);
+  });
+
+  var editedTag = document.createElement('div');
+  if (n.edited_at) {
+    editedTag.style.cssText = 'font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:6px;';
+    editedTag.textContent = 'edited';
+  }
+
+  div.appendChild(delBtn);
+  div.appendChild(heading);
+  div.appendChild(textarea);
+  if (n.edited_at) div.appendChild(editedTag);
+  return div;
+}
+
+function buildNewSectionButton() {
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'padding:8px 0;';
+  var btn = document.createElement('button');
+  btn.textContent = '+ New section';
+  btn.style.cssText = 'width:100%; background:transparent; border:1px dashed var(--border-lit); color:var(--text-dim); font-family:var(--mono); font-size:12px; letter-spacing:0.08em; padding:10px; cursor:pointer; border-radius:4px; transition:all 0.2s;';
+  btn.onmouseover = function() { btn.style.borderColor = 'var(--gold-dim)'; btn.style.color = 'var(--gold-pale)'; };
+  btn.onmouseout = function() { btn.style.borderColor = 'var(--border-lit)'; btn.style.color = 'var(--text-dim)'; };
+  btn.onclick = function() { startNewSection(wrap); };
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+// A new section starts as an unsaved draft — nothing is written to the
+// database until there's an actual title to attach it to, so abandoning
+// an empty "+ New section" click never leaves junk rows behind.
+function startNewSection(wrap) {
+  wrap.innerHTML = '';
+  var titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.placeholder = 'Section title';
+  titleInput.style.cssText = 'width:100%; font-family:var(--crimson); font-weight:600; font-size:15px; color:var(--text); background:transparent; border:none; border-bottom:1px solid rgba(122,98,48,0.25); padding:0 0 6px; margin-bottom:8px;';
+  var textarea = document.createElement('textarea');
+  textarea.placeholder = 'Write freely — saves as you go';
+  textarea.style.cssText = 'width:100%; min-height:50px; background:transparent; border:none; color:var(--text); font-family:var(--crimson); font-size:15px; line-height:1.5; padding:0; resize:vertical;';
+
+  var container = document.createElement('div');
+  container.className = 'chat-msg mine';
+  container.style.borderColor = 'var(--gold-dim)';
+  container.style.background = 'rgba(122,98,48,0.04)';
+  container.appendChild(titleInput);
+  container.appendChild(textarea);
+  wrap.parentNode.insertBefore(container, wrap);
+
+  var created = false;
+  var createdId = null;
+
+  async function commit() {
+    var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+    if (!email || !titleInput.value.trim()) return;
+    if (created) return;
+    created = true;
+    try {
+      var res = await fetch('/api/followups?kind=note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+        body: JSON.stringify({
+          threadId: activeThreadId,
+          nodeId:   _activeNodeId,
+          title:    titleInput.value.trim(),
+          content:  textarea.value
+        })
+      });
+      var data = await res.json();
+      createdId = data.note && data.note.id;
+      container.dataset.noteId = createdId;
+    } catch(e) { console.error('New section create error:', e); }
+  }
+
+  titleInput.addEventListener('blur', commit);
+  textarea.addEventListener('input', function() {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+    if (created && createdId) {
+      scheduleNoteAutosave(createdId, { content: textarea.value });
+    }
+  });
+  textarea.addEventListener('blur', async function() {
+    await commit(); // in case they typed content before ever leaving the title field
+    if (createdId) flushNoteAutosave(createdId);
+  });
+
+  titleInput.focus();
+}
+
+function scheduleNoteAutosave(noteId, fields) {
+  if (_noteAutosaveTimers[noteId]) clearTimeout(_noteAutosaveTimers[noteId].timer);
+  var pending = (_noteAutosaveTimers[noteId] && _noteAutosaveTimers[noteId].fields) || {};
+  Object.assign(pending, fields);
+  _noteAutosaveTimers[noteId] = {
+    fields: pending,
+    timer: setTimeout(function() { flushNoteAutosave(noteId); }, 900)
+  };
+}
+
+async function flushNoteAutosave(noteId) {
+  var pending = _noteAutosaveTimers[noteId];
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  delete _noteAutosaveTimers[noteId];
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  if (!email) return;
+  try {
+    await fetch('/api/followups?kind=note', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify(Object.assign({ noteId: noteId }, pending.fields))
+    });
+  } catch(e) { console.error('Note autosave error:', e); }
+}
+
+async function deletePrivateNote(noteId) {
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  if (!email) return;
+  if (!confirm('Delete this section? This can\'t be undone.')) return;
+  try {
+    await fetch('/api/followups?kind=note', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify({ noteId: noteId })
+    });
+    _notesLastCount = -1; // force reload
+    renderNotesView();
+  } catch(e) { console.error('Delete note error:', e); }
 }
 
 // ── Trust Circle — the shared discussion ──────────────────────────────────
