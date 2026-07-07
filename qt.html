@@ -2117,10 +2117,14 @@
         <div style="display:flex;align-items:center;gap:0;flex-shrink:0;"></div>
       </div>
 
-      <!-- URL address layer — always mounted, fades in/out -->
+      <!-- Address layer — always mounted, fades in/out -->
       <div class="query-address-layer" id="queryUrlRow">
-        <div class="query-url-chip">
-          <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Copy an invitation with this link">—</span>
+        <div style="display:flex; align-items:center; flex:1; min-width:0;">
+          <!-- Quiet confirmation, not a permanent link display — a raw URL
+               sitting on screen looks technical and undercuts the whole
+               point of a warm invitation message. This only flashes
+               briefly after Share/Copy actually succeeds. -->
+          <span id="queryActionConfirm" style="font-family:var(--mono); font-size:12px; letter-spacing:0.1em; color:rgba(80,180,120,0.75); opacity:0; transition:opacity 0.3s ease;"></span>
         </div>
         <div style="display:flex;gap:16px;align-items:center;flex-shrink:0;">
           <button class="query-share-btn" id="queryShareBtn" onclick="shareQueryNative()" title="Share via Messages, Mail, or any app on your device" style="display:none;">
@@ -2130,6 +2134,11 @@
           <button class="query-copy-btn" id="queryCopyBtn" onclick="copyQueryLink()">Copy Link</button>
           <button class="query-close-btn" id="queryToggleBtn" onclick="handleShareBtn()">Stop Sharing</button>
         </div>
+      </div>
+      <!-- Fallback raw link — hidden unless clipboard copy actually fails,
+           so there's still a way to grab the link manually if needed. -->
+      <div class="query-url-chip" id="queryUrlFallback" style="display:none; margin-top:10px;">
+        <span class="query-url-text active" id="queryUrlText" onclick="copyQueryLink()" title="Tap to copy">—</span>
       </div>
 
     </div>
@@ -5105,6 +5114,8 @@ function updateSessionGovernanceUI() {
     // Fade out URL layer (stays mounted)
     if (urlRow)   urlRow.classList.remove('visible');
     if (urlText)  { urlText.textContent = '—'; urlText.classList.remove('active'); }
+    var fallback = document.getElementById('queryUrlFallback');
+    if (fallback) fallback.style.display = 'none';
   }
 }
 
@@ -5143,6 +5154,8 @@ function shareQueryNative() {
     title: 'The Prism',
     text: buildShareMessage(url, false),
     url: url
+  }).then(function() {
+    showQueryActionConfirm('Shared ✓');
   }).catch(function() {
     // User cancelled the share sheet, or it failed silently — no action needed,
     // Copy Link remains available as a fallback either way.
@@ -5154,25 +5167,45 @@ function checkNativeShareSupport() {
   if (shareBtn && navigator.share) shareBtn.style.display = 'inline-flex';
 }
 
+function showQueryActionConfirm(text) {
+  var el = document.getElementById('queryActionConfirm');
+  if (!el) return;
+  el.textContent = text;
+  el.style.opacity = '1';
+  setTimeout(function() { el.style.opacity = '0'; }, 2200);
+}
+
+function revealUrlFallback() {
+  var fallback = document.getElementById('queryUrlFallback');
+  var txt = document.getElementById('queryUrlText');
+  if (fallback) fallback.style.display = 'flex';
+  if (txt && window._currentShareUrl) txt.textContent = window._currentShareUrl;
+}
+
 function copyQueryLink() {
   var url = window._currentShareUrl;
   if (!url) return;
   var message = buildShareMessage(url, true);
 
   var doCopy = function() {
-    var txt = document.getElementById('queryUrlText');
-    if (txt) { txt.style.color = 'rgba(80,180,120,0.7)'; setTimeout(function() { txt.style.color = ''; }, 1200); }
+    showQueryActionConfirm('Copied ✓');
   };
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(message).then(doCopy).catch(function() {
+  var manualFallback = function() {
+    try {
       var el = document.createElement('textarea');
       el.value = message; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
       doCopy();
-    });
+    } catch (e) {
+      // Genuine failure end-to-end — only now does the raw link appear,
+      // as a last resort so there's still some way to get it manually.
+      revealUrlFallback();
+      showQueryActionConfirm('Tap the link below to copy it');
+    }
+  };
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(message).then(doCopy).catch(manualFallback);
   } else {
-    var el = document.createElement('textarea');
-    el.value = message; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
-    doCopy();
+    manualFallback();
   }
 }
 
