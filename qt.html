@@ -5712,13 +5712,16 @@ async function loadChatMessages() {
       var time = new Date(m.created_at).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
       var editedTag = m.edited_at ? ' (edited)' : '';
       var controls = m._private
-        ? '<span class="note-controls" style="float:right; display:flex; gap:8px;">' +
-            '<button onclick="editPrivateNote(\'' + m.id + '\')" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:0;">Edit</button>' +
-            '<button onclick="deletePrivateNote(\'' + m.id + '\')" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:0;">Delete</button>' +
+        ? '<span class="note-controls" style="display:flex; gap:10px; flex-shrink:0;">' +
+            '<button onclick="editPrivateNote(\'' + m.id + '\')" style="background:transparent;border:1px solid var(--gold-dim);color:var(--gold-pale);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;border-radius:3px;">Edit</button>' +
+            '<button onclick="deletePrivateNote(\'' + m.id + '\')" style="background:transparent;border:1px solid var(--gold-dim);color:var(--gold-pale);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;border-radius:3px;">Delete</button>' +
           '</span>'
         : '';
       div.innerHTML =
-        '<div class="chat-msg-name"' + (headerColor ? ' style="color:' + headerColor + ';"' : '') + '>' + escapeHtml(name) + ' · ' + time + editedTag + controls + '</div>' +
+        '<div class="chat-msg-name" style="display:flex; justify-content:space-between; align-items:center; gap:8px;' + (headerColor ? ' color:' + headerColor + ';' : '') + '">' +
+          '<span>' + escapeHtml(name) + ' · ' + time + editedTag + '</span>' +
+          controls +
+        '</div>' +
         '<div class="chat-msg-bubble" id="note-body-' + (m._private ? m.id : '') + '">' + escapeHtml(m.content) + '</div>';
       stream.appendChild(div);
     });
