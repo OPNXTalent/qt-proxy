@@ -5517,6 +5517,20 @@ function getNodeLabel(nodeId) {
 }
 
 // ── Participant color identity ─────────────────────────────────────────────
+// Derives border/background tints from a participant's assigned color, so
+// each person's messages read as a genuinely distinct box in a multi-person
+// Trust Circle conversation — not just a thin left-edge accent, which is
+// easy to miss when scanning a longer discussion at a glance.
+function participantBoxTint(pColor) {
+  var m = /rgba\((\d+),(\d+),(\d+),[\d.]+\)/.exec(pColor);
+  if (!m) return { border: pColor, background: 'transparent' };
+  var r = m[1], g = m[2], b = m[3];
+  return {
+    border:     'rgba(' + r + ',' + g + ',' + b + ',0.35)',
+    background: 'rgba(' + r + ',' + g + ',' + b + ',0.06)'
+  };
+}
+
 var _participantColors = [
   'rgba(100,160,255,0.7)',   // blue
   'rgba(255,140,100,0.7)',   // amber
@@ -5790,7 +5804,10 @@ async function loadChatMessages() {
       var headerColor = null;
       if (!isMine) {
         var pColor = getParticipantColor(name, m.message_type, m.session_token);
+        var tint = participantBoxTint(pColor);
+        div.style.borderColor = tint.border;
         div.style.borderLeftColor = pColor;
+        div.style.background = tint.background;
         headerColor = pColor;
       }
       if (m._private) {
@@ -6034,7 +6051,10 @@ function renderChatMessage(msg) {
   var headerColor = null;
   if (!msg.mine) {
     var pColor = getParticipantColor(msg.name, msg.messageType || 'recipient', msg.sessionToken);
+    var tint = participantBoxTint(pColor);
+    div.style.borderColor = tint.border;
     div.style.borderLeftColor = pColor;
+    div.style.background = tint.background;
     headerColor = pColor;
   }
   // Color the box — and its header line — to match whichever visibility
