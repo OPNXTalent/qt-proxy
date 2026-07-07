@@ -207,6 +207,28 @@ async function handleGet(req, res) {
     return res.status(410).json({ error: 'This share has been closed by the sender.' });
   }
 
+  // Look up the sender's display name — a bare email address isn't a warm
+  // "so-and-so shared this with you" moment, and showing someone's raw
+  // email to a stranger who clicked a link isn't great either. Falls back
+  // to null if no display name is set; share.html handles that gracefully
+  // with a generic "Someone shared this with you" instead.
+  let senderDisplayName = null;
+  if (share.sender_email) {
+    try {
+      const senderRes = await sbFetch(
+        `/subscribers?email=eq.${encodeURIComponent(share.sender_email)}&select=display_name&limit=1`,
+        { headers: sbHeaders(true) }
+      );
+      if (senderRes.ok) {
+        const senderRows = await senderRes.json();
+        senderDisplayName = senderRows?.[0]?.display_name || null;
+      }
+    } catch (e) {
+      // Non-fatal — share still loads, just without a name to show
+    }
+  }
+  share.sender_display_name = senderDisplayName;
+
   // If collaboration is open, fetch the channel id for this share
   let channelId = null;
   if (share.collaboration_open) {
