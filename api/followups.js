@@ -20,7 +20,7 @@
 //      exactly as they would in their own thread — no different UI, no
 //      different cost, just the same main-view follow-up flow
 //
-// Visibility note: unlike Refractions notes (share_chat_messages), the main
+// Visibility note: unlike Refractions notes (refraction_notes), the main
 // Q&A chain has NO per-entry private/public split. Once a thread is Trust
 // Circle, every follow-up in it is visible to the whole circle by default —
 // hiding an actual interpretive answer was confirmed out of scope for this
@@ -70,17 +70,17 @@ function filterForViewer(followUps, mutedIds) {
   return followUps.filter(f => !(f.user_id && mutedIds.includes(f.user_id)));
 }
 
-// ── Refractions private notes ("My Thoughts") ───────────────────────────────
-// Merged in from what was originally a separate api/refractions.js — see
-// file header. Author-scoped throughout: a note is only ever visible,
-// editable, or deletable by whoever wrote it.
+// ── Refractions private notes ──────────────────────────────────────────────
+// Now backed by its own dedicated table, refraction_notes — no longer
+// sharing share_chat_messages with the anonymous social layer at all. That
+// was the seam that caused real bugs earlier (the share_id NOT NULL issue);
+// a private note has nothing to do with sharing and now lives somewhere
+// that reflects that. Still merged into this file rather than its own
+// api/refractions.js, purely to stay within Vercel Hobby's 12-function cap.
 //
-// Keyed by thread_id, NOT share_id — a private note is your own reflection
-// on your own thread and has nothing to do with whether that thread has
-// ever been shared with anyone. Requiring a share_id here (the original
-// design) meant "My Thoughts" silently failed on any thread that had never
-// gone through the Share modal, since share_id was NOT NULL and there was
-// no share to reference — exactly the bug this was rewritten to fix.
+// Author-scoped throughout: a note is only ever visible, editable, or
+// deletable by whoever wrote it. quote is optional — a note can exist with
+// or without a highlighted passage attached.
 async function handleNoteRequest(req, res) {
   const userEmail = req.headers['x-user-email'] || null;
   if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
@@ -94,7 +94,7 @@ async function handleNoteRequest(req, res) {
     if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
     const notesRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/share_chat_messages?thread_id=eq.${encodeURIComponent(threadId)}&node_id=eq.${encodeURIComponent(nodeId)}&user_id=eq.${userId}&visibility=eq.private&order=created_at.asc&select=id,content,created_at,edited_at,visibility`,
+      `${SUPABASE_URL}/rest/v1/refraction_notes?thread_id=eq.${encodeURIComponent(threadId)}&node_id=eq.${encodeURIComponent(nodeId)}&user_id=eq.${userId}&order=created_at.asc&select=id,quote,content,created_at,edited_at`,
       { headers: sbHeaders() }
     );
     const notes = await notesRes.json();
@@ -108,27 +108,24 @@ async function handleNoteRequest(req, res) {
     } catch {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
-    const { threadId, nodeId, content, displayName } = body || {};
+    const { threadId, nodeId, content, quote } = body || {};
     if (!threadId || !content) return res.status(400).json({ error: 'threadId and content required' });
 
-    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/share_chat_messages`, {
+    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/refraction_notes`, {
       method: 'POST',
       headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
       body: JSON.stringify({
-        thread_id:    threadId,
-        share_id:     null,
-        node_id:      nodeId || 'root',
-        user_id:      userId,
-        display_name: displayName || null,
-        message_type: 'sender',
-        content:      content,
-        visibility:   'private'
+        thread_id: threadId,
+        node_id:   nodeId || 'root',
+        user_id:   userId,
+        quote:     quote || null,
+        content:   content
       })
     });
 
     if (!insertRes.ok) {
       const err = await insertRes.text();
-      console.error('private note insert failed:', err);
+      console.error('note insert failed:', err);
       return res.status(500).json({ error: 'Failed to save note' });
     }
 
@@ -147,14 +144,14 @@ async function handleNoteRequest(req, res) {
     if (!noteId || !content) return res.status(400).json({ error: 'noteId and content required' });
 
     const ownRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/share_chat_messages?id=eq.${noteId}&user_id=eq.${userId}&select=id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}&user_id=eq.${userId}&select=id&limit=1`,
       { headers: sbHeaders() }
     );
     const ownRows = await ownRes.json();
     if (!ownRows?.length) return res.status(403).json({ error: 'Only the author can edit this note' });
 
     await fetch(
-      `${SUPABASE_URL}/rest/v1/share_chat_messages?id=eq.${noteId}`,
+      `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}`,
       {
         method: 'PATCH',
         headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
@@ -169,14 +166,14 @@ async function handleNoteRequest(req, res) {
     if (!noteId) return res.status(400).json({ error: 'noteId required' });
 
     const ownRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/share_chat_messages?id=eq.${noteId}&user_id=eq.${userId}&select=id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}&user_id=eq.${userId}&select=id&limit=1`,
       { headers: sbHeaders() }
     );
     const ownRows = await ownRes.json();
     if (!ownRows?.length) return res.status(403).json({ error: 'Only the author can delete this note' });
 
     await fetch(
-      `${SUPABASE_URL}/rest/v1/share_chat_messages?id=eq.${noteId}`,
+      `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}`,
       { method: 'DELETE', headers: sbHeaders() }
     );
     return res.status(200).json({ success: true });
