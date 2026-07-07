@@ -2225,7 +2225,7 @@
           <path d="M 7.9 4.3 A 4 4 0 0 1 10 8.3" fill="none" stroke="currentColor" stroke-width="0.8"/>
           <path d="M 4.9 9.6 A 3.2 3.2 0 0 0 9.1 9.6" fill="none" stroke="currentColor" stroke-width="0.8"/>
         </svg>
-        <span id="entryVisibilityLabel">My Thoughts</span>
+        <span id="entryVisibilityLabel">Private View</span>
       </button>
     </div>
 
@@ -5528,7 +5528,7 @@ function updateChatBarUI() {
   count.textContent = n > 0 ? n + (n === 1 ? ' message' : ' messages') : '';
 }
 
-// Per-entry My Thoughts / Trust Circle toggle for Refractions. Sticky —
+// Per-entry Private View / Trust Circle toggle for Refractions. Sticky —
 // stays wherever it was last left rather than resetting after every send,
 // so someone contributing several entries in a row doesn't have to touch
 // it each time unless they actually want to switch.
@@ -5551,7 +5551,7 @@ function toggleEntryVisibility() {
     btn.style.background = 'rgba(74,106,170,0.08)';
     btn.style.borderColor = 'var(--blue-lit)';
   } else {
-    label.textContent = 'My Thoughts';
+    label.textContent = 'Private View';
     iconTrustCircle.style.display = 'none';
     iconPrivate.style.display = '';
     btn.style.color = 'var(--gold-dim)';
@@ -5575,7 +5575,8 @@ async function sendChatMessage() {
   var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
 
   // Optimistic render
-  var msg = { id: Date.now(), name: name, text: text, mine: true, visibility: currentVisibility };
+  var displayLabel = currentVisibility === 'private' ? 'Thoughts' : name;
+  var msg = { id: Date.now(), name: displayLabel, text: text, mine: true, visibility: currentVisibility };
   _chatMessages.push(msg);
   // Track fingerprint so Realtime skips re-rendering our own send
   _sentByMe.add(name + '::' + text);
@@ -5669,7 +5670,7 @@ async function loadChatMessages() {
             return {
               id: n.id, content: n.content, created_at: n.created_at,
               edited_at: n.edited_at, message_type: 'sender',
-              display_name: getChatParticipantName(), _private: true
+              display_name: 'Thoughts', _private: true
             };
           });
         }
