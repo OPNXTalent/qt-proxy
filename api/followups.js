@@ -94,7 +94,7 @@ async function handleNoteRequest(req, res) {
     if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
     const notesRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/refraction_notes?thread_id=eq.${encodeURIComponent(threadId)}&node_id=eq.${encodeURIComponent(nodeId)}&user_id=eq.${userId}&order=created_at.asc&select=id,quote,content,created_at,edited_at`,
+      `${SUPABASE_URL}/rest/v1/refraction_notes?thread_id=eq.${encodeURIComponent(threadId)}&node_id=eq.${encodeURIComponent(nodeId)}&user_id=eq.${userId}&order=created_at.asc&select=id,quote,title,content,created_at,edited_at`,
       { headers: sbHeaders() }
     );
     const notes = await notesRes.json();
@@ -108,8 +108,9 @@ async function handleNoteRequest(req, res) {
     } catch {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
-    const { threadId, nodeId, content, quote } = body || {};
-    if (!threadId || !content) return res.status(400).json({ error: 'threadId and content required' });
+    const { threadId, nodeId, content, quote, title } = body || {};
+    if (!threadId) return res.status(400).json({ error: 'threadId required' });
+    if (!quote && !title) return res.status(400).json({ error: 'quote or title required' });
 
     const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/refraction_notes`, {
       method: 'POST',
@@ -119,7 +120,8 @@ async function handleNoteRequest(req, res) {
         node_id:   nodeId || 'root',
         user_id:   userId,
         quote:     quote || null,
-        content:   content
+        title:     title || null,
+        content:   content || ''
       })
     });
 
@@ -140,8 +142,11 @@ async function handleNoteRequest(req, res) {
     } catch {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
-    const { noteId, content } = body || {};
-    if (!noteId || !content) return res.status(400).json({ error: 'noteId and content required' });
+    const { noteId, content, title } = body || {};
+    if (!noteId) return res.status(400).json({ error: 'noteId required' });
+    if (content === undefined && title === undefined) {
+      return res.status(400).json({ error: 'content or title required' });
+    }
 
     const ownRes = await fetch(
       `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}&user_id=eq.${userId}&select=id&limit=1`,
@@ -150,12 +155,16 @@ async function handleNoteRequest(req, res) {
     const ownRows = await ownRes.json();
     if (!ownRows?.length) return res.status(403).json({ error: 'Only the author can edit this note' });
 
+    const updates = { edited_at: new Date().toISOString() };
+    if (content !== undefined) updates.content = content;
+    if (title !== undefined) updates.title = title;
+
     await fetch(
       `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}`,
       {
         method: 'PATCH',
         headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ content, edited_at: new Date().toISOString() })
+        body: JSON.stringify(updates)
       }
     );
     return res.status(200).json({ success: true });
