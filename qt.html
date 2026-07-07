@@ -5592,7 +5592,7 @@ async function sendChatMessage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-email': email },
         body: JSON.stringify({
-          shareId:     _currentChannelId,
+          threadId:    activeThreadId,
           nodeId:      _activeNodeId,
           content:     text,
           displayName: name
@@ -5639,20 +5639,25 @@ async function sendChatMessage() {
 }
 
 async function loadChatMessages() {
-  if (!_currentChannelId) return;
   var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
   var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
   try {
-    var res = await fetch(
-      SUPA_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(_currentChannelId) + '&visibility=eq.trust_circle&order=created_at.asc&select=id,content,message_type,display_name,session_token,node_id,created_at',
-      { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON } }
-    );
-    var messages = await res.json();
-    if (!Array.isArray(messages)) messages = [];
-    // Client-side filter by active node
-    var filtered = messages.filter(function(m) {
-      return (m.node_id || 'root') === _activeNodeId;
-    }).map(function(m) { return Object.assign({}, m, { _private: false }); });
+    var filtered = [];
+    // Open/Trust Circle messages only exist in the context of an actual
+    // share — skip this part entirely if the thread has never been shared,
+    // but still fall through to the private notes fetch below regardless.
+    if (_currentChannelId) {
+      var res = await fetch(
+        SUPA_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(_currentChannelId) + '&visibility=eq.trust_circle&order=created_at.asc&select=id,content,message_type,display_name,session_token,node_id,created_at',
+        { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON } }
+      );
+      var messages = await res.json();
+      if (!Array.isArray(messages)) messages = [];
+      // Client-side filter by active node
+      filtered = messages.filter(function(m) {
+        return (m.node_id || 'root') === _activeNodeId;
+      }).map(function(m) { return Object.assign({}, m, { _private: false }); });
+    }
 
     // Merge in this person's own private notes, if authenticated — a
     // separate, server-verified fetch, never mixed into the open channel.
@@ -5661,7 +5666,7 @@ async function loadChatMessages() {
     if (email) {
       try {
         var noteRes = await fetch(
-          '/api/followups?kind=note&shareId=' + encodeURIComponent(_currentChannelId) + '&nodeId=' + encodeURIComponent(_activeNodeId),
+          '/api/followups?kind=note&threadId=' + encodeURIComponent(activeThreadId) + '&nodeId=' + encodeURIComponent(_activeNodeId),
           { headers: { 'x-user-email': email } }
         );
         var noteData = await noteRes.json();
@@ -5880,7 +5885,7 @@ function focusRefractionNode(nodeId, queryText) {
   // Open panel
   openChatPanel();
 
-  if (_currentChannelId) loadChatMessages();
+  loadChatMessages();
 }
 
 // Focus root node (original interpretation)
