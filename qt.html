@@ -588,6 +588,29 @@
   }
   .query-sync-btn:hover { color: rgba(80,180,120,0.85); }
 
+  /* Share — the primary action where supported. Native share sheets are a
+     lower-friction, more familiar pattern than "copy this, then go paste it
+     somewhere yourself" — hidden entirely via feature detection on browsers
+     that don't support the Web Share API, where Copy Link remains the way in. */
+  .query-share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size:12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border: 1px solid rgba(201,168,76,0.45);
+    background: rgba(201,168,76,0.05);
+    color: rgba(201,168,76,0.85);
+    cursor: pointer;
+    transition: color 0.22s, border-color 0.22s, background 0.22s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .query-share-btn:hover { border-color: var(--gold); color: var(--gold-pale); background: rgba(201,168,76,0.09); }
+
   /* Copy Link — the one clearly primary action in this bar */
   .query-copy-btn {
     font-family: var(--mono);
@@ -2097,9 +2120,13 @@
       <!-- URL address layer — always mounted, fades in/out -->
       <div class="query-address-layer" id="queryUrlRow">
         <div class="query-url-chip">
-          <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Copy link">—</span>
+          <span class="query-url-text" id="queryUrlText" onclick="copyQueryLink()" title="Copy an invitation with this link">—</span>
         </div>
-        <div style="display:flex;gap:20px;align-items:center;flex-shrink:0;">
+        <div style="display:flex;gap:16px;align-items:center;flex-shrink:0;">
+          <button class="query-share-btn" id="queryShareBtn" onclick="shareQueryNative()" title="Share via Messages, Mail, or any app on your device" style="display:none;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            Share
+          </button>
           <button class="query-copy-btn" id="queryCopyBtn" onclick="copyQueryLink()">Copy Link</button>
           <button class="query-close-btn" id="queryToggleBtn" onclick="handleShareBtn()">Stop Sharing</button>
         </div>
@@ -5067,6 +5094,7 @@ function updateSessionGovernanceUI() {
       urlText.textContent = window._currentShareUrl;
       urlText.classList.add('active');
     }
+    checkNativeShareSupport();
   } else {
     // Fade in Share This button, fade out Shared label
     stateEl.style.opacity = '0';
@@ -5080,22 +5108,70 @@ function updateSessionGovernanceUI() {
   }
 }
 
+// A bare link with no context is exactly the shape of thing spam filters
+// and wary recipients both learn to distrust. Build a short, warm message
+// alongside it instead — naming the actual subject explored, so whoever
+// receives it has context before they ever click.
+//
+// includeUrl=true appends the link directly into the text (needed when
+// pasting into an arbitrary text field, e.g. the clipboard fallback).
+// includeUrl=false leaves the link out of the text, for native sharing,
+// where the URL is passed as its own separate field — most share targets
+// (Messages, Mail, WhatsApp) handle a separate url param more cleanly than
+// finding it duplicated inside the text too.
+function buildShareMessage(url, includeUrl) {
+  var displayName = localStorage.getItem('qt_display_name');
+  var subject = (typeof currentSubject !== 'undefined' && currentSubject) ? currentSubject : null;
+
+  var opener = displayName
+    ? displayName + ' is exploring something on The Prism and wanted to share it with you:'
+    : "I'm exploring something on The Prism and wanted to share it with you:";
+
+  var message = subject ? opener + '\n\n"' + subject + '"' : opener;
+  if (includeUrl) message += '\n\n' + url;
+  return message;
+}
+
+// Native share sheet — the phone/browser's own share UI (Messages, Mail,
+// WhatsApp, whatever's installed), rather than "copy this, then go paste it
+// somewhere yourself." Feature-detected; the button that calls this is only
+// ever shown on browsers that actually support it (see checkNativeShareSupport).
+function shareQueryNative() {
+  var url = window._currentShareUrl;
+  if (!url || !navigator.share) return;
+  navigator.share({
+    title: 'The Prism',
+    text: buildShareMessage(url, false),
+    url: url
+  }).catch(function() {
+    // User cancelled the share sheet, or it failed silently — no action needed,
+    // Copy Link remains available as a fallback either way.
+  });
+}
+
+function checkNativeShareSupport() {
+  var shareBtn = document.getElementById('queryShareBtn');
+  if (shareBtn && navigator.share) shareBtn.style.display = 'inline-flex';
+}
+
 function copyQueryLink() {
   var url = window._currentShareUrl;
   if (!url) return;
+  var message = buildShareMessage(url, true);
+
   var doCopy = function() {
     var txt = document.getElementById('queryUrlText');
     if (txt) { txt.style.color = 'rgba(80,180,120,0.7)'; setTimeout(function() { txt.style.color = ''; }, 1200); }
   };
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(doCopy).catch(function() {
+    navigator.clipboard.writeText(message).then(doCopy).catch(function() {
       var el = document.createElement('textarea');
-      el.value = url; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+      el.value = message; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
       doCopy();
     });
   } else {
     var el = document.createElement('textarea');
-    el.value = url; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+    el.value = message; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
     doCopy();
   }
 }
