@@ -74,6 +74,13 @@ function filterForViewer(followUps, mutedIds) {
 // Merged in from what was originally a separate api/refractions.js — see
 // file header. Author-scoped throughout: a note is only ever visible,
 // editable, or deletable by whoever wrote it.
+//
+// Keyed by thread_id, NOT share_id — a private note is your own reflection
+// on your own thread and has nothing to do with whether that thread has
+// ever been shared with anyone. Requiring a share_id here (the original
+// design) meant "My Thoughts" silently failed on any thread that had never
+// gone through the Share modal, since share_id was NOT NULL and there was
+// no share to reference — exactly the bug this was rewritten to fix.
 async function handleNoteRequest(req, res) {
   const userEmail = req.headers['x-user-email'] || null;
   if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
@@ -82,12 +89,12 @@ async function handleNoteRequest(req, res) {
   if (!userId) return res.status(404).json({ error: 'Subscriber not found' });
 
   if (req.method === 'GET') {
-    const shareId = req.query?.shareId || null;
-    const nodeId  = req.query?.nodeId  || 'root';
-    if (!shareId) return res.status(400).json({ error: 'shareId required' });
+    const threadId = req.query?.threadId || null;
+    const nodeId    = req.query?.nodeId  || 'root';
+    if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
     const notesRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/share_chat_messages?share_id=eq.${encodeURIComponent(shareId)}&node_id=eq.${encodeURIComponent(nodeId)}&user_id=eq.${userId}&visibility=eq.private&order=created_at.asc&select=id,content,created_at,edited_at,visibility`,
+      `${SUPABASE_URL}/rest/v1/share_chat_messages?thread_id=eq.${encodeURIComponent(threadId)}&node_id=eq.${encodeURIComponent(nodeId)}&user_id=eq.${userId}&visibility=eq.private&order=created_at.asc&select=id,content,created_at,edited_at,visibility`,
       { headers: sbHeaders() }
     );
     const notes = await notesRes.json();
@@ -101,14 +108,15 @@ async function handleNoteRequest(req, res) {
     } catch {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
-    const { shareId, nodeId, content, displayName } = body || {};
-    if (!shareId || !content) return res.status(400).json({ error: 'shareId and content required' });
+    const { threadId, nodeId, content, displayName } = body || {};
+    if (!threadId || !content) return res.status(400).json({ error: 'threadId and content required' });
 
     const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/share_chat_messages`, {
       method: 'POST',
       headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
       body: JSON.stringify({
-        share_id:     shareId,
+        thread_id:    threadId,
+        share_id:     null,
         node_id:      nodeId || 'root',
         user_id:      userId,
         display_name: displayName || null,
