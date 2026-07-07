@@ -2101,7 +2101,6 @@
         </div>
         <div style="display:flex;gap:20px;align-items:center;flex-shrink:0;">
           <button class="query-copy-btn" id="queryCopyBtn" onclick="copyQueryLink()">Copy Link</button>
-          <button class="query-sync-btn" id="querySyncBtn" onclick="govSync()" title="Start live updates for anyone with this link" style="opacity:0.45;">Sync</button>
           <button class="query-close-btn" id="queryToggleBtn" onclick="handleShareBtn()">Stop Sharing</button>
         </div>
       </div>
@@ -5055,7 +5054,7 @@ function updateSessionGovernanceUI() {
   if (!stateEl) return;
 
   if (window._shareActive) {
-    // Fade in Query Open label, fade out Open Query button
+    // Fade in Shared label, fade out Share This button
     stateEl.style.opacity = '1';
     stateEl.style.pointerEvents = 'none';
     stateEl.className = 'query-state-label open';
@@ -5068,9 +5067,8 @@ function updateSessionGovernanceUI() {
       urlText.textContent = window._currentShareUrl;
       urlText.classList.add('active');
     }
-    if (typeof setGovState === 'function') setGovState('copy');
   } else {
-    // Fade in Open Query button, fade out Query Open label
+    // Fade in Share This button, fade out Shared label
     stateEl.style.opacity = '0';
     stateEl.className = 'query-state-label';
     if (openTrig) openTrig.style.opacity = '1';
@@ -5082,52 +5080,12 @@ function updateSessionGovernanceUI() {
   }
 }
 
-// Governance flow: Copy Link → Sync → Copy Link (cyclical)
-var _govState = 'copy'; // 'copy' | 'sync'
-
-function setGovState(state) {
-  _govState = state;
-  var copyBtn = document.getElementById('queryCopyBtn');
-  var syncBtn = document.getElementById('querySyncBtn');
-  if (!copyBtn || !syncBtn) return;
-  if (state === 'copy') {
-    // Copy Link (gold) = active; Sync = dim
-    copyBtn.style.opacity = '1';
-    copyBtn.style.pointerEvents = 'auto';
-    syncBtn.textContent = 'Sync';
-    syncBtn.style.opacity = '0.35';
-    syncBtn.style.pointerEvents = 'auto';
-  } else {
-    // Sync (green) = active; Copy Link = dim
-    syncBtn.textContent = 'Sync';
-    syncBtn.style.opacity = '1';
-    copyBtn.style.opacity = '0.35';
-  }
-}
-
-function govSync() {
-  var syncBtn = document.getElementById('querySyncBtn');
-  if (syncBtn) {
-    // Text-only change — fixed min-width keeps layout stable
-    syncBtn.textContent = 'Syncing…';
-    syncBtn.style.opacity = '1';
-    syncBtn.style.pointerEvents = 'none';
-  }
-  startLiveSync();
-  setTimeout(function() {
-    if (syncBtn) syncBtn.style.pointerEvents = 'auto';
-    setGovState('copy');
-  }, 1800);
-}
-
 function copyQueryLink() {
   var url = window._currentShareUrl;
   if (!url) return;
   var doCopy = function() {
     var txt = document.getElementById('queryUrlText');
     if (txt) { txt.style.color = 'rgba(80,180,120,0.7)'; setTimeout(function() { txt.style.color = ''; }, 1200); }
-    // After copy: Sync becomes primary
-    setGovState('sync');
   };
   if (navigator.clipboard) {
     navigator.clipboard.writeText(url).then(doCopy).catch(function() {
