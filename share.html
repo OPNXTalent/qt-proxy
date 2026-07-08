@@ -546,6 +546,7 @@
 
     <div class="share-banner">
       Shared interpretation &nbsp;·&nbsp; <a href="https://theprism.io/index.html" style="color:var(--gold);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='var(--gold-pale)'" onmouseout="this.style.color='var(--gold)'">The Prism</a> &nbsp;·&nbsp; <a href="https://theprism.io/purchase.html" style="color:var(--text-muted);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-muted)'">theprism.io</a>
+      &nbsp;·&nbsp; <a href="javascript:void(0)" onclick="showProactiveSignIn()" id="proactiveSignInLink" style="display:none; color:var(--gold-dim);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='var(--gold-pale)'" onmouseout="this.style.color='var(--gold-dim)'">Already have an account? Sign in</a>
     </div>
 
     <div id="sharedByBanner" style="display:none; text-align:center; font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:20px;"></div>
@@ -847,6 +848,8 @@ async function submitAuthGate() {
 function onAuthGateSuccess(email, displayName) {
   var gate = document.getElementById('recipientAuthGate');
   if (gate) gate.style.display = 'none';
+  var signInLink = document.getElementById('proactiveSignInLink');
+  if (signInLink) signInLink.style.display = 'none';
   initSidebarPanels();
   // Restore input section — registered users get more queries
   var inputSec = document.getElementById('inputSection');
@@ -1332,6 +1335,21 @@ function showQueryLimitAuthPrompt() {
   // Update copy to reflect limit context
   var desc = gate.querySelector('.auth-gate-desc');
   if (desc) desc.textContent = "You’ve used your 3 free queries for today. Create a free account to save this session and continue your exploration — or sign in if you already have one. Your progress is saved.";
+  gate.style.display = 'flex';
+}
+
+// Proactive entry point — the gate above only ever appeared after burning
+// through 3 free anonymous queries. Someone who already has an account
+// landing on a shared link had no way to say "actually, sign me in first"
+// before that point, meaning they'd be stuck using their own private
+// notes and everything else as if they were a stranger. Same gate, same
+// working sign-in logic — just reachable immediately, not gated behind a
+// limit wall.
+function showProactiveSignIn() {
+  var gate = document.getElementById('recipientAuthGate');
+  if (!gate) return;
+  var desc = gate.querySelector('.auth-gate-desc');
+  if (desc) desc.textContent = "Sign in to your account to use your own notes and everything else you're used to, right here on this shared interpretation.";
   gate.style.display = 'flex';
 }
 
@@ -2221,6 +2239,12 @@ function attachInteractionListeners() {
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   loadShare();
+  // Show "Already have an account? Sign in" only for visitors who aren't
+  // already identified — no point offering it to someone already signed in.
+  var signInLink = document.getElementById('proactiveSignInLink');
+  if (signInLink && !localStorage.getItem('qt_user_email')) {
+    signInLink.style.display = 'inline';
+  }
   // Store share token in sessionStorage so index.html can offer a return path
   var params = new URLSearchParams(window.location.search);
   var t = params.get('t');
