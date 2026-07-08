@@ -5693,6 +5693,7 @@ function updateChatBarUI() {
 // private: notes are the first thing anyone encounters, before there's
 // ever a reason to share anything.
 var _refractionView = 'private';
+var _refractionRenderGen = 0;
 
 function toggleEntryVisibility() {
   var btn = document.getElementById('entryVisibilityToggle');
@@ -5727,6 +5728,12 @@ function toggleEntryVisibility() {
 // Renders whichever view is currently active — called on toggle switch,
 // and whenever the panel opens or focuses a different response.
 function renderActiveRefractionView() {
+  // Bumped on every switch — lets an in-flight async render from the
+  // PREVIOUS view detect it's now stale and abandon its own DOM write,
+  // instead of landing late and silently overwriting whatever the current
+  // view just correctly rendered (e.g. toggling to Trust Circle then
+  // quickly back to Private View, before the Trust Circle fetch resolves).
+  _refractionRenderGen++;
   var composeBar = document.getElementById('chatComposeBar');
   if (_refractionView === 'private') {
     // Notes are edited directly in place, with their own "+ New section"
@@ -5736,11 +5743,17 @@ function renderActiveRefractionView() {
     // let the toggle drop down to fill the gap, shifting position between
     // the two views. Reserving the space keeps it pinned consistently.
     if (composeBar) composeBar.style.visibility = 'hidden';
+    // Force a fresh fetch+render — the stream was just wiped by whichever
+    // view was showing a moment ago, so a matching note count here would
+    // otherwise trigger the "nothing changed, skip re-render" shortcut and
+    // leave the (now empty) stream never actually repopulated.
+    _notesLastCount = -1;
     renderNotesView();
   } else {
     if (composeBar) composeBar.style.visibility = 'visible';
     var input = document.getElementById('chatInput');
     if (input) input.placeholder = 'Add your refraction…';
+    _chatLastCount = -1;
     renderDiscussionView();
   }
 }
@@ -5819,11 +5832,13 @@ var _notesLastCount = -1;
 var _noteAutosaveTimers = {};
 
 async function renderNotesView() {
+  var myGen = _refractionRenderGen;
   var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
   var stream = document.getElementById('chatStream');
   if (!stream) return;
 
   if (!email) {
+    if (myGen !== _refractionRenderGen) return;
     stream.innerHTML = '<div class="chat-empty">Sign in to write private notes.</div>';
     return;
   }
@@ -5837,6 +5852,10 @@ async function renderNotesView() {
     var noteData = await noteRes.json();
     if (Array.isArray(noteData.notes)) notes = noteData.notes;
   } catch(e) { console.error('Notes fetch error:', e); }
+
+  // Abandon silently if a newer view switch happened while this fetch was
+  // in flight — writing now would overwrite whatever's correctly showing.
+  if (myGen !== _refractionRenderGen) return;
 
   if (notes.length === _notesLastCount) return;
   _notesLastCount = notes.length;
@@ -6159,6 +6178,7 @@ async function deletePrivateNote(noteId) {
 
 // ── Trust Circle — the shared discussion ──────────────────────────────────
 async function renderDiscussionView() {
+  var myGen = _refractionRenderGen;
   var stream = document.getElementById('chatStream');
   if (!stream) return;
 
@@ -6179,6 +6199,12 @@ async function renderDiscussionView() {
     var filtered = messages.filter(function(m) {
       return (m.node_id || 'root') === _activeNodeId;
     });
+
+    // Abandon silently if a newer view switch happened while this fetch
+    // was in flight — writing now would overwrite whatever's correctly
+    // showing (this is exactly how a stale "hasn't been shared yet"
+    // message could land on Private View after a quick toggle back).
+    if (myGen !== _refractionRenderGen) return;
 
     if (filtered.length === _chatLastCount) return;
     _chatLastCount = filtered.length;
