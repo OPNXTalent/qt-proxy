@@ -255,7 +255,7 @@
   .disc-anchor-text {
     font-family: var(--crimson);
     font-style: italic;
-    font-size:19px;
+    font-size:21.5px;
     line-height: 1.65;
     color: var(--gold-dim);
     padding: 0 24px 16px;
@@ -5731,10 +5731,14 @@ function renderActiveRefractionView() {
   if (_refractionView === 'private') {
     // Notes are edited directly in place, with their own "+ New section"
     // control at the bottom of the stream — no separate compose bar needed.
-    if (composeBar) composeBar.style.display = 'none';
+    // Using visibility (not display) so its space stays reserved — the
+    // toggle sits directly above it, and removing it from layout entirely
+    // let the toggle drop down to fill the gap, shifting position between
+    // the two views. Reserving the space keeps it pinned consistently.
+    if (composeBar) composeBar.style.visibility = 'hidden';
     renderNotesView();
   } else {
-    if (composeBar) composeBar.style.display = 'flex';
+    if (composeBar) composeBar.style.visibility = 'visible';
     var input = document.getElementById('chatInput');
     if (input) input.placeholder = 'Add your refraction…';
     renderDiscussionView();
