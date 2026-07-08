@@ -6007,6 +6007,19 @@ function truncateForTitle(text, maxLen) {
   return cut.trim() + '…';
 }
 
+// The actual unwrap mechanics — pulls a <mark> back out to plain text.
+// Shared by the user-facing removal below (which confirms first) and the
+// automatic overlap cleanup in applyHighlightAndCreateNote (which doesn't
+// need to confirm, since it's just clearing the way for a replacement
+// color, not deleting anything the person didn't just ask for).
+function unwrapMark(mark) {
+  var parent = mark.parentNode;
+  if (!parent) return;
+  while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+  parent.removeChild(mark);
+  parent.normalize(); // merge adjacent text nodes back together
+}
+
 // Removes just the visual highlight — unwraps the <mark> back to plain
 // text. Deliberately doesn't touch the note it created; that's real
 // written content and shouldn't disappear just because the mark in the
@@ -6014,10 +6027,7 @@ function truncateForTitle(text, maxLen) {
 // if that's actually what's wanted.
 function removeHighlightMark(mark) {
   if (!confirm('Remove this highlight? The note itself will stay in Notes.')) return;
-  var parent = mark.parentNode;
-  while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-  parent.removeChild(mark);
-  parent.normalize(); // merge adjacent text nodes back together
+  unwrapMark(mark);
 }
 
 async function applyHighlightAndCreateNote(color) {
@@ -6026,6 +6036,22 @@ async function applyHighlightAndCreateNote(color) {
   var range = sel.getRangeAt(0);
   var text = sel.toString().trim();
   if (!text) return;
+
+  // Clear any existing highlight(s) this selection overlaps, so a new
+  // color replaces the old one cleanly instead of nesting inside it and
+  // creating a visibly "layered" double-highlight effect.
+  var resultContent = document.getElementById('resultContent');
+  if (resultContent) {
+    var existingMarks = resultContent.querySelectorAll('mark');
+    existingMarks.forEach(function(m) {
+      if (range.intersectsNode(m)) unwrapMark(m);
+    });
+  }
+  // The unwrap above can shift text nodes around, so re-derive a fresh
+  // range from the current selection rather than reusing the stale one.
+  sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  range = sel.getRangeAt(0);
 
   // Mark the selection in the response itself
   var mark = document.createElement('mark');
