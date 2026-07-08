@@ -6262,44 +6262,6 @@ async function deletePrivateNote(noteId) {
   } catch(e) { console.error('Delete note error:', e); }
 }
 
-function editPrivateNote(noteId) {
-  var bodyEl = document.getElementById('note-body-' + noteId);
-  if (!bodyEl) return;
-  var currentText = bodyEl.textContent;
-  var textarea = document.createElement('textarea');
-  textarea.value = currentText;
-  textarea.style.cssText = 'width:100%; min-height:60px; background:var(--deep); border:1px solid var(--gold-dim); color:var(--text); font-family:var(--crimson); font-size:15px; padding:8px; resize:vertical;';
-  var saveBtn = document.createElement('button');
-  saveBtn.textContent = 'Save';
-  saveBtn.style.cssText = 'margin-top:6px; margin-right:8px; font-family:var(--mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-pale); background:transparent; border:1px solid var(--gold-dim); padding:6px 14px; cursor:pointer;';
-  saveBtn.onclick = function() { saveEditedNote(noteId, textarea.value); };
-  var cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel';
-  cancelBtn.style.cssText = 'margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); background:transparent; border:1px solid var(--border-lit); padding:6px 14px; cursor:pointer;';
-  cancelBtn.onclick = function() { _notesLastCount = -1; renderNotesView(); };
-
-  bodyEl.innerHTML = '';
-  bodyEl.appendChild(textarea);
-  bodyEl.appendChild(document.createElement('br'));
-  bodyEl.appendChild(saveBtn);
-  bodyEl.appendChild(cancelBtn);
-  textarea.focus();
-}
-
-async function saveEditedNote(noteId, newContent) {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
-  if (!email || !newContent.trim()) return;
-  try {
-    await fetch('/api/followups?kind=note', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
-      body: JSON.stringify({ noteId: noteId, content: newContent.trim() })
-    });
-    _notesLastCount = -1; // force reload
-    renderNotesView();
-  } catch(e) { console.error('Save note error:', e); }
-}
-
 // Focus a specific interpretation node — updates panel and reloads refractions
 // Build the local control row for any interpretation node
 function buildNodeControls(nodeId, queryText) {
