@@ -5806,6 +5806,10 @@ async function renderNotesView() {
     // No placeholder message — go straight to a ready-to-write section,
     // title input already focused, instead of making someone click
     // "+ New section" as an extra step before they can write anything.
+    // A second "+ New section" button appears naturally once this first
+    // one is actually committed (see startNewSection's commit()) — no
+    // need to show one in parallel before that, since Enter just adds a
+    // line within the same note rather than completing it.
     var starterWrap = document.createElement('div');
     stream.appendChild(starterWrap);
     startNewSection(starterWrap);
