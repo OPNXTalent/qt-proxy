@@ -257,12 +257,8 @@
     font-style: italic;
     font-size:19px;
     line-height: 1.65;
-    color: rgba(230,225,210,0.72);
+    color: var(--text-dim);
     padding: 0 24px 16px;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
     flex-shrink: 0;
   }
   .disc-anchor-rule {
@@ -6344,9 +6340,10 @@ function focusRefractionNode(nodeId, queryText) {
   var changed = !isSameNode;
   _activeNodeId = nodeId;
 
-  // Update contextual anchor text
+  // Update contextual anchor text — full text now, no truncation, since
+  // the CSS line-clamp that used to cut this off after 4 lines is gone too.
   var ctxEl = document.getElementById('discContextQuery');
-  if (ctxEl) ctxEl.textContent = queryText ? ('“' + (queryText.length > 140 ? queryText.slice(0, 140) + '…' : queryText) + '”') : 'The original interpretation';
+  if (ctxEl) ctxEl.textContent = queryText ? ('“' + queryText + '”') : 'The original interpretation';
 
   // Update sigil with R-label
   var rLabel = getNodeLabel(nodeId);
@@ -7315,7 +7312,24 @@ function restoreResumeSnapshot() {
   (snap.followUps || []).forEach(function(fu) {
     var el = document.createElement('div');
     el.className = 'fu-block';
+    // Same pattern as the other restore paths — a stable node ID, a click
+    // affordance to focus this node's Refractions, and the button row.
+    // This path was missing all three, which is exactly why Print/Share/
+    // Refractions was inconsistent — every OTHER render path already did
+    // this; this was the one that didn't.
+    var nodeId = fu.id || ('fu-' + Date.now());
+    el.dataset.nodeId = nodeId;
+    el.style.cursor = 'pointer';
+    el.title = 'Focus refractions for this response';
+    el.addEventListener('click', (function(nid, query) {
+      return function(e) {
+        if (e.target.closest('.node-controls')) return;
+        focusRefractionNode(nid, query);
+      };
+    })(nodeId, fu.question || ''));
+
     el.innerHTML = '<div class="fu-question">' + escHtml(fu.question || '') + '</div><div class="fu-body">' + fu.bodyHtml + '</div>';
+    el.appendChild(buildNodeControls(nodeId, fu.question || ''));
     if (container) container.appendChild(el);
   });
 
