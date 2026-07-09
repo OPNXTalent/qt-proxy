@@ -388,6 +388,75 @@
   .collab-send-btn:hover { background: rgba(80,180,120,0.06); }
   .collab-closed-notice { padding: 20px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text-muted); text-align: center; text-transform: uppercase; }
 
+  /* ── Notes (Private View) ── */
+  .note-block {
+    padding: 14px 16px;
+    border: 1px solid var(--gold-dim);
+    background: rgba(201,165,90,0.04);
+  }
+  .note-block-header {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .note-title-input {
+    width: 100%;
+    font-family: var(--crimson);
+    font-weight: 500;
+    font-size: 16px;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(201,165,90,0.25);
+    padding: 0 0 6px;
+  }
+  .note-delete-btn {
+    flex-shrink: 0;
+    background: transparent; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 16px; line-height: 1; padding: 0 0 0 8px;
+  }
+  .note-textarea {
+    width: 100%; min-height: 60px;
+    background: transparent; border: none;
+    color: var(--text); font-family: var(--crimson); font-size: 15px; line-height: 1.6;
+    padding: 0; resize: vertical;
+  }
+  .note-mic-btn {
+    position: absolute; bottom: 4px; right: 0;
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 1px solid var(--border-lit); background: var(--surface); color: var(--text-muted);
+    cursor: pointer; font-size: 12px; line-height: 1; padding: 0;
+    display: none; align-items: center; justify-content: center;
+  }
+  .note-new-section-btn {
+    width: 100%; background: transparent; border: 1px dashed var(--border-lit);
+    color: var(--text-muted); font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    padding: 10px; cursor: pointer; transition: all 0.2s;
+  }
+  .note-new-section-btn:hover { border-color: var(--gold-dim); color: var(--gold-pale); }
+  .note-edited-tag { font-family: var(--mono); font-size: 9px; color: var(--text-muted); margin-top: 6px; }
+
+  /* ── Highlight-to-note bottom sheet ── */
+  #highlightSheet {
+    position: fixed;
+    left: 0; right: 0; top: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-lit);
+    padding: calc(14px + env(safe-area-inset-top)) 20px 14px;
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    transform: translateY(-100%);
+    transition: transform 0.25s ease;
+    z-index: 900;
+  }
+  #highlightSheet.visible { transform: translateY(0); }
+  .highlight-swatch {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.25);
+    cursor: pointer; padding: 0;
+    transition: transform 0.15s ease;
+  }
+  .highlight-swatch:hover { transform: scale(1.12); }
+  .highlight-swatch:active { transform: scale(0.95); }
+
   /* ── LOADING / ERROR ── */
   .state-block { text-align: center; padding: 80px 0; position: relative; z-index: 1; }
   .state-symbol { font-family: var(--cinzel); font-size: 32px; color: var(--gold-dim); margin-bottom: 20px; animation: pulse 2s ease-in-out infinite; }
@@ -564,22 +633,51 @@
     <!-- Shared interpretation renders here -->
     <div id="shareResult"></div>
 
-    <!-- Collaboration panel (shown when collaboration_open = true) -->
+    <!-- Highlight-to-note bottom sheet — same mechanism as qt.html -->
+    <div id="highlightSheet">
+      <button class="highlight-swatch" style="background:rgba(201,168,76,0.85);" title="Gold" onclick="applyHighlightAndCreateNote('rgba(201,168,76,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(74,106,170,0.85);" title="Blue" onclick="applyHighlightAndCreateNote('rgba(74,106,170,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(212,83,110,0.85);" title="Rose" onclick="applyHighlightAndCreateNote('rgba(212,83,110,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(29,158,117,0.85);" title="Teal" onclick="applyHighlightAndCreateNote('rgba(29,158,117,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(127,119,221,0.85);" title="Violet" onclick="applyHighlightAndCreateNote('rgba(127,119,221,0.32)')"></button>
+    </div>
+
+    <!-- Refractions panel (shown when collaboration_open = true) — now
+         toggle-able between Private View (Notes, new) and Trust Circle
+         (the existing live discussion, unchanged). Same toggle pattern as
+         qt.html, adapted to this page's inline layout rather than a
+         slide-out side panel. -->
     <div class="collab-panel" id="collabPanel" style="display:none;">
-      <div class="collab-header">
-        <div class="collab-dot"></div>
-        <div class="collab-label">Live Discussion</div>
+      <div class="collab-header" style="justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="collab-dot" id="refractionsDot"></div>
+          <div class="collab-label" id="refractionsLabel">Refractions</div>
+        </div>
+        <button id="refractionsToggle" onclick="toggleRefractionsView()" type="button"
+          data-view="private"
+          style="display:inline-flex; align-items:center; gap:7px; font-family:var(--mono); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); background:rgba(122,98,48,0.06); border:1px solid var(--gold-dim); border-radius:16px; padding:5px 12px; cursor:pointer; transition:all 0.2s;">
+          <span id="refractionsToggleLabel">Private View</span>
+        </button>
       </div>
-      <div class="collab-messages" id="collabMessages">
-        <!-- messages injected by JS -->
+
+      <!-- Trust Circle — existing live discussion, unchanged -->
+      <div id="collabDiscussionSide" style="display:none;">
+        <div class="collab-messages" id="collabMessages">
+          <!-- messages injected by JS -->
+        </div>
+        <div class="collab-input-row" id="collabInputRow">
+          <textarea class="collab-input" id="collabInput" placeholder="Add to the discussion…" rows="2"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCollabMessage();}"></textarea>
+          <button class="collab-send-btn" onclick="sendCollabMessage()">Send →</button>
+        </div>
+        <div class="collab-closed-notice" id="collabClosedNotice" style="display:none;">
+          This discussion has been closed by the sender. The exchange is preserved above.
+        </div>
       </div>
-      <div class="collab-input-row" id="collabInputRow">
-        <textarea class="collab-input" id="collabInput" placeholder="Add to the discussion…" rows="2"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCollabMessage();}"></textarea>
-        <button class="collab-send-btn" onclick="sendCollabMessage()">Send →</button>
-      </div>
-      <div class="collab-closed-notice" id="collabClosedNotice" style="display:none;">
-        This discussion has been closed by the sender. The exchange is preserved above.
+
+      <!-- Private View — Notes, new -->
+      <div id="collabNotesSide" style="padding:20px;">
+        <div id="notesStream" style="display:flex; flex-direction:column; gap:14px;"></div>
       </div>
     </div>
 
@@ -1399,6 +1497,354 @@ function showLimitWall(msg) {
   wall.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ── Refractions: view toggle (Private Notes / Trust Circle) ───────────────
+// Same toggle pattern as qt.html, adapted to this page's inline layout.
+// Trust Circle reuses the existing collab discussion untouched; Private
+// View is new — see below.
+var _refractionsView = 'private';
+var _activeNodeId = 'root'; // this page currently only has one entry point
+                             // (the root shared interpretation); extending
+                             // to the recipient's own follow-up queries is
+                             // a natural next step, not built yet here.
+
+function toggleRefractionsView() {
+  var btn = document.getElementById('refractionsToggle');
+  var label = document.getElementById('refractionsToggleLabel');
+  var discussionSide = document.getElementById('collabDiscussionSide');
+  var notesSide = document.getElementById('collabNotesSide');
+  if (!btn || !label || !discussionSide || !notesSide) return;
+
+  var next = _refractionsView === 'private' ? 'trust_circle' : 'private';
+  _refractionsView = next;
+  btn.dataset.view = next;
+
+  if (next === 'trust_circle') {
+    label.textContent = 'Trust Circle';
+    btn.style.color = 'var(--collab)';
+    btn.style.background = 'rgba(80,180,120,0.06)';
+    btn.style.borderColor = 'var(--collab-dim)';
+    discussionSide.style.display = 'block';
+    notesSide.style.display = 'none';
+  } else {
+    label.textContent = 'Private View';
+    btn.style.color = 'var(--gold-dim)';
+    btn.style.background = 'rgba(122,98,48,0.06)';
+    btn.style.borderColor = 'var(--gold-dim)';
+    discussionSide.style.display = 'none';
+    notesSide.style.display = 'block';
+    renderNotesView();
+  }
+}
+
+// ── Private View — a document of blocks, same model as qt.html ───────────
+var _noteAutosaveTimers = {};
+
+async function renderNotesView() {
+  var email = localStorage.getItem('qt_user_email');
+  var stream = document.getElementById('notesStream');
+  if (!stream) return;
+
+  if (!email) {
+    stream.innerHTML = '<div class="collab-closed-notice" style="text-align:left; padding:0;">Sign in to write private notes — see "Already have an account? Sign in" above.</div>';
+    return;
+  }
+  if (!_threadId) {
+    stream.innerHTML = '<div class="collab-closed-notice" style="text-align:left; padding:0;">Notes aren\'t available for this share yet.</div>';
+    return;
+  }
+
+  var notes = [];
+  try {
+    var res = await fetch('/api/followups?kind=note&threadId=' + encodeURIComponent(_threadId) + '&nodeId=' + encodeURIComponent(_activeNodeId), {
+      headers: { 'x-user-email': email }
+    });
+    var data = await res.json();
+    if (Array.isArray(data.notes)) notes = data.notes;
+  } catch (e) { console.error('Notes fetch error:', e); }
+
+  stream.innerHTML = '';
+  notes.forEach(function(n) { stream.appendChild(buildNoteBlock(n)); });
+  stream.appendChild(buildNewSectionButton());
+}
+
+function buildNoteTextarea(initialContent, onInput) {
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative;';
+
+  var textarea = document.createElement('textarea');
+  textarea.className = 'note-textarea';
+  textarea.value = initialContent || '';
+  textarea.placeholder = 'Write freely — saves as you go';
+  textarea.style.paddingRight = '32px';
+  textarea.addEventListener('input', function() { onInput(textarea.value); });
+
+  var micBtn = document.createElement('button');
+  micBtn.className = 'note-mic-btn';
+  micBtn.innerHTML = '🎙';
+  micBtn.title = 'Speak';
+
+  var micStatus = document.createElement('div');
+  micStatus.style.cssText = 'display:none; font-family:var(--mono); font-size:10px; color:var(--gold-dim); margin-top:4px;';
+
+  wrap.appendChild(textarea);
+  wrap.appendChild(micBtn);
+  wrap.appendChild(micStatus);
+
+  if (window.createVoiceRecorder) {
+    micBtn.style.display = 'flex';
+    var recorder = window.createVoiceRecorder({ btn: micBtn, statusEl: micStatus, textarea: textarea, preserveExisting: true });
+    micBtn.onclick = function() { recorder.toggle(); };
+  }
+
+  return { wrap: wrap, textarea: textarea };
+}
+
+function buildNoteBlock(n) {
+  var div = document.createElement('div');
+  div.className = 'note-block';
+  div.dataset.noteId = n.id;
+
+  var header = document.createElement('div');
+  header.className = 'note-block-header';
+
+  var titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'note-title-input';
+  titleInput.value = n.title || n.quote || '';
+  titleInput.placeholder = 'Section title';
+  titleInput.addEventListener('input', function() { scheduleNoteAutosave(n.id, { title: titleInput.value }); });
+  titleInput.addEventListener('blur', function() { flushNoteAutosave(n.id); });
+
+  var delBtn = document.createElement('button');
+  delBtn.className = 'note-delete-btn';
+  delBtn.innerHTML = '&times;';
+  delBtn.title = 'Delete this section';
+  delBtn.onclick = function() { deletePrivateNote(n.id); };
+
+  header.appendChild(titleInput);
+  header.appendChild(delBtn);
+
+  var built = buildNoteTextarea(n.content, function(value) {
+    scheduleNoteAutosave(n.id, { content: value });
+  });
+  built.textarea.addEventListener('blur', function() { flushNoteAutosave(n.id); });
+
+  div.appendChild(header);
+  div.appendChild(built.wrap);
+
+  if (n.edited_at) {
+    var tag = document.createElement('div');
+    tag.className = 'note-edited-tag';
+    tag.textContent = 'edited';
+    div.appendChild(tag);
+  }
+  return div;
+}
+
+function buildNewSectionButton() {
+  var wrap = document.createElement('div');
+  populateNewSectionButton(wrap);
+  return wrap;
+}
+
+function populateNewSectionButton(wrap) {
+  wrap.innerHTML = '';
+  var btn = document.createElement('button');
+  btn.className = 'note-new-section-btn';
+  btn.textContent = '+ New section';
+  btn.onclick = function() { startNewSection(wrap); };
+  wrap.appendChild(btn);
+}
+
+function startNewSection(wrap) {
+  wrap.innerHTML = '';
+  var container = document.createElement('div');
+  container.className = 'note-block';
+
+  var header = document.createElement('div');
+  header.className = 'note-block-header';
+  var titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'note-title-input';
+  titleInput.placeholder = 'Section title';
+  header.appendChild(titleInput);
+  container.appendChild(header);
+
+  var created = false;
+  var createdId = null;
+
+  var built = buildNoteTextarea('', function(value) {
+    if (created && createdId) scheduleNoteAutosave(createdId, { content: value });
+  });
+  container.appendChild(built.wrap);
+  wrap.parentNode.insertBefore(container, wrap);
+
+  async function commit() {
+    var email = localStorage.getItem('qt_user_email');
+    if (!email || !titleInput.value.trim() || created) return;
+    created = true;
+    try {
+      var res = await fetch('/api/followups?kind=note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+        body: JSON.stringify({ threadId: _threadId, nodeId: _activeNodeId, title: titleInput.value.trim(), content: built.textarea.value })
+      });
+      var data = await res.json();
+      createdId = data.note && data.note.id;
+      container.dataset.noteId = createdId;
+      populateNewSectionButton(wrap);
+    } catch (e) { console.error('New section create error:', e); }
+  }
+
+  titleInput.addEventListener('blur', commit);
+  built.textarea.addEventListener('blur', async function() {
+    await commit();
+    if (createdId) flushNoteAutosave(createdId);
+  });
+  titleInput.focus();
+}
+
+function scheduleNoteAutosave(noteId, fields) {
+  if (_noteAutosaveTimers[noteId]) clearTimeout(_noteAutosaveTimers[noteId].timer);
+  var pending = (_noteAutosaveTimers[noteId] && _noteAutosaveTimers[noteId].fields) || {};
+  Object.assign(pending, fields);
+  _noteAutosaveTimers[noteId] = { fields: pending, timer: setTimeout(function() { flushNoteAutosave(noteId); }, 900) };
+}
+
+async function flushNoteAutosave(noteId) {
+  var pending = _noteAutosaveTimers[noteId];
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  delete _noteAutosaveTimers[noteId];
+  var email = localStorage.getItem('qt_user_email');
+  if (!email) return;
+  try {
+    await fetch('/api/followups?kind=note', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify(Object.assign({ noteId: noteId }, pending.fields))
+    });
+  } catch (e) { console.error('Note autosave error:', e); }
+}
+
+async function deletePrivateNote(noteId) {
+  var email = localStorage.getItem('qt_user_email');
+  if (!email) return;
+  if (!confirm('Delete this section? This can\'t be undone.')) return;
+  try {
+    await fetch('/api/followups?kind=note', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify({ noteId: noteId })
+    });
+    renderNotesView();
+  } catch (e) { console.error('Delete note error:', e); }
+}
+
+// ── Highlight-to-note — same mechanism as qt.html ─────────────────────────
+function truncateForTitle(text, maxLen) {
+  if (text.length <= maxLen) return text;
+  var cut = text.slice(0, maxLen);
+  var lastSpace = cut.lastIndexOf(' ');
+  if (lastSpace > maxLen * 0.6) cut = cut.slice(0, lastSpace);
+  return cut.trim() + '…';
+}
+
+function unwrapMark(mark) {
+  var parent = mark.parentNode;
+  if (!parent) return;
+  while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+  parent.removeChild(mark);
+  parent.normalize();
+}
+
+function removeHighlightMark(mark) {
+  if (!confirm('Remove this highlight? The note itself will stay in Notes.')) return;
+  unwrapMark(mark);
+}
+
+async function applyHighlightAndCreateNote(color) {
+  var sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  var range = sel.getRangeAt(0);
+  var text = sel.toString().trim();
+  if (!text) return;
+
+  var scopeEl = document.getElementById('shareResult');
+  if (scopeEl) {
+    scopeEl.querySelectorAll('mark').forEach(function(m) {
+      if (range.intersectsNode(m)) unwrapMark(m);
+    });
+  }
+  sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  range = sel.getRangeAt(0);
+
+  var mark = document.createElement('mark');
+  mark.style.background = color;
+  mark.style.color = 'inherit';
+  mark.style.borderRadius = '2px';
+  mark.style.cursor = 'pointer';
+  mark.title = 'Click to remove this highlight';
+  mark.addEventListener('click', function(e) { e.stopPropagation(); removeHighlightMark(mark); });
+  try {
+    range.surroundContents(mark);
+  } catch (e) {
+    mark.appendChild(range.extractContents());
+    range.insertNode(mark);
+  }
+
+  sel.removeAllRanges();
+  var sheet = document.getElementById('highlightSheet');
+  if (sheet) sheet.classList.remove('visible');
+
+  var email = localStorage.getItem('qt_user_email');
+  if (!email) {
+    alert('Sign in to save notes — use "Already have an account? Sign in" above.');
+    return;
+  }
+  if (!_threadId) return;
+
+  try {
+    await fetch('/api/followups?kind=note', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify({
+        threadId: _threadId,
+        nodeId:   _activeNodeId,
+        title:    truncateForTitle(text, 60),
+        quote:    text,
+        content:  ''
+      })
+    });
+  } catch (e) { console.error('Highlight note create error:', e); }
+
+  if (_refractionsView !== 'private') toggleRefractionsView();
+  var panel = document.getElementById('collabPanel');
+  if (panel) { panel.style.display = 'block'; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  renderNotesView();
+}
+
+(function initHighlightToNoteShare() {
+  var sheet = document.getElementById('highlightSheet');
+  var scopeEl = document.getElementById('shareResult');
+  if (!sheet || !scopeEl) return;
+
+  document.addEventListener('selectionchange', function() {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+      sheet.classList.remove('visible');
+      return;
+    }
+    var range = sel.getRangeAt(0);
+    if (scopeEl.contains(range.commonAncestorContainer)) {
+      sheet.classList.add('visible');
+    } else {
+      sheet.classList.remove('visible');
+    }
+  });
+})();
+
 // ── Collaboration ─────────────────────────────────────────────────────────────
 async function loadCollabMessages() {
   if (!shareId) return;
@@ -1594,12 +2040,28 @@ async function loadShare() {
       startLiveThreadPolling(share.thread_id);
     }
 
-    // Show collaboration panel if bidirectional
+    // The panel itself is always shown now — Private Notes has nothing to
+    // do with whether the sender enabled live discussion, and shouldn't be
+    // hidden just because collaboration wasn't turned on for this share.
+    var panel = document.getElementById('collabPanel');
+    if (panel) panel.style.display = 'block';
+    renderNotesView(); // Private View is the default state — load it now,
+                        // don't wait for a toggle click that may never happen
+
     if (collaborationMode === 'bidirectional') {
-      var panel = document.getElementById('collabPanel');
-      if (panel) panel.style.display = 'block';
       await loadCollabMessages();
       startChatRealtime(shareId);
+    } else {
+      // No live discussion on this share — Trust Circle isn't reachable,
+      // but Notes still is. Disable the toggle's Trust Circle side rather
+      // than leave it pointing at an empty, broken discussion view.
+      var toggleBtn = document.getElementById('refractionsToggle');
+      if (toggleBtn) {
+        toggleBtn.title = 'Live discussion isn\'t enabled for this share';
+        toggleBtn.style.opacity = '0.4';
+        toggleBtn.style.cursor = 'default';
+        toggleBtn.onclick = null;
+      }
     }
 
     // Gate the follow-up input section by collaboration mode
