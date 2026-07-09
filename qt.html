@@ -4336,15 +4336,17 @@ function selectThread(id) {
           updateCollabToggleUI();
         }
 
-        // Fetch existing recipient contributions immediately
-        fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
-          headers: { 'x-user-email': userEmail() }
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false);
-        })
-        .catch(function() {});
+        // Note: existing follow-ups for this thread are loaded exactly
+        // once, by restoreFollowUps() later in selectThread() — that
+        // function already handles both the local-cache and server-fetch
+        // cases correctly for every thread, shared or not. This block used
+        // to ALSO fetch and render the same data independently, which
+        // meant any shared thread got its follow-ups rendered twice
+        // through two separate paths racing against the same R1/R2
+        // label counter — the confirmed cause of inconsistent/missing
+        // labels reported on shared threads. Only the live subscription
+        // (below) belongs here; it's a genuinely separate concern
+        // (watching for future updates) from the initial render.
 
         // Subscribe via Realtime for instant updates
         startFollowUpRealtime(threadId);
