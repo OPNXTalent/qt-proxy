@@ -1889,7 +1889,8 @@ async function sendCollabMessage() {
         content:      content,
         message_type: 'recipient',
         display_name: localStorage.getItem('qt_display_name') || ('Explorer ' + _recipientSessionToken.slice(0,4)),
-        session_token: _recipientSessionToken
+        session_token: _recipientSessionToken,
+        visibility:   'trust_circle'
       })
     });
     await loadCollabMessages();
@@ -2057,20 +2058,17 @@ async function loadShare() {
     renderNotesView(); // Private View is the default state — load it now,
                         // don't wait for a toggle click that may never happen
 
+    // Trust Circle is always reachable, on every share, regardless of
+    // collaboration mode — a guest should always be able to leave a
+    // thought for the sender to see later, even if it's not a live,
+    // real-time back-and-forth. That's the whole point: first contact
+    // with what The Prism can do, and a tacit way of learning the product
+    // before the recipient might ever use it themselves. Only the LIVE,
+    // real-time subscription is reserved for bidirectional shares — the
+    // ability to comment at all is never gated.
+    await loadCollabMessages();
     if (collaborationMode === 'bidirectional') {
-      await loadCollabMessages();
       startChatRealtime(shareId);
-    } else {
-      // No live discussion on this share — Trust Circle isn't reachable,
-      // but Notes still is. Disable the toggle's Trust Circle side rather
-      // than leave it pointing at an empty, broken discussion view.
-      var toggleBtn = document.getElementById('refractionsToggle');
-      if (toggleBtn) {
-        toggleBtn.title = 'Live discussion isn\'t enabled for this share';
-        toggleBtn.style.opacity = '0.4';
-        toggleBtn.style.cursor = 'default';
-        toggleBtn.onclick = null;
-      }
     }
 
     // Gate the follow-up input section by collaboration mode
