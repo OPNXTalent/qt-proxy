@@ -1540,14 +1540,9 @@ function toggleRefractionsView() {
 var _noteAutosaveTimers = {};
 
 async function renderNotesView() {
-  var email = localStorage.getItem('qt_user_email');
   var stream = document.getElementById('notesStream');
   if (!stream) return;
 
-  if (!email) {
-    stream.innerHTML = '<div class="collab-closed-notice" style="text-align:left; padding:0;">Sign in to write private notes — see "Already have an account? Sign in" above.</div>';
-    return;
-  }
   if (!_threadId) {
     stream.innerHTML = '<div class="collab-closed-notice" style="text-align:left; padding:0;">Notes aren\'t available for this share yet.</div>';
     return;
@@ -1556,7 +1551,7 @@ async function renderNotesView() {
   var notes = [];
   try {
     var res = await fetch('/api/followups?kind=note&threadId=' + encodeURIComponent(_threadId) + '&nodeId=' + encodeURIComponent(_activeNodeId), {
-      headers: { 'x-user-email': email }
+      headers: noteAuthHeaders()
     });
     var data = await res.json();
     if (Array.isArray(data.notes)) notes = data.notes;
@@ -1680,13 +1675,12 @@ function startNewSection(wrap) {
   wrap.parentNode.insertBefore(container, wrap);
 
   async function commit() {
-    var email = localStorage.getItem('qt_user_email');
-    if (!email || !titleInput.value.trim() || created) return;
+    if (!titleInput.value.trim() || created) return;
     created = true;
     try {
       var res = await fetch('/api/followups?kind=note', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, noteAuthHeaders()),
         body: JSON.stringify({ threadId: _threadId, nodeId: _activeNodeId, title: titleInput.value.trim(), content: built.textarea.value })
       });
       var data = await res.json();
@@ -1716,25 +1710,21 @@ async function flushNoteAutosave(noteId) {
   if (!pending) return;
   clearTimeout(pending.timer);
   delete _noteAutosaveTimers[noteId];
-  var email = localStorage.getItem('qt_user_email');
-  if (!email) return;
   try {
     await fetch('/api/followups?kind=note', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, noteAuthHeaders()),
       body: JSON.stringify(Object.assign({ noteId: noteId }, pending.fields))
     });
   } catch (e) { console.error('Note autosave error:', e); }
 }
 
 async function deletePrivateNote(noteId) {
-  var email = localStorage.getItem('qt_user_email');
-  if (!email) return;
   if (!confirm('Delete this section? This can\'t be undone.')) return;
   try {
     await fetch('/api/followups?kind=note', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, noteAuthHeaders()),
       body: JSON.stringify({ noteId: noteId })
     });
     renderNotesView();
@@ -1798,17 +1788,12 @@ async function applyHighlightAndCreateNote(color) {
   var sheet = document.getElementById('highlightSheet');
   if (sheet) sheet.classList.remove('visible');
 
-  var email = localStorage.getItem('qt_user_email');
-  if (!email) {
-    alert('Sign in to save notes — use "Already have an account? Sign in" above.');
-    return;
-  }
   if (!_threadId) return;
 
   try {
     await fetch('/api/followups?kind=note', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, noteAuthHeaders()),
       body: JSON.stringify({
         threadId: _threadId,
         nodeId:   _activeNodeId,
@@ -1923,6 +1908,30 @@ function startCollabPolling() {
 var _shareRealtimeClient  = null;
 var _shareRealtimeChannel = null;
 // Unique token per browser session — distinguishes anonymous participants
+// Persistent anonymous identity for notes — deliberately localStorage, not
+// sessionStorage like the chat participant token above. Notes need to
+// survive across separate visits (someone hitting the query wall or losing
+// work more than once before deciding to register), not just within one
+// sitting. This is what a note anchors to before an account exists, and
+// what the future migration step hands over to a real user_id once this
+// person actually registers.
+function getAnonNoteSessionId() {
+  var id = localStorage.getItem('prism_anon_id');
+  if (!id) {
+    id = 'anon_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('prism_anon_id', id);
+  }
+  return id;
+}
+
+// The identity headers to send for note requests — a real account if
+// signed in, otherwise the persistent anonymous ID. Never neither.
+function noteAuthHeaders() {
+  var email = localStorage.getItem('qt_user_email');
+  if (email) return { 'x-user-email': email };
+  return { 'x-anon-session': getAnonNoteSessionId() };
+}
+
 var _recipientSessionToken = sessionStorage.getItem('qt_session_token') || 
   (function() { var t = Math.random().toString(36).slice(2); sessionStorage.setItem('qt_session_token', t); return t; })();
 
