@@ -2279,6 +2279,7 @@ function dismissReturnBar() {
     <li><a href="/terms">Terms</a></li>
     <li><a href="/privacy">Privacy</a></li>
     <li><a href="mailto:support@theprism.io">Support</a></li>
+    <li><a href="javascript:void(0)" onclick="window.reopenCookieConsent && window.reopenCookieConsent()">Cookie Settings</a></li>
   </ul>
 </footer>
 
@@ -2366,6 +2367,108 @@ function toggleBilling() {
   }
 }
 
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     Cookie consent — adapted to this page's own font variables
+     (--sans/Montserrat here; other pages use --crimson/--mono, which
+     don't exist in this page's :root, so those were swapped for what
+     actually exists rather than silently falling back to defaults).
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+  #cookieConsent {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--gold-dim);
+    padding: 22px 24px calc(20px + env(safe-area-inset-bottom));
+    z-index: 3000;
+    display: none;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+  }
+  #cookieConsent.visible { display: block; }
+  .cookie-inner { max-width: 640px; margin: 0 auto; }
+  .cookie-inner h3 {
+    font-family: var(--cinzel);
+    font-size: 17px;
+    letter-spacing: 0.04em;
+    color: var(--gold-pale);
+    margin: 0 0 10px;
+    font-weight: 500;
+  }
+  .cookie-inner p {
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text);
+    margin: 0 0 6px;
+  }
+  .cookie-inner .cookie-fine {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 10px;
+  }
+  .cookie-fine a { color: var(--gold-dim); text-decoration: underline; }
+  .cookie-actions { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  .cookie-btn {
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.2s;
+  }
+  .cookie-btn-primary { border: 1px solid var(--gold-dim); color: var(--gold-pale); }
+  .cookie-btn-primary:hover { border-color: var(--gold); background: var(--gold-glow); }
+  .cookie-btn-secondary { border: 1px solid var(--border-lit); color: var(--text-dim); }
+  .cookie-btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+</style>
+
+<div id="cookieConsent">
+  <div class="cookie-inner">
+    <h3>Your inquiry belongs to you.</h3>
+    <p>The Prism uses essential cookies and optional analytics to improve the product. We measure the platform — not our users. Your subscription supports The Prism, allowing us to build without advertising or selling personal information.</p>
+    <div class="cookie-fine">Essential cookies keep you signed in and remember your preferences — the site doesn't work without them. Analytics, if allowed, tells us which features are used and where people get stuck; nothing is sold or shared with advertisers. <a href="/privacy.html">Read the full privacy policy</a>.</div>
+    <div class="cookie-actions">
+      <button class="cookie-btn cookie-btn-secondary" onclick="setCookieConsent('essential')">Essential Only</button>
+      <button class="cookie-btn cookie-btn-primary" onclick="setCookieConsent('analytics')">Allow Analytics</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function initCookieConsent() {
+    var STORAGE_KEY = 'prism_cookie_consent';
+
+    window.setCookieConsent = function(choice) {
+      localStorage.setItem(STORAGE_KEY, choice);
+      var banner = document.getElementById('cookieConsent');
+      if (banner) banner.classList.remove('visible');
+      applyConsent(choice);
+    };
+
+    function applyConsent(choice) {
+      if (choice === 'analytics') {
+        // e.g. load your chosen privacy-respecting analytics script here
+      }
+    }
+
+    window.reopenCookieConsent = function() {
+      var banner = document.getElementById('cookieConsent');
+      if (banner) banner.classList.add('visible');
+    };
+
+    var existing = localStorage.getItem(STORAGE_KEY);
+    if (existing) {
+      applyConsent(existing);
+    } else {
+      var banner = document.getElementById('cookieConsent');
+      if (banner) banner.classList.add('visible');
+    }
+  })();
 </script>
 
 </body>
