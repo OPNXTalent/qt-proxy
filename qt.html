@@ -279,15 +279,15 @@
   /* ── Highlight-to-note bottom sheet ── */
   #highlightSheet {
     position: fixed;
-    left: 0; right: 0; bottom: 0;
+    left: 0; right: 0; top: 0;
     background: var(--deep);
-    border-top: 1px solid var(--border-lit);
-    padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+    border-bottom: 1px solid var(--border-lit);
+    padding: calc(14px + env(safe-area-inset-top)) 20px 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 14px;
-    transform: translateY(100%);
+    transform: translateY(-100%);
     transition: transform 0.25s ease;
     z-index: 900;
   }
@@ -5996,6 +5996,40 @@ function buildNoteBlock(n) {
   });
 })();
 
+// Truncates at a word boundary rather than cutting mid-word, so a long
+// highlighted phrase becomes a clean title instead of an awkward partial
+// word followed by "…".
+function truncateForTitle(text, maxLen) {
+  if (text.length <= maxLen) return text;
+  var cut = text.slice(0, maxLen);
+  var lastSpace = cut.lastIndexOf(' ');
+  if (lastSpace > maxLen * 0.6) cut = cut.slice(0, lastSpace); // only trim to the word boundary if it's not TOO far back
+  return cut.trim() + '…';
+}
+
+// The actual unwrap mechanics — pulls a <mark> back out to plain text.
+// Shared by the user-facing removal below (which confirms first) and the
+// automatic overlap cleanup in applyHighlightAndCreateNote (which doesn't
+// need to confirm, since it's just clearing the way for a replacement
+// color, not deleting anything the person didn't just ask for).
+function unwrapMark(mark) {
+  var parent = mark.parentNode;
+  if (!parent) return;
+  while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+  parent.removeChild(mark);
+  parent.normalize(); // merge adjacent text nodes back together
+}
+
+// Removes just the visual highlight — unwraps the <mark> back to plain
+// text. Deliberately doesn't touch the note it created; that's real
+// written content and shouldn't disappear just because the mark in the
+// original text got removed. Delete the note itself from the Notes panel
+// if that's actually what's wanted.
+function removeHighlightMark(mark) {
+  if (!confirm('Remove this highlight? The note itself will stay in Notes.')) return;
+  unwrapMark(mark);
+}
+
 async function applyHighlightAndCreateNote(color) {
   var sel = window.getSelection();
   if (!sel || sel.isCollapsed) return;
@@ -6003,11 +6037,33 @@ async function applyHighlightAndCreateNote(color) {
   var text = sel.toString().trim();
   if (!text) return;
 
+  // Clear any existing highlight(s) this selection overlaps, so a new
+  // color replaces the old one cleanly instead of nesting inside it and
+  // creating a visibly "layered" double-highlight effect.
+  var resultContent = document.getElementById('resultContent');
+  if (resultContent) {
+    var existingMarks = resultContent.querySelectorAll('mark');
+    existingMarks.forEach(function(m) {
+      if (range.intersectsNode(m)) unwrapMark(m);
+    });
+  }
+  // The unwrap above can shift text nodes around, so re-derive a fresh
+  // range from the current selection rather than reusing the stale one.
+  sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  range = sel.getRangeAt(0);
+
   // Mark the selection in the response itself
   var mark = document.createElement('mark');
   mark.style.background = color;
   mark.style.color = 'inherit';
   mark.style.borderRadius = '2px';
+  mark.style.cursor = 'pointer';
+  mark.title = 'Click to remove this highlight';
+  mark.addEventListener('click', function(e) {
+    e.stopPropagation(); // don't also trigger the fu-block's own focus-refractions click
+    removeHighlightMark(mark);
+  });
   try {
     range.surroundContents(mark);
   } catch (e) {
@@ -6038,7 +6094,8 @@ async function applyHighlightAndCreateNote(color) {
       body: JSON.stringify({
         threadId: activeThreadId,
         nodeId:   nodeId,
-        title:    text,
+        title:    truncateForTitle(text, 60),
+        quote:    text, // full original phrase preserved here, even though only the (possibly shortened) title shows and is editable
         content:  ''
       })
     });
@@ -7927,6 +7984,8 @@ window.addEventListener('appinstalled', function() {
     <a href="/terms">Terms</a>
     <span class="sep">·</span>
     <a href="/privacy">Privacy</a>
+    <span class="sep">·</span>
+    <a href="javascript:void(0)" onclick="window.reopenCookieConsent && window.reopenCookieConsent()">Cookie Settings</a>
   </div>
 </footer>
   
@@ -8842,6 +8901,128 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 <!-- End Concept Detail Modal -->
+
+<!-- ══════════════════════════════════════════════════════════════════
+     Cookie consent — portable block. Same markup/script belongs on every
+     page (index.html, purchase.html, share.html, qt.html). Copy this
+     whole block as-is; nothing here depends on qt.html specifically.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+  #cookieConsent {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--deep);
+    border-top: 1px solid var(--gold-dim);
+    padding: 22px 24px calc(20px + env(safe-area-inset-bottom));
+    z-index: 3000;
+    display: none;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+  }
+  #cookieConsent.visible { display: block; }
+  .cookie-inner {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .cookie-inner h3 {
+    font-family: var(--cinzel);
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    color: var(--gold-pale);
+    margin: 0 0 10px;
+    font-weight: 500;
+  }
+  .cookie-inner p {
+    font-family: var(--crimson);
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text);
+    margin: 0 0 6px;
+  }
+  .cookie-inner .cookie-fine {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 10px;
+    letter-spacing: 0.02em;
+  }
+  .cookie-fine a { color: var(--gold-dim); text-decoration: underline; }
+  .cookie-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .cookie-btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.2s;
+  }
+  .cookie-btn-primary {
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-pale);
+  }
+  .cookie-btn-primary:hover { border-color: var(--gold); background: rgba(201,168,76,0.08); }
+  .cookie-btn-secondary {
+    border: 1px solid var(--border-lit);
+    color: var(--text-dim);
+  }
+  .cookie-btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+</style>
+
+<div id="cookieConsent">
+  <div class="cookie-inner">
+    <h3>Your inquiry belongs to you.</h3>
+    <p>The Prism uses essential cookies and optional analytics to improve the product. We measure the platform — not our users. Your subscription supports The Prism, allowing us to build without advertising or selling personal information.</p>
+    <div class="cookie-fine">Essential cookies keep you signed in and remember your preferences — the site doesn't work without them. Analytics, if allowed, tells us which features are used and where people get stuck; nothing is sold or shared with advertisers. <a href="/privacy.html">Read the full privacy policy</a>.</div>
+    <div class="cookie-actions">
+      <button class="cookie-btn cookie-btn-secondary" onclick="setCookieConsent('essential')">Essential Only</button>
+      <button class="cookie-btn cookie-btn-primary" onclick="setCookieConsent('analytics')">Allow Analytics</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function initCookieConsent() {
+    var STORAGE_KEY = 'prism_cookie_consent'; // 'essential' | 'analytics'
+
+    window.setCookieConsent = function(choice) {
+      localStorage.setItem(STORAGE_KEY, choice);
+      var banner = document.getElementById('cookieConsent');
+      if (banner) banner.classList.remove('visible');
+      applyConsent(choice);
+    };
+
+    // Called on every load — hooks up whatever a granted "analytics"
+    // choice should actually enable. No specific analytics vendor is
+    // wired in here yet; this is the gate to load one behind, once a
+    // tool is chosen. Nothing loads at all unless choice === 'analytics'.
+    function applyConsent(choice) {
+      if (choice === 'analytics') {
+        // e.g. load your chosen privacy-respecting analytics script here
+      }
+    }
+
+    // Exposed so a footer "Cookie Settings" link (add one to every page's
+    // footer) can let someone change their mind later, not just on first visit.
+    window.reopenCookieConsent = function() {
+      var banner = document.getElementById('cookieConsent');
+      if (banner) banner.classList.add('visible');
+    };
+
+    var existing = localStorage.getItem(STORAGE_KEY);
+    if (existing) {
+      applyConsent(existing);
+    } else {
+      var banner = document.getElementById('cookieConsent');
+      if (banner) banner.classList.add('visible');
+    }
+  })();
+</script>
 
 </body>
 </html>
