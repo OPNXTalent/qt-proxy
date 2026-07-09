@@ -1923,7 +1923,7 @@
 <!-- ── SIDEBAR ── -->
 <aside class="sidebar" id="sidebar">
 
-  <div class="sidebar-header">
+  <div class="sidebar-header" onclick="toggleSidebar()" title="Close Archive" style="cursor:pointer;">
     <div class="sidebar-logo">The Prism</div>
     <div class="sidebar-tier" id="sidebarTierLabel"></div>
     <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:13px; letter-spacing:0.14em; display:flex; flex-direction:column; gap:3px;">
@@ -7469,7 +7469,8 @@ function restoreResumeSnapshot() {
       };
     })(nodeId, fu.question || ''));
 
-    el.innerHTML = '<div class="fu-question">' + escHtml(fu.question || '') + '</div><div class="fu-body">' + fu.bodyHtml + '</div>';
+    var label = assignNodeLabel(nodeId);
+    el.innerHTML = '<div class="fu-question" data-label="' + label + ' — ">' + escHtml(fu.question || '') + '</div><div class="fu-body">' + fu.bodyHtml + '</div>';
     el.appendChild(buildNodeControls(nodeId, fu.question || ''));
     if (container) container.appendChild(el);
   });
