@@ -252,11 +252,11 @@
 
   /* ── RECOGNITION ── */
   .qt-recognition { padding: 28px 0 28px; margin-bottom: 8px; }
-  .qt-recognition p { font-family: var(--crimson); font-size: 18.5px; font-style: italic; color: var(--text); line-height: 1.8; margin: 0; }
+  .qt-recognition p { font-family: var(--crimson); font-size: 21.5px; font-style: italic; color: var(--text); line-height: 1.8; margin: 0; }
 
   /* ── CORE INSIGHT ── */
   .qt-core-insight { padding: 24px 0 28px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
-  .qt-core-insight p { font-family: var(--crimson); font-size: 18px; color: var(--text); line-height: 1.8; margin: 0; }
+  .qt-core-insight p { font-family: var(--crimson); font-size: 21px; color: var(--text); line-height: 1.8; margin: 0; }
 
   /* ── KINGDOM BLOCK ── */
   .kingdom-block { border: 1px solid var(--gold-dim); background: linear-gradient(135deg, rgba(201,168,76,0.06), rgba(30,42,74,0.3)); padding: 28px 32px; margin-top: 12px; position: relative; }
@@ -335,9 +335,9 @@
 
   /* ── FOLLOW-UP BLOCKS ── */
   .fu-block { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 32px; }
-  .fu-question { font-family: var(--crimson); font-size: 15px; font-style: italic; color: var(--gold-dim); letter-spacing: 0.01em; margin-bottom: 20px; padding-left: 14px; border-left: 2px solid var(--border); line-height: 1.55; }
-  .fu-question::before { content: 'Your question — '; font-family: var(--mono); font-size: 10px; font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px; }
-  .fu-body { font-family: var(--crimson); font-size: 18px; color: var(--text); line-height: 1.8; }
+  .fu-question { font-family: var(--crimson); font-size: 18px; font-style: italic; color: var(--gold-dim); letter-spacing: 0.01em; margin-bottom: 20px; padding-left: 14px; border-left: 2px solid var(--border); line-height: 1.55; }
+  .fu-question::before { content: attr(data-label); font-family: var(--mono); font-size: 13px; font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px; }
+  .fu-body { font-family: var(--crimson); font-size: 21px; color: var(--text); line-height: 1.8; }
   .fu-body p { margin: 0 0 16px 0; }
   .fu-body p:last-child { margin-bottom: 0; }
 
@@ -720,7 +720,7 @@
     <!-- Shared interpretation renders here -->
     <div id="shareResult"></div>
 
-    <button id="refractionsTrigger" onclick="openRefractionsPanel()" type="button">Refractions</button>
+    <button id="refractionsTrigger" onclick="focusShareRefractionNode('root', currentSubject, 'Q')" type="button">Refractions</button>
 
     <!-- Highlight-to-note bottom sheet — same mechanism as qt.html -->
     <div id="highlightSheet">
@@ -1440,9 +1440,14 @@ async function runQuery() {
     'Respond within the Prism framework — grounded in Echad b\'Emet, relational ontology, entanglement/coherence/decoherence, telos, and Hebrew two-world cosmology where relevant. Be direct and precise. Plain prose, no JSON, no markdown headers.';
 
   // Create follow-up element to stream into
+  var fuNodeId = 'fu-' + Date.now();
+  _shareFuCounter = (_shareFuCounter || 0) + 1;
+  var fuLabel = 'R' + _shareFuCounter;
+
   var fuEl = document.createElement('div');
   fuEl.className = 'fu-block recipient';
-  fuEl.innerHTML = '<div class="fu-question">' + escHtml(input) + '</div>';
+  fuEl.dataset.nodeId = fuNodeId;
+  fuEl.innerHTML = '<div class="fu-question" data-label="' + fuLabel + ' — ">' + escHtml(input) + '</div>';
   var bodyEl = document.createElement('div');
   bodyEl.className = 'fu-body';
   fuEl.appendChild(bodyEl);
@@ -1514,6 +1519,18 @@ async function runQuery() {
 
     // Save as recipient follow-up on the shared thread
     saveRecipientFollowUp(_completedInput, fullText);
+
+    // Button row — Print (reuses the existing PDF export) and Refractions
+    // (scoped to this specific follow-up's node, not just the root).
+    // "Share" deliberately held off pending a real answer to what it should
+    // even do here — a recipient generating their own onward share link is
+    // a new capability, not just a missing button.
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex; gap:10px; margin-top:20px;';
+    btnRow.innerHTML =
+      '<button onclick="downloadPDF(\'dark\')" style="font-family:var(--mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase; padding:8px 16px; border:1px solid var(--border-lit); background:transparent; color:var(--text-muted); cursor:pointer;">↓ Print</button>' +
+      '<button onclick="focusShareRefractionNode(\'' + fuNodeId + '\', ' + JSON.stringify(_completedInput) + ', ' + JSON.stringify(fuLabel) + ')" style="font-family:var(--mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase; padding:8px 16px; border:1px solid var(--gold-dim); background:transparent; color:var(--gold-dim); cursor:pointer;">Refractions</button>';
+    fuEl.appendChild(btnRow);
 
     // Add to sidebar
     addQueryToSidebar(_completedInput, fuEl);
@@ -1615,6 +1632,32 @@ var _activeNodeId = 'root'; // this page currently only has one entry point
                              // a natural next step, not built yet here.
 
 // ── Panel open/close — genuine screen takeover, matching qt.html ─────────
+var _shareFuCounter = 0; // increments for each recipient follow-up — R1, R2, etc.
+
+// Focuses Refractions on a specific node — the root interpretation, or one
+// of the recipient's own follow-ups. Updates which thread the toggle/notes
+// operate on and refreshes the "Attached to" quote to match, exactly the
+// same job qt.html's focusRefractionNode does for the member experience.
+function focusShareRefractionNode(nodeId, queryText, nodeLabel) {
+  _activeNodeId = nodeId;
+  var anchorEl = document.getElementById('shareDiscContextQuery');
+  if (anchorEl) {
+    anchorEl.textContent = queryText ? ('\u201c' + queryText + '\u201d') : 'The original interpretation';
+  }
+  var sigilEl = document.getElementById('shareDiscSigil');
+  if (sigilEl) sigilEl.textContent = nodeId === 'root' ? 'Q' : (nodeLabel || 'R');
+  // Force a fresh render for the newly-focused node rather than showing
+  // whatever the previous node's content happened to be.
+  _notesLastCount = -1;
+  _chatLastCount = 0;
+  openRefractionsPanel();
+  if (_refractionsView === 'private') {
+    renderNotesView();
+  } else {
+    loadCollabMessages();
+  }
+}
+
 function openRefractionsPanel() {
   var panel = document.getElementById('collabPanel');
   if (panel) panel.classList.add('open');
