@@ -124,7 +124,7 @@
   #discussionPanel {
     position: fixed;
     top: 0;
-    right: -540px;
+    right: -820px;
     width: 520px;
     height: 100vh;
     background: rgba(8,8,14,0.99);
@@ -136,6 +136,26 @@
                 opacity 0.38s ease;
     box-shadow: -24px 0 64px rgba(0,0,0,0.6);
     opacity: 0;
+  }
+  /* Width changes during a drag skip the slide transition — otherwise
+     every pixel of resize would visibly animate/lag behind the cursor. */
+  #discussionPanel.resizing {
+    transition: opacity 0.38s ease;
+  }
+  #panelResizeHandle {
+    position: absolute;
+    left: -4px;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 501;
+    background: transparent;
+    transition: background 0.2s;
+  }
+  #panelResizeHandle:hover,
+  #panelResizeHandle.active {
+    background: rgba(201,168,76,0.25);
   }
   #discussionPanel.open {
     right: 0;
@@ -2259,6 +2279,7 @@
 
     <!-- ── DISCUSSION SLIDE-OVER PANEL ── -->
   <div id="discussionPanel">
+    <div id="panelResizeHandle" title="Drag to resize"></div>
     <!-- Breadcrumb — future sprint -->
     <div class="disc-breadcrumb" id="discBreadcrumb"></div>
 
@@ -5622,6 +5643,77 @@ function getChatParticipantName() {
   sessionStorage.setItem('qt_chat_name', name);
   return name;
 }
+
+// ── Refractions panel resize ────────────────────────────────────────────
+// Drag the left edge to widen or narrow the panel, same idea as this
+// chat interface's own sidebar. Desktop only — on mobile the panel is a
+// deliberate full-screen takeover (see the max-width:600px media query),
+// where a resizable width wouldn't mean anything.
+(function initPanelResize() {
+  var handle = document.getElementById('panelResizeHandle');
+  var panel  = document.getElementById('discussionPanel');
+  if (!handle || !panel) return;
+
+  var MIN_WIDTH = 380;
+  var MAX_WIDTH = 800;
+  var STORAGE_KEY = 'prism_panel_width';
+
+  var dragging = false;
+  var startX = 0;
+  var startWidth = 0;
+
+  function isDesktop() {
+    return window.innerWidth > 600; // matches the existing mobile breakpoint
+  }
+
+  // Restore a previously chosen width, if any, if it's still sane, and
+  // only on desktop — an inline style has higher specificity than the
+  // mobile media query's width:100vw rule, so applying a saved desktop
+  // width unconditionally would silently break the mobile full-screen
+  // takeover for anyone who'd resized the panel on a wider screen before.
+  var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+  if (isDesktop() && saved && saved >= MIN_WIDTH && saved <= MAX_WIDTH) {
+    panel.style.width = Math.min(saved, window.innerWidth - 40) + 'px';
+  }
+
+  function onPointerDown(e) {
+    if (!isDesktop()) return;
+    dragging = true;
+    startX = (e.touches ? e.touches[0].clientX : e.clientX);
+    startWidth = panel.getBoundingClientRect().width;
+    panel.classList.add('resizing');
+    handle.classList.add('active');
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  }
+
+  function onPointerMove(e) {
+    if (!dragging) return;
+    var x = (e.touches ? e.touches[0].clientX : e.clientX);
+    // Panel is anchored to the right edge — dragging the left handle
+    // LEFT (negative delta) should WIDEN it, so the delta is inverted.
+    var delta = startX - x;
+    var newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startWidth + delta));
+    panel.style.width = newWidth + 'px';
+  }
+
+  function onPointerUp() {
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove('resizing');
+    handle.classList.remove('active');
+    document.body.style.userSelect = '';
+    var finalWidth = parseInt(panel.style.width, 10);
+    if (finalWidth) localStorage.setItem(STORAGE_KEY, finalWidth);
+  }
+
+  handle.addEventListener('mousedown', onPointerDown);
+  handle.addEventListener('touchstart', onPointerDown, { passive: false });
+  document.addEventListener('mousemove', onPointerMove);
+  document.addEventListener('touchmove', onPointerMove);
+  document.addEventListener('mouseup', onPointerUp);
+  document.addEventListener('touchend', onPointerUp);
+})();
 
 function openChatPanel() {
   var panel = document.getElementById('discussionPanel');
