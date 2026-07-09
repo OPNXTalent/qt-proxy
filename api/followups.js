@@ -82,11 +82,29 @@ function filterForViewer(followUps, mutedIds) {
 // deletable by whoever wrote it. quote is optional — a note can exist with
 // or without a highlighted passage attached.
 async function handleNoteRequest(req, res) {
-  const userEmail = req.headers['x-user-email'] || null;
-  if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
+  const userEmail = req.headers['x-user-email']   || null;
+  const anonId    = req.headers['x-anon-session'] || null;
+  if (!userEmail && !anonId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const userId = await getSubscriberId(userEmail);
-  if (!userId) return res.status(404).json({ error: 'Subscriber not found' });
+  // Resolve to exactly one owner identity — a real account if signed in,
+  // otherwise the anonymous session identifier. A note anchored to an
+  // anon session today is exactly what the migration step (still to come)
+  // will hand over to a real user_id once that session registers.
+  let userId = null;
+  if (userEmail) {
+    userId = await getSubscriberId(userEmail);
+    if (!userId) return res.status(404).json({ error: 'Subscriber not found' });
+  }
+
+  // Query-string fragment and insert fields, built once, used everywhere
+  // below — keeps every branch correct for both identity types without
+  // duplicating the same if/else four times.
+  const ownerFilter = userId
+    ? `user_id=eq.${userId}`
+    : `anon_session_id=eq.${encodeURIComponent(anonId)}`;
+  const ownerFields = userId
+    ? { user_id: userId, anon_session_id: null }
+    : { user_id: null, anon_session_id: anonId };
 
   if (req.method === 'GET') {
     const threadId = req.query?.threadId || null;
@@ -94,7 +112,7 @@ async function handleNoteRequest(req, res) {
     if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
     const notesRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/refraction_notes?thread_id=eq.${encodeURIComponent(threadId)}&node_id=eq.${encodeURIComponent(nodeId)}&user_id=eq.${userId}&order=created_at.asc&select=id,quote,title,content,created_at,edited_at`,
+      `${SUPABASE_URL}/rest/v1/refraction_notes?thread_id=eq.${encodeURIComponent(threadId)}&node_id=eq.${encodeURIComponent(nodeId)}&${ownerFilter}&order=created_at.asc&select=id,quote,title,content,created_at,edited_at`,
       { headers: sbHeaders() }
     );
     const notes = await notesRes.json();
@@ -118,10 +136,10 @@ async function handleNoteRequest(req, res) {
       body: JSON.stringify({
         thread_id: threadId,
         node_id:   nodeId || 'root',
-        user_id:   userId,
         quote:     quote || null,
         title:     title || null,
-        content:   content || ''
+        content:   content || '',
+        ...ownerFields
       })
     });
 
@@ -149,7 +167,7 @@ async function handleNoteRequest(req, res) {
     }
 
     const ownRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}&user_id=eq.${userId}&select=id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}&${ownerFilter}&select=id&limit=1`,
       { headers: sbHeaders() }
     );
     const ownRows = await ownRes.json();
@@ -175,7 +193,7 @@ async function handleNoteRequest(req, res) {
     if (!noteId) return res.status(400).json({ error: 'noteId required' });
 
     const ownRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}&user_id=eq.${userId}&select=id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/refraction_notes?id=eq.${noteId}&${ownerFilter}&select=id&limit=1`,
       { headers: sbHeaders() }
     );
     const ownRows = await ownRes.json();
