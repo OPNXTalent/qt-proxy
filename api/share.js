@@ -250,11 +250,117 @@ async function getCollabChannelId(shareId) {
   return shareId;
 }
 
+// ── Sender engagement notification ────────────────────────────────────────
+// Triggered only by genuine Trust Circle activity — never by private
+// notes, which are never visible to the sender and shouldn't silently
+// inform them that something private happened, even without revealing
+// content. Trust Circle is explicitly open, SMS-like exchange between
+// session members, so notifying the sender that someone responded there
+// carries none of that tension.
+//
+// Throttled per share: an active back-and-forth shouldn't produce an
+// email per message. If a notification already went out recently for
+// this share, this just quietly updates nothing and returns — the next
+// genuinely new burst of activity, after the window passes, triggers
+// the next one.
+const ENGAGEMENT_NOTIFY_THROTTLE_MINUTES = 15;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
+async function handleNotifyEngagement(req, res) {
+  let body;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+
+  const { shareId } = body || {};
+  if (!shareId) return res.status(400).json({ error: 'shareId required' });
+
+  const shareRes = await sbFetch(
+    `/shares?id=eq.${encodeURIComponent(shareId)}&select=id,token,sender_email,subject,last_engagement_notified_at`,
+    { headers: sbHeaders(true) }
+  );
+  if (!shareRes.ok) return res.status(200).json({ success: true, sent: false });
+
+  const rows = await shareRes.json();
+  const share = rows?.[0];
+  if (!share || !share.sender_email) return res.status(200).json({ success: true, sent: false });
+
+  // Throttle check
+  if (share.last_engagement_notified_at) {
+    const last = new Date(share.last_engagement_notified_at).getTime();
+    const minutesSince = (Date.now() - last) / 60000;
+    if (minutesSince < ENGAGEMENT_NOTIFY_THROTTLE_MINUTES) {
+      return res.status(200).json({ success: true, sent: false, throttled: true });
+    }
+  }
+
+  // Mark the throttle window immediately, before sending — avoids a
+  // burst of near-simultaneous messages all triggering their own send
+  // while the email itself is still in flight.
+  await sbFetch(`/shares?id=eq.${encodeURIComponent(shareId)}`, {
+    method: 'PATCH',
+    headers: { ...sbHeaders(true), 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ last_engagement_notified_at: new Date().toISOString() })
+  });
+
+  if (!RESEND_API_KEY) {
+    console.error('RESEND_API_KEY not configured — engagement email not sent');
+    return res.status(200).json({ success: true, sent: false });
+  }
+
+  const subjectLine = share.subject
+    ? `Someone responded to "${share.subject}"`
+    : 'Someone responded to what you shared on The Prism';
+
+  const icebreaker = share.subject
+    ? `Hi [name], I shared this reflection on "${share.subject}" and thought you might find it interesting too. If you have any questions or comments, let me know.`
+    : `Hi [name], I shared something on The Prism and thought you might find it interesting too. If you have any questions or comments, let me know.`;
+
+  const emailHtml = `
+    <div style="font-family: Georgia, serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; line-height: 1.6;">
+      <p style="font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: #7a6230;">The Prism</p>
+      <h2 style="font-weight: 500; margin-bottom: 4px;">Someone responded to what you shared</h2>
+      <p>Someone you shared a reflection with left a response in the discussion. Worth a look — and if you want to keep the conversation going, here's something ready to send them directly:</p>
+      <div style="background: #f7f5f0; border-left: 3px solid #c9a84c; padding: 16px 20px; margin: 20px 0; font-style: italic;">
+        ${icebreaker}
+      </div>
+      <p><a href="${BASE_URL}/share.html?t=${encodeURIComponent(share.token)}" style="color: #7a6230;">View the discussion →</a></p>
+    </div>
+  `;
+
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'The Prism <noreply@theprism.io>',
+        to: share.sender_email,
+        subject: subjectLine,
+        html: emailHtml
+      })
+    });
+  } catch (e) {
+    console.error('Engagement email send failed:', e);
+    return res.status(200).json({ success: true, sent: false });
+  }
+
+  return res.status(200).json({ success: true, sent: true });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (req.method === 'POST' && req.query?.action === 'notify-engagement') {
+    return handleNotifyEngagement(req, res);
+  }
 
   switch (req.method) {
     case 'POST':  return handlePost(req, res);
