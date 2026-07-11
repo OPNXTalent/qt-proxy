@@ -2198,6 +2198,31 @@ export default async function handler(req, res) {
         let buffer = '';
         let fullResponse = '';
         let streamDone = false;
+        let terminalSignalSent = false;
+
+        const handleStreamLine = (line) => {
+          if (!line.startsWith('data: ')) return;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') return;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              fullResponse += parsed.delta.text;
+              res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+            } else if (parsed.type === 'message_stop') {
+              res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
+              streamDone = true;
+              terminalSignalSent = true;
+            } else if (parsed.type === 'error') {
+              // Anthropic sent a mid-stream error (e.g. overloaded_error).
+              // Without this, the client never gets a terminal event and
+              // is left showing "interpreting…" indefinitely.
+              console.error('[interpret POST] Anthropic stream error event:', JSON.stringify(parsed.error || parsed));
+              res.write(`data: ${JSON.stringify({ type: 'error', error: parsed.error?.message || 'Stream error' })}\n\n`);
+              terminalSignalSent = true;
+            }
+          } catch {}
+        };
 
         while (true) {
           const { done, value } = await reader.read();
@@ -2205,41 +2230,20 @@ export default async function handler(req, res) {
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop();
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                  fullResponse += parsed.delta.text;
-                  res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
-                } else if (parsed.type === 'message_stop') {
-                  res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
-                  streamDone = true;
-                }
-              } catch {}
-            }
-          }
+          for (const line of lines) handleStreamLine(line);
         }
 
         if (buffer.trim()) {
-          for (const line of buffer.split('\n')) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                  fullResponse += parsed.delta.text;
-                  res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
-                } else if (parsed.type === 'message_stop') {
-                  res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
-                  streamDone = true;
-                }
-              } catch {}
-            }
-          }
+          for (const line of buffer.split('\n')) handleStreamLine(line);
+        }
+
+        // Safety net: the underlying stream ended without ever sending
+        // message_stop or an error event (dropped connection, unexpected
+        // close, etc). Send an explicit terminal signal so the client
+        // doesn't hang on "interpreting…" forever.
+        if (!terminalSignalSent) {
+          console.error(`[interpret POST] Stream ended with no terminal event — sending fallback error. userId=${userId}`);
+          res.write(`data: ${JSON.stringify({ type: 'error', error: 'Response ended unexpectedly. Please try again.' })}\n\n`);
         }
 
         console.log(`[interpret POST] end-of-stream check: streamDone=${streamDone}, userId=${userId}`);
@@ -2339,6 +2343,26 @@ export default async function handler(req, res) {
     const reader = anthropicRes.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let terminalSignalSent = false;
+
+    const handleFreeStreamLine = (line) => {
+      if (!line.startsWith('data: ')) return;
+      const data = line.slice(6).trim();
+      if (data === '[DONE]') return;
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+          res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+        } else if (parsed.type === 'message_stop') {
+          res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
+          terminalSignalSent = true;
+        } else if (parsed.type === 'error') {
+          console.error('[interpret POST free] Anthropic stream error event:', JSON.stringify(parsed.error || parsed));
+          res.write(`data: ${JSON.stringify({ type: 'error', error: parsed.error?.message || 'Stream error' })}\n\n`);
+          terminalSignalSent = true;
+        }
+      } catch {}
+    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -2346,37 +2370,19 @@ export default async function handler(req, res) {
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop();
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-              res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
-            } else if (parsed.type === 'message_stop') {
-              res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
-            }
-          } catch {}
-        }
-      }
+      for (const line of lines) handleFreeStreamLine(line);
     }
 
     if (buffer.trim()) {
-      for (const line of buffer.split('\n')) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-              res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
-            } else if (parsed.type === 'message_stop') {
-              res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
-            }
-          } catch {}
-        }
-      }
+      for (const line of buffer.split('\n')) handleFreeStreamLine(line);
+    }
+
+    // Safety net: stream ended with no message_stop or error event ever
+    // seen — send an explicit terminal signal so the client doesn't hang
+    // on "interpreting…" forever.
+    if (!terminalSignalSent) {
+      console.error('[interpret POST free] Stream ended with no terminal event — sending fallback error.');
+      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Response ended unexpectedly. Please try again.' })}\n\n`);
     }
 
     return res.end();
