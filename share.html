@@ -762,6 +762,9 @@
       <!-- Trust Circle — existing live discussion, unchanged -->
       <div id="collabDiscussionSide" style="display:none; flex:1; overflow-y:auto; display:flex; flex-direction:column;">
         <div class="collab-messages" id="collabMessages" style="flex:1;"></div>
+        <div style="padding:10px 20px 0; font-family:var(--mono); font-size:11px; letter-spacing:0.08em; color:var(--collab); text-transform:uppercase;">
+          Questions or thoughts? The person who shared this would love to hear them.
+        </div>
         <div class="collab-input-row" id="collabInputRow">
           <textarea class="collab-input" id="collabInput" placeholder="Add to the discussion…" rows="2"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCollabMessage();}"></textarea>
@@ -2111,6 +2114,17 @@ async function sendCollabMessage() {
       })
     });
     await loadCollabMessages();
+
+    // Let the sender know — Trust Circle only, never private notes. This
+    // function exclusively handles recipient-side sends on this page, so
+    // every call here is genuine "someone other than the sender" activity.
+    // Fire-and-forget: this shouldn't block or fail the actual message send
+    // if it errors for any reason.
+    fetch('/api/share?action=notify-engagement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shareId: shareId })
+    }).catch(function() {});
   } catch {} finally {
     input.disabled = false;
     input.focus();
