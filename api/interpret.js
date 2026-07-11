@@ -1471,23 +1471,26 @@ async function checkSubscriberQuota(subscriber, visitorKey) {
   // No limit defined for this tier — allow
   if (limit === null || limit === undefined) return { allowed: true };
 
-  // Prefer live count from query_log over stale subscriber.query_count
-  const liveCount = await getLiveQueryCount(subscriber.id, tier);
+  // Prefer live count from query_log over stale subscriber.query_count.
+  // Free tier also needs the anonymous visitor lookup folded in (a user who
+  // burns through anonymous queries and then logs in should not get a fresh
+  // allotment on the same device). These two reads are independent of each
+  // other — run them concurrently instead of one after the other.
+  const needsAnonLog = tier === 'free' && !!visitorKey;
+  const [liveCount, anonLog] = await Promise.all([
+    getLiveQueryCount(subscriber.id, tier),
+    needsAnonLog
+      ? getQueryLog(visitorKey).catch(err => {
+          console.error(`[SUBSCRIBER QUOTA FAIL-OPEN] Anonymous usage lookup failed for key=${visitorKey}: ${err.message}`);
+          return null;
+        })
+      : Promise.resolve(null)
+  ]);
+
   let used = liveCount !== null ? liveCount : (subscriber.query_count || 0);
 
-  // Free tier shares its 24-hour window with the anonymous visitor quota — a
-  // user who burns through anonymous queries and then logs in should not get
-  // a fresh allotment on the same device. Fold any recent anonymous usage in,
-  // keyed on the persistent visitor cookie rather than IP.
-  if (tier === 'free' && visitorKey) {
-    try {
-      const anonLog = await getQueryLog(visitorKey);
-      if (anonLog && anonLog.query_count > 0) {
-        used += anonLog.query_count;
-      }
-    } catch (err) {
-      console.error(`[SUBSCRIBER QUOTA FAIL-OPEN] Anonymous usage lookup failed for key=${visitorKey}: ${err.message}`);
-    }
+  if (needsAnonLog && anonLog && anonLog.query_count > 0) {
+    used += anonLog.query_count;
   }
 
   if (used < limit) return { allowed: true, queriesUsed: used };
@@ -2106,11 +2109,21 @@ export default async function handler(req, res) {
     return res.status(200).json({ crisis: true });
   }
 
+  // RAG retrieval (embed + corpus match) only depends on the user's text —
+  // it doesn't need to know yet whether this turns out to be a subscriber
+  // or free/anonymous request. Kick it off now so it runs concurrently with
+  // the subscriber/quota checks below instead of waiting behind them.
+  // Whichever path actually serves the request awaits this same promise
+  // rather than starting a second embed+retrieval call.
+  const ragContextPromise = getRetrievedContext(lastUserText || rawQuery || '', null);
+
   // ── SUBSCRIBER PATH ───────────────────────────────────────────────────────
   try {
     if (userEmail) {
-      const subscriber = await getSubscriber(userEmail);
-      const redemption = await getCodeRedemption(userEmail);
+      const [subscriber, redemption] = await Promise.all([
+        getSubscriber(userEmail),
+        getCodeRedemption(userEmail)
+      ]);
       if ((subscriber && subscriber.status === 'active') || redemption) {
         const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
         if (!apiMessages || apiMessages.length === 0) {
@@ -2152,9 +2165,10 @@ export default async function handler(req, res) {
         res.setHeader('X-Prism-Tier', tier);
         res.setHeader('X-Prism-Subscriber', 'true');
 
-        // RAG: retrieve relevant corpus passages before AI call
-        // Pass null for classification — getRetrievedContext will retrieve for all queries
-        const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
+        // RAG: already kicked off above, concurrently with the subscriber/
+        // quota checks — await the in-flight result rather than starting a
+        // second embed+retrieval call here.
+        const ragContext = await ragContextPromise;
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT + ragContext;
 
         const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -2294,9 +2308,10 @@ export default async function handler(req, res) {
     res.setHeader('X-Prism-Tier', 'free');
     res.setHeader('X-Prism-Subscriber', 'false');
 
-    // RAG: retrieve relevant corpus passages before AI call
-    // Pass null for classification — getRetrievedContext will retrieve for all queries
-    const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
+    // RAG: already kicked off right after crisis detection, concurrently
+    // with the subscriber-path checks above — await the in-flight result
+    // rather than starting a second embed+retrieval call here.
+    const ragContext = await ragContextPromise;
     const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT + ragContext;
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
