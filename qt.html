@@ -4688,14 +4688,17 @@ function selectThread(id) {
         _chatLastCount = 0;
         _notesLastCount = -1;
         // Pre-load root refractions into memory (panel stays hidden until user opens it)
-        if (share.collaboration_open) {
-          // Start realtime subscription to receive new refractions
-          if (typeof window.startChatRealtime === 'function') {
-            window.startChatRealtime(share.id);
-          }
-          // Load into background — panel shows loaded data when user opens it
-          loadChatMessages();
+        // Previously gated on share.collaboration_open already being true at
+        // this exact moment — meaning if collaboration got turned on AFTER
+        // this page had already loaded, nothing was ever set up to notice,
+        // and only a refresh would re-check and start watching. Now this
+        // always starts whenever a share exists at all, so it's already
+        // listening whenever collaboration does turn on.
+        if (typeof window.startChatRealtime === 'function') {
+          window.startChatRealtime(share.id);
         }
+        // Load into background — panel shows loaded data when user opens it
+        loadChatMessages();
       })
       .catch(function() {});
     })(id);
