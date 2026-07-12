@@ -6098,7 +6098,23 @@ function getChatParticipantName() {
   if (_chatParticipantName) return _chatParticipantName;
   var stored = localStorage.getItem('qt_display_name');
   if (stored) { _chatParticipantName = stored; return stored; }
-  // Anonymous — assign Participant N (neutral label, not a plan/tier name)
+
+  // Signed in, but no display_name on file — this is the actual gap:
+  // submitFreeAccount() (the only account-creation path reachable from
+  // qt.html itself) never collects one, unlike qt-gateway.html's separate
+  // full signup form. Without this branch, a signed-in sender with no
+  // display_name fell into the exact same "Participant N" placeholder
+  // meant for genuinely anonymous visitors — which is why the sender of a
+  // thread, not just recipients, could end up labeled that way.
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  if (email) {
+    var derived = email.split('@')[0].replace(/[._]+/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+    _chatParticipantName = derived;
+    localStorage.setItem('qt_display_name', derived);
+    return derived;
+  }
+
+  // Genuinely anonymous — assign Participant N (neutral label, not a plan/tier name)
   _explorerCount++;
   var name = 'Participant ' + _explorerCount;
   _chatParticipantName = name;
