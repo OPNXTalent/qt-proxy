@@ -70,6 +70,122 @@ function filterForViewer(followUps, mutedIds) {
   return followUps.filter(f => !(f.user_id && mutedIds.includes(f.user_id)));
 }
 
+// ── Claim anonymous session on registration ─────────────────────────────────
+// Runs once, immediately after a share recipient completes the "Save This
+// Session" free-account flow. Re-keys everything that anon session id
+// touched into their new user_id, and adds them as a thread_participant so
+// the thread actually surfaces in their sidebar on future visits — without
+// that insert, everything below would be correctly re-owned but still
+// invisible to them.
+//
+// Deliberately does NOT touch share_chat_messages. That table has no
+// user_id column to re-key at all — Trust Circle "mine" attribution for an
+// anonymous sender is (and stays) keyed to the same anon session id, which
+// persists in localStorage across registration. Same browser, same
+// attribution, no migration needed. A future cross-device claim (via an
+// emailed link rather than this same-session flow) would need to solve that
+// differently — out of scope here, see the handoff notes on same-session
+// as a deliberate, visible limitation rather than a silent one.
+//
+// Same-session only: anonId is whatever the browser's own prism_anon_id
+// currently is. If that's wrong or missing, nothing matches and nothing
+// migrates — a no-op, not a misattribution.
+async function handleClaimAnonSession(req, res) {
+  let body;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+
+  const { anonId, userEmail, threadId } = body || {};
+  if (!anonId || !userEmail || !threadId) {
+    return res.status(400).json({ error: 'anonId, userEmail, and threadId are required' });
+  }
+
+  const userId = await getSubscriberId(userEmail);
+  if (!userId) return res.status(404).json({ error: 'Subscriber not found' });
+
+  const results = { followUps: false, notes: false, participant: false };
+
+  try {
+    const fuRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/follow_ups?anon_session_id=eq.${encodeURIComponent(anonId)}&thread_id=eq.${encodeURIComponent(threadId)}`,
+      {
+        method: 'PATCH',
+        headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ user_id: userId, anon_session_id: null })
+      }
+    );
+    results.followUps = fuRes.ok;
+    if (!fuRes.ok) console.error('claim-anon-session: follow_ups patch failed:', await fuRes.text());
+  } catch (e) { console.error('claim-anon-session: follow_ups patch error:', e); }
+
+  try {
+    const notesRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/refraction_notes?anon_session_id=eq.${encodeURIComponent(anonId)}&thread_id=eq.${encodeURIComponent(threadId)}`,
+      {
+        method: 'PATCH',
+        headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ user_id: userId, anon_session_id: null })
+      }
+    );
+    results.notes = notesRes.ok;
+    if (!notesRes.ok) console.error('claim-anon-session: refraction_notes patch failed:', await notesRes.text());
+  } catch (e) { console.error('claim-anon-session: refraction_notes patch error:', e); }
+
+  try {
+    const partRes = await fetch(`${SUPABASE_URL}/rest/v1/thread_participants`, {
+      method: 'POST',
+      headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates,return=minimal' }),
+      body: JSON.stringify({ thread_id: threadId, user_id: userId, active: true, last_seen_at: new Date().toISOString() })
+    });
+    results.participant = partRes.ok;
+    if (!partRes.ok) console.error('claim-anon-session: thread_participants insert failed:', await partRes.text());
+  } catch (e) { console.error('claim-anon-session: thread_participants insert error:', e); }
+
+  return res.status(200).json({ success: true, results });
+}
+
+// ── Join Trust Circle ────────────────────────────────────────────────────────
+// Deliberately separate from handleClaimAnonSession above, and deliberately
+// NOT automatic. A signed-in visitor opening a shared link can already read
+// and comment anonymously via x-share-id, same as anyone else — this is the
+// one explicit action that actually makes them a thread_participant: visible
+// as a member, able to add others, able to post under their own account
+// rather than an anon session. Confirmed-only, on purpose — see the
+// consolidation notes on why silent auto-join on link-open was rejected.
+async function handleJoinCircle(req, res) {
+  const userEmail = req.headers['x-user-email'] || null;
+  if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
+
+  let body;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+  const { threadId } = body || {};
+  if (!threadId) return res.status(400).json({ error: 'threadId required' });
+
+  const userId = await getSubscriberId(userEmail);
+  if (!userId) return res.status(404).json({ error: 'Subscriber not found' });
+
+  const partRes = await fetch(`${SUPABASE_URL}/rest/v1/thread_participants`, {
+    method: 'POST',
+    headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates,return=minimal' }),
+    body: JSON.stringify({ thread_id: threadId, user_id: userId, active: true, last_seen_at: new Date().toISOString() })
+  });
+
+  if (!partRes.ok) {
+    const err = await partRes.text();
+    console.error('join-circle: thread_participants insert failed:', err);
+    return res.status(500).json({ error: 'Could not join' });
+  }
+
+  return res.status(200).json({ success: true });
+}
+
 // ── Refractions private notes ──────────────────────────────────────────────
 // Now backed by its own dedicated table, refraction_notes — no longer
 // sharing share_chat_messages with the anonymous social layer at all. That
@@ -222,6 +338,14 @@ export default async function handler(req, res) {
     return handleNoteRequest(req, res);
   }
 
+  if (req.method === 'POST' && req.query?.action === 'claim-anon-session') {
+    return handleClaimAnonSession(req, res);
+  }
+
+  if (req.method === 'POST' && req.query?.action === 'join-circle') {
+    return handleJoinCircle(req, res);
+  }
+
   const userEmail = req.headers['x-user-email'] || null;
   const shareId   = req.headers['x-share-id']   || null;
 
@@ -285,7 +409,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
 
-    const { threadId, question, response, source, shareId: bodyShareId } = body || {};
+    const { threadId, question, response, source, shareId: bodyShareId, anonSessionId } = body || {};
     if (!threadId || !question) return res.status(400).json({ error: 'threadId and question required' });
 
     const postSource  = source || 'owner';
@@ -305,14 +429,15 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
         body: JSON.stringify({
-          thread_id:    threadId,
-          user_id:      null,
-          query:        question,
-          response:     typeof response === 'string' ? { text: response } : (response || {}),
-          query_cost:   0,
-          submitted_in: 'share',
-          source:       'recipient',
-          share_id:     postShareId
+          thread_id:       threadId,
+          user_id:         null,
+          query:           question,
+          response:        typeof response === 'string' ? { text: response } : (response || {}),
+          query_cost:      0,
+          submitted_in:    'share',
+          source:          'recipient',
+          share_id:        postShareId,
+          anon_session_id: anonSessionId || null
         })
       });
 
