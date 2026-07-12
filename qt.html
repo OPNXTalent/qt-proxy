@@ -6048,17 +6048,50 @@ var _participantColors = [
   'rgba(120,200,120,0.7)',   // sage
   'rgba(255,160,60,0.7)',    // orange
 ];
+var _participantColorNames = ['Blue', 'Amber', 'Violet', 'Teal', 'Rose', 'Gold', 'Sage', 'Orange'];
 var _colorMap = {};
+var _colorLabelMap = {};
 var _colorIndex = 0;
+
+// Stable identity for color/label assignment — deliberately NOT the display
+// name. Anonymous recipients previously collided here: getChatParticipantName()
+// assigns "Participant N" from a purely local, per-browser counter, so every
+// anonymous visitor's own first message independently becomes "Participant 1"
+// in the database — a real, stored collision, not just a display artifact.
+// session_token is genuinely unique per anonymous visitor and already exists
+// on every recipient-type message; named sender-type participants (the owner,
+// or anyone who's joined the Circle) key on their own real display_name instead,
+// since those names are already meaningfully distinct.
+function participantIdentityKey(name, messageType, sessionToken) {
+  if (sessionToken) return 'anon:' + sessionToken;
+  return 'sender:' + (name || 'owner');
+}
+
 // Color key includes message_type to distinguish sender instances with same display name
 function getParticipantColor(name, messageType, sessionToken) {
-  if (!name) return 'var(--border)';
-  var key = (sessionToken || messageType || '') + ':' + name;
-  if (!_colorMap[key]) {
-    _colorMap[key] = _participantColors[_colorIndex % _participantColors.length];
-    _colorIndex++;
-  }
+  var key = participantIdentityKey(name, messageType, sessionToken);
+  assignParticipantColor(key);
   return _colorMap[key];
+}
+
+function assignParticipantColor(key) {
+  if (_colorMap[key]) return;
+  var i = _colorIndex % _participantColors.length;
+  var generation = Math.floor(_colorIndex / _participantColors.length) + 1;
+  _colorMap[key]      = _participantColors[i];
+  _colorLabelMap[key] = generation > 1 ? (_participantColorNames[i] + ' ' + generation) : _participantColorNames[i];
+  _colorIndex++;
+}
+
+// The actual displayed label for an anonymous recipient — "Blue", or
+// "Blue 2" once all 8 colors have been used once and a 9th distinct
+// person shows up. Named sender-type participants keep their real name;
+// this is only ever substituted for the anonymous "Participant N" case.
+function getParticipantLabel(name, messageType, sessionToken) {
+  if (messageType === 'sender') return name || 'You';
+  var key = participantIdentityKey(name, messageType, sessionToken);
+  assignParticipantColor(key);
+  return _colorLabelMap[key];
 }
 
 function getChatParticipantName() {
@@ -6072,6 +6105,7 @@ function getChatParticipantName() {
   sessionStorage.setItem('qt_chat_name', name);
   return name;
 }
+
 
 // ── Refractions panel resize ────────────────────────────────────────────
 // Drag the left edge to widen or narrow the panel, same idea as this
@@ -6285,12 +6319,19 @@ async function sendChatMessage() {
   var text = input.value.trim();
   if (!text) return;
 
-  var name  = getChatParticipantName();
   var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
   // Distinct from just "has an email" — a signed-in visitor who hasn't
   // explicitly joined this thread's Trust Circle yet still sends as an
   // anonymous-style recipient, same as anyone else, until they join.
   var isAnonSender = !canActAsThreadMember();
+  // Named participants (owner, or anyone who's joined the Circle) keep
+  // their real chosen name. An anonymous sender's own label is derived
+  // from color identity instead — the same scheme used to render everyone
+  // else's messages — rather than getChatParticipantName()'s old
+  // "Participant N" counter, which is purely local per browser and was
+  // the actual cause of every anonymous visitor's first message
+  // independently landing in the database as "Participant 1".
+  var name = isAnonSender ? getParticipantLabel(null, 'recipient', getAnonSessionId()) : getChatParticipantName();
 
   // This only ever runs for Trust Circle now — the compose bar is hidden
   // entirely in Private View, since notes are created and edited directly
@@ -6803,7 +6844,7 @@ async function renderDiscussionView() {
     var senderName = getChatParticipantName();
     filtered.forEach(function(m) {
       var isMine = m.message_type === 'sender';
-      var name   = m.display_name || (isMine ? senderName : ('Participant ' + (m.session_token || 'anon').slice(0,4)));
+      var name   = isMine ? senderName : getParticipantLabel(m.display_name, m.message_type, m.session_token);
       var div = document.createElement('div');
       div.className = 'chat-msg ' + (isMine ? 'mine' : 'theirs');
       var headerColor = null;
@@ -7096,7 +7137,7 @@ function startChatRealtime(shareId) {
         var isMine = msg.message_type === 'sender' && msg.display_name === myName;
         renderChatMessage({
           id:          msg.id,
-          name:        msg.display_name || (isMine ? myName : ('Participant ' + (msg.session_token || 'anon').slice(0,4))),
+          name:        isMine ? myName : getParticipantLabel(msg.display_name, msg.message_type, msg.session_token),
           text:        msg.content,
           mine:        isMine,
           messageType: msg.message_type,
