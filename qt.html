@@ -2307,6 +2307,49 @@
     <div class="disc-anchor-text" id="discContextQuery">The original interpretation</div>
     <div class="disc-anchor-rule"></div>
 
+    <!-- Save This Session — anonymous share-recipient context only.
+         Visibility set/unset by updateSaveSessionVisibility(), called from
+         loadSharedThread() and from the normal owner-view init paths so it
+         never lingers visible in the wrong context. Collapsed by default,
+         same interaction pattern as keepQuestioningBox. -->
+    <div id="saveSessionBox" style="display:none; margin:10px 14px; flex-shrink:0;">
+      <div style="border:1px solid rgba(201,168,76,0.35); background:rgba(201,168,76,0.06); padding:14px 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleSaveSession()">
+          <div style="font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(201,168,76,0.85);">Save This Session</div>
+          <button id="saveSessionToggle" style="background:none; border:none; color:rgba(201,168,76,0.85); font-size:16px; cursor:pointer; padding:0; line-height:1; transition:transform 0.2s;">↓</button>
+        </div>
+        <div id="saveSessionBody" style="display:none; margin-top:12px;">
+          <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">This view disappears once you leave. A free account keeps your notes, questions, and this conversation here for you.</div>
+          <button onclick="showFreeAccountModal('save-session')" style="display:block; width:100%; font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.1); color:var(--gold-pale); cursor:pointer; transition:all 0.2s; text-align:center; box-sizing:border-box;"
+            onmouseover="this.style.background='rgba(201,168,76,0.18)'" onmouseout="this.style.background='rgba(201,168,76,0.1)'">
+            Create Free Account →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Join This Discussion — signed-in visitor, not yet a Trust Circle
+         participant on this thread. Deliberately a separate, explicit
+         action rather than something that happens on page load — see
+         handleJoinCircle in followups.js for why. Visibility set by
+         updateJoinCircleVisibility(), called once checkCircleParticipant()
+         resolves in loadSharedThread(). -->
+    <div id="joinCircleBox" style="display:none; margin:10px 14px; flex-shrink:0;">
+      <div style="border:1px solid rgba(122,150,201,0.35); background:rgba(122,150,201,0.06); padding:14px 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleJoinCircle()">
+          <div style="font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(150,175,220,0.9);">Join This Discussion</div>
+          <button id="joinCircleToggle" style="background:none; border:none; color:rgba(150,175,220,0.9); font-size:16px; cursor:pointer; padding:0; line-height:1; transition:transform 0.2s;">↓</button>
+        </div>
+        <div id="joinCircleBody" style="display:none; margin-top:12px;">
+          <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;" id="joinCircleCopy">You're signed in. Join the Trust Circle to post under your own name and be part of the discussion going forward.</div>
+          <button id="joinCircleBtn" onclick="joinCircle()" style="display:block; width:100%; font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid rgba(150,175,220,0.6); background:rgba(122,150,201,0.12); color:rgba(200,215,240,0.95); cursor:pointer; transition:all 0.2s; text-align:center; box-sizing:border-box;"
+            onmouseover="this.style.background='rgba(122,150,201,0.2)'" onmouseout="this.style.background='rgba(122,150,201,0.12)'">
+            Join Circle →
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Message stream -->
     <div class="chat-stream" id="chatStream" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
       <div class="chat-empty" id="chatEmpty">No refractions yet.<br>Begin the conversation.</div>
@@ -3647,6 +3690,15 @@ function closeSidebarOverlay() {
 }
 
 function resetForm() {
+  // Leaving a loaded shared thread to start something new — store the way
+  // back for injectSharedThreadEntry()'s sidebar item. Previously this was
+  // goNewSubject() in share.html, navigating out to a second file; now
+  // it's the same bookkeeping in place, since qt.html already is the
+  // shared-thread view.
+  if (window._sharedViewToken) {
+    sessionStorage.setItem('prism_shared_thread', '/qt.html?mode=anon&t=' + window._sharedViewToken);
+    sessionStorage.setItem('prism_shared_thread_title', currentSubject || 'Shared interpretation');
+  }
   conversationHistory = [];
   currentSubject = '';
   localStorage.removeItem('qt_resume_snapshot');
@@ -4213,6 +4265,241 @@ function renderThreads(threads) {
 }
 
 // SELECT THREAD
+// ── Anonymous session identity ──────────────────────────────────────────────
+// One identifier for an anonymous visitor's whole session — notes AND Trust
+// Circle messages both key off this. share.html previously used two
+// unrelated identifiers for these (prism_anon_id in localStorage for notes,
+// qt_session_token in sessionStorage for chat) that were never reconciled;
+// qt.html gets one from the start instead. localStorage (not sessionStorage)
+// deliberately, so it survives across visits in the same browser — same
+// tradeoff already proven out for notes: doesn't survive a device change,
+// but that's an honest, visible limitation rather than a silent one.
+function getAnonSessionId() {
+  var id = localStorage.getItem('prism_anon_id');
+  if (!id) {
+    id = 'anon_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('prism_anon_id', id);
+  }
+  return id;
+}
+
+// Resolves to whichever identity headers the current viewer actually has —
+// a signed-in email, or (only inside a loaded shared thread) the anon
+// session id. Returns null if neither applies, so every call site can just
+// bail rather than guessing at a fallback.
+function noteIdentityHeaders() {
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  if (email) return { 'x-user-email': email };
+  if (window._sharedViewToken) return { 'x-anon-session': getAnonSessionId() };
+  return null;
+}
+
+// Being signed in is NOT the same as being authorized to act as a member
+// on THIS thread. Outside a loaded shared thread, normal own-thread rules
+// apply (signed in = yes). Inside one, a visitor only counts as a member
+// once they're the owner or have explicitly joined via joinCircle() —
+// followups.js's owner/participant checks would 403 an otherwise-signed-in
+// visitor who hasn't joined, same as they would an anonymous one.
+function canActAsThreadMember() {
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  if (!window._sharedViewToken) return !!email;
+  return !!email && window._sharedViewIsParticipant === true;
+}
+
+// ── Anonymous share-token entry point ───────────────────────────────────────
+// Resolves ?mode=anon&t=TOKEN into a single synthetic thread entry and hands
+// it to the exact same selectThread()/renderResult() pipeline a signed-in
+// user's own threads go through. This is the consolidation point: there is
+// no second renderer here, no share.html-specific markup building — just
+// one real thread object, rendered the one real way. See the "Consolidating
+// share.html into qt.html's anonymous mode" handoff for the full context on
+// why this replaces share.html's renderSnapshot().
+window._sharedViewToken         = null;
+window._sharedViewShareId       = null;
+window._sharedViewIsParticipant = false;
+
+async function loadSharedThread(token) {
+  window._sharedViewToken = token;
+  try {
+    var res = await fetch((window.API_BASE || '') + '/api/share?t=' + encodeURIComponent(token));
+
+    if (res.status === 410) { showSharedThreadError('This share has been closed by the sender.'); return; }
+    if (res.status === 404) { showSharedThreadError('This interpretation could not be found or has expired.'); return; }
+    if (!res.ok)             { showSharedThreadError('Could not load this interpretation. Please try again.'); return; }
+
+    var data  = await res.json();
+    var share = data.share;
+    if (!share || !share.thread_id) {
+      showSharedThreadError('This interpretation could not be found or has expired.');
+      return;
+    }
+
+    window._sharedViewShareId = share.id;
+
+    // Synthetic thread entry — same shape selectThread()/renderThreads()
+    // already expect from a real /api/threads row. share.snapshot is
+    // field-for-field the same object renderResult() already knows how
+    // to draw; that's what makes this consolidation possible at all.
+    var syntheticThread = {
+      id:                 share.thread_id,
+      query:              share.subject || (share.snapshot && share.snapshot._subject) || '',
+      title:              share.subject || (share.snapshot && share.snapshot._subject) || 'Shared interpretation',
+      response:           share.snapshot || {},
+      collaboration_open: !!share.collaboration_open
+    };
+
+    allThreads     = [syntheticThread];
+    activeThreadId = null;
+    selectThread(syntheticThread.id);
+    updateSaveSessionVisibility();
+
+    // Sender attribution — "so-and-so shared this with you." Falls back to
+    // a generic phrase if no display name is on file. NOTE: #sharedByBanner
+    // doesn't exist in qt.html's markup yet — this needs one small addition
+    // near the header before this line does anything visible.
+    var bannerEl = document.getElementById('sharedByBanner');
+    if (bannerEl) {
+      bannerEl.textContent = share.sender_display_name
+        ? share.sender_display_name + ' shared this with you'
+        : 'Someone shared this with you';
+      bannerEl.style.display = 'block';
+    }
+
+    // Signed-in visitor opening someone else's share link — check whether
+    // they're already a Trust Circle member on this thread (participant
+    // status is never assumed; see handleJoinCircle for why this stays an
+    // explicit, confirmed action rather than something that happens just
+    // from opening the link), and separately bring in their own thread
+    // history so it's not lost underneath the one shared thread.
+    var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+    if (email) {
+      checkCircleParticipant(share.thread_id, email);
+      mergeOwnThreadHistory(syntheticThread);
+    } else if (!localStorage.getItem('prism_gateway_seen')) {
+      // First-time anonymous visitor — non-blocking: the thread is already
+      // rendering underneath (see selectThread() call above), this is a
+      // welcome layer over it, not a gate in front of it. Shown once per
+      // browser; "Explore Freely" and just reading/commenting without
+      // ever seeing this again both mark it seen the same way.
+      showShareGateway(share.sender_display_name, token);
+    }
+  } catch (e) {
+    console.error('[loadSharedThread] failed:', e.message);
+    showSharedThreadError('Could not load this interpretation. Please try again.');
+  }
+}
+
+// Client-side check against the same two tables the backend already
+// trusts (public anon key, read-only lookups) — mirrors the pattern
+// selectThread() already uses for its own share-status lookup just below.
+async function checkCircleParticipant(threadId, email) {
+  var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://fgngixbhpilefmyyeldr.supabase.co';
+  var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  try {
+    var subRes = await fetch(SUPA_URL + '/rest/v1/subscribers?email=eq.' + encodeURIComponent(email) + '&select=id&limit=1', {
+      headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
+    });
+    var subRows = await subRes.json();
+    var userId = subRows && subRows[0] && subRows[0].id;
+    if (!userId) { updateJoinCircleVisibility(); return; }
+
+    var partRes = await fetch(SUPA_URL + '/rest/v1/thread_participants?thread_id=eq.' + encodeURIComponent(threadId) + '&user_id=eq.' + encodeURIComponent(userId) + '&active=eq.true&select=id&limit=1', {
+      headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
+    });
+    var partRows = await partRes.json();
+    window._sharedViewIsParticipant = !!(partRows && partRows.length);
+  } catch (e) {
+    console.error('[checkCircleParticipant] failed:', e.message);
+    window._sharedViewIsParticipant = false;
+  }
+  updateJoinCircleVisibility();
+}
+
+// A signed-in visitor's own thread history shouldn't just vanish because
+// they arrived via someone else's share link — pulled in separately from
+// the synthetic single-thread array loadSharedThread() otherwise builds.
+function mergeOwnThreadHistory(syntheticThread) {
+  fetch((window.API_BASE || '') + '/api/threads', { headers: { 'x-user-email': userEmail() } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.threads) return;
+      var own = data.threads.filter(function(t) { return t.id !== syntheticThread.id; });
+      allThreads = [syntheticThread].concat(own);
+      renderThreads(allThreads);
+    })
+    .catch(function() {});
+}
+
+function showSharedThreadError(message) {
+  var mc = document.getElementById('mainContent');
+  if (!mc) return;
+  mc.innerHTML = '<div style="max-width:520px;margin:80px auto;text-align:center;font-family:var(--crimson);font-size:19px;color:var(--text-dim);line-height:1.7;">' + escHtml(message) + '</div>';
+}
+
+// Welcome gateway — shown once per browser to a first-time anonymous
+// visitor arriving via a share link. Non-blocking: the thread underneath
+// is already rendering by the time this appears (see the caller in
+// loadSharedThread()). Two real choices, no email prompt up front — that
+// only ever surfaces later, contextually, via Save This Session. Sign In
+// exists for people who already have an account and want continuity from
+// the start; Explore Freely is the expected default path for everyone
+// else, matching "recipient can read and interact without registering."
+function showShareGateway(senderName, token) {
+  localStorage.setItem('prism_gateway_seen', '1');
+
+  var modal = document.createElement('div');
+  modal.id = 'shareGatewayModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(6,6,10,0.92);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);';
+
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--deep);border:1px solid var(--border);padding:44px 40px;max-width:480px;width:90%;text-align:center;';
+
+  var badge = document.createElement('div');
+  badge.style.cssText = 'font-family:var(--mono);font-size:12px;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:20px;';
+  badge.textContent = 'The Prism';
+
+  var invite = document.createElement('div');
+  invite.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:19px;color:var(--gold-pale);margin-bottom:14px;';
+  invite.textContent = (senderName || 'Someone') + ' invited you into a conversation.';
+
+  var title = document.createElement('div');
+  title.style.cssText = 'font-family:var(--cinzel);font-size:22px;letter-spacing:0.04em;color:var(--text);line-height:1.4;margin-bottom:20px;';
+  title.textContent = 'Better questions lead to deeper understanding.';
+
+  var desc = document.createElement('div');
+  desc.style.cssText = 'font-family:var(--crimson);font-size:16px;color:var(--text-dim);line-height:1.7;margin-bottom:28px;';
+  desc.textContent = "Explore Scripture, philosophy, science, and life's hardest questions through a framework that helps reveal assumptions, sharpen reasoning, and deepen understanding — without requiring agreement.";
+
+  var signInBtn = document.createElement('button');
+  signInBtn.textContent = 'Sign In';
+  signInBtn.style.cssText = 'width:100%;font-family:var(--mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;padding:14px 24px;border:1px solid var(--border-lit);background:transparent;color:var(--text-dim);cursor:pointer;transition:all 0.25s;margin-bottom:12px;';
+  signInBtn.onmouseover = function() { this.style.borderColor = 'var(--gold-dim)'; this.style.color = 'var(--gold-pale)'; };
+  signInBtn.onmouseout  = function() { this.style.borderColor = 'var(--border-lit)'; this.style.color = 'var(--text-dim)'; };
+  signInBtn.onclick = function() {
+    // Same return-pointer mechanism qt.html's own boot sequence already
+    // uses for "returning from gateway after viewing a shared link" — this
+    // is that flow's other half, going out instead of coming back.
+    sessionStorage.setItem('prism_return_share', token);
+    window.location.href = '/qt-gateway.html';
+  };
+
+  var exploreBtn = document.createElement('button');
+  exploreBtn.textContent = 'Explore Freely →';
+  exploreBtn.style.cssText = 'width:100%;font-family:var(--cinzel);font-size:16px;letter-spacing:0.2em;text-transform:uppercase;padding:14px 24px;border:1px solid var(--gold-dim);background:var(--gold-dim);color:var(--void);cursor:pointer;transition:all 0.25s;margin-bottom:16px;';
+  exploreBtn.onmouseover = function() { this.style.background = 'var(--gold)'; };
+  exploreBtn.onmouseout  = function() { this.style.background = 'var(--gold-dim)'; };
+  exploreBtn.onclick = function() { modal.remove(); };
+
+  var footnote = document.createElement('div');
+  footnote.style.cssText = 'font-family:var(--mono);font-size:12px;letter-spacing:0.06em;color:var(--text-muted);';
+  footnote.textContent = 'No account required. Save your reflections anytime by signing in.';
+
+  box.appendChild(badge); box.appendChild(invite); box.appendChild(title); box.appendChild(desc);
+  box.appendChild(signInBtn); box.appendChild(exploreBtn); box.appendChild(footnote);
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+}
+
 function selectThread(id) {
   var thread = allThreads.find(function(t) { return t.id === id; });
   if (!thread) return;
@@ -4616,11 +4903,27 @@ function saveFollowUp(threadId, question, response) {
   try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
   list.push({ question: question, response: response });
   localStorage.setItem(key, JSON.stringify(list));
-  if (!threadId.startsWith('pending-') && userEmail()) {
+
+  if (threadId.startsWith('pending-')) return;
+
+  if (canActAsThreadMember()) {
     fetch(API_BASE + '/api/followups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
       body: JSON.stringify({ threadId: threadId, question: question, response: response })
+    }).catch(function() {});
+    return;
+  }
+
+  // Anonymous-style recipient — either genuinely anonymous, or signed in
+  // but hasn't joined this thread's Trust Circle yet. Uses the same
+  // x-share-id/source=recipient path followups.js already supports and
+  // share.html already relied on.
+  if (window._sharedViewToken && window._sharedViewShareId) {
+    fetch(API_BASE + '/api/followups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-share-id': window._sharedViewShareId },
+      body: JSON.stringify({ threadId: threadId, question: question, response: response, source: 'recipient', shareId: window._sharedViewShareId, anonSessionId: getAnonSessionId() })
     }).catch(function() {});
   }
 }
@@ -4807,6 +5110,70 @@ function toggleKeepQuestioning() {
   var open = body.style.display !== 'none';
   body.style.display = open ? 'none' : 'block';
   if (btn) btn.textContent = open ? '↓' : '↑';
+}
+
+function toggleSaveSession() {
+  var body = document.getElementById('saveSessionBody');
+  var btn  = document.getElementById('saveSessionToggle');
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (btn) btn.textContent = open ? '↓' : '↑';
+}
+
+// Shows the Save This Session box only for an anonymous visitor currently
+// inside a loaded shared thread — never the owner viewing their own work,
+// never someone already signed in (their thread already lives in their own
+// account via thread_participants, nothing left to save).
+function updateSaveSessionVisibility() {
+  var box = document.getElementById('saveSessionBox');
+  if (!box) return;
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var show = !!(window._sharedViewToken && !email);
+  box.style.display = show ? 'block' : 'none';
+}
+
+function toggleJoinCircle() {
+  var body = document.getElementById('joinCircleBody');
+  var btn  = document.getElementById('joinCircleToggle');
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (btn) btn.textContent = open ? '↓' : '↑';
+}
+
+// Shown only for a signed-in visitor inside a loaded shared thread who
+// isn't yet a confirmed thread_participant — never for the owner, never
+// for an anonymous visitor (their path is Save This Session instead),
+// and never once they've actually joined.
+function updateJoinCircleVisibility() {
+  var box = document.getElementById('joinCircleBox');
+  if (!box) return;
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var show = !!(window._sharedViewToken && email && !window._sharedViewIsParticipant);
+  box.style.display = show ? 'block' : 'none';
+}
+
+async function joinCircle() {
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  if (!email || !activeThreadId) return;
+  var btn = document.getElementById('joinCircleBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Joining…'; }
+  try {
+    var res = await fetch((window.API_BASE || '') + '/api/followups?action=join-circle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify({ threadId: activeThreadId })
+    });
+    if (!res.ok) throw new Error('join failed');
+    window._sharedViewIsParticipant = true;
+    updateJoinCircleVisibility();
+    var copyEl = document.getElementById('joinCircleCopy');
+    if (copyEl) copyEl.textContent = "You're a member of this discussion now.";
+  } catch (e) {
+    console.error('[joinCircle] failed:', e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Join Circle →'; }
+  }
 }
 
 // ── QUERY COUNT DISPLAY ───────────────────────────────────────────────────────
@@ -5858,7 +6225,12 @@ async function sendChatMessage() {
   var text = input.value.trim();
   if (!text) return;
 
-  var name = getChatParticipantName();
+  var name  = getChatParticipantName();
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  // Distinct from just "has an email" — a signed-in visitor who hasn't
+  // explicitly joined this thread's Trust Circle yet still sends as an
+  // anonymous-style recipient, same as anyone else, until they join.
+  var isAnonSender = !canActAsThreadMember();
 
   // This only ever runs for Trust Circle now — the compose bar is hidden
   // entirely in Private View, since notes are created and edited directly
@@ -5883,6 +6255,16 @@ async function sendChatMessage() {
 
   var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
   var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  var messagePayload = {
+    share_id:     _currentChannelId,
+    content:      text,
+    message_type: isAnonSender ? 'recipient' : 'sender',
+    display_name: name,
+    node_id:      _activeNodeId,
+    visibility:   'trust_circle'
+  };
+  if (isAnonSender) messagePayload.session_token = getAnonSessionId();
+
   try {
     var sendRes = await fetch(SUPA_URL + '/rest/v1/share_chat_messages', {
       method: 'POST',
@@ -5892,14 +6274,7 @@ async function sendChatMessage() {
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       },
-      body: JSON.stringify({
-        share_id:     _currentChannelId,
-        content:      text,
-        message_type: 'sender',
-        display_name: name,
-        node_id:      _activeNodeId,
-        visibility:   'trust_circle'
-      })
+      body: JSON.stringify(messagePayload)
     });
     if (sendRes.ok) {
       var rows = await sendRes.json();
@@ -5927,11 +6302,11 @@ var _noteAutosaveTimers = {};
 
 async function renderNotesView() {
   var myGen = _refractionRenderGen;
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var identityHeaders = noteIdentityHeaders();
   var stream = document.getElementById('chatStream');
   if (!stream) return;
 
-  if (!email) {
+  if (!identityHeaders) {
     if (myGen !== _refractionRenderGen) return;
     stream.innerHTML = '<div class="chat-empty">Sign in to write private notes.</div>';
     return;
@@ -5941,7 +6316,7 @@ async function renderNotesView() {
   try {
     var noteRes = await fetch(
       '/api/followups?kind=note&threadId=' + encodeURIComponent(activeThreadId) + '&nodeId=' + encodeURIComponent(_activeNodeId),
-      { headers: { 'x-user-email': email } }
+      { headers: identityHeaders }
     );
     var noteData = await noteRes.json();
     if (Array.isArray(noteData.notes)) notes = noteData.notes;
@@ -6175,8 +6550,8 @@ async function applyHighlightAndCreateNote(color) {
   sel.removeAllRanges();
   document.getElementById('highlightSheet').classList.remove('visible');
 
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
-  if (!email) {
+  var identityHeaders = noteIdentityHeaders();
+  if (!identityHeaders) {
     showQueryActionConfirm && showQueryActionConfirm('Sign in to save notes');
     return;
   }
@@ -6184,7 +6559,7 @@ async function applyHighlightAndCreateNote(color) {
   try {
     await fetch('/api/followups?kind=note', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, identityHeaders),
       body: JSON.stringify({
         threadId: activeThreadId,
         nodeId:   nodeId,
@@ -6251,14 +6626,14 @@ function startNewSection(wrap) {
   wrap.parentNode.insertBefore(container, wrap);
 
   async function commit() {
-    var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
-    if (!email || !titleInput.value.trim()) return;
+    var identityHeaders = noteIdentityHeaders();
+    if (!identityHeaders || !titleInput.value.trim()) return;
     if (created) return;
     created = true;
     try {
       var res = await fetch('/api/followups?kind=note', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, identityHeaders),
         body: JSON.stringify({
           threadId: activeThreadId,
           nodeId:   _activeNodeId,
@@ -6301,25 +6676,25 @@ async function flushNoteAutosave(noteId) {
   if (!pending) return;
   clearTimeout(pending.timer);
   delete _noteAutosaveTimers[noteId];
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
-  if (!email) return;
+  var identityHeaders = noteIdentityHeaders();
+  if (!identityHeaders) return;
   try {
     await fetch('/api/followups?kind=note', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, identityHeaders),
       body: JSON.stringify(Object.assign({ noteId: noteId }, pending.fields))
     });
   } catch(e) { console.error('Note autosave error:', e); }
 }
 
 async function deletePrivateNote(noteId) {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
-  if (!email) return;
+  var identityHeaders = noteIdentityHeaders();
+  if (!identityHeaders) return;
   if (!confirm('Delete this section? This can\'t be undone.')) return;
   try {
     await fetch('/api/followups?kind=note', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, identityHeaders),
       body: JSON.stringify({ noteId: noteId })
     });
     _notesLastCount = -1; // force reload
@@ -7310,9 +7685,11 @@ function formatThreadTimestamp(ms) {
   return month + ' ' + day + ' \u00b7 ' + hours + ':' + mins + ' ' + ampm;
 }
 
-function showFreeAccountModal() {
+function showFreeAccountModal(context) {
+  window._freeAcctContext = context || 'limit';
+
   var existing = document.getElementById('freeAccountModal');
-  if (existing) { existing.style.display = 'flex'; return; }
+  if (existing) existing.remove(); // always rebuild — a stale modal from a different context would show the wrong copy
 
   var modal = document.createElement('div');
   modal.id = 'freeAccountModal';
@@ -7336,11 +7713,19 @@ function showFreeAccountModal() {
 
   var desc = document.createElement('div');
   desc.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:19px;color:var(--text-dim);line-height:1.7;margin-bottom:6px;';
-  desc.textContent = '3 queries every 24 hours, always. Your session history saved for 30 days. Need more? Purchase query bundles any time — no plan required.';
 
   var perks = document.createElement('ul');
   perks.style.cssText = 'font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--text-dim);margin:12px 0 20px 16px;line-height:2;';
-  ['3 free queries · resets every 24 hours', 'Session history saved · 30 days', 'Query bundles available · no subscription', 'Cancel nothing · ever'].forEach(function(t) {
+
+  var perkLines;
+  if (window._freeAcctContext === 'save-session') {
+    desc.textContent = 'This view disappears once you leave. A free account keeps it here — the conversation, your notes, and anything you asked.';
+    perkLines = ['This conversation · saved', 'Your private notes · saved', '3 free queries · resets every 24 hours', 'Cancel nothing · ever'];
+  } else {
+    desc.textContent = '3 queries every 24 hours, always. Your session history saved for 30 days. Need more? Purchase query bundles any time — no plan required.';
+    perkLines = ['3 free queries · resets every 24 hours', 'Session history saved · 30 days', 'Query bundles available · no subscription', 'Cancel nothing · ever'];
+  }
+  perkLines.forEach(function(t) {
     var li = document.createElement('li'); li.textContent = t; perks.appendChild(li);
   });
 
@@ -7573,6 +7958,23 @@ async function submitFreeAccount() {
       });
     } catch(e) {}
 
+    // Claim this browser's anonymous session — re-keys notes and follow-up
+    // questions from anon_session_id onto the new account, and adds them
+    // as a thread_participant so this thread actually shows up in their
+    // sidebar afterward. Only relevant coming from a loaded shared thread;
+    // a no-op call for the ordinary query-limit path would just find
+    // nothing to migrate, but skipping it entirely when there's genuinely
+    // nothing to claim keeps this from firing on every free-account signup.
+    if (window._freeAcctContext === 'save-session' && window._sharedViewToken && activeThreadId) {
+      try {
+        await fetch('/api/followups?action=claim-anon-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ anonId: getAnonSessionId(), userEmail: email, threadId: activeThreadId })
+        });
+      } catch (e) { console.error('claim-anon-session request failed:', e); }
+    }
+
     // If this modal was opened from a purchase click, continue straight on
     // to that link now — carrying the new account's email into it — rather
     // than showing the generic "Account Created" confirmation.
@@ -7591,76 +7993,21 @@ async function submitFreeAccount() {
       box2.style.cssText = 'background:var(--deep);border:1px solid rgba(80,180,120,0.3);padding:44px 40px;max-width:440px;width:90%;text-align:center;';
       var t1 = document.createElement('div'); t1.style.cssText = 'font-family:var(--mono);font-size:13px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(80,180,120,0.8);margin-bottom:12px;'; t1.textContent = 'Account Created';
       var t2 = document.createElement('div'); t2.style.cssText = 'font-family:var(--cinzel);font-size:23px;color:var(--gold-pale);margin-bottom:16px;'; t2.textContent = 'You are set.';
-      var t3 = document.createElement('div'); t3.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:19px;color:var(--text-dim);line-height:1.7;margin-bottom:24px;'; t3.textContent = 'Your session is saved and 3 bonus queries have been added. Come back any time — your history will be here.';
-      var btn2 = document.createElement('button'); btn2.textContent = 'Continue →'; btn2.style.cssText = 'font-family:var(--mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;padding:10px 24px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;'; btn2.onclick = function() { modal.style.display = 'none'; };
+      var t3 = document.createElement('div'); t3.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:19px;color:var(--text-dim);line-height:1.7;margin-bottom:24px;';
+      t3.textContent = window._freeAcctContext === 'save-session'
+        ? 'This conversation and your notes are saved to your account. Come back any time — it will be here.'
+        : 'Your session is saved and 3 bonus queries have been added. Come back any time — your history will be here.';
+      var btn2 = document.createElement('button'); btn2.textContent = 'Continue →'; btn2.style.cssText = 'font-family:var(--mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;padding:10px 24px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;';
+      btn2.onclick = function() {
+        modal.style.display = 'none';
+        if (typeof updateSaveSessionVisibility === 'function') updateSaveSessionVisibility();
+      };
       box2.appendChild(t1); box2.appendChild(t2); box2.appendChild(t3); box2.appendChild(btn2);
       modal.appendChild(box2);
     }
     if (typeof loadUserThreads === 'function') loadUserThreads();
   } catch(e) {
     if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
-  }
-}
-
-function toggleAnonCapture() {
-  var form = document.getElementById('anonCaptureForm');
-  var btn  = document.getElementById('keepAccessBtn');
-  if (!form) return;
-  var open = form.style.display === 'block';
-  form.style.display = open ? 'none' : 'block';
-  if (btn) btn.style.display = open ? 'block' : 'none';
-  if (!open) {
-    setTimeout(function() {
-      var inp = document.getElementById('anonEmailInput');
-      if (inp) inp.focus();
-    }, 100);
-  }
-}
-
-async function submitAnonSave() {
-  var emailInp = document.getElementById('anonEmailInput');
-  var passInp  = document.getElementById('anonPasswordInput');
-  var statusEl = document.getElementById('anonSaveStatus');
-  var email    = emailInp ? emailInp.value.trim() : '';
-  var password = passInp  ? passInp.value.trim()  : '';
-  var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!re.test(email)) {
-    if (statusEl) { statusEl.textContent = 'Please enter a valid email.'; statusEl.style.display = 'block'; } return;
-  }
-  if (password.length < 6) {
-    if (statusEl) { statusEl.textContent = 'Password must be at least 6 characters.'; statusEl.style.display = 'block'; } return;
-  }
-  try {
-    // Same fix as submitFreeAccount — create the real Auth account first,
-    // so this isn't just a database row with no way to log in.
-    var client = getSupabaseClient();
-    var signUpResult = await client.auth.signUp({ email: email, password: password });
-    if (signUpResult.error) {
-      if (statusEl) { statusEl.textContent = signUpResult.error.message; statusEl.style.display = 'block'; }
-      return;
-    }
-
-    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-    await fetch(sbUrl + '/rest/v1/subscribers', {
-      method: 'POST',
-      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
-      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
-    });
-    localStorage.setItem('qt_user_email', email);
-    localStorage.setItem('qt_user_password', btoa(password));
-    // Send welcome email + bonus queries
-    fetch('/api/welcome', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) }).catch(function(){});
-    var block = document.getElementById('freeUpgradePrompt');
-    if (block) {
-      block.innerHTML = '<div style="border:1px solid rgba(80,180,120,0.3);background:rgba(80,180,120,0.03);padding:16px;">' +
-        '<div style="font-family:var(--mono);font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(80,180,120,0.8);margin-bottom:6px;">SESSION SAVED</div>' +
-        '<div style="font-family:var(--crimson);font-style:italic;font-size:16px;color:var(--text-dim);line-height:1.5;">Your work is saved for 30 days. 3 bonus queries added.</div>' +
-        '</div>';
-    }
-    if (typeof loadUserThreads === 'function') loadUserThreads();
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = 'Something went wrong. Try again.'; statusEl.style.display = 'block'; }
   }
 }
 
@@ -7857,11 +8204,34 @@ async function handleCreditsAdded() {
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
-  // If returning from gateway after viewing a shared link — go back to it
+  var _bootParams = new URLSearchParams(window.location.search);
+
+  // Share-token entry — qt.html rendering a specific shared thread
+  // directly, through its own real render pipeline, rather than
+  // share.html's separate copy of it. Fires regardless of sign-in state:
+  // an anonymous visitor gets the anon-mode reduced boot (no personal
+  // thread history to fetch); a signed-in visitor still gets their own
+  // thread history underneath, they just land on this thread first. Either
+  // way there's no resume snapshot to restore here — just the one shared
+  // thread the link pointed at.
+  var _bootShareToken = _bootParams.get('t');
+  if (_bootShareToken) {
+    sessionStorage.removeItem('prism_return_share');
+    loadSharedThread(_bootShareToken);
+    runPreflightCheck();
+    var shModal = document.getElementById('shareModal');
+    if (shModal) {
+      shModal.addEventListener('click', function(e) { if (e.target === shModal) closeShareModal(); });
+    }
+    return;
+  }
+
+  // If returning from gateway after viewing a shared link — go back to it,
+  // in place, rather than a second navigation out to share.html.
   var returnShare = sessionStorage.getItem('prism_return_share');
   if (returnShare) {
     sessionStorage.removeItem('prism_return_share');
-    window.location.href = 'https://theprism.io/share.html?t=' + encodeURIComponent(returnShare);
+    window.location.href = '/qt.html?mode=anon&t=' + encodeURIComponent(returnShare);
     return;
   }
   // Only restore a saved conversation when actually returning from a Stripe
