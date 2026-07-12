@@ -823,8 +823,23 @@ var flowCopies = {
         localStorage.setItem('qt_sidebar_appeared', '1');
       }
 
+function postAuthRedirect(tier) {
+  // If this login was reached via the "Sign In" option on a shared
+  // thread's welcome gateway, go back there instead of the generic
+  // tier-based landing — qt.html's own boot sequence already knows how
+  // to pick this up (see "returning from gateway after viewing a shared
+  // link" in qt.html's DOMContentLoaded handler).
+  var returnShare = sessionStorage.getItem('prism_return_share');
+  if (returnShare) {
+    sessionStorage.removeItem('prism_return_share');
+    window.location.href = '/qt.html?t=' + encodeURIComponent(returnShare);
+    return;
+  }
+  window.location.href = '/qt.html?tier=' + tier;
+}
+
       setTimeout(function() {
-        window.location.href = '/qt.html?tier=' + tier;
+        postAuthRedirect(tier);
       }, 2000);
     })
     .catch(function(err) {
@@ -832,7 +847,7 @@ var flowCopies = {
       // Fallback — redirect with free tier
       localStorage.setItem('qt_user_email', email);
       setTimeout(function() {
-        window.location.href = '/qt.html?tier=free';
+        postAuthRedirect('free');
       }, 2000);
     });
   }
@@ -932,6 +947,12 @@ const regRes = await fetch('/api/redeem?action=register', {
     sessionStorage.setItem('qt_anon', '1');
     sessionStorage.setItem('qt_anon_queries', '0');
     sessionStorage.setItem('qt_anon_mode', '1');
+    var returnShare = sessionStorage.getItem('prism_return_share');
+    if (returnShare) {
+      sessionStorage.removeItem('prism_return_share');
+      window.location.href = '/qt.html?mode=anon&t=' + encodeURIComponent(returnShare);
+      return;
+    }
     window.location.href = '/qt.html?mode=anon';
   }
 
