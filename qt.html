@@ -3241,6 +3241,7 @@ function showResult() {
   document.getElementById('loadingBlock').classList.remove('visible');
   document.getElementById('resultBlock').classList.add('visible');
   document.getElementById('newSubjectTopBtn').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function renderResult(d) {
@@ -4336,56 +4337,89 @@ async function loadSharedThread(token) {
 
     window._sharedViewShareId = share.id;
 
-    // Synthetic thread entry — same shape selectThread()/renderThreads()
-    // already expect from a real /api/threads row. share.snapshot is
-    // field-for-field the same object renderResult() already knows how
-    // to draw; that's what makes this consolidation possible at all.
-    var syntheticThread = {
-      id:                 share.thread_id,
-      query:              share.subject || (share.snapshot && share.snapshot._subject) || '',
-      title:              share.subject || (share.snapshot && share.snapshot._subject) || 'Shared interpretation',
-      response:           share.snapshot || {},
-      collaboration_open: !!share.collaboration_open
-    };
-
-    allThreads     = [syntheticThread];
-    activeThreadId = null;
-    selectThread(syntheticThread.id);
-    updateSaveSessionVisibility();
-
-    // Sender attribution — "so-and-so shared this with you." Falls back to
-    // a generic phrase if no display name is on file. NOTE: #sharedByBanner
-    // doesn't exist in qt.html's markup yet — this needs one small addition
-    // near the header before this line does anything visible.
-    var bannerEl = document.getElementById('sharedByBanner');
-    if (bannerEl) {
-      bannerEl.textContent = share.sender_display_name
-        ? share.sender_display_name + ' shared this with you'
-        : 'Someone shared this with you';
-      bannerEl.style.display = 'block';
-    }
-
-    // Signed-in visitor opening someone else's share link — check whether
-    // they're already a Trust Circle member on this thread (participant
-    // status is never assumed; see handleJoinCircle for why this stays an
-    // explicit, confirmed action rather than something that happens just
-    // from opening the link), and separately bring in their own thread
-    // history so it's not lost underneath the one shared thread.
     var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
-    if (email) {
-      checkCircleParticipant(share.thread_id, email);
-      mergeOwnThreadHistory(syntheticThread);
-    } else if (!localStorage.getItem('prism_gateway_seen')) {
-      // First-time anonymous visitor — non-blocking: the thread is already
-      // rendering underneath (see selectThread() call above), this is a
-      // welcome layer over it, not a gate in front of it. Shown once per
-      // browser; "Explore Freely" and just reading/commenting without
-      // ever seeing this again both mark it seen the same way.
-      showShareGateway(share.sender_display_name, token);
+
+    // First-time anonymous visitor — the gateway IS the arrival point.
+    // Nothing renders underneath it; entering the thread is what "Explore
+    // Freely" (or a completed sign-in, via the return-token round trip)
+    // actually does. Anyone who's seen it before, or is already signed in,
+    // skips straight to the thread — this only ever happens once per
+    // browser, not every time a share link is opened.
+    if (!email && !localStorage.getItem('prism_gateway_seen')) {
+      showShareGateway(share.sender_display_name, token, function() {
+        enterSharedThread(share);
+      });
+      return;
     }
+
+    enterSharedThread(share);
   } catch (e) {
     console.error('[loadSharedThread] failed:', e.message);
     showSharedThreadError('Could not load this interpretation. Please try again.');
+  }
+}
+
+// The actual render step — pulled out of loadSharedThread() so the
+// gateway's "Explore Freely" can trigger it on demand, rather than it
+// always firing immediately on page load.
+function enterSharedThread(share) {
+  // Synthetic thread entry — same shape selectThread()/renderThreads()
+  // already expect from a real /api/threads row. share.snapshot is
+  // field-for-field the same object renderResult() already knows how
+  // to draw; that's what makes this consolidation possible at all.
+  var syntheticThread = {
+    id:                 share.thread_id,
+    query:              share.subject || (share.snapshot && share.snapshot._subject) || '',
+    title:              share.subject || (share.snapshot && share.snapshot._subject) || 'Shared interpretation',
+    response:           share.snapshot || {},
+    collaboration_open: !!share.collaboration_open
+  };
+
+  allThreads     = [syntheticThread];
+  activeThreadId = null;
+  selectThread(syntheticThread.id);
+  updateSaveSessionVisibility();
+
+  // initSidebar() is what normally adds the "visible" class the hamburger
+  // toggle and sidebar need to appear at all — this entry point bypasses
+  // initSidebar() entirely (it fetches a signed-in user's own /api/threads,
+  // which would be wrong here), so that has to happen here instead.
+  var sidebarEl = document.getElementById('sidebar');
+  var toggleEl  = document.getElementById('sidebarToggle');
+  if (sidebarEl) sidebarEl.classList.add('visible');
+  if (toggleEl)  toggleEl.classList.add('visible');
+  var emailNow = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  if (!emailNow) {
+    // Anonymous — same default-open behavior ordinary anon browsing
+    // already uses in initSidebar()'s own "no identity" branch.
+    if (sidebarEl) sidebarEl.classList.add('open');
+    if (toggleEl)  toggleEl.textContent = '‹';
+    var mcEl = document.getElementById('mainContent');
+    if (mcEl) mcEl.classList.add('sidebar-open');
+  }
+
+  // Sender attribution — "so-and-so shared this with you." Falls back to
+  // a generic phrase if no display name is on file. NOTE: #sharedByBanner
+  // doesn't exist in qt.html's markup yet — this needs one small addition
+  // near the header before this line does anything visible.
+  var bannerEl = document.getElementById('sharedByBanner');
+  if (bannerEl) {
+    bannerEl.textContent = share.sender_display_name
+      ? share.sender_display_name + ' shared this with you'
+      : 'Someone shared this with you';
+    bannerEl.style.display = 'block';
+  }
+
+  // Signed-in visitor opening someone else's share link — check whether
+  // they're already a Trust Circle member on this thread (participant
+  // status is never assumed; see handleJoinCircle for why this stays an
+  // explicit, confirmed action rather than something that happens just
+  // from opening the link), and separately bring in their own thread
+  // history so it's not lost underneath the one shared thread.
+  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  if (email) {
+    checkCircleParticipant(share.thread_id, email);
+    mergeOwnThreadHistory(syntheticThread);
   }
 }
 
@@ -4444,37 +4478,40 @@ function showSharedThreadError(message) {
 // exists for people who already have an account and want continuity from
 // the start; Explore Freely is the expected default path for everyone
 // else, matching "recipient can read and interact without registering."
-function showShareGateway(senderName, token) {
+function showShareGateway(senderName, token, onExplore) {
   localStorage.setItem('prism_gateway_seen', '1');
 
   var modal = document.createElement('div');
   modal.id = 'shareGatewayModal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(6,6,10,0.92);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);padding:2rem 0;';
 
   var box = document.createElement('div');
-  box.style.cssText = 'background:var(--deep);border:1px solid var(--border);padding:44px 40px;max-width:480px;width:90%;text-align:center;';
+  box.style.cssText = 'background:var(--deep);border:1px solid var(--gold-dim);border-radius:12px;padding:2.5rem 2rem;max-width:440px;width:90%;text-align:center;';
 
   var badge = document.createElement('div');
-  badge.style.cssText = 'font-family:var(--mono);font-size:12px;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:20px;';
+  badge.style.cssText = 'font-family:var(--mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:20px;';
   badge.textContent = 'The Prism';
 
-  var invite = document.createElement('div');
-  invite.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:19px;color:var(--gold-pale);margin-bottom:14px;';
+  var invite = document.createElement('p');
+  invite.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:16px;color:var(--gold-pale);line-height:1.6;margin:0 0 6px;';
   invite.textContent = (senderName || 'Someone') + ' invited you into a conversation.';
 
-  var title = document.createElement('div');
-  title.style.cssText = 'font-family:var(--cinzel);font-size:22px;letter-spacing:0.04em;color:var(--text);line-height:1.4;margin-bottom:20px;';
+  var title = document.createElement('p');
+  title.style.cssText = 'font-family:var(--crimson);font-size:19px;color:var(--text);line-height:1.5;margin:0 0 18px;font-weight:500;';
   title.textContent = 'Better questions lead to deeper understanding.';
 
-  var desc = document.createElement('div');
-  desc.style.cssText = 'font-family:var(--crimson);font-size:16px;color:var(--text-dim);line-height:1.7;margin-bottom:28px;';
+  var desc = document.createElement('p');
+  desc.style.cssText = 'font-size:14px;color:var(--text-dim);line-height:1.65;margin:0 0 28px;';
   desc.textContent = "Explore Scripture, philosophy, science, and life's hardest questions through a framework that helps reveal assumptions, sharpen reasoning, and deepen understanding — without requiring agreement.";
 
+  var btnWrap = document.createElement('div');
+  btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+
   var signInBtn = document.createElement('button');
-  signInBtn.textContent = 'Sign In';
-  signInBtn.style.cssText = 'width:100%;font-family:var(--mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;padding:14px 24px;border:1px solid var(--border-lit);background:transparent;color:var(--text-dim);cursor:pointer;transition:all 0.25s;margin-bottom:12px;';
-  signInBtn.onmouseover = function() { this.style.borderColor = 'var(--gold-dim)'; this.style.color = 'var(--gold-pale)'; };
-  signInBtn.onmouseout  = function() { this.style.borderColor = 'var(--border-lit)'; this.style.color = 'var(--text-dim)'; };
+  signInBtn.textContent = 'Sign in';
+  signInBtn.style.cssText = 'width:100%;padding:12px;border-radius:6px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);font-family:var(--mono);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:background 0.2s;';
+  signInBtn.onmouseover = function() { this.style.background = 'rgba(122,98,48,0.1)'; };
+  signInBtn.onmouseout  = function() { this.style.background = 'transparent'; };
   signInBtn.onclick = function() {
     // Same return-pointer mechanism qt.html's own boot sequence already
     // uses for "returning from gateway after viewing a shared link" — this
@@ -4484,18 +4521,24 @@ function showShareGateway(senderName, token) {
   };
 
   var exploreBtn = document.createElement('button');
-  exploreBtn.textContent = 'Explore Freely →';
-  exploreBtn.style.cssText = 'width:100%;font-family:var(--cinzel);font-size:16px;letter-spacing:0.2em;text-transform:uppercase;padding:14px 24px;border:1px solid var(--gold-dim);background:var(--gold-dim);color:var(--void);cursor:pointer;transition:all 0.25s;margin-bottom:16px;';
+  exploreBtn.textContent = 'Explore freely →';
+  exploreBtn.style.cssText = 'width:100%;padding:12px;border-radius:6px;border:none;background:var(--gold-dim);color:var(--deep);font-family:var(--mono);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:background 0.2s;';
   exploreBtn.onmouseover = function() { this.style.background = 'var(--gold)'; };
   exploreBtn.onmouseout  = function() { this.style.background = 'var(--gold-dim)'; };
-  exploreBtn.onclick = function() { modal.remove(); };
+  exploreBtn.onclick = function() {
+    modal.remove();
+    if (typeof onExplore === 'function') onExplore();
+  };
 
-  var footnote = document.createElement('div');
-  footnote.style.cssText = 'font-family:var(--mono);font-size:12px;letter-spacing:0.06em;color:var(--text-muted);';
+  btnWrap.appendChild(signInBtn);
+  btnWrap.appendChild(exploreBtn);
+
+  var footnote = document.createElement('p');
+  footnote.style.cssText = 'font-size:11px;color:var(--text-muted);margin:20px 0 0;';
   footnote.textContent = 'No account required. Save your reflections anytime by signing in.';
 
   box.appendChild(badge); box.appendChild(invite); box.appendChild(title); box.appendChild(desc);
-  box.appendChild(signInBtn); box.appendChild(exploreBtn); box.appendChild(footnote);
+  box.appendChild(btnWrap); box.appendChild(footnote);
   modal.appendChild(box);
   document.body.appendChild(modal);
 }
