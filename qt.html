@@ -4794,8 +4794,23 @@ function restoreFollowUps(id) {
   var local = [];
   try { local = JSON.parse(localStorage.getItem('qt_followups_' + id) || '[]'); } catch(e) {}
   if (local.length > 0) { renderFU(local); return; }
-  if (!id.startsWith('pending-') && userEmail()) {
+  if (id.startsWith('pending-')) return;
+
+  if (canActAsThreadMember()) {
     fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-user-email': userEmail() } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false); })
+    .catch(function() {});
+    return;
+  }
+
+  // Recipient — anonymous, or signed in but hasn't joined this thread's
+  // Trust Circle yet. Previously this branch didn't exist at all, so a
+  // recipient's view of a shared thread never showed any of its prior
+  // follow-up (R1/R2/R3) history, only the root interpretation — even
+  // though the backend already supports this exact read via x-share-id.
+  if (window._sharedViewToken && window._sharedViewShareId) {
+    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-share-id': window._sharedViewShareId } })
     .then(function(r) { return r.json(); })
     .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false); })
     .catch(function() {});
@@ -4814,9 +4829,11 @@ var _qtPollInterval     = null;
 function startFollowUpPolling(threadId) {
   if (_qtPollInterval) clearInterval(_qtPollInterval);
   _qtPollInterval = setInterval(function() {
-    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), {
-      headers: { 'x-user-email': userEmail() }
-    })
+    var headers = canActAsThreadMember()
+      ? { 'x-user-email': userEmail() }
+      : (window._sharedViewToken && window._sharedViewShareId ? { 'x-share-id': window._sharedViewShareId } : null);
+    if (!headers) return;
+    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), { headers: headers })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false);
