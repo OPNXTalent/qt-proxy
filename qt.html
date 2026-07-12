@@ -7339,7 +7339,7 @@ function showFreeAccountModal() {
   desc.textContent = '3 queries every 24 hours, always. Your session history saved for 30 days. Need more? Purchase query bundles any time — no plan required.';
 
   var perks = document.createElement('ul');
-  perks.style.cssText = 'font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--text-muted);margin:12px 0 20px 16px;line-height:2;';
+  perks.style.cssText = 'font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--text-dim);margin:12px 0 20px 16px;line-height:2;';
   ['3 free queries · resets every 24 hours', 'Session history saved · 30 days', 'Query bundles available · no subscription', 'Cancel nothing · ever'].forEach(function(t) {
     var li = document.createElement('li'); li.textContent = t; perks.appendChild(li);
   });
