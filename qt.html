@@ -7116,7 +7116,8 @@ function startChatRealtime(shareId) {
   }
   window._chatCurrentShareId = shareId;
   if (!window.supabase) {
-    console.warn('[Chat Realtime] supabase not available');
+    console.warn('[Chat Realtime] supabase not available — falling back to polling');
+    startChatPolling();
     return;
   }
   // Reuse existing client to avoid multiple GoTrueClient instances
@@ -7163,9 +7164,22 @@ function startChatRealtime(shareId) {
       })
       .subscribe(function(status) {
         console.log('[Chat Realtime] status:', status, 'share:', shareId);
+        // startChatPolling() already existed in this file but was never
+        // actually called anywhere — the follow-up Realtime subscription
+        // has always had this exact fallback; chat's subscribe callback
+        // just logged the status and stopped. Whenever the channel failed
+        // to establish (table not enabled for Realtime, a network blip, an
+        // extension blocking WebSockets), new messages simply never
+        // arrived live — only a manual refresh's one-time fetch would
+        // show them. This is that fix.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('[Chat Realtime] subscription failed — falling back to polling');
+          startChatPolling();
+        }
       });
   } catch(err) {
     console.warn('[Chat Realtime] subscribe failed:', err.message);
+    startChatPolling();
   }
 }
 
