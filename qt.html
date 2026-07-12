@@ -4855,9 +4855,15 @@ function startFollowUpRealtime(threadId) {
     window._qtRealtimeChannel.unsubscribe();
     window._qtRealtimeChannel = null;
   }
+
+  // Run unconditionally, not just as a fallback on detected failure — a
+  // channel that reports SUBSCRIBED but was never actually added to
+  // Supabase's Realtime publication for this table delivers zero events
+  // silently, with no error to catch. Same reasoning as chat's polling.
+  startFollowUpPolling(threadId);
+
   if (!window.supabase) {
-    console.warn('[Realtime] supabase not loaded — using polling fallback');
-    startFollowUpPolling(threadId);
+    console.warn('[Realtime] supabase not loaded — polling only');
     return;
   }
   try {
@@ -4879,9 +4885,7 @@ function startFollowUpRealtime(threadId) {
         }
       })
       .subscribe(function(status) {
-        if (status === 'SUBSCRIBED') {
-          console.log('[Realtime] subscribed to follow_ups for thread:', threadId);
-        }
+        console.log('[Realtime] status:', status, 'thread:', threadId);
       });
   } catch(err) {
     console.warn('[Realtime] failed to subscribe:', err.message);
@@ -7115,9 +7119,16 @@ function startChatRealtime(shareId) {
     _chatRealtimeChannel = null;
   }
   window._chatCurrentShareId = shareId;
+
+  // Run unconditionally, not just on failure — a channel that reports
+  // SUBSCRIBED but was never actually added to Supabase's Realtime
+  // publication for this table delivers zero events, silently, forever.
+  // There's no error to catch in that case, so detecting failure alone
+  // isn't enough; polling has to run regardless of what Realtime reports.
+  startChatPolling();
+
   if (!window.supabase) {
-    console.warn('[Chat Realtime] supabase not available — falling back to polling');
-    startChatPolling();
+    console.warn('[Chat Realtime] supabase not available — polling only');
     return;
   }
   // Reuse existing client to avoid multiple GoTrueClient instances
@@ -7126,8 +7137,6 @@ function startChatRealtime(shareId) {
   var client = window._supabaseClient || 
                (window._supabaseClient = window.supabase.createClient(SUPA_URL, SUPA_ANON));
   _chatSupabaseClient = client;
-  // Stop polling — Realtime takes over
-  stopChatPolling();
 
   try {
     _chatRealtimeChannel = client
@@ -7189,6 +7198,7 @@ function stopChatRealtime() {
     _chatRealtimeChannel = null;
   }
   window._chatCurrentShareId = null;
+  stopChatPolling();
 }
 window.startChatRealtime = startChatRealtime;
 window.stopChatRealtime  = stopChatRealtime;
