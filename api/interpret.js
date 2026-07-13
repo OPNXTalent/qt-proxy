@@ -5606,10 +5606,10 @@ Do not add any question after the exit offer. The person chooses the next move.
         console.timeEnd(`[interpret:${requestId}] rag`);
 
         const closureInjection = buildClosureInjection(apiMessages);
-        const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
+        const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', null);
 
         console.log(`[interpret:${requestId}] module-decision`, {
-          inquiryClassification,
+          inquiryClassification: null,
           theodicyModule,
           elapsedMs: Date.now() - startedAt,
         });
@@ -5809,7 +5809,7 @@ Do not add any question after the exit offer. The person chooses the next move.
     // Pass null for classification — getRetrievedContext will retrieve for all queries
     const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
     const closureInjection = buildClosureInjection(apiMessages);
-    const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
+    const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', null);
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
