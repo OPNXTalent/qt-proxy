@@ -3024,8 +3024,8 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
               const paras = fullText.split(/\n\n/);
               targetEl.innerHTML = paras.map((p, i) =>
                 i < paras.length - 1
-                  ? '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>'
-                  : '<p>' + escHtml(p.replace(/\n/g, ' ')) + (fullText.endsWith('\n\n') ? '</p>' : '')
+                  ? '<p>' + _esc(p.replace(/\n/g, ' ')) + '</p>'
+                  : '<p>' + _esc(p.replace(/\n/g, ' ')) + (fullText.endsWith('\n\n') ? '</p>' : '')
               ).join('');
             }
           }
@@ -3157,12 +3157,13 @@ async function callProxy(messages, rawQuery) {
               // with accumulated text so the user sees words appearing in real time
               var streamEl = document.getElementById('resultContent');
               if (streamEl) {
+                var _esc = function(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
                 var paras = fullText.split(/
 
 /);
                 streamEl.innerHTML = paras.map(function(p, i) {
                   if (!p.trim()) return '';
-                  return '<p>' + escHtml(p.replace(/
+                  return '<p>' + _esc(p.replace(/
 /g, ' ')) + (i === paras.length - 1 && !fullText.endsWith('
 
 ') ? '<span class="stream-cursor">▍</span>' : '</p>');
