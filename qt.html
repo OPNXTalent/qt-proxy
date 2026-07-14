@@ -3128,12 +3128,15 @@ async function callProxy(messages, rawQuery) {
   document.getElementById('resultContent').innerHTML =
     '<div id="streamIndicator" style="font-family:var(--mono); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); padding:20px 0; text-align:center;">Interpreting<span id="streamDots">...</span></div>';
 
-  // Animate the dots
+  // Dots animation — runs until first delta arrives, then live text takes over
   var dotCount = 0;
   var dotInterval = setInterval(function() {
-    dotCount = (dotCount + 1) % 4;
-    var dotsEl = document.getElementById('streamDots');
-    if (dotsEl) dotsEl.textContent = '.'.repeat(dotCount + 1);
+    // Only animate if no text has arrived yet
+    if (!fullText) {
+      dotCount = (dotCount + 1) % 4;
+      var dotsEl = document.getElementById('streamDots');
+      if (dotsEl) dotsEl.textContent = '.'.repeat(dotCount + 1);
+    }
   }, 400);
 
   try {
@@ -3150,6 +3153,21 @@ async function callProxy(messages, rawQuery) {
             const parsed = JSON.parse(data);
             if (parsed.type === 'delta' && parsed.text) {
               fullText += parsed.text;
+              // Paint tokens as they arrive — replace the streaming indicator
+              // with accumulated text so the user sees words appearing in real time
+              var streamEl = document.getElementById('resultContent');
+              if (streamEl) {
+                var paras = fullText.split(/
+
+/);
+                streamEl.innerHTML = paras.map(function(p, i) {
+                  if (!p.trim()) return '';
+                  return '<p>' + escHtml(p.replace(/
+/g, ' ')) + (i === paras.length - 1 && !fullText.endsWith('
+
+') ? '<span class="stream-cursor">▍</span>' : '</p>');
+                }).join('');
+              }
             } else if (parsed.type === 'corrected') {
               // Coherence check trimmed a momentum question — replace accumulated text
               fullText = parsed.text;
@@ -3186,6 +3204,17 @@ async function callProxy(messages, rawQuery) {
     }
   } finally {
     clearInterval(dotInterval);
+    // Remove the streaming cursor once complete
+    var streamEl = document.getElementById('resultContent');
+    if (streamEl) {
+      var cursors = streamEl.querySelectorAll('.stream-cursor');
+      cursors.forEach(function(c) { c.remove(); });
+      // Close any unclosed final paragraph
+      var lastP = streamEl.querySelector('p:last-child');
+      if (lastP && !lastP.innerHTML.endsWith('</p>')) {
+        lastP.innerHTML = lastP.innerHTML + '</p>';
+      }
+    }
   }
 
   if (!fullText) {
