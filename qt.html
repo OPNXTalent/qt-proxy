@@ -2680,11 +2680,9 @@ async function runInterpretation() {
           parsed = JSON.parse(candidate);
         }
       } catch {
-        document.getElementById('resultContent').innerHTML = `
-          <div class="error-block">
-            <p style="margin-bottom:12px;">Could not parse response. Raw output:</p>
-            <p style="font-family:var(--mono); font-size:20px; white-space:pre-wrap; color:var(--text-dim);">${escHtml(apiRawText.slice(0, 800))}</p>
-          </div>`;
+        // Parse failed — log raw output for debugging, never expose to user
+        console.error('[Prism] Response parse failed. Raw output:', apiRawText.slice(0, 2000));
+        document.getElementById('resultContent').innerHTML = getErrorMessage({ type: 'parse' });
         showResult();
         return;
       }
@@ -3150,26 +3148,6 @@ async function callProxy(messages, rawQuery) {
             const parsed = JSON.parse(data);
             if (parsed.type === 'delta' && parsed.text) {
               fullText += parsed.text;
-              // Progressive plain-prose render — replaced by structured layout on completion
-              var _rc = document.getElementById('resultContent');
-              if (_rc) {
-                var _si = document.getElementById('streamIndicator');
-                if (_si) { _si.style.display = 'none'; }
-                var _paras = fullText.split('\n\n');
-                var _html = '';
-                for (var _pi = 0; _pi < _paras.length; _pi++) {
-                  var _p = _paras[_pi].trim();
-                  if (!_p) continue;
-                  var _escaped = _p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                  _escaped = _escaped.replace(/\n/g, ' ');
-                  if (_pi === _paras.length - 1 && !fullText.endsWith('\n\n')) {
-                    _html += '<p style="color:var(--text);font-family:var(--crimson);font-size:18px;line-height:1.75;">' + _escaped + '<span style="opacity:0.5;"> ▍</span></p>';
-                  } else {
-                    _html += '<p style="color:var(--text);font-family:var(--crimson);font-size:18px;line-height:1.75;">' + _escaped + '</p>';
-                  }
-                }
-                _rc.innerHTML = _html;
-              }
             } else if (parsed.type === 'corrected') {
               // Coherence check trimmed a momentum question — replace accumulated text
               fullText = parsed.text;
