@@ -1061,7 +1061,15 @@
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--gold-pale);
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+  }
+  .qt-threads-sub {
+    font-family: var(--crimson);
+    font-size: 15px;
+    font-style: italic;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 16px;
   }
   .qt-thread-btn {
     display: block;
@@ -2680,9 +2688,11 @@ async function runInterpretation() {
           parsed = JSON.parse(candidate);
         }
       } catch {
-        // Parse failed — log raw output for debugging, never expose to user
-        console.error('[Prism] Response parse failed. Raw output:', apiRawText.slice(0, 2000));
-        document.getElementById('resultContent').innerHTML = getErrorMessage({ type: 'parse' });
+        document.getElementById('resultContent').innerHTML = `
+          <div class="error-block">
+            <p style="margin-bottom:12px;">Could not parse response. Raw output:</p>
+            <p style="font-family:var(--mono); font-size:20px; white-space:pre-wrap; color:var(--text-dim);">${escHtml(apiRawText.slice(0, 800))}</p>
+          </div>`;
         showResult();
         return;
       }
@@ -3291,7 +3301,7 @@ function renderResult(d) {
   } else {
     const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
     if (threads.length > 0) {
-      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
+      html += '<div class="qt-threads"><div class="qt-threads-label">Trace the Inquiry</div><div class="qt-threads-sub">These are not random cross-references. They are the passages most likely to strengthen, challenge, or clarify the interpretation above.</div>';
       threads.forEach(function(t) {
         html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
       });
