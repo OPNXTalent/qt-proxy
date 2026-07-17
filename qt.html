@@ -1061,15 +1061,7 @@
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--gold-pale);
-    margin-bottom: 8px;
-  }
-  .qt-threads-sub {
-    font-family: var(--crimson);
-    font-size: 15px;
-    font-style: italic;
-    color: var(--text-muted);
-    line-height: 1.6;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
   .qt-thread-btn {
     display: block;
@@ -1142,6 +1134,15 @@
   }
 
   /* Progressive disclosure toggle */
+  .qt-framework-callout {
+    font-family: var(--crimson);
+    font-size: 16px;
+    font-style: italic;
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin: 24px 0 16px;
+    text-align: center;
+  }
   .qt-framework-toggle {
     display: block;
     width: 100%;
@@ -2688,11 +2689,9 @@ async function runInterpretation() {
           parsed = JSON.parse(candidate);
         }
       } catch {
-        document.getElementById('resultContent').innerHTML = `
-          <div class="error-block">
-            <p style="margin-bottom:12px;">Could not parse response. Raw output:</p>
-            <p style="font-family:var(--mono); font-size:20px; white-space:pre-wrap; color:var(--text-dim);">${escHtml(apiRawText.slice(0, 800))}</p>
-          </div>`;
+        // Parse failed — log raw output for debugging, never expose to user
+        console.error('[Prism] Response parse failed. Raw output:', apiRawText.slice(0, 2000));
+        document.getElementById('resultContent').innerHTML = getErrorMessage({ type: 'parse' });
         showResult();
         return;
       }
@@ -3301,7 +3300,7 @@ function renderResult(d) {
   } else {
     const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
     if (threads.length > 0) {
-      html += '<div class="qt-threads"><div class="qt-threads-label">Trace the Inquiry</div><div class="qt-threads-sub">These are not random cross-references. They are the passages most likely to strengthen, challenge, or clarify the interpretation above.</div>';
+      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
       threads.forEach(function(t) {
         html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
       });
@@ -3327,6 +3326,7 @@ function renderResult(d) {
       frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body" style="padding:0;"><table class="qt-table"><thead><tr><th>Term</th><th>Prism Meaning</th></tr></thead><tbody>' + termRows + '</tbody></table></div></div>';
     }
 
+    html += '<p class="qt-framework-callout">Every interpretation in The Prism is traceable. Expand the Framework below to examine the reasoning behind this conclusion.</p>';
     html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
   }
 
