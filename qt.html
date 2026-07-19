@@ -3386,11 +3386,6 @@ function renderResult(d) {
     html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
   }
 
-  // ── 2. CURRENT SUBJECT ────────────────────────────────────────────────────────
-  if (currentSubject) {
-    html += '<div class="current-subject-block"><div class="current-subject-label">Current Subject</div><div class="current-subject-text">' + escHtml(currentSubject) + '</div></div>';
-  }
-
   // ── 3. LEAD — orientation block replaces fixed Scripture opener ───────────────
   if (d.recognition) {
     html += '<div class="orientation-block"><p>' + escHtml(d.recognition) + '</p></div>';
