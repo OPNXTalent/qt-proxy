@@ -1156,6 +1156,17 @@
   }
 
   /* Progressive disclosure toggle */
+  .qt-framework-callout {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-style: normal;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin: 0 0 10px;
+    text-align: left;
+  }
+
   .qt-framework-toggle {
     display: block;
     width: 100%;
@@ -3355,14 +3366,14 @@ function renderResult(d) {
     });
 
     if (d.key_terms && d.key_terms.length > 0) {
-      const termRows = d.key_terms.map(function(t) {
-        const hebrewSpan = t.hebrew ? ' <span style="color:var(--hebrew); font-size:20px;">' + escHtml(t.hebrew) + '</span>' : '';
-        return '<tr><td>' + escHtml(t.term) + hebrewSpan + '</td><td>' + escHtml(t.prism_meaning) + '</td></tr>';
+      const termItems = d.key_terms.map(function(t) {
+        const hebrewSpan = t.hebrew ? ' <span style="color:var(--hebrew); font-size:15px; font-family:var(--crimson);">' + escHtml(t.hebrew) + '</span>' : '';
+        return '<p><strong style="color:var(--text); font-size:15px;">' + escHtml(t.term) + hebrewSpan + '</strong> — ' + escHtml(t.prism_meaning) + '</p>';
       }).join('');
-      frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body" style="padding:0;"><table class="qt-table"><thead><tr><th>Term</th><th>Prism Meaning</th></tr></thead><tbody>' + termRows + '</tbody></table></div></div>';
+      frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body">' + termItems + '</div></div>';
     }
 
-    html += '<p class="qt-framework-callout">Every interpretation in The Prism is traceable. Expand the Framework below to examine the reasoning behind this conclusion.</p>';
+    html += '<p class="qt-framework-callout">Every interpretation in The Prism is guided by the same interpretive framework. Expand the sections below to examine the reasoning behind this conclusion.</p>';
     html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
   }
 
@@ -3412,7 +3423,7 @@ function renderResult(d) {
       // Collapsible Follow-Up Queries section mirroring Framework toggle
       html += '<button class="follow-up-queries-toggle" onclick="toggleFollowUpQueries(this)" aria-expanded="false">Follow-Up Queries</button>';
       html += '<div class="follow-up-queries-body" id="followUpQueriesBody">';
-      html += '<div class="qt-threads"><div class="qt-threads-label">Trace the Inquiry</div><div class="qt-threads-sub">These are not random cross-references. They are the passages most likely to strengthen, challenge, or clarify the interpretation above.</div>';
+      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the Query</div><div class="qt-threads-sub">Suggested questions designed to deepen, test, or extend the interpretation.</div>';
       threads.forEach(function(t) {
         html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
       });
