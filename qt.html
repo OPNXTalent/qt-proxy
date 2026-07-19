@@ -1183,7 +1183,7 @@
 
   /* Section block */
   .qt-section {
-    margin-bottom: 32px;
+    margin-bottom: 16px;
     border: 1px solid var(--border);
     background: var(--surface);
     overflow: hidden;
@@ -1192,15 +1192,15 @@
   .qt-section-head {
     display: flex;
     align-items: baseline;
-    gap: 14px;
-    padding: 16px 24px;
+    gap: 12px;
+    padding: 10px 20px;
     background: var(--surface-2);
     border-bottom: 1px solid var(--border);
   }
 
   .qt-section-num {
     font-family: var(--mono);
-    font-size:20px;
+    font-size:13px;
     color: var(--gold-dim);
     letter-spacing: 0.1em;
     flex-shrink: 0;
@@ -1208,7 +1208,7 @@
 
   .qt-section-title {
     font-family: var(--cinzel);
-    font-size:20px;
+    font-size:14px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--text);
@@ -1216,7 +1216,7 @@
   }
 
   .qt-section-hebrew {
-    font-size:21px;
+    font-size:16px;
     color: var(--hebrew);
     letter-spacing: 0.05em;
     font-family: var(--crimson);
@@ -1224,13 +1224,13 @@
   }
 
   .qt-section-body {
-    padding: 22px 24px;
-    font-size:22px;
-    color: var(--text);
-    line-height: 1.75;
+    padding: 12px 20px;
+    font-size:16px;
+    color: var(--text-dim);
+    line-height: 1.65;
   }
 
-  .qt-section-body p { margin-bottom: 12px; }
+  .qt-section-body p { margin-bottom: 8px; }
   .qt-section-body p:last-child { margin-bottom: 0; }
 
   /* Table inside sections */
@@ -2032,7 +2032,7 @@
     <div style="font-family:var(--crimson); font-size:27px; color:var(--hebrew); letter-spacing:0.08em; margin-bottom:16px; direction:rtl;">אֶחָד בֶּאֱמֶת</div>
     <div class="header-sub">Framework Interpreter</div>
     <div class="header-rule"></div>
-    <p class="header-premise">We’re all about six good questions away from IDK—“I don’t know.”<br>The Prism is for people who keep asking anyway.</p>
+    <p class="header-premise">A verse, a question, or whatever is on your mind. The Prism surfaces the relational architecture already present in the text.</p>
   </header>
 
   <!-- Anonymous back link — shown only to non-subscribers -->
@@ -2042,7 +2042,7 @@
   <div id="inputSection">
     <div class="input-wrap">
       <div style="position:relative;">
-        <textarea class="input-field" id="userInput" placeholder="A question, a verse, a doubt — whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+        <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
         <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
       </div>
       <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -3294,44 +3294,36 @@ function renderResult(d) {
     }
 
     html += '<p class="qt-framework-callout">ⓘ Every interpretation in The Prism is guided by the same interpretive framework. Expand the sections below to examine the reasoning behind this conclusion.</p>';
-    html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
+    html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">Framework for Interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
   }
 
-  // ── 2. CURRENT SUBJECT ────────────────────────────────────────────────────────
-  if (currentSubject) {
-    html += '<div class="current-subject-block"><div class="current-subject-label">Current Subject</div><div class="current-subject-text">' + escHtml(currentSubject) + '</div></div>';
-  }
-
-  // ── 3. LEAD — orientation block replaces fixed Scripture opener ───────────────
+  // ── 2. LEAD — orientation block ───────────────────────────────────────────────
   if (d.recognition) {
     html += '<div class="orientation-block"><p>' + escHtml(d.recognition) + '</p></div>';
   }
 
-  // ── 4. INTERPRETATION ─────────────────────────────────────────────────────────
-  // 4a. Interpretive Context — conditional orientation, before core insight
+  // ── 3. INTERPRETATION ─────────────────────────────────────────────────────────
   if (d.interpretive_context) {
     html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
   }
 
-  // 4b. Core insight
   if (d.core_insight) {
     html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
   }
 
-  // Kingdom implication — preserved in DOM as hidden element for PDF export compatibility
+  // Kingdom implication — hidden, preserved for compatibility
   html += '<div class="kingdom-block" style="display:none;"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(d.kingdom_implication || '') + '</div></div>';
 
-  // ── 4c. Framework Concept nodes ───────────────────────────────────────────────
+  // Concept nodes
   var _conceptText = [d.recognition || '', d.core_insight || '', d.kingdom_implication || ''].join(' ');
   var _conceptNodes = getConceptNodes(_conceptText);
   if (_conceptNodes.length > 0) {
     html += renderConceptNodes(_conceptNodes);
   }
 
-  // ── 5. FOLLOW-UP QUERIES (collapsible, mirrors framework toggle) ──────────────
+  // ── 4. FOLLOW-UP QUERIES (collapsible) ──────────────────────────────────────
   const threadSummary = (d.thread_summary || '').trim();
   if (threadSummary) {
-    // Closure protocol — show thread summary instead
     html += '<div class="qt-thread-summary">';
     html += '<div class="qt-thread-summary-label">Where this conversation arrived</div>';
     html += '<div class="qt-thread-summary-text">' + escHtml(threadSummary) + '</div>';
@@ -3340,7 +3332,6 @@ function renderResult(d) {
   } else {
     const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
     if (threads.length > 0) {
-      // Collapsible Follow-Up Queries section mirroring Framework toggle
       html += '<button class="follow-up-queries-toggle" onclick="toggleFollowUpQueries(this)" aria-expanded="false">Follow-Up Queries</button>';
       html += '<div class="follow-up-queries-body" id="followUpQueriesBody">';
       html += '<div class="qt-threads"><div class="qt-threads-label">Continue the Query</div><div class="qt-threads-sub">ⓘ Suggested questions designed to deepen, test, or extend the interpretation.</div>';
@@ -3353,7 +3344,6 @@ function renderResult(d) {
 
   document.getElementById('resultContent').innerHTML = html;
 
-  // Append root node controls directly into resultContent
   var rootControls = buildNodeControls('root', currentSubject || '');
   document.getElementById('resultContent').appendChild(rootControls);
 }
@@ -3372,7 +3362,7 @@ function toggleFramework(btn) {
   if (!body) return;
   const isOpen = body.classList.toggle('open');
   btn.setAttribute('aria-expanded', isOpen);
-  btn.textContent = isOpen ? 'Hide framework interpretation' : 'View full framework interpretation';
+  btn.textContent = isOpen ? 'Hide Framework' : 'Framework for Interpretation';
 }
 
 function submitSuggestedThread(text, btnEl) {
