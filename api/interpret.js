@@ -8,6 +8,7 @@ export const config = {
 };
 
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
+import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
 
@@ -2102,7 +2103,6 @@ function shouldLoadTheodicyModule(query, inquiryClassification) {
     /why (didn.t|doesn.t|won.t) god (stop|prevent|intervene|act|save)/i,
     /(evil|suffering|pain|abuse|holocaust|genocide|famine|cancer|disease).*(proves?|disproves?|means?|shows?).*(no god|god doesn|god can.t|god isn.t|god is not)/i,
     /is god (responsible|to blame|the cause|the author) (for|of)/i,
-    /how can (hell|eternal punishment|damnation) be (just|fair|moral|right|good)/i,
     /god.*(moral|morally|justice|just|good|evil|wicked|cruel|monstrous|sadistic)/i,
     /problem of evil/i,
     /theodicy/i,
@@ -2142,6 +2142,78 @@ function shouldLoadTheodicyModule(query, inquiryClassification) {
   const shouldLoad = semanticSignal || (classificationSignal && propositionSignal) || isComparativeEvil;
 
   return shouldLoad;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RELATIONAL SALVATION GATE
+// Two-signal gate:
+//   Signal A: direct salvation/judgment terms (sufficient alone)
+//   Signal B: theological/God context + agency/foreknowledge/providence terms
+//             (both required — prevents loading on "Augustine and free will" etc.)
+//
+// Control: "Did Augustine believe in free will?" → false (no god+salvation signal)
+//          "Explain determinism" → false (no god signal)
+//          "Conscience in psychology" → false (no god signal)
+//          "Why does God send people to hell?" → true (direct salvation)
+//          "If God knows my choices, am I free?" → true (god + foreknowledge)
+// ─────────────────────────────────────────────────────────────────────────────
+function shouldLoadRelationalSalvation(query) {
+  if (!query) return false;
+  const q = query.toLowerCase();
+
+  // ── Signal A: Direct salvation/judgment terms — sufficient alone ─────────
+  const directSalvationSignal = [
+    /\b(hell|hades|gehenna|lake of fire|eternal fire)\b/i,
+    /\b(damned|damnation|condemned|condemnation)\b/i,
+    /\bperish(es|ed|ing)?\b/i,
+    /never (heard|knew) (about|of) (jesus|god|christ|the gospel)/i,
+    /(born|raised|grew up) (in|as) (india|africa|china|a muslim|a buddhist|a hindu|another religion)/i,
+    /geographic(al)? (exposure|access|accident|lottery)/i,
+    /what (about|happens to) (people|someone|those) who never/i,
+    /(raised|born|grew up) (as|in) a? ?(christian|muslim|buddhist|hindu|jewish|religious|secular)/i,
+    /raised (christian|muslim|buddhist|hindu|jewish|catholic|protestant)/i,
+    /only because (i was born|of where i was born|of my birthplace|of my upbringing|my family)/i,
+    /(racist|immoral|wicked) christian.*(saved|heaven)/i,
+    /(compassionate|good|moral|kind) (hindu|buddhist|muslim|atheist).*(condemned|hell|perish)/i,
+    /romans 2.*(gentile|conscience|heart|law)/i,
+    /gentiles?.*(law|heart|conscience|judged)/i,
+    /god (send|sent|throw|cast|condemn).*(hell|perish|away)/i,
+    /send(s|ing)? people to hell/i,
+    /god (create|created|made).*(knowing|knew).*(hell|condemn|perish|burn)/i,
+    /not willing (that any|anyone) should perish/i,
+    /why (does|would|did) anyone perish/i,
+    /salvation.*(fair|fairness|just|equal|geography|culture|religion|birth)/i,
+    /who (can be|is|gets) saved/i,
+  ].some(p => p.test(q));
+
+  if (directSalvationSignal) return true;
+
+  // ── Signal B: God/Scripture context + agency/foreknowledge/providence ─────
+  // Both required — prevents loading on historical/philosophical queries
+  const godSignal = [
+    'god', 'jesus', 'christ', 'yhwh', 'lord', 'holy spirit', 'calvinist', 'calvinism', 'arminian', 'arminianism',
+    'scripture', 'bible', 'biblical', 'theological', 'theology',
+    'christian', 'faith', 'covenant', 'divine',
+  ].some(t => q.includes(t));
+
+  const agencySignal = [
+    /\bforeknowledge\b/i,
+    /\bpredestination\b/i,
+    /\bpredestined\b/i,
+    /\bdeterminism\b/i,
+    /\bdetermined\b/i,
+    /\bprovidence\b/i,
+    /free will/i,
+    /\belect(ion|ed)?\b/i,
+    /if (god|he) knows (every|all|my|our|future)/i,
+    /does (god|he) control (every|all)/i,
+    /how can (prophecy|god's plan) (be certain|succeed|fail)/i,
+    /(caused|cause) (every|all) (decision|choice|action)/i,
+    /control (every|all) (decision|choice|action|event)/i,
+  ].some(p => p.test(q));
+
+  return godSignal && agencySignal;
 }
 
 async function getRetrievedContext(userQuery, inquiryClassification) {
@@ -5777,6 +5849,7 @@ Do not add any question after the exit offer. The person chooses the next move.
 
         const closureInjection = buildClosureInjection(apiMessages);
         const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
+        const salvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
 
         console.log(`[interpret:${requestId}] module-decision`, {
           inquiryClassification,
@@ -5787,7 +5860,8 @@ Do not add any question after the exit offer. The person chooses the next move.
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
-          + (theodicyModule ? PRISM_THEODICY_MODULE : '');
+          + (theodicyModule ? PRISM_THEODICY_MODULE : '')
+          + (salvationModule ? PRISM_RELATIONAL_SALVATION : '');
 
         console.log(`[interpret:${requestId}] prompt-composition`, {
           basePromptChars: PRISM_SYSTEM_PROMPT.length,
@@ -5980,10 +6054,12 @@ Do not add any question after the exit offer. The person chooses the next move.
     const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
     const closureInjection = buildClosureInjection(apiMessages);
     const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
+        const salvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
-          + (theodicyModule ? PRISM_THEODICY_MODULE : '');
+          + (theodicyModule ? PRISM_THEODICY_MODULE : '')
+          + (salvationModule ? PRISM_RELATIONAL_SALVATION : '');
 
         console.log(`[interpret:${requestId}] prompt-composition-free`, {
           totalChars: enhancedSystemPrompt.length,
