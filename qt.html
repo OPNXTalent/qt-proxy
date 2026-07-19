@@ -1038,6 +1038,28 @@
   }
 
   /* Core insight */
+  .qt-interpretive-context {
+    padding: 8px 0 20px;
+    margin-bottom: 4px;
+    border-left: 2px solid var(--gold-dim);
+    padding-left: 16px;
+  }
+  .qt-ic-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 6px;
+  }
+  .qt-interpretive-context p {
+    font-family: var(--crimson);
+    font-size: 16px;
+    font-style: italic;
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin: 0;
+  }
   .qt-core-insight {
     padding: 24px 0 28px;
     border-bottom: 1px solid var(--border);
@@ -1134,15 +1156,6 @@
   }
 
   /* Progressive disclosure toggle */
-  .qt-framework-callout {
-    font-family: var(--crimson);
-    font-size: 19px;
-    font-style: italic;
-    color: var(--gold-pale);
-    line-height: 1.7;
-    margin: 24px 0 16px;
-    text-align: center;
-  }
   .qt-framework-toggle {
     display: block;
     width: 100%;
@@ -3273,6 +3286,11 @@ function renderResult(d) {
     html += '<div class="qt-recognition"><p>' + escHtml(d.recognition) + '</p></div>';
   }
 
+  // 2a. Interpretive Context — conditional orientation block, before core insight
+  if (d.interpretive_context) {
+    html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
+  }
+
   // 2. Core insight — unlabeled, framework language now permitted
   if (d.core_insight) {
     html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
@@ -3326,7 +3344,6 @@ function renderResult(d) {
       frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body" style="padding:0;"><table class="qt-table"><thead><tr><th>Term</th><th>Prism Meaning</th></tr></thead><tbody>' + termRows + '</tbody></table></div></div>';
     }
 
-    html += '<p class="qt-framework-callout">Every interpretation in The Prism is traceable. Expand the Framework below to examine the reasoning behind this conclusion.</p>';
     html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
   }
 
