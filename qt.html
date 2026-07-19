@@ -1082,7 +1082,24 @@
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--gold-pale);
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+  }
+  .qt-framework-callout {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin: 0 0 10px;
+    text-align: left;
+  }
+  .qt-threads-sub {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin-bottom: 16px;
   }
   .qt-thread-btn {
     display: block;
@@ -1163,13 +1180,42 @@
     border: 1px solid var(--gold-dim);
     color: var(--gold-pale);
     font-family: var(--cinzel);
-    font-size:13px;
+    font-size:16px;
     letter-spacing: 0.2em;
     text-transform: uppercase;
     padding: 12px 20px;
     cursor: pointer;
     margin-bottom: 32px;
     transition: all 0.25s;
+  }
+  .follow-up-queries-toggle {
+    display: block;
+    width: 100%;
+    text-align: center;
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-pale);
+    font-family: var(--cinzel);
+    font-size:16px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 12px 20px;
+    cursor: pointer;
+    margin-top: 28px;
+    margin-bottom: 0;
+    transition: all 0.25s;
+  }
+  .follow-up-queries-toggle:hover,
+  .qt-framework-toggle:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .follow-up-queries-body {
+    display: none;
+    padding-top: 20px;
+  }
+  .follow-up-queries-body.open {
+    display: block;
   }
   .qt-framework-toggle:hover {
     border-color: var(--gold);
