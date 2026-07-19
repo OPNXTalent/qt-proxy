@@ -1182,6 +1182,74 @@
     display: block;
   }
 
+  /* Current Subject block */
+  .current-subject-block {
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .current-subject-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 10px;
+  }
+  .current-subject-text {
+    font-family: var(--crimson);
+    font-size: 22px;
+    color: var(--text);
+    line-height: 1.55;
+    font-style: italic;
+  }
+
+  /* Orientation block — replaces verse-banner as the contextual lead */
+  .orientation-block {
+    border-left: 2px solid var(--gold-dim);
+    padding: 20px 28px;
+    background: linear-gradient(135deg, rgba(201,168,76,0.04), transparent);
+    margin-bottom: 36px;
+  }
+  .orientation-block p {
+    font-family: var(--crimson);
+    font-size: 22px;
+    color: var(--gold-pale);
+    font-style: italic;
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  /* Follow-Up Queries collapsible — mirrors framework toggle */
+  .follow-up-queries-toggle {
+    display: block;
+    width: 100%;
+    text-align: center;
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-pale);
+    font-family: var(--cinzel);
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 12px 20px;
+    cursor: pointer;
+    margin-top: 28px;
+    margin-bottom: 0;
+    transition: all 0.25s;
+  }
+  .follow-up-queries-toggle:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .follow-up-queries-body {
+    display: none;
+    padding-top: 4px;
+  }
+  .follow-up-queries-body.open {
+    display: block;
+  }
+
   /* Section block */
   .qt-section {
     margin-bottom: 32px;
@@ -3276,60 +3344,15 @@ function renderResult(d) {
 
   let html = '';
 
-  // Verse banner — show reference always when identified; text supplied by AI for all traditions
-  if (d.verse_identified) {
-    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text || '') + '</div></div>';
-  }
-
-  // 1. Recognition moment — unlabeled, pure prose, full breathing room
-  if (d.recognition) {
-    html += '<div class="qt-recognition"><p>' + escHtml(d.recognition) + '</p></div>';
-  }
-
-  // 2a. Interpretive Context — conditional orientation block, before core insight
-  if (d.interpretive_context) {
-    html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
-  }
-
-  // 2. Core insight — unlabeled, framework language now permitted
-  if (d.core_insight) {
-    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
-  }
-
-  // 3. Kingdom Implication — ceremonial arrival, immediately after the encounter
-  html += '<div class="kingdom-block"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(d.kingdom_implication || '') + '</div></div>';
-
-  // 4. Framework Concepts — keyword detection against full interpretation text
-  // Phase I: static data source. Phase II: swap getConceptNodes() to API/RAG — UI unchanged.
-  var _conceptText = [d.recognition || '', d.core_insight || '', d.kingdom_implication || ''].join(' ');
-  var _conceptNodes = getConceptNodes(_conceptText);
-  if (_conceptNodes.length > 0) {
-    html += renderConceptNodes(_conceptNodes);
-  }
-
-  // 5. Thread summary card OR suggested threads — mutually exclusive
-  const threadSummary = (d.thread_summary || '').trim();
-  if (threadSummary) {
-    html += '<div class="qt-thread-summary">';
-    html += '<div class="qt-thread-summary-label">Where this conversation arrived</div>';
-    html += '<div class="qt-thread-summary-text">' + escHtml(threadSummary) + '</div>';
-    html += '<button class="qt-thread-summary-btn" onclick="startNewThreadWithSummary(this.dataset.summary)" data-summary="' + escHtml(threadSummary) + '">Continue the exploration →</button>';
-    html += '</div>';
-  } else {
-    const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
-    if (threads.length > 0) {
-      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
-      threads.forEach(function(t) {
-        html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
-      });
-      html += '</div>';
-    }
-  }
-
-  // 5. Progressive disclosure toggle + framework architecture (collapsed by default)
+  // ── 1. FRAMEWORK FOR INTERPRETATION (collapsed, top of response) ─────────────
   const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0);
   if (hasFramework) {
     let frameworkHtml = '';
+
+    // Verse banner lives inside the framework panel as a reference tool
+    if (d.verse_identified) {
+      frameworkHtml += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text || '') + '</div></div>';
+    }
 
     sections.forEach(function(s) {
       if (!s.content) return;
@@ -3344,7 +3367,62 @@ function renderResult(d) {
       frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body" style="padding:0;"><table class="qt-table"><thead><tr><th>Term</th><th>Prism Meaning</th></tr></thead><tbody>' + termRows + '</tbody></table></div></div>';
     }
 
+    html += '<p class="qt-framework-callout">Every interpretation in The Prism is traceable. Expand the Framework below to examine the reasoning behind this conclusion.</p>';
     html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
+  }
+
+  // ── 2. CURRENT SUBJECT ────────────────────────────────────────────────────────
+  if (currentSubject) {
+    html += '<div class="current-subject-block"><div class="current-subject-label">Current Subject</div><div class="current-subject-text">' + escHtml(currentSubject) + '</div></div>';
+  }
+
+  // ── 3. LEAD — orientation block replaces fixed Scripture opener ───────────────
+  if (d.recognition) {
+    html += '<div class="orientation-block"><p>' + escHtml(d.recognition) + '</p></div>';
+  }
+
+  // ── 4. INTERPRETATION ─────────────────────────────────────────────────────────
+  // 4a. Interpretive Context — conditional orientation, before core insight
+  if (d.interpretive_context) {
+    html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
+  }
+
+  // 4b. Core insight
+  if (d.core_insight) {
+    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
+  }
+
+  // Kingdom implication — preserved in DOM as hidden element for PDF export compatibility
+  html += '<div class="kingdom-block" style="display:none;"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(d.kingdom_implication || '') + '</div></div>';
+
+  // ── 4c. Framework Concept nodes ───────────────────────────────────────────────
+  var _conceptText = [d.recognition || '', d.core_insight || '', d.kingdom_implication || ''].join(' ');
+  var _conceptNodes = getConceptNodes(_conceptText);
+  if (_conceptNodes.length > 0) {
+    html += renderConceptNodes(_conceptNodes);
+  }
+
+  // ── 5. FOLLOW-UP QUERIES (collapsible, mirrors framework toggle) ──────────────
+  const threadSummary = (d.thread_summary || '').trim();
+  if (threadSummary) {
+    // Closure protocol — show thread summary instead
+    html += '<div class="qt-thread-summary">';
+    html += '<div class="qt-thread-summary-label">Where this conversation arrived</div>';
+    html += '<div class="qt-thread-summary-text">' + escHtml(threadSummary) + '</div>';
+    html += '<button class="qt-thread-summary-btn" onclick="startNewThreadWithSummary(this.dataset.summary)" data-summary="' + escHtml(threadSummary) + '">Continue the exploration →</button>';
+    html += '</div>';
+  } else {
+    const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
+    if (threads.length > 0) {
+      // Collapsible Follow-Up Queries section mirroring Framework toggle
+      html += '<button class="follow-up-queries-toggle" onclick="toggleFollowUpQueries(this)" aria-expanded="false">Follow-Up Queries</button>';
+      html += '<div class="follow-up-queries-body" id="followUpQueriesBody">';
+      html += '<div class="qt-threads"><div class="qt-threads-label">Trace the Inquiry</div><div class="qt-threads-sub">These are not random cross-references. They are the passages most likely to strengthen, challenge, or clarify the interpretation above.</div>';
+      threads.forEach(function(t) {
+        html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
+      });
+      html += '</div></div>';
+    }
   }
 
   document.getElementById('resultContent').innerHTML = html;
@@ -3361,6 +3439,14 @@ function toggleFramework(btn) {
   const isOpen = body.classList.toggle('open');
   btn.setAttribute('aria-expanded', isOpen);
   btn.textContent = isOpen ? 'Hide framework interpretation' : 'View full framework interpretation';
+}
+
+function toggleFollowUpQueries(btn) {
+  const body = document.getElementById('followUpQueriesBody');
+  if (!body) return;
+  const isOpen = body.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen);
+  btn.textContent = isOpen ? 'Hide Follow-Up Queries' : 'Follow-Up Queries';
 }
 
 function submitSuggestedThread(text, btnEl) {
