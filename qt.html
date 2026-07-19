@@ -1252,7 +1252,7 @@
 
   /* Section block */
   .qt-section {
-    margin-bottom: 32px;
+    margin-bottom: 16px;
     border: 1px solid var(--border);
     background: var(--surface);
     overflow: hidden;
@@ -1261,15 +1261,15 @@
   .qt-section-head {
     display: flex;
     align-items: baseline;
-    gap: 14px;
-    padding: 16px 24px;
+    gap: 12px;
+    padding: 10px 20px;
     background: var(--surface-2);
     border-bottom: 1px solid var(--border);
   }
 
   .qt-section-num {
     font-family: var(--mono);
-    font-size:20px;
+    font-size:13px;
     color: var(--gold-dim);
     letter-spacing: 0.1em;
     flex-shrink: 0;
@@ -1277,7 +1277,7 @@
 
   .qt-section-title {
     font-family: var(--cinzel);
-    font-size:20px;
+    font-size:14px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--text);
@@ -1285,7 +1285,7 @@
   }
 
   .qt-section-hebrew {
-    font-size:21px;
+    font-size:16px;
     color: var(--hebrew);
     letter-spacing: 0.05em;
     font-family: var(--crimson);
@@ -1293,13 +1293,13 @@
   }
 
   .qt-section-body {
-    padding: 22px 24px;
-    font-size:22px;
-    color: var(--text);
-    line-height: 1.75;
+    padding: 12px 20px;
+    font-size:16px;
+    color: var(--text-dim);
+    line-height: 1.65;
   }
 
-  .qt-section-body p { margin-bottom: 12px; }
+  .qt-section-body p { margin-bottom: 8px; }
   .qt-section-body p:last-child { margin-bottom: 0; }
 
   /* Table inside sections */
@@ -3348,11 +3348,6 @@ function renderResult(d) {
   const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0);
   if (hasFramework) {
     let frameworkHtml = '';
-
-    // Verse banner lives inside the framework panel as a reference tool
-    if (d.verse_identified) {
-      frameworkHtml += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text || '') + '</div></div>';
-    }
 
     sections.forEach(function(s) {
       if (!s.content) return;
