@@ -2032,7 +2032,7 @@
     <div style="font-family:var(--crimson); font-size:27px; color:var(--hebrew); letter-spacing:0.08em; margin-bottom:16px; direction:rtl;">אֶחָד בֶּאֱמֶת</div>
     <div class="header-sub">Framework Interpreter</div>
     <div class="header-rule"></div>
-    <p class="header-premise">A verse, a question, or whatever is on your mind. The Prism surfaces the relational architecture already present in the text.</p>
+    <p class="header-premise">We’re all about six good questions away from IDK—“I don’t know.”<br>The Prism is for people who keep asking anyway.</p>
   </header>
 
   <!-- Anonymous back link — shown only to non-subscribers -->
@@ -2042,7 +2042,7 @@
   <div id="inputSection">
     <div class="input-wrap">
       <div style="position:relative;">
-        <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+        <textarea class="input-field" id="userInput" placeholder="A question, a verse, a doubt — whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
         <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
       </div>
       <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -3275,57 +3275,7 @@ function renderResult(d) {
 
   let html = '';
 
-  // Verse banner — show reference always when identified; text supplied by AI for all traditions
-  if (d.verse_identified) {
-    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text || '') + '</div></div>';
-  }
-
-  // 1. Recognition moment — unlabeled, pure prose, full breathing room
-  if (d.recognition) {
-    html += '<div class="qt-recognition"><p>' + escHtml(d.recognition) + '</p></div>';
-  }
-
-  // 2a. Interpretive Context — conditional orientation block, before core insight
-  if (d.interpretive_context) {
-    html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
-  }
-
-  // 2. Core insight — unlabeled, framework language now permitted
-  if (d.core_insight) {
-    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
-  }
-
-  // 3. Kingdom Implication — ceremonial arrival, immediately after the encounter
-  html += '<div class="kingdom-block"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(d.kingdom_implication || '') + '</div></div>';
-
-  // 4. Framework Concepts — keyword detection against full interpretation text
-  // Phase I: static data source. Phase II: swap getConceptNodes() to API/RAG — UI unchanged.
-  var _conceptText = [d.recognition || '', d.core_insight || '', d.kingdom_implication || ''].join(' ');
-  var _conceptNodes = getConceptNodes(_conceptText);
-  if (_conceptNodes.length > 0) {
-    html += renderConceptNodes(_conceptNodes);
-  }
-
-  // 5. Thread summary card OR suggested threads — mutually exclusive
-  const threadSummary = (d.thread_summary || '').trim();
-  if (threadSummary) {
-    html += '<div class="qt-thread-summary">';
-    html += '<div class="qt-thread-summary-label">Where this conversation arrived</div>';
-    html += '<div class="qt-thread-summary-text">' + escHtml(threadSummary) + '</div>';
-    html += '<button class="qt-thread-summary-btn" onclick="startNewThreadWithSummary(this.dataset.summary)" data-summary="' + escHtml(threadSummary) + '">Continue the exploration →</button>';
-    html += '</div>';
-  } else {
-    const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
-    if (threads.length > 0) {
-      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
-      threads.forEach(function(t) {
-        html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
-      });
-      html += '</div>';
-    }
-  }
-
-  // 5. Progressive disclosure toggle + framework architecture (collapsed by default)
+  // ── 1. FRAMEWORK FOR INTERPRETATION (collapsed, top of response) ─────────────
   const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0);
   if (hasFramework) {
     let frameworkHtml = '';
@@ -3336,14 +3286,69 @@ function renderResult(d) {
     });
 
     if (d.key_terms && d.key_terms.length > 0) {
-      const termRows = d.key_terms.map(function(t) {
-        const hebrewSpan = t.hebrew ? ' <span style="color:var(--hebrew); font-size:20px;">' + escHtml(t.hebrew) + '</span>' : '';
-        return '<tr><td>' + escHtml(t.term) + hebrewSpan + '</td><td>' + escHtml(t.prism_meaning) + '</td></tr>';
+      const termItems = d.key_terms.map(function(t) {
+        const hebrewSpan = t.hebrew ? ' <span style="color:var(--hebrew); font-size:15px; font-family:var(--crimson);">' + escHtml(t.hebrew) + '</span>' : '';
+        return '<p><strong style="color:var(--text); font-size:15px;">' + escHtml(t.term) + hebrewSpan + '</strong> — ' + escHtml(t.prism_meaning) + '</p>';
       }).join('');
-      frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body" style="padding:0;"><table class="qt-table"><thead><tr><th>Term</th><th>Prism Meaning</th></tr></thead><tbody>' + termRows + '</tbody></table></div></div>';
+      frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body">' + termItems + '</div></div>';
     }
 
+    html += '<p class="qt-framework-callout">ⓘ Every interpretation in The Prism is guided by the same interpretive framework. Expand the sections below to examine the reasoning behind this conclusion.</p>';
     html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
+  }
+
+  // ── 2. CURRENT SUBJECT ────────────────────────────────────────────────────────
+  if (currentSubject) {
+    html += '<div class="current-subject-block"><div class="current-subject-label">Current Subject</div><div class="current-subject-text">' + escHtml(currentSubject) + '</div></div>';
+  }
+
+  // ── 3. LEAD — orientation block replaces fixed Scripture opener ───────────────
+  if (d.recognition) {
+    html += '<div class="orientation-block"><p>' + escHtml(d.recognition) + '</p></div>';
+  }
+
+  // ── 4. INTERPRETATION ─────────────────────────────────────────────────────────
+  // 4a. Interpretive Context — conditional orientation, before core insight
+  if (d.interpretive_context) {
+    html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
+  }
+
+  // 4b. Core insight
+  if (d.core_insight) {
+    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
+  }
+
+  // Kingdom implication — preserved in DOM as hidden element for PDF export compatibility
+  html += '<div class="kingdom-block" style="display:none;"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(d.kingdom_implication || '') + '</div></div>';
+
+  // ── 4c. Framework Concept nodes ───────────────────────────────────────────────
+  var _conceptText = [d.recognition || '', d.core_insight || '', d.kingdom_implication || ''].join(' ');
+  var _conceptNodes = getConceptNodes(_conceptText);
+  if (_conceptNodes.length > 0) {
+    html += renderConceptNodes(_conceptNodes);
+  }
+
+  // ── 5. FOLLOW-UP QUERIES (collapsible, mirrors framework toggle) ──────────────
+  const threadSummary = (d.thread_summary || '').trim();
+  if (threadSummary) {
+    // Closure protocol — show thread summary instead
+    html += '<div class="qt-thread-summary">';
+    html += '<div class="qt-thread-summary-label">Where this conversation arrived</div>';
+    html += '<div class="qt-thread-summary-text">' + escHtml(threadSummary) + '</div>';
+    html += '<button class="qt-thread-summary-btn" onclick="startNewThreadWithSummary(this.dataset.summary)" data-summary="' + escHtml(threadSummary) + '">Continue the exploration →</button>';
+    html += '</div>';
+  } else {
+    const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
+    if (threads.length > 0) {
+      // Collapsible Follow-Up Queries section mirroring Framework toggle
+      html += '<button class="follow-up-queries-toggle" onclick="toggleFollowUpQueries(this)" aria-expanded="false">Follow-Up Queries</button>';
+      html += '<div class="follow-up-queries-body" id="followUpQueriesBody">';
+      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the Query</div><div class="qt-threads-sub">ⓘ Suggested questions designed to deepen, test, or extend the interpretation.</div>';
+      threads.forEach(function(t) {
+        html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
+      });
+      html += '</div></div>';
+    }
   }
 
   document.getElementById('resultContent').innerHTML = html;
@@ -3353,6 +3358,14 @@ function renderResult(d) {
   document.getElementById('resultContent').appendChild(rootControls);
 }
 
+
+function toggleFollowUpQueries(btn) {
+  const body = document.getElementById('followUpQueriesBody');
+  if (!body) return;
+  const isOpen = body.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen);
+  btn.textContent = isOpen ? 'Hide Follow-Up Queries' : 'Follow-Up Queries';
+}
 
 function toggleFramework(btn) {
   const body = document.getElementById('qtFrameworkBody');
