@@ -1083,7 +1083,16 @@
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--gold-pale);
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+  }
+  .qt-threads-sub {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-style: normal;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin-bottom: 16px;
   }
   .qt-thread-btn {
     display: block;
@@ -1158,7 +1167,7 @@
   /* Progressive disclosure toggle */
   .qt-framework-callout {
     font-family: var(--mono);
-    font-size: 10px;
+    font-size: 12px;
     font-style: normal;
     letter-spacing: 0.12em;
     color: var(--text-dim);
@@ -1255,7 +1264,7 @@
   }
   .follow-up-queries-body {
     display: none;
-    padding-top: 4px;
+    padding-top: 20px;
   }
   .follow-up-queries-body.open {
     display: block;
@@ -3373,7 +3382,7 @@ function renderResult(d) {
       frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body">' + termItems + '</div></div>';
     }
 
-    html += '<p class="qt-framework-callout">Every interpretation in The Prism is guided by the same interpretive framework. Expand the sections below to examine the reasoning behind this conclusion.</p>';
+    html += '<p class="qt-framework-callout">ⓘ Every interpretation in The Prism is guided by the same interpretive framework. Expand the sections below to examine the reasoning behind this conclusion.</p>';
     html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
   }
 
@@ -3423,7 +3432,7 @@ function renderResult(d) {
       // Collapsible Follow-Up Queries section mirroring Framework toggle
       html += '<button class="follow-up-queries-toggle" onclick="toggleFollowUpQueries(this)" aria-expanded="false">Follow-Up Queries</button>';
       html += '<div class="follow-up-queries-body" id="followUpQueriesBody">';
-      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the Query</div><div class="qt-threads-sub">Suggested questions designed to deepen, test, or extend the interpretation.</div>';
+      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the Query</div><div class="qt-threads-sub">ⓘ Suggested questions designed to deepen, test, or extend the interpretation.</div>';
       threads.forEach(function(t) {
         html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
       });
