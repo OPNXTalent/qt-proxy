@@ -15,7 +15,6 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/realtime.js" defer></script>
 <style>
@@ -1083,16 +1082,7 @@
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--gold-pale);
-    margin-bottom: 8px;
-  }
-  .qt-threads-sub {
-    font-family: var(--mono);
-    font-size: 12px;
-    font-style: normal;
-    letter-spacing: 0.12em;
-    color: var(--text-dim);
-    line-height: 1.7;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
   .qt-thread-btn {
     display: block;
@@ -1165,17 +1155,6 @@
   }
 
   /* Progressive disclosure toggle */
-  .qt-framework-callout {
-    font-family: var(--mono);
-    font-size: 12px;
-    font-style: normal;
-    letter-spacing: 0.12em;
-    color: var(--text-dim);
-    line-height: 1.7;
-    margin: 0 0 10px;
-    text-align: left;
-  }
-
   .qt-framework-toggle {
     display: block;
     width: 100%;
@@ -1202,77 +1181,9 @@
     display: block;
   }
 
-  /* Current Subject block */
-  .current-subject-block {
-    margin-bottom: 28px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--border);
-  }
-  .current-subject-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 10px;
-  }
-  .current-subject-text {
-    font-family: var(--crimson);
-    font-size: 22px;
-    color: var(--text);
-    line-height: 1.55;
-    font-style: italic;
-  }
-
-  /* Orientation block — replaces verse-banner as the contextual lead */
-  .orientation-block {
-    border-left: 2px solid var(--gold-dim);
-    padding: 20px 28px;
-    background: linear-gradient(135deg, rgba(201,168,76,0.04), transparent);
-    margin-bottom: 36px;
-  }
-  .orientation-block p {
-    font-family: var(--crimson);
-    font-size: 22px;
-    color: var(--gold-pale);
-    font-style: italic;
-    line-height: 1.65;
-    margin: 0;
-  }
-
-  /* Follow-Up Queries collapsible — mirrors framework toggle */
-  .follow-up-queries-toggle {
-    display: block;
-    width: 100%;
-    text-align: center;
-    background: transparent;
-    border: 1px solid var(--gold-dim);
-    color: var(--gold-pale);
-    font-family: var(--cinzel);
-    font-size: 13px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    padding: 12px 20px;
-    cursor: pointer;
-    margin-top: 28px;
-    margin-bottom: 0;
-    transition: all 0.25s;
-  }
-  .follow-up-queries-toggle:hover {
-    border-color: var(--gold);
-    color: var(--gold);
-  }
-  .follow-up-queries-body {
-    display: none;
-    padding-top: 20px;
-  }
-  .follow-up-queries-body.open {
-    display: block;
-  }
-
   /* Section block */
   .qt-section {
-    margin-bottom: 16px;
+    margin-bottom: 32px;
     border: 1px solid var(--border);
     background: var(--surface);
     overflow: hidden;
@@ -1281,15 +1192,15 @@
   .qt-section-head {
     display: flex;
     align-items: baseline;
-    gap: 12px;
-    padding: 10px 20px;
+    gap: 14px;
+    padding: 16px 24px;
     background: var(--surface-2);
     border-bottom: 1px solid var(--border);
   }
 
   .qt-section-num {
     font-family: var(--mono);
-    font-size:13px;
+    font-size:20px;
     color: var(--gold-dim);
     letter-spacing: 0.1em;
     flex-shrink: 0;
@@ -1297,7 +1208,7 @@
 
   .qt-section-title {
     font-family: var(--cinzel);
-    font-size:14px;
+    font-size:20px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--text);
@@ -1305,7 +1216,7 @@
   }
 
   .qt-section-hebrew {
-    font-size:16px;
+    font-size:21px;
     color: var(--hebrew);
     letter-spacing: 0.05em;
     font-family: var(--crimson);
@@ -1313,13 +1224,13 @@
   }
 
   .qt-section-body {
-    padding: 12px 20px;
-    font-size:16px;
-    color: var(--text-dim);
-    line-height: 1.65;
+    padding: 22px 24px;
+    font-size:22px;
+    color: var(--text);
+    line-height: 1.75;
   }
 
-  .qt-section-body p { margin-bottom: 8px; }
+  .qt-section-body p { margin-bottom: 12px; }
   .qt-section-body p:last-child { margin-bottom: 0; }
 
   /* Table inside sections */
@@ -2121,8 +2032,7 @@
     <div style="font-family:var(--crimson); font-size:27px; color:var(--hebrew); letter-spacing:0.08em; margin-bottom:16px; direction:rtl;">אֶחָד בֶּאֱמֶת</div>
     <div class="header-sub">Framework Interpreter</div>
     <div class="header-rule"></div>
-    <p class="header-premise">We’re all about six good questions away from IDK—“I don’t know.”
-<br>The Prism is for people who keep asking anyway.</p>
+    <p class="header-premise">A verse, a question, or whatever is on your mind. The Prism surfaces the relational architecture already present in the text.</p>
   </header>
 
   <!-- Anonymous back link — shown only to non-subscribers -->
@@ -2132,7 +2042,7 @@
   <div id="inputSection">
     <div class="input-wrap">
       <div style="position:relative;">
-        <textarea class="input-field" id="userInput" placeholder="We’re all about six good questions away from IDK—“I don’t know.”" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+        <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
         <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
       </div>
       <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -2323,10 +2233,10 @@
       <div style="display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap;">
 
         <!-- Save -->
-        <button onclick="downloadPDF('dark')"
+        <button onclick="window.print()"
             style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.2s;"
             onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border-lit)'"
-            title="Export as archival PDF">↓ Print</button>
+            title="Print this interpretation">↓ Print</button>
 
         <!-- Share -->
         <div style="position:relative; display:inline-flex; align-items:center; gap:6px;">
@@ -3365,7 +3275,57 @@ function renderResult(d) {
 
   let html = '';
 
-  // ── 1. FRAMEWORK FOR INTERPRETATION (collapsed, top of response) ─────────────
+  // Verse banner — show reference always when identified; text supplied by AI for all traditions
+  if (d.verse_identified) {
+    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text || '') + '</div></div>';
+  }
+
+  // 1. Recognition moment — unlabeled, pure prose, full breathing room
+  if (d.recognition) {
+    html += '<div class="qt-recognition"><p>' + escHtml(d.recognition) + '</p></div>';
+  }
+
+  // 2a. Interpretive Context — conditional orientation block, before core insight
+  if (d.interpretive_context) {
+    html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
+  }
+
+  // 2. Core insight — unlabeled, framework language now permitted
+  if (d.core_insight) {
+    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
+  }
+
+  // 3. Kingdom Implication — ceremonial arrival, immediately after the encounter
+  html += '<div class="kingdom-block"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(d.kingdom_implication || '') + '</div></div>';
+
+  // 4. Framework Concepts — keyword detection against full interpretation text
+  // Phase I: static data source. Phase II: swap getConceptNodes() to API/RAG — UI unchanged.
+  var _conceptText = [d.recognition || '', d.core_insight || '', d.kingdom_implication || ''].join(' ');
+  var _conceptNodes = getConceptNodes(_conceptText);
+  if (_conceptNodes.length > 0) {
+    html += renderConceptNodes(_conceptNodes);
+  }
+
+  // 5. Thread summary card OR suggested threads — mutually exclusive
+  const threadSummary = (d.thread_summary || '').trim();
+  if (threadSummary) {
+    html += '<div class="qt-thread-summary">';
+    html += '<div class="qt-thread-summary-label">Where this conversation arrived</div>';
+    html += '<div class="qt-thread-summary-text">' + escHtml(threadSummary) + '</div>';
+    html += '<button class="qt-thread-summary-btn" onclick="startNewThreadWithSummary(this.dataset.summary)" data-summary="' + escHtml(threadSummary) + '">Continue the exploration →</button>';
+    html += '</div>';
+  } else {
+    const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
+    if (threads.length > 0) {
+      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the exploration</div>';
+      threads.forEach(function(t) {
+        html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
+      });
+      html += '</div>';
+    }
+  }
+
+  // 5. Progressive disclosure toggle + framework architecture (collapsed by default)
   const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0);
   if (hasFramework) {
     let frameworkHtml = '';
@@ -3376,64 +3336,14 @@ function renderResult(d) {
     });
 
     if (d.key_terms && d.key_terms.length > 0) {
-      const termItems = d.key_terms.map(function(t) {
-        const hebrewSpan = t.hebrew ? ' <span style="color:var(--hebrew); font-size:15px; font-family:var(--crimson);">' + escHtml(t.hebrew) + '</span>' : '';
-        return '<p><strong style="color:var(--text); font-size:15px;">' + escHtml(t.term) + hebrewSpan + '</strong> — ' + escHtml(t.prism_meaning) + '</p>';
+      const termRows = d.key_terms.map(function(t) {
+        const hebrewSpan = t.hebrew ? ' <span style="color:var(--hebrew); font-size:20px;">' + escHtml(t.hebrew) + '</span>' : '';
+        return '<tr><td>' + escHtml(t.term) + hebrewSpan + '</td><td>' + escHtml(t.prism_meaning) + '</td></tr>';
       }).join('');
-      frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body">' + termItems + '</div></div>';
+      frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body" style="padding:0;"><table class="qt-table"><thead><tr><th>Term</th><th>Prism Meaning</th></tr></thead><tbody>' + termRows + '</tbody></table></div></div>';
     }
 
-    html += '<p class="qt-framework-callout">ⓘ Every interpretation in The Prism is guided by the same interpretive framework. Expand the sections below to examine the reasoning behind this conclusion.</p>';
     html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">View full framework interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
-  }
-
-  // ── 3. LEAD — orientation block replaces fixed Scripture opener ───────────────
-  if (d.recognition) {
-    html += '<div class="orientation-block"><p>' + escHtml(d.recognition) + '</p></div>';
-  }
-
-  // ── 4. INTERPRETATION ─────────────────────────────────────────────────────────
-  // 4a. Interpretive Context — conditional orientation, before core insight
-  if (d.interpretive_context) {
-    html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
-  }
-
-  // 4b. Core insight
-  if (d.core_insight) {
-    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
-  }
-
-  // Kingdom implication — preserved in DOM as hidden element for PDF export compatibility
-  html += '<div class="kingdom-block" style="display:none;"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(d.kingdom_implication || '') + '</div></div>';
-
-  // ── 4c. Framework Concept nodes ───────────────────────────────────────────────
-  var _conceptText = [d.recognition || '', d.core_insight || '', d.kingdom_implication || ''].join(' ');
-  var _conceptNodes = getConceptNodes(_conceptText);
-  if (_conceptNodes.length > 0) {
-    html += renderConceptNodes(_conceptNodes);
-  }
-
-  // ── 5. FOLLOW-UP QUERIES (collapsible, mirrors framework toggle) ──────────────
-  const threadSummary = (d.thread_summary || '').trim();
-  if (threadSummary) {
-    // Closure protocol — show thread summary instead
-    html += '<div class="qt-thread-summary">';
-    html += '<div class="qt-thread-summary-label">Where this conversation arrived</div>';
-    html += '<div class="qt-thread-summary-text">' + escHtml(threadSummary) + '</div>';
-    html += '<button class="qt-thread-summary-btn" onclick="startNewThreadWithSummary(this.dataset.summary)" data-summary="' + escHtml(threadSummary) + '">Continue the exploration →</button>';
-    html += '</div>';
-  } else {
-    const threads = Array.isArray(d.suggested_threads) ? d.suggested_threads.filter(function(t) { return t && t.trim(); }) : [];
-    if (threads.length > 0) {
-      // Collapsible Follow-Up Queries section mirroring Framework toggle
-      html += '<button class="follow-up-queries-toggle" onclick="toggleFollowUpQueries(this)" aria-expanded="false">Follow-Up Queries</button>';
-      html += '<div class="follow-up-queries-body" id="followUpQueriesBody">';
-      html += '<div class="qt-threads"><div class="qt-threads-label">Continue the Query</div><div class="qt-threads-sub">ⓘ Suggested questions designed to deepen, test, or extend the interpretation.</div>';
-      threads.forEach(function(t) {
-        html += '<button class="qt-thread-btn" onclick="submitSuggestedThread(this.dataset.thread, this)" data-thread="' + escHtml(t) + '">' + escHtml(t) + '</button>';
-      });
-      html += '</div></div>';
-    }
   }
 
   document.getElementById('resultContent').innerHTML = html;
@@ -3450,14 +3360,6 @@ function toggleFramework(btn) {
   const isOpen = body.classList.toggle('open');
   btn.setAttribute('aria-expanded', isOpen);
   btn.textContent = isOpen ? 'Hide framework interpretation' : 'View full framework interpretation';
-}
-
-function toggleFollowUpQueries(btn) {
-  const body = document.getElementById('followUpQueriesBody');
-  if (!body) return;
-  const isOpen = body.classList.toggle('open');
-  btn.setAttribute('aria-expanded', isOpen);
-  btn.textContent = isOpen ? 'Hide Follow-Up Queries' : 'Follow-Up Queries';
 }
 
 function submitSuggestedThread(text, btnEl) {
@@ -3515,287 +3417,6 @@ function stripHebrew(text) {
   return (text || '').replace(/[\u0590-\u05FF]+/g, '').replace(/\s+/g, ' ').trim();
 }
 
-async function downloadPDF(mode) {
-  // Fetch latest follow-ups before generating PDF to ensure R1 contributions are included.
-  // Guard: only re-render if follow-ups are NOT already present in the DOM — prevents
-  // the duplication bug where renderFUWithSource appends to blocks already rendered
-  // during the live session, causing the PDF collector to pick up every exchange twice.
-  const existingFUBlocks = document.querySelectorAll('#resultContent .fu-block');
-  if (activeThreadId && !activeThreadId.startsWith('pending-') && typeof userEmail === 'function' && userEmail() && existingFUBlocks.length === 0) {
-    try {
-      var fuRes = await fetch((window.API_BASE || '') + '/api/followups?threadId=' + encodeURIComponent(activeThreadId), {
-        headers: { 'x-user-email': userEmail() }
-      });
-      var fuData = await fuRes.json();
-      if (fuData.followUps && fuData.followUps.length > 0 && typeof renderFUWithSource === 'function') {
-        renderFUWithSource(fuData.followUps);
-      }
-    } catch(e) {}
-  }
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  const isDark = mode !== 'light';
-  const pageW = 210;
-  const pageH = 297;
-  const margin = 18;
-  const contentW = pageW - margin * 2;
-  let y = margin;
-
-  // Color schemes
-  const bg       = isDark ? [6, 6, 10]       : [255, 255, 255];
-  const bgSection= isDark ? [20, 20, 40]      : [240, 240, 248];
-  const gold     = isDark ? [201, 168, 76]    : [120, 90, 20];
-  const goldDim  = isDark ? [122, 98, 46]     : [150, 120, 50];
-  const bodyText = isDark ? [212, 212, 216]   : [30, 30, 40];
-  const dimText  = isDark ? [120, 120, 144]   : [90, 90, 110];
-  const footerBg = isDark ? [6, 6, 10]        : [245, 245, 250];
-
-  doc.setFillColor(...bg);
-  doc.rect(0, 0, pageW, pageH, 'F');
-
-  function checkPage(needed) {
-    if (y + needed > pageH - 18) {
-      doc.addPage();
-      doc.setFillColor(...bg);
-      doc.rect(0, 0, pageW, pageH, 'F');
-      y = margin;
-    }
-  }
-
-  function drawRule() {
-    doc.setDrawColor(...goldDim);
-    doc.setLineWidth(0.3);
-    doc.line(margin, y, pageW - margin, y);
-    y += 5;
-  }
-
-  function addBody(text, color, size) {
-    const cleaned = stripHebrew(text);
-    if (!cleaned) return;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(size || 10);
-    doc.setTextColor(...(color || bodyText));
-    const lines = doc.splitTextToSize(cleaned, contentW - 8);
-    checkPage(lines.length * 5 + 4);
-    doc.text(lines, margin + 4, y);
-    y += lines.length * 5 + 4;
-  }
-
-  // Paragraph-aware body renderer — splits on \n\n, adds gap between paragraphs
-  function addBodyParagraphs(text, color, size) {
-    const cleaned = stripHebrew(text);
-    if (!cleaned) return;
-    const lineH = (size || 10) === 10 ? 5 : (size / 2);
-    const paragraphs = cleaned.split(/\n{2,}/).map(p => p.replace(/\n/g, ' ').trim()).filter(p => p.length > 0);
-    paragraphs.forEach((para, i) => {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(size || 10);
-      doc.setTextColor(...(color || bodyText));
-      const lines = doc.splitTextToSize(para, contentW - 8);
-      checkPage(lines.length * lineH + 4);
-      doc.text(lines, margin + 4, y);
-      y += lines.length * lineH + (i < paragraphs.length - 1 ? 6 : 4); // 6pt gap between paragraphs
-    });
-  }
-
-  // Logo
-  const logoImg = document.querySelector('header img');
-  if (logoImg) {
-    try {
-      const logoData = logoImg.src; // already base64
-      const logoSize = 28;
-      doc.addImage(logoData, 'PNG', (pageW - logoSize) / 2, y, logoSize, logoSize);
-      y += logoSize + 6;
-    } catch(e) {
-      y += 4;
-    }
-  }
-
-  // HEADER
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.setTextColor(...gold);
-  doc.text('THE PRISM', pageW / 2, y + 8, { align: 'center' });
-  y += 14;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...goldDim);
-  doc.text('FRAMEWORK INTERPRETATION', pageW / 2, y, { align: 'center' });
-  y += 6;
-  doc.setFontSize(7);
-  doc.text('OPNX LLC  ·  © 2026 All Rights Reserved', pageW / 2, y, { align: 'center' });
-  y += 8;
-  drawRule();
-
-  // Subject
-  const subject = stripHebrew(document.getElementById('subjectText').textContent);
-  if (subject) {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(11);
-    doc.setTextColor(...dimText);
-    const sl = doc.splitTextToSize(`Subject: ${subject}`, contentW);
-    doc.text(sl, margin, y);
-    y += sl.length * 6 + 5;
-  }
-
-  // Verse banner
-  const verseRef = document.querySelector('.verse-ref');
-  const verseText = document.querySelector('.verse-text');
-  if (verseRef && verseText) {
-    checkPage(24);
-    doc.setFillColor(...bgSection);
-    const vLines = doc.splitTextToSize(stripHebrew(verseText.innerText), contentW - 12);
-    const vHeight = vLines.length * 6 + 18;
-    doc.rect(margin, y - 2, contentW, vHeight, 'F');
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(...goldDim);
-    doc.text(stripHebrew(verseRef.innerText).toUpperCase(), margin + 4, y + 4);
-    y += 9;
-    doc.setFont('helvetica', 'bolditalic');
-    doc.setFontSize(10);
-    doc.setTextColor(...gold);
-    doc.text(vLines, margin + 4, y);
-    y += vLines.length * 6 + 8;
-  }
-
-  // Recognition threshold
-  const recognitionEl = document.querySelector('.qt-recognition p');
-  if (recognitionEl) {
-    checkPage(20);
-    y += 4;
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(10);
-    doc.setTextColor(...dimText);
-    const rLines = doc.splitTextToSize(recognitionEl.innerText.trim(), contentW);
-    checkPage(rLines.length * 5 + 14);
-    doc.text(rLines, margin, y);
-    y += rLines.length * 5 + 10;
-  }
-
-  // Core insight
-  const coreInsightEl = document.querySelector('.qt-core-insight p');
-  if (coreInsightEl) {
-    checkPage(16);
-    y += 2;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(...bodyText);
-    const ciLines = doc.splitTextToSize(coreInsightEl.innerText.trim(), contentW);
-    checkPage(ciLines.length * 5 + 10);
-    doc.text(ciLines, margin, y);
-    y += ciLines.length * 5 + 10;
-  }
-
-  // Kingdom Implication — immediately after the encounter
-  const kingdomEl = document.querySelector('.kingdom-text');
-  if (kingdomEl) {
-    checkPage(32);
-    y += 4;
-    drawRule();
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...goldDim);
-    doc.text('KINGDOM IMPLICATION', pageW / 2, y, { align: 'center' });
-    y += 7;
-    doc.setFont('helvetica', 'bolditalic');
-    doc.setFontSize(11);
-    doc.setTextColor(...gold);
-    const kl = doc.splitTextToSize(stripHebrew(kingdomEl.innerText), contentW);
-    doc.text(kl, pageW / 2, y, { align: 'center' });
-    y += kl.length * 6 + 8;
-    drawRule();
-  }
-
-  // Suggested threads — listed as plain text
-  const threadBtns = document.querySelectorAll('.qt-thread-btn');
-  if (threadBtns.length > 0) {
-    checkPage(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(...goldDim);
-    doc.text('CONTINUE THE EXPLORATION', margin, y);
-    y += 6;
-    threadBtns.forEach(btn => {
-      const threadText = btn.innerText.replace(/^→\s*/, '').trim();
-      if (!threadText) return;
-      checkPage(10);
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(9);
-      doc.setTextColor(...dimText);
-      const tl = doc.splitTextToSize('— ' + threadText, contentW - 4);
-      doc.text(tl, margin + 4, y);
-      y += tl.length * 5 + 3;
-    });
-    y += 6;
-    drawRule();
-  }
-
-
-  // Follow-up exchanges — wrapped, with section header per exchange
-  const followUps = document.querySelectorAll('#resultContent .fu-block');
-  if (followUps.length > 0) {
-    checkPage(20);
-    drawRule();
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...goldDim);
-    doc.text('CONTINUED EXPLORATION', margin, y);
-    y += 8;
-    followUps.forEach(el => {
-      const questionEl = el.querySelector('.fu-question');
-      const bodyEl = el.querySelector('.fu-body');
-      const isRecipient = el.classList.contains('from-recipient');
-      if (questionEl) {
-        // Label recipient contributions
-        if (isRecipient) {
-          doc.setFont('helvetica', 'italic');
-          doc.setFontSize(7);
-          doc.setTextColor(...dimText);
-          doc.text('FROM THE PERSON YOU SHARED WITH', margin, y);
-          y += 6;
-        }
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        const qLines = doc.splitTextToSize(stripHebrew(questionEl.innerText), contentW);
-        const qHeight = qLines.length * 5 + 4;
-        checkPage(qHeight + 14);
-        doc.setTextColor(...gold);
-        doc.text(qLines, margin, y);
-        y += qHeight;
-      }
-      if (bodyEl) {
-        const paras = Array.from(bodyEl.querySelectorAll('p')).map(p => p.innerText.trim()).filter(t => t);
-        if (paras.length > 0) {
-          addBodyParagraphs(paras.join('\n\n'), dimText);
-        } else {
-          addBodyParagraphs(stripHebrew(bodyEl.innerText), dimText);
-        }
-      }
-      y += 6;
-    });
-  }
-
-  // Footer on every page
-  const totalPages = doc.getNumberOfPages();
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    doc.setFillColor(...footerBg);
-    doc.rect(0, pageH - 14, pageW, 14, 'F');
-    doc.setDrawColor(...goldDim);
-    doc.setLineWidth(0.3);
-    doc.line(margin, pageH - 14, pageW - margin, pageH - 14);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(...goldDim);
-    doc.text('OPNX LLC  ·  © 2026 All Rights Reserved  ·  The Prism Framework', pageW / 2, pageH - 7, { align: 'center' });
-    doc.text(`${p} / ${totalPages}`, pageW - margin, pageH - 7, { align: 'right' });
-  }
-
-  const filename = `Prism_${subject.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)}_${new Date().toISOString().slice(0,10)}_${isDark ? 'dark' : 'print'}.pdf`;
-  doc.save(filename);
-}
 
 // Closes the Archive sidebar overlay without hiding it permanently — used
 // whenever the person has just made a selection (New Subject, or picking a
@@ -7045,8 +6666,8 @@ function buildNodeControls(nodeId, queryText) {
   var archBtn = document.createElement('button');
   archBtn.className = 'node-ctrl-btn';
   archBtn.textContent = '↓ Print';
-  archBtn.title = 'Export as archival PDF';
-  archBtn.addEventListener('click', function(e) { e.stopPropagation(); downloadPDF('dark'); });
+  archBtn.title = 'Print this interpretation';
+  archBtn.addEventListener('click', function(e) { e.stopPropagation(); window.print(); });
   wrap.appendChild(archBtn);
 
   // Share
@@ -9703,6 +9324,188 @@ document.addEventListener('DOMContentLoaded', function() {
     color: var(--text-dim);
   }
   .cookie-btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+
+  /* ══════════════════════════════════════════════════════
+     @media print — WYSIWYG print view
+     Print directly from the live DOM.
+     Collapsed sections stay collapsed.
+     Expanded sections stay expanded.
+     No second renderer. No jsPDF. No maintenance burden.
+  ══════════════════════════════════════════════════════ */
+  @media print {
+
+    /* ── Reset to white page ───────────────────────────── */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+
+    html, body {
+      background: #ffffff !important;
+      color: #1a1a2e !important;
+      margin: 0;
+      padding: 0;
+      font-size: 11pt;
+    }
+
+    /* ── Remove UI chrome ─────────────────────────────── */
+    #sidebar,
+    #sidebarToggle,
+    #mainHeader,
+    #inputArea,
+    #governanceRow,
+    #saveSessionPanel,
+    #joinCirclePanel,
+    #keepQuestioningBar,
+    #pwaInstallBtn,
+    .hdr-btn,
+    .qt-framework-toggle,
+    .follow-up-queries-toggle,
+    .qt-thread-btn,
+    .qt-thread-summary-btn,
+    .node-controls,
+    .chat-input-area,
+    .char-count,
+    button,
+    input,
+    textarea,
+    nav,
+    footer,
+    .sidebar,
+    .refractions-panel,
+    .refractions-toggle,
+    #shareBtn,
+    #newSubjectBtn,
+    #interpretBtn {
+      display: none !important;
+    }
+
+    /* ── Show main content full width ─────────────────── */
+    #mainContent {
+      margin: 0 !important;
+      padding: 20mm 20mm 20mm 20mm !important;
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+
+    #resultContent {
+      display: block !important;
+      width: 100% !important;
+    }
+
+    /* ── Typography ───────────────────────────────────── */
+    body, p, div, span, li, td, th {
+      color: #1a1a2e !important;
+    }
+
+    h1, h2, h3,
+    .qt-section-title,
+    .qt-section-num,
+    .kingdom-label,
+    .qt-threads-label,
+    .current-subject-label,
+    .qt-ic-label {
+      color: #8a6a1e !important;
+    }
+
+    .qt-section-hebrew,
+    .verse-ref,
+    .qt-framework-callout,
+    .qt-threads-sub {
+      color: #666688 !important;
+    }
+
+    .orientation-block p,
+    .qt-recognition p {
+      color: #3a3a5e !important;
+      font-style: italic;
+    }
+
+    /* ── Preserve open/closed accordion state ─────────── */
+    /* Framework body: print only if .open */
+    .qt-framework-body:not(.open) {
+      display: none !important;
+    }
+    .qt-framework-body.open {
+      display: block !important;
+    }
+
+    /* Follow-up queries: print only if .open */
+    .follow-up-queries-body:not(.open) {
+      display: none !important;
+    }
+    .follow-up-queries-body.open {
+      display: block !important;
+    }
+
+    /* ── Page break control ───────────────────────────── */
+    .qt-section,
+    .orientation-block,
+    .qt-interpretive-context,
+    .qt-recognition,
+    .qt-core-insight,
+    .kingdom-block,
+    .qt-thread-summary,
+    .fu-block,
+    .refractions-note {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    /* ── Remove decorative backgrounds ───────────────── */
+    .qt-section,
+    .qt-section-head,
+    .qt-section-body,
+    .verse-banner,
+    .orientation-block,
+    .kingdom-block {
+      background: transparent !important;
+      background-image: none !important;
+    }
+
+    /* ── Borders in print ─────────────────────────────── */
+    .qt-section {
+      border: 1px solid #cccccc !important;
+      margin-bottom: 8pt !important;
+    }
+
+    .qt-section-head {
+      border-bottom: 1px solid #cccccc !important;
+      padding: 6pt 12pt !important;
+    }
+
+    .qt-section-body {
+      padding: 8pt 12pt !important;
+      font-size: 10pt !important;
+      line-height: 1.5 !important;
+    }
+
+    .orientation-block {
+      border-left: 2px solid #8a6a1e !important;
+      padding: 8pt 12pt !important;
+      margin-bottom: 12pt !important;
+    }
+
+    /* ── Thread buttons: show as plain text list ─────── */
+    .qt-thread-btn {
+      display: block !important;
+      background: none !important;
+      border: none !important;
+      border-bottom: 1px solid #eeeeee !important;
+      padding: 4pt 0 !important;
+      font-style: italic;
+      color: #444466 !important;
+      text-align: left !important;
+      cursor: default;
+    }
+
+    /* ── Page header on every page ───────────────────── */
+    @page {
+      margin: 18mm 18mm 22mm 18mm;
+      size: A4 portrait;
+    }
+  }
 </style>
 
 <div id="cookieConsent">
