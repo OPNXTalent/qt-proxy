@@ -3360,8 +3360,8 @@ function renderResult(d) {
   }
 
   // ── 2. LEAD — orientation block ───────────────────────────────────────────────
-if (d.recognition || d.core_insight) {
-    html += '<div class="orientation-block"><p>' + escHtml(d.recognition || d.core_insight) + '</p></div>';
+  if (d.recognition) {
+    html += '<div class="orientation-block"><p>' + escHtml(d.recognition) + '</p></div>';
   }
 
   // ── 3. INTERPRETATION ─────────────────────────────────────────────────────────
@@ -4650,7 +4650,7 @@ function startFollowUpPolling(threadId) {
       if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false);
     })
     .catch(function() {});
-  }, 8000);
+  }, 4000);
 }
 
 function getSupabaseClient() {
@@ -4697,6 +4697,14 @@ function startFollowUpRealtime(threadId) {
       })
       .subscribe(function(status) {
         console.log('[Realtime] status:', status, 'thread:', threadId);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('[Realtime] channel dropped — will reconnect in 5s');
+          setTimeout(function() {
+            if (activeThreadId === threadId) {
+              startFollowUpRealtime(threadId);
+            }
+          }, 5000);
+        }
       });
   } catch(err) {
     console.warn('[Realtime] failed to subscribe:', err.message);
@@ -6672,10 +6680,18 @@ async function renderDiscussionView() {
       stream.innerHTML = '<div class="chat-empty">No refractions yet.<br>Begin the conversation.</div>';
       return;
     }
-    var senderName = getChatParticipantName();
+    var myEmail = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+    var myName  = getChatParticipantName();
+    var myAnonId = getAnonSessionId();
     filtered.forEach(function(m) {
-      var isMine = m.message_type === 'sender';
-      var name   = isMine ? senderName : getParticipantLabel(m.display_name, m.message_type, m.session_token);
+      // isMine: true only if this message was sent by the current viewer
+      // Compare stored email for named participants, anon session for anonymous
+      var isMine = (m.message_type === 'sender' && m.display_name === myName && myEmail)
+                || (m.session_token && m.session_token === myAnonId);
+      // Always use the stored display_name from the DB — never infer from local state
+      var name = m.display_name
+        ? m.display_name
+        : getParticipantLabel(m.display_name, m.message_type, m.session_token);
       var div = document.createElement('div');
       div.className = 'chat-msg ' + (isMine ? 'mine' : 'theirs');
       var headerColor = null;
