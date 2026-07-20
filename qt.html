@@ -3360,8 +3360,8 @@ function renderResult(d) {
   }
 
   // ── 2. LEAD — orientation block ───────────────────────────────────────────────
-  if (d.recognition) {
-    html += '<div class="orientation-block"><p>' + escHtml(d.recognition) + '</p></div>';
+if (d.recognition || d.core_insight) {
+    html += '<div class="orientation-block"><p>' + escHtml(d.recognition || d.core_insight) + '</p></div>';
   }
 
   // ── 3. INTERPRETATION ─────────────────────────────────────────────────────────
