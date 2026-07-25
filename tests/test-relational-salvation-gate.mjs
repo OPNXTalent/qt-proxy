@@ -1,62 +1,13 @@
 // test-relational-salvation-gate.mjs
 // CLI regression test for shouldLoadRelationalSalvation()
 // Run: node test-relational-salvation-gate.mjs
+//
+// Sprint 1 correction: this test previously hand-copied the gate logic
+// instead of importing it, meaning it could pass while production behavior
+// drifted underneath it undetected. It now imports the real, exported
+// implementation from api/interpret.js.
 
-// ── Inline gate function (mirrors interpret.js exactly) ───────────────────────
-function shouldLoadRelationalSalvation(query) {
-  if (!query) return false;
-  const q = query.toLowerCase();
-
-  const directSalvationSignal = [
-    /\b(hell|hades|gehenna|lake of fire|eternal fire)\b/i,
-    /\b(damned|damnation|condemned|condemnation)\b/i,
-    /\bperish(es|ed|ing)?\b/i,
-    /never (heard|knew) (about|of) (jesus|god|christ|the gospel)/i,
-    /(born|raised|grew up) (in|as) (india|africa|china|a muslim|a buddhist|a hindu|another religion)/i,
-    /geographic(al)? (exposure|access|accident|lottery)/i,
-    /what (about|happens to) (people|someone|those) who never/i,
-    /(raised|born|grew up) (as|in) a? ?(christian|muslim|buddhist|hindu|jewish|religious|secular)/i,
-    /raised (christian|muslim|buddhist|hindu|jewish|catholic|protestant)/i,
-    /only because (i was born|of where i was born|of my birthplace|of my upbringing|my family)/i,
-    /(racist|immoral|wicked) christian.*(saved|heaven)/i,
-    /(compassionate|good|moral|kind) (hindu|buddhist|muslim|atheist).*(condemned|hell|perish)/i,
-    /romans 2.*(gentile|conscience|heart|law)/i,
-    /gentiles?.*(law|heart|conscience|judged)/i,
-    /god (send|sent|throw|cast|condemn).*(hell|perish|away)/i,
-    /send(s|ing)? people to hell/i,
-    /god (create|created|made).*(knowing|knew).*(hell|condemn|perish|burn)/i,
-    /not willing (that any|anyone) should perish/i,
-    /why (does|would|did) anyone perish/i,
-    /salvation.*(fair|fairness|just|equal|geography|culture|religion|birth)/i,
-    /who (can be|is|gets) saved/i,
-  ].some(p => p.test(q));
-
-  if (directSalvationSignal) return true;
-
-  const godSignal = [
-    'god', 'jesus', 'christ', 'yhwh', 'lord', 'holy spirit', 'calvinist', 'calvinism', 'arminian', 'arminianism',
-    'scripture', 'bible', 'biblical', 'theological', 'theology',
-    'christian', 'faith', 'covenant', 'divine',
-  ].some(t => q.includes(t));
-
-  const agencySignal = [
-    /\bforeknowledge\b/i,
-    /\bpredestination\b/i,
-    /\bpredestined\b/i,
-    /\bdeterminism\b/i,
-    /\bdetermined\b/i,
-    /\bprovidence\b/i,
-    /free will/i,
-    /\belect(ion|ed)?\b/i,
-    /if (god|he) knows (every|all|my|our|future)/i,
-    /does (god|he) control (every|all)/i,
-    /how can (prophecy|god's plan) (be certain|succeed|fail)/i,
-    /(caused|cause) (every|all) (decision|choice|action)/i,
-    /control (every|all) (decision|choice|action|event)/i,
-  ].some(p => p.test(q));
-
-  return godSignal && agencySignal;
-}
+import { shouldLoadRelationalSalvation } from '../api/interpret.js';
 
 // ── Test cases ────────────────────────────────────────────────────────────────
 const LOAD    = true;
