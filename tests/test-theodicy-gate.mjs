@@ -9,7 +9,7 @@
 //   2. Prompt composition: stub present in base, module appended only when triggered,
 //      matchCount and token estimates within expected ranges
 
-import { PRISM_THEODICY_MODULE } from './lib/prompt-modules/theodicy.js';
+import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
 
 // ── Inline the gate function for testing ─────────────────────────────────────
 // (mirrors the implementation in interpret.js exactly)
