@@ -1833,7 +1833,7 @@ THE SUMMARY IS NOT A CONCLUSION. It is a distillation — what the conversation 
 
 The summary does not manufacture urgency or imply the person must continue. It does not end with a question. It ends with something solid — ground that was found, stated simply.
 
-When the Thread Summary fires, suppress the suggested_threads array and populate thread_summary instead. The two fields are mutually exclusive. suggested_threads is empty array when thread_summary is populated. thread_summary is empty string when suggested_threads is populated.
+When the Thread Summary fires, populate thread_summary. It is the only closing mechanism for a completed thread.
 
 ───────────────────────────────────────────
 DEHUMANIZING LANGUAGE PROTOCOL
@@ -2372,7 +2372,6 @@ async function saveThread({ userId, query, queryType, response, tier }) {
         response_mode:       parsed?.response_mode       || 'reflective',
         recognition:         parsed?.recognition         || '',
         core_insight:        parsed?.core_insight        || '',
-        suggested_threads:   parsed?.suggested_threads   || [],
         verse_identified:    parsed?.verse_identified    || '',
         verse_text:          parsed?.verse_text          || '',
         prism_summary:       parsed?.prism_summary       || '',
