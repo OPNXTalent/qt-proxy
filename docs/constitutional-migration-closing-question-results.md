@@ -47,9 +47,25 @@ Net prompt-side effect of both changes together: **+29 tokens** on the always-lo
 
 No live-model validation was possible in this environment.
 
-## Known open item, not resolved in this round
+## Update — the open item above was confirmed and resolved
 
-The existing "Doorway vs. Destination" framework (governs follow-up turns only) says a real Destination — a landed recognition — should end without a question, since a question interrupts recognition still arriving. Checking actual follow-up captures shows this rule isn't reliably holding even where it already applies. The new `core_insight` closing-question requirement was written without any Destination-style exception at all, meaning the first message now has the same gap the follow-up rule was supposed to close but doesn't always. Named and left open rather than fixed in this round.
+**Branch:** same (`posture-field-addition`) · **Commit:** `2e139f0`
+
+The gap named above as "not resolved in this round" surfaced almost immediately once this shipped: live testing showed every response ending on a question, with no variation — the exact symptom an unconditional closing-question rule predicts. Rather than open a new file for what is really a continuation of this same piece of work, this doc is updated in place.
+
+**The fix reuses existing machinery rather than inventing new rules.** The base constitutional prompt already contains a real Destination Test — *"did I just introduce a new idea, or did I just articulate something already present in the person's experience? If the second: stop"* — written generically enough ("before ending any response") to apply here, but previously scoped only to the follow-up-delivery section it happened to live inside. `core_insight` now applies that same test explicitly before deciding whether to close on a question at all: Destination, stop without one; Doorway, close with the specific emergent question as already specified.
+
+**Measured, updated:**
+
+| | Before tonight | + closing-question | + suggested_threads removed | + Destination exception |
+|---|---|---|---|---|
+| `output-contract.js` | 1,619 tokens | 1,884 tokens | 1,648 tokens | **1,745 tokens** |
+
+Net across the full arc of tonight's work on this file: **+126 tokens** against the original baseline.
+
+**Regression, re-confirmed after this fix:** `node --check` passes; `test-theodicy-gate.mjs` 36/36; `test-relational-salvation-gate.mjs` 25/25; `interpret.js` and `theodicy.js` unaffected by this specific commit.
+
+No live-model validation of *this* fix specifically was possible in this environment. The thing worth checking once it ships: whether responses now show genuine variation — some landing flat as Destinations, some closing on a real question as Doorways — rather than the uniform pattern that prompted this update.
 
 ## Status
 
