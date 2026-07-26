@@ -3038,6 +3038,16 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
   }
 }
 
+// Experimental theodicy module switch, set via URL parameter for easy A/B
+// testing without redeploying: ?theodicy=quadrant or ?theodicy=protocol
+function getTheodicyDebugMode() {
+  const params = new URLSearchParams(window.location.search);
+  const val = params.get('theodicy');
+  if (val === 'quadrant') return 'theodicy-quadrant';
+  if (val === 'protocol') return 'theodicy-protocol';
+  return undefined;
+}
+
 async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
   // Streams plain text response directly into targetEl
   const userEmail = localStorage.getItem('qt_user_email') || null;
@@ -3047,7 +3057,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
     response = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '', isFollowUp: isFollowUp || false })
+      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '', isFollowUp: isFollowUp || false, debugMode: getTheodicyDebugMode() })
     });
   } catch (networkErr) {
     const err = new Error('NETWORK_ERROR');
@@ -3126,7 +3136,7 @@ async function callProxy(messages, rawQuery) {
     response = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '' })
+      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '', debugMode: getTheodicyDebugMode() })
     });
   } catch (networkErr) {
     const err = new Error('NETWORK_ERROR');
