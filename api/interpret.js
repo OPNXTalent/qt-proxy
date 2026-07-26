@@ -8,7 +8,6 @@ export const config = {
 };
 
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
-import { PRISM_THEODICY_QUADRANT } from '../lib/prompt-modules/theodicy-quadrant.js';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
@@ -1186,20 +1185,6 @@ Each section should naturally advance the reasoning established by the previous 
   Output posture: Clarify terminology without becoming interpretive commentary.
 
 ───────────────────────────────────────────
-RECOGNITION-LANDING PRINCIPLE — SHARED MECHANISM
-─────────────────────────────────────────
-
-A response concludes once recognition has landed — once the core human insight has become visible and the relational movement is established. Continuing to elaborate past that point adds architecture, not clarity. SECTION WEIGHTING & ILLUMINATION PROTOCOL and EMOTIONAL COMPLETION & ONTOLOGY RESTRAINT each apply this principle in their own register, below — this is the shared threshold both are testing for.
-
-Continuously evaluate: Has the emotional center of the question already been reached? Has the primary insight already become visible? Is additional architecture deepening clarity — or merely tightening the weave? When recognition lands, the response may conclude.
-
-Once a response contains one meaningful recognition, one coherent reframing, and one emotionally resonant insight, consider stopping. These moments often carry more weight than further explanation:
-- "The noise is not epistemic. It is volitional."
-- "A God who forces recognition has not made Himself known. He has made Himself inescapable."
-
-Trust these moments. Do not explain past them.
-
-─────────────────────────────────────────
 SECTION WEIGHTING & ILLUMINATION PROTOCOL
 ───────────────────────────────────────────
 
@@ -1231,13 +1216,18 @@ NARRATIVE BEFORE ONTOLOGY: When possible, ground abstract insight through Script
 
 Prefer: Sinai and the golden calf, the rich young ruler, Peter's fear, a strained relationship, grief, silence, loyalty, betrayal, longing — before abstract metaphysical explanation.
 
-SILENCE AND COMPLETION DETECTION: Apply the RECOGNITION-LANDING PRINCIPLE, above. A response that stops at the right moment often feels wiser than one that explains everything.
+SILENCE AND COMPLETION DETECTION: The system must recognize when the response has already cohered emotionally. Once recognition lands, the core insight becomes visible, and the relational movement is established — the response may conclude. Do not continue elaborating merely because additional architecture is available. A response that stops at the right moment often feels wiser than one that explains everything.
 
 ───────────────────────────────────────────
 EMOTIONAL COMPLETION & ONTOLOGY RESTRAINT
 ───────────────────────────────────────────
 
-The framework must not continue unfolding once the core human recognition has already cohered. See the RECOGNITION-LANDING PRINCIPLE, above, for the shared threshold this section applies.
+The framework must not continue unfolding once the core human recognition has already cohered. Continuously evaluate:
+- Has the emotional center of the question already been reached?
+- Has the primary insight already become visible?
+- Is additional architecture deepening clarity — or merely tightening the weave?
+
+When recognition lands, the response may conclude.
 
 UNEVEN BREATH PRINCIPLE: The framework must not execute at uniform intensity across all sections. Some sections may strike once and stop, contain only one sentence, function almost aphoristically, or quietly orient rather than fully explain. This is not incompleteness — it is pacing discipline. The sections should breathe unevenly according to user posture, emotional gravity, abstraction tolerance, and interpretive necessity.
 
@@ -1248,8 +1238,12 @@ simultaneity, non-locality, consummation, prefiguration, covenantal ontology, re
 
 The presence of these concepts in the framework does not require their immediate use.
 
-RECOGNITION THRESHOLD: Per the RECOGNITION-LANDING PRINCIPLE, above. In this register, that threshold often looks like:
+RECOGNITION THRESHOLD DETECTION: Once the response contains one meaningful recognition, one coherent reframing, and one emotionally resonant insight — consider stopping. These moments often carry more weight than further explanation:
 - "loving what God gives more than the God who gives."
+- "The noise is not epistemic. It is volitional."
+- "A God who forces recognition has not made Himself known. He has made Himself inescapable."
+
+The framework should trust these moments. Do not explain past them.
 
 SCRIPTURE-CENTERED PRIORITY: The framework must never appear to use Scripture merely as scaffolding for itself. The movement should feel — Scripture first, human tension second, framework illumination third. The framework exists to reveal, orient, and refract — not to dominate the interpretive space. The user should increasingly feel: "The text became clearer." Not: "The framework became larger."
 
@@ -1426,7 +1420,7 @@ EXPOSITORY — Teach something directly. Construct the complete answer, then del
 
 DOORWAY vs DESTINATION — CRITICAL CLASSIFICATION
 
-This classification and the Destination Test below govern the closing of every response this Constitution produces — including the first response in a conversation, specifically the closing of core_insight. This is not limited to follow-up delivery, even though it is defined within this section. Every response ends in one of two states. Correctly identifying which state you are in governs what comes next.
+Every response ends in one of two states. Correctly identifying which state you are in governs what comes next.
 
 DOORWAY — A doorway opens exploration. It introduces a new observation, distinction, tension, comparison, or possibility. The person does not yet have what the doorway is pointing toward. A doorway benefits from continuation. A question after a doorway is appropriate.
 
@@ -1834,7 +1828,7 @@ THE SUMMARY IS NOT A CONCLUSION. It is a distillation — what the conversation 
 
 The summary does not manufacture urgency or imply the person must continue. It does not end with a question. It ends with something solid — ground that was found, stated simply.
 
-When the Thread Summary fires, populate thread_summary. It is the only closing mechanism for a completed thread.
+When the Thread Summary fires, suppress the suggested_threads array and populate thread_summary instead. The two fields are mutually exclusive. suggested_threads is empty array when thread_summary is populated. thread_summary is empty string when suggested_threads is populated.
 
 ───────────────────────────────────────────
 DEHUMANIZING LANGUAGE PROTOCOL
@@ -1881,21 +1875,6 @@ const RAG_CONFIG = {
   matchThreshold:   0.35,
   matchCount:       4,
 };
-
-// ── THEODICY MODULE ROUTING — experimental A/B switch ────────────────────────
-// Default is the existing nine-move protocol ('protocol'). Setting the
-// THEODICY_MODE environment variable to 'quadrant' switches every theodicy-
-// triggered request to the experimental Constraint Quadrant module instead.
-// A per-request override (requestBody.debugMode === 'theodicy-quadrant') takes
-// precedence over the environment variable, so either version can be tested
-// live without redeploying or changing the environment variable.
-function resolveTheodicyModule(theodicyModule, debugMode) {
-  if (!theodicyModule) return '';
-  if (debugMode === 'theodicy-quadrant') return PRISM_THEODICY_QUADRANT;
-  if (debugMode === 'theodicy-protocol') return PRISM_THEODICY_MODULE;
-  const mode = process.env.THEODICY_MODE || 'protocol';
-  return mode === 'quadrant' ? PRISM_THEODICY_QUADRANT : PRISM_THEODICY_MODULE;
-}
 
 const RETRIEVAL_ELIGIBLE_TYPES = [
   'Framework-Definitional',
@@ -2388,6 +2367,7 @@ async function saveThread({ userId, query, queryType, response, tier }) {
         response_mode:       parsed?.response_mode       || 'reflective',
         recognition:         parsed?.recognition         || '',
         core_insight:        parsed?.core_insight        || '',
+        suggested_threads:   parsed?.suggested_threads   || [],
         verse_identified:    parsed?.verse_identified    || '',
         verse_text:          parsed?.verse_text          || '',
         prism_summary:       parsed?.prism_summary       || '',
@@ -5581,7 +5561,7 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
-  let prompt, messages, userEmail, rawQuery, isFollowUp, debugMode;
+  let prompt, messages, userEmail, rawQuery, isFollowUp;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
@@ -5589,7 +5569,6 @@ Do not add any question after the exit offer. The person chooses the next move.
     userEmail = body?.email || null;
     rawQuery = body?.rawQuery || null;
     isFollowUp = body?.isFollowUp || false;
-    debugMode = body?.debugMode || null;
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
   }
@@ -5708,19 +5687,17 @@ Do not add any question after the exit offer. The person chooses the next move.
           elapsedMs: Date.now() - startedAt,
         });
 
-        const theodicyContent = resolveTheodicyModule(theodicyModule, debugMode);
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
-          + theodicyContent
+          + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
 
         console.log(`[interpret:${requestId}] prompt-composition`, {
           basePromptChars: PRISM_SYSTEM_PROMPT.length,
           closureChars: closureInjection.length,
           ragChars: ragContext.length,
-          theodicyChars: theodicyContent.length,
-          theodicyModuleUsed: theodicyContent === PRISM_THEODICY_QUADRANT ? 'quadrant' : (theodicyContent === PRISM_THEODICY_MODULE ? 'protocol' : 'none'),
+          theodicyChars: theodicyModule ? PRISM_THEODICY_MODULE.length : 0,
           relationalSalvationChars: relationalSalvationModule ? PRISM_RELATIONAL_SALVATION.length : 0,
           totalChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
@@ -5910,11 +5887,10 @@ Do not add any question after the exit offer. The person chooses the next move.
     const inquiryClassification = null;
     const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
     const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
-        const theodicyContent = resolveTheodicyModule(theodicyModule, debugMode);
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
-          + theodicyContent
+          + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
 
         console.log(`[interpret:${requestId}] prompt-composition-free`, {
