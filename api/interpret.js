@@ -8,6 +8,7 @@ export const config = {
 };
 
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
+import { PRISM_THEODICY_QUADRANT } from '../lib/prompt-modules/theodicy-quadrant.js';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
@@ -1880,6 +1881,22 @@ const RAG_CONFIG = {
   matchThreshold:   0.35,
   matchCount:       4,
 };
+
+// ── THEODICY MODULE ROUTING — experimental A/B switch ────────────────────────
+// Default is the existing nine-move protocol ('protocol'). Setting the
+// THEODICY_MODE environment variable to 'quadrant' switches every theodicy-
+// triggered request to the experimental Constraint Quadrant module instead.
+// A per-request override (requestBody.debugMode === 'theodicy-quadrant') takes
+// precedence over the environment variable, so either version can be tested
+// live without redeploying or changing the environment variable.
+function resolveTheodicyModule(theodicyModule, requestBody) {
+  if (!theodicyModule) return '';
+  const perRequestOverride = requestBody?.debugMode;
+  if (perRequestOverride === 'theodicy-quadrant') return PRISM_THEODICY_QUADRANT;
+  if (perRequestOverride === 'theodicy-protocol') return PRISM_THEODICY_MODULE;
+  const mode = process.env.THEODICY_MODE || 'protocol';
+  return mode === 'quadrant' ? PRISM_THEODICY_QUADRANT : PRISM_THEODICY_MODULE;
+}
 
 const RETRIEVAL_ELIGIBLE_TYPES = [
   'Framework-Definitional',
@@ -5691,17 +5708,19 @@ Do not add any question after the exit offer. The person chooses the next move.
           elapsedMs: Date.now() - startedAt,
         });
 
+        const theodicyContent = resolveTheodicyModule(theodicyModule, body);
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
-          + (theodicyModule ? PRISM_THEODICY_MODULE : '')
+          + theodicyContent
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
 
         console.log(`[interpret:${requestId}] prompt-composition`, {
           basePromptChars: PRISM_SYSTEM_PROMPT.length,
           closureChars: closureInjection.length,
           ragChars: ragContext.length,
-          theodicyChars: theodicyModule ? PRISM_THEODICY_MODULE.length : 0,
+          theodicyChars: theodicyContent.length,
+          theodicyModuleUsed: theodicyContent === PRISM_THEODICY_QUADRANT ? 'quadrant' : (theodicyContent === PRISM_THEODICY_MODULE ? 'protocol' : 'none'),
           relationalSalvationChars: relationalSalvationModule ? PRISM_RELATIONAL_SALVATION.length : 0,
           totalChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
@@ -5891,10 +5910,11 @@ Do not add any question after the exit offer. The person chooses the next move.
     const inquiryClassification = null;
     const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
     const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
+        const theodicyContent = resolveTheodicyModule(theodicyModule, body);
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
-          + (theodicyModule ? PRISM_THEODICY_MODULE : '')
+          + theodicyContent
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
 
         console.log(`[interpret:${requestId}] prompt-composition-free`, {
