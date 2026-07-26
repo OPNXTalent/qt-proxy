@@ -1889,11 +1889,10 @@ const RAG_CONFIG = {
 // A per-request override (requestBody.debugMode === 'theodicy-quadrant') takes
 // precedence over the environment variable, so either version can be tested
 // live without redeploying or changing the environment variable.
-function resolveTheodicyModule(theodicyModule, requestBody) {
+function resolveTheodicyModule(theodicyModule, debugMode) {
   if (!theodicyModule) return '';
-  const perRequestOverride = requestBody?.debugMode;
-  if (perRequestOverride === 'theodicy-quadrant') return PRISM_THEODICY_QUADRANT;
-  if (perRequestOverride === 'theodicy-protocol') return PRISM_THEODICY_MODULE;
+  if (debugMode === 'theodicy-quadrant') return PRISM_THEODICY_QUADRANT;
+  if (debugMode === 'theodicy-protocol') return PRISM_THEODICY_MODULE;
   const mode = process.env.THEODICY_MODE || 'protocol';
   return mode === 'quadrant' ? PRISM_THEODICY_QUADRANT : PRISM_THEODICY_MODULE;
 }
@@ -5582,7 +5581,7 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
-  let prompt, messages, userEmail, rawQuery, isFollowUp;
+  let prompt, messages, userEmail, rawQuery, isFollowUp, debugMode;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
@@ -5590,6 +5589,7 @@ Do not add any question after the exit offer. The person chooses the next move.
     userEmail = body?.email || null;
     rawQuery = body?.rawQuery || null;
     isFollowUp = body?.isFollowUp || false;
+    debugMode = body?.debugMode || null;
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
   }
@@ -5708,7 +5708,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           elapsedMs: Date.now() - startedAt,
         });
 
-        const theodicyContent = resolveTheodicyModule(theodicyModule, body);
+        const theodicyContent = resolveTheodicyModule(theodicyModule, debugMode);
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
@@ -5910,7 +5910,7 @@ Do not add any question after the exit offer. The person chooses the next move.
     const inquiryClassification = null;
     const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
     const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
-        const theodicyContent = resolveTheodicyModule(theodicyModule, body);
+        const theodicyContent = resolveTheodicyModule(theodicyModule, debugMode);
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
