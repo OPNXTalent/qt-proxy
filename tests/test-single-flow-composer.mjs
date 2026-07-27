@@ -50,6 +50,20 @@ assert.match(
 );
 assert.match(
   frontend,
+  /id="queryPrintBtn"[\s\S]*onclick="window\.print\(\)"[\s\S]*>Print<\/button>/,
+  'Print must remain available beneath the composer',
+);
+
+const nodeControlsStart = frontend.indexOf('function buildNodeControls(nodeId, queryText) {');
+const nodeControlsEnd = frontend.indexOf('function focusRefractionNode(', nodeControlsStart);
+const nodeControlsFlow = frontend.slice(nodeControlsStart, nodeControlsEnd);
+assert.doesNotMatch(
+  nodeControlsFlow,
+  /node-share-btn|textContent = 'Share'|textContent = '↓ Print'/,
+  'Per-response controls must omit redundant Share and Print actions',
+);
+assert.match(
+  frontend,
   /function showResult\(preserveScroll\)[\s\S]*if \(!preserveScroll\)/,
   'Result rendering must support preserving the reading position',
 );

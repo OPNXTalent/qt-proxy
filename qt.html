@@ -2254,8 +2254,11 @@
           <span class="query-state-dot" id="queryStateDot"
             style="position:absolute;left:calc(5.5em + 10px);"></span>
         </div>
-        <!-- Right: artifact governance — anchored, never moves -->
-        <div style="display:flex;align-items:center;gap:0;flex-shrink:0;"></div>
+        <!-- Right: the one persistent artifact action -->
+        <div style="display:flex;align-items:center;gap:0;flex-shrink:0;">
+          <button class="query-secondary-btn" id="queryPrintBtn"
+            onclick="window.print()" title="Print this conversation">Print</button>
+        </div>
       </div>
 
       <!-- Address layer — always mounted, fades in/out -->
@@ -5758,7 +5761,6 @@ async function deactivateShare() {
   allThreads = allThreads.map(function(t) {
     return t.id === activeThreadId ? Object.assign({}, t, { collaboration_open: false }) : t;
   });
-  syncNodeShareButtons();
   updateSessionGovernanceUI();
   updateSidebarSharedDot(activeThreadId, false);
 
@@ -5853,7 +5855,6 @@ async function handleShareBtn() {
 
     // Track this thread as open
     _openThreadIds.add(activeThreadId);
-    syncNodeShareButtons();
     updateSessionGovernanceUI();
     updateSidebarSharedDot(activeThreadId, true);
 
@@ -6910,25 +6911,6 @@ function buildNodeControls(nodeId, queryText) {
   wrap.className = 'node-controls';
   wrap.dataset.nodeId = nodeId;
 
-  // Print
-  var archBtn = document.createElement('button');
-  archBtn.className = 'node-ctrl-btn';
-  archBtn.textContent = '↓ Print';
-  archBtn.title = 'Print this interpretation';
-  archBtn.addEventListener('click', function(e) { e.stopPropagation(); window.print(); });
-  wrap.appendChild(archBtn);
-
-  // Share
-  var shareBtn = document.createElement('button');
-  shareBtn.className = 'node-ctrl-btn node-share-btn';
-  shareBtn.textContent = window._shareActive ? 'Shared ✓' : 'Share';
-  if (window._shareActive) shareBtn.classList.add('share-active');
-  shareBtn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    handleShareBtn();
-  });
-  wrap.appendChild(shareBtn);
-
   // Refractions
   var refBtn = document.createElement('button');
   refBtn.className = 'node-ctrl-btn node-refraction-btn';
@@ -6941,20 +6923,6 @@ function buildNodeControls(nodeId, queryText) {
   wrap.appendChild(refBtn);
 
   return wrap;
-}
-
-// Update all node Share buttons when share state changes
-function syncNodeShareButtons() {
-  var btns = document.querySelectorAll('.node-share-btn');
-  btns.forEach(function(btn) {
-    if (window._shareActive) {
-      btn.textContent = 'Shared ✓';
-      btn.classList.add('share-active');
-    } else {
-      btn.textContent = 'Share';
-      btn.classList.remove('share-active');
-    }
-  });
 }
 
 function focusRefractionNode(nodeId, queryText) {
