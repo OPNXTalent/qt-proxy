@@ -2809,7 +2809,7 @@ async function runInterpretation() {
       document.getElementById('resultContent').appendChild(truncNotice);
     }
 
-    showResult();
+    showResult(true);
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
         if (parsed.recognition && !prismEarlyRecognitionRequests.has(requestId)) {
@@ -3446,11 +3446,13 @@ function getErrorMessage(err) {
   </div>`;
 }
 
-function showResult() {
+function showResult(preserveScroll) {
   document.getElementById('loadingBlock').classList.remove('visible');
   document.getElementById('resultBlock').classList.add('visible');
   document.getElementById('newSubjectTopBtn').style.display = 'block';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!preserveScroll) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 function findLastContextQuestion(text) {

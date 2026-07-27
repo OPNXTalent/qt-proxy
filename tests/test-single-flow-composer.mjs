@@ -38,5 +38,15 @@ assert.match(
   /function stageComposerBelowResponse\(\)[\s\S]*section\.appendChild\(composer\)[\s\S]*async function runInterpretation\(\)[\s\S]*stageComposerBelowResponse\(\)[\s\S]*loadingBlock/,
   'The composer must move below the response as soon as interpretation begins',
 );
+assert.match(
+  frontend,
+  /function showResult\(preserveScroll\)[\s\S]*if \(!preserveScroll\)/,
+  'Result rendering must support preserving the reading position',
+);
+assert.match(
+  frontend,
+  /async function runInterpretation\(\)[\s\S]*renderResult\(parsed\)[\s\S]*showResult\(true\)/,
+  'A completed live query must preserve its reading position',
+);
 
 console.log('Single-flow composer contract checks passed.');
