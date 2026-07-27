@@ -4344,17 +4344,11 @@ function enterSharedThread(share) {
   // which would be wrong here), so that has to happen here instead.
   var sidebarEl = document.getElementById('sidebar');
   var toggleEl  = document.getElementById('sidebarToggle');
-  if (sidebarEl) sidebarEl.classList.add('visible');
-  if (toggleEl)  toggleEl.classList.add('visible');
-  var emailNow = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
-  if (!emailNow) {
-    // Anonymous — same default-open behavior ordinary anon browsing
-    // already uses in initSidebar()'s own "no identity" branch.
-    if (sidebarEl) sidebarEl.classList.add('open');
-    if (toggleEl)  toggleEl.textContent = '‹';
-    var mcEl = document.getElementById('mainContent');
-    if (mcEl) mcEl.classList.add('sidebar-open');
-  }
+  if (sidebarEl) { sidebarEl.classList.add('visible'); sidebarEl.classList.remove('open'); }
+  if (toggleEl)  { toggleEl.classList.add('visible'); toggleEl.textContent = '☰'; }
+  var mcEl = document.getElementById('mainContent');
+  if (mcEl) mcEl.classList.remove('sidebar-open');
+  sidebarOpen = false;
 
   // Sender attribution — "so-and-so shared this with you." Falls back to
   // a generic phrase if no display name is on file. NOTE: #sharedByBanner
@@ -5402,6 +5396,14 @@ function initSidebar() {
 
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
+  var mainContent = document.getElementById('mainContent');
+
+  // Begin every visit with a clean reading surface. Archive remains
+  // available from its toggle but never opens itself.
+  sidebarOpen = false;
+  if (sidebar) sidebar.classList.remove('open');
+  if (mainContent) mainContent.classList.remove('sidebar-open');
+  if (toggle) toggle.textContent = '☰';
 
   // R1 new session — start fresh, don't load S1's thread history
   if (sessionStorage.getItem('prism_r1_session')) {
@@ -5409,11 +5411,8 @@ function initSidebar() {
     sessionStorage.setItem('prism_r1_active', '1');
     allThreads = [];
     renderThreads(allThreads);
-    if (sidebar) { sidebar.classList.add('visible'); sidebar.classList.add('open'); }
-    if (toggle)  { toggle.classList.add('visible'); toggle.textContent = '‹'; }
-    var mc = document.getElementById('mainContent');
-    if (mc) mc.classList.add('sidebar-open');
-    sidebarOpen = true;
+    if (sidebar) sidebar.classList.add('visible');
+    if (toggle)  toggle.classList.add('visible');
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
     if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
@@ -5424,11 +5423,8 @@ function initSidebar() {
   if (!email) {
     allThreads = [];
     renderThreads(allThreads);
-    if (sidebar) { sidebar.classList.add('visible'); sidebar.classList.add('open'); }
-    if (toggle)  { toggle.classList.add('visible'); toggle.textContent = '‹'; }
-    var mcAnon = document.getElementById('mainContent');
-    if (mcAnon) mcAnon.classList.add('sidebar-open');
-    sidebarOpen = true;
+    if (sidebar) sidebar.classList.add('visible');
+    if (toggle)  toggle.classList.add('visible');
     sidebarHasAppeared = true;
     loadSidebarCreditsAnon();
     return;
@@ -5444,15 +5440,9 @@ function initSidebar() {
   }
 
   var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
-  var wasOpen     = localStorage.getItem('qt_sidebar_open') === '1';
   if (hasAppeared && sidebar) {
     sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
     sidebarHasAppeared = true;
-    if (wasOpen) {
-      sidebarOpen = true; sidebar.classList.add('open');
-      var mc = document.getElementById('mainContent'); if (mc) mc.classList.add('sidebar-open');
-      if (toggle) toggle.textContent = '‹';
-    }
   }
 
   fetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': email } })
@@ -5479,11 +5469,6 @@ function initSidebar() {
     if (allThreads.length > 0 && sidebar) {
       sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
       sidebarHasAppeared = true; localStorage.setItem('qt_sidebar_appeared', '1');
-      if (!sidebarOpen) {
-        sidebarOpen = true; sidebar.classList.add('open');
-        var mc2 = document.getElementById('mainContent'); if (mc2) mc2.classList.add('sidebar-open');
-        if (toggle) toggle.textContent = '‹';
-      }
     }
     renderThreads(allThreads);
 

@@ -87,4 +87,19 @@ assert.match(
   'Archive refresh must migrate the local response and start Realtime without rerendering',
 );
 
+const initSidebarStart = frontend.indexOf('function initSidebar() {');
+const initSidebarEnd = frontend.indexOf('async function handleLogout()', initSidebarStart);
+assert.ok(initSidebarStart >= 0 && initSidebarEnd > initSidebarStart, 'Sidebar initialization flow must exist');
+const initSidebarFlow = frontend.slice(initSidebarStart, initSidebarEnd);
+assert.match(
+  initSidebarFlow,
+  /sidebarOpen = false[\s\S]*sidebar\.classList\.remove\('open'\)[\s\S]*mainContent\.classList\.remove\('sidebar-open'\)/,
+  'Every visit must initialize Archive in its closed state',
+);
+assert.doesNotMatch(
+  initSidebarFlow,
+  /wasOpen|sidebar\.classList\.add\('open'\)|mainContent\.classList\.add\('sidebar-open'\)/,
+  'Archive must not reopen itself from saved or populated state',
+);
+
 console.log('Single-flow composer contract checks passed.');
