@@ -5255,6 +5255,36 @@ export function getReversingHermonGuidance() {
 // ============================================================
 
 
+export function createSseWriter(res, timing, isAborted = () => false) {
+  let terminalType = null;
+
+  return {
+    write(event, details = {}) {
+      if (isAborted() || res.destroyed || res.writableEnded || terminalType) {
+        timing('sse_write_skipped', {
+          eventType: event?.type || 'unknown',
+          terminalType,
+          aborted: isAborted(),
+        });
+        return false;
+      }
+
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+
+      if (event.type === 'done' || event.type === 'error') {
+        terminalType = event.type;
+        timing(event.type === 'done' ? 'done_sent' : 'error_sent', details);
+      }
+
+      return true;
+    },
+    get terminalType() {
+      return terminalType;
+    },
+  };
+}
+
+
 export default async function handler(req, res) {
   const startedAt = Date.now();
   const correlationBody = (() => {
@@ -5280,13 +5310,18 @@ export default async function handler(req, res) {
     });
   };
 
+  let clientAborted = false;
   res.setHeader('X-Prism-Request-Id', requestId);
-  req.once('aborted', () => timing('client_abort'));
+  req.once('aborted', () => {
+    clientAborted = true;
+    timing('client_abort');
+  });
   res.once('close', () => timing('response_closed', {
     statusCode: res.statusCode,
     writableEnded: res.writableEnded,
   }));
   timing('request_start', { method: req.method });
+  const sse = createSseWriter(res, timing, () => clientAborted);
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -5828,8 +5863,10 @@ Do not add any question after the exit offer. The person chooses the next move.
             status: anthropicRes.status,
             body: errText.slice(0, 500),
           });
-          res.write(`data: ${JSON.stringify({ type: 'error', error: errText })}\n\n`);
-          timing('error_sent', { source: 'anthropic_response', status: anthropicRes.status });
+          sse.write(
+            { type: 'error', error: errText },
+            { source: 'anthropic_response', status: anthropicRes.status },
+          );
           return res.end();
         }
 
@@ -5858,12 +5895,10 @@ Do not add any question after the exit offer. The person chooses the next move.
                     timing('first_upstream_delta');
                   }
                   fullResponse += parsed.delta.text;
-                  res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+                  sse.write({ type: 'delta', text: parsed.delta.text });
                 } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-                  res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
+                  sse.write({ type: 'truncated' });
                 } else if (parsed.type === 'message_stop') {
-                  res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
-                  timing('done_sent', { source: 'upstream_message_stop', tier });
                   streamDone = true;
                   timing('anthropic_message_stop');
                 }
@@ -5885,12 +5920,10 @@ Do not add any question after the exit offer. The person chooses the next move.
                     timing('first_upstream_delta');
                   }
                   fullResponse += parsed.delta.text;
-                  res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+                  sse.write({ type: 'delta', text: parsed.delta.text });
                 } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-                  res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
+                  sse.write({ type: 'truncated' });
                 } else if (parsed.type === 'message_stop') {
-                  res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
-                  timing('done_sent', { source: 'final_buffer_message_stop', tier });
                   streamDone = true;
                   timing('anthropic_message_stop');
                 }
@@ -5910,11 +5943,18 @@ Do not add any question after the exit offer. The person chooses the next move.
           timing('coherence_complete', { corrected: checkedResponse !== fullResponse });
           if (checkedResponse !== fullResponse) {
             // Send corrected event — client replaces accumulated fullText
-            res.write(`data: ${JSON.stringify({ type: 'corrected', text: checkedResponse })}\n\n`);
+            sse.write({ type: 'corrected', text: checkedResponse });
             fullResponse = checkedResponse;
           }
-          res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
-          timing('done_sent', { source: 'post_coherence', tier });
+          sse.write(
+            { type: 'done', tier },
+            { source: 'post_coherence', tier },
+          );
+        } else {
+          sse.write(
+            { type: 'error', error: 'UPSTREAM_STREAM_INCOMPLETE' },
+            { source: 'upstream_stream_incomplete', tier },
+          );
         }
 
         if (streamDone && userId) {
@@ -5964,6 +6004,11 @@ Do not add any question after the exit offer. The person chooses the next move.
     if (!res.headersSent) {
       return res.status(500).json({ error: 'INTERPRET_FAILED', message: err?.message || 'Unknown error' });
     }
+    sse.write(
+      { type: 'error', error: err?.message || 'INTERPRET_FAILED' },
+      { source: 'subscriber_path_exception' },
+    );
+    return res.end();
   }
 
   // ── FREE / ANONYMOUS PATH ─────────────────────────────────────────────────
@@ -6059,8 +6104,10 @@ Do not add any question after the exit offer. The person chooses the next move.
 
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();
-      res.write(`data: ${JSON.stringify({ type: 'error', error: errText })}\n\n`);
-      timing('error_sent', { source: 'anthropic_response', status: anthropicRes.status });
+      sse.write(
+        { type: 'error', error: errText },
+        { source: 'anthropic_response', status: anthropicRes.status },
+      );
       return res.end();
     }
 
@@ -6089,9 +6136,9 @@ Do not add any question after the exit offer. The person chooses the next move.
                 timing('first_upstream_delta');
               }
               fullResponseFree += parsed.delta.text;
-              res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+              sse.write({ type: 'delta', text: parsed.delta.text });
             } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-              res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
+              sse.write({ type: 'truncated' });
             } else if (parsed.type === 'message_stop') {
               streamDoneFree = true;
               timing('anthropic_message_stop');
@@ -6114,9 +6161,9 @@ Do not add any question after the exit offer. The person chooses the next move.
                 timing('first_upstream_delta');
               }
               fullResponseFree += parsed.delta.text;
-              res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+              sse.write({ type: 'delta', text: parsed.delta.text });
             } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-              res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
+              sse.write({ type: 'truncated' });
             } else if (parsed.type === 'message_stop') {
               streamDoneFree = true;
               timing('anthropic_message_stop');
@@ -6133,10 +6180,17 @@ Do not add any question after the exit offer. The person chooses the next move.
       const checkedResponseFree = await buildCoherenceCheck(userTurnCountFree, fullResponseFree, lastUserText);
       timing('coherence_complete', { corrected: checkedResponseFree !== fullResponseFree });
       if (checkedResponseFree !== fullResponseFree) {
-        res.write(`data: ${JSON.stringify({ type: 'corrected', text: checkedResponseFree })}\n\n`);
+        sse.write({ type: 'corrected', text: checkedResponseFree });
       }
-      res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
-      timing('done_sent', { source: 'post_coherence', tier: 'free' });
+      sse.write(
+        { type: 'done', tier: 'free' },
+        { source: 'post_coherence', tier: 'free' },
+      );
+    } else {
+      sse.write(
+        { type: 'error', error: 'UPSTREAM_STREAM_INCOMPLETE' },
+        { source: 'upstream_stream_incomplete', tier: 'free' },
+      );
     }
 
     timing('request_complete', {
@@ -6147,8 +6201,10 @@ Do not add any question after the exit offer. The person chooses the next move.
     });
     return res.end();
   } catch (err) {
-    res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
-    timing('error_sent', { source: 'free_path_exception' });
+    sse.write(
+      { type: 'error', error: err.message },
+      { source: 'free_path_exception' },
+    );
     return res.end();
   }
 }
