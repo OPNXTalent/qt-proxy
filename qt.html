@@ -5065,11 +5065,28 @@ function addThreadToSidebar(queryText) {
       .then(function(data) {
         if (!data.threads) return;
         allThreads = data.threads;
-        if (allThreads.length > 0) {
-          activeThreadId = allThreads[0].id;
-          // Auto-start Realtime for the most recent thread
-          // This ensures S1 doesn't need to click sidebar to initiate bidirectional flow
-          if (typeof selectThread === 'function') selectThread(allThreads[0].id);
+        // Keep the response already on screen. Automatically selecting the
+        // server row here races its response persistence: selectThread()
+        // interprets a not-yet-populated response as an empty thread and
+        // hides resultBlock. Re-key the local snapshot instead, then start
+        // Realtime without rerendering the active conversation.
+        if (activeThreadId === tempId && allThreads.length > 0) {
+          var realThread = allThreads.find(function(thread) {
+            return thread.query === queryText;
+          }) || allThreads[0];
+          var realId = realThread.id;
+          ['qt_response_', 'qt_input_', 'qt_followups_', 'qt_thread_title_'].forEach(function(prefix) {
+            var pendingValue = localStorage.getItem(prefix + tempId);
+            if (pendingValue != null) {
+              localStorage.setItem(prefix + realId, pendingValue);
+              localStorage.removeItem(prefix + tempId);
+            }
+          });
+          activeThreadId = realId;
+          localStorage.setItem('qt_last_thread_id', realId);
+          if (typeof startFollowUpRealtime === 'function') {
+            startFollowUpRealtime(realId);
+          }
         }
         renderThreads(allThreads);
       }).catch(function() {});

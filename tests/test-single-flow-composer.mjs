@@ -49,4 +49,18 @@ assert.match(
   'A completed live query must preserve its reading position',
 );
 
+const addThreadStart = frontend.indexOf('function addThreadToSidebar(queryText) {');
+const addThreadEnd = frontend.indexOf('// SHOW SIDEBAR AFTER QUERY', addThreadStart);
+const addThreadFlow = frontend.slice(addThreadStart, addThreadEnd);
+assert.doesNotMatch(
+  addThreadFlow,
+  /typeof selectThread|selectThread\(allThreads/,
+  'Archive refresh must not rerender and hide a just-completed response',
+);
+assert.match(
+  addThreadFlow,
+  /activeThreadId === tempId[\s\S]*qt_response_[\s\S]*startFollowUpRealtime\(realId\)/,
+  'Archive refresh must migrate the local response and start Realtime without rerendering',
+);
+
 console.log('Single-flow composer contract checks passed.');
