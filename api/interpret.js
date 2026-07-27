@@ -2050,7 +2050,7 @@ export function shouldLoadRelationalSalvation(query) {
 }
 
 
-async function getRetrievedContext(userQuery, inquiryClassification) {
+async function getRetrievedContext(userQuery, inquiryClassification, timing) {
   // When classification is null, retrieve for all queries
   // When classification is provided, only retrieve for eligible types
   if (inquiryClassification && !RETRIEVAL_ELIGIBLE_TYPES.includes(inquiryClassification)) {
@@ -2058,13 +2058,17 @@ async function getRetrievedContext(userQuery, inquiryClassification) {
   }
 
   let embedding;
+  timing?.('embedding_start');
   try {
     embedding = await embedQuery(userQuery);
+    timing?.('embedding_end', { outcome: 'success' });
   } catch (err) {
+    timing?.('embedding_end', { outcome: 'error' });
     console.error('RAG embed error:', err.message);
     return '';
   }
 
+  timing?.('rag_rpc_start');
   try {
     const rpcResponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/match_corpus`, {
       method:  'POST',
@@ -2082,11 +2086,17 @@ async function getRetrievedContext(userQuery, inquiryClassification) {
     });
 
     if (!rpcResponse.ok) {
+      timing?.('rag_rpc_end', { outcome: 'error', status: rpcResponse.status });
       console.error('RAG retrieval error:', rpcResponse.status);
       return '';
     }
 
     const passages = await rpcResponse.json();
+    timing?.('rag_rpc_end', {
+      outcome: 'success',
+      status: rpcResponse.status,
+      passageCount: Array.isArray(passages) ? passages.length : 0,
+    });
     if (!passages || passages.length === 0) return '';
 
     const sourceLabels = {
@@ -2104,6 +2114,7 @@ async function getRetrievedContext(userQuery, inquiryClassification) {
     return `\n\n───────────────────────────────────────────\nRETRIEVED CORPUS PASSAGES — AUTHORITATIVE SOURCE CONTEXT\n───────────────────────────────────────────\nThe following passages have been retrieved from the authoritative corpus. These are Tier 1 source documents. Where retrieved passages speak to the inquiry, draw from them directly and precisely rather than from training memory. The retrieved text is authoritative over any training-data approximation of these documents.\n\n${formatted}\n───────────────────────────────────────────`;
 
   } catch (err) {
+    timing?.('rag_rpc_end', { outcome: 'error' });
     console.error('RAG retrieval error:', err.message);
     return '';
   }
@@ -5244,7 +5255,74 @@ export function getReversingHermonGuidance() {
 // ============================================================
 
 
+export function createSseWriter(res, timing, isAborted = () => false) {
+  let terminalType = null;
+
+  return {
+    write(event, details = {}) {
+      if (isAborted() || res.destroyed || res.writableEnded || terminalType) {
+        timing('sse_write_skipped', {
+          eventType: event?.type || 'unknown',
+          terminalType,
+          aborted: isAborted(),
+        });
+        return false;
+      }
+
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+
+      if (event.type === 'done' || event.type === 'error') {
+        terminalType = event.type;
+        timing(event.type === 'done' ? 'done_sent' : 'error_sent', details);
+      }
+
+      return true;
+    },
+    get terminalType() {
+      return terminalType;
+    },
+  };
+}
+
+
 export default async function handler(req, res) {
+  const startedAt = Date.now();
+  const correlationBody = (() => {
+    if (req.body && typeof req.body === 'object') return req.body;
+    if (typeof req.body !== 'string') return null;
+    try {
+      return JSON.parse(req.body);
+    } catch {
+      return null;
+    }
+  })();
+  const requestedId = correlationBody?.requestId;
+  const requestId = typeof requestedId === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(requestedId)
+    ? requestedId
+    : Math.random().toString(36).slice(2, 10);
+  const timing = (event, details = {}) => {
+    console.log('[prism-timing]', {
+      requestId,
+      event,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - startedAt,
+      ...details,
+    });
+  };
+
+  let clientAborted = false;
+  res.setHeader('X-Prism-Request-Id', requestId);
+  req.once('aborted', () => {
+    clientAborted = true;
+    timing('client_abort');
+  });
+  res.once('close', () => timing('response_closed', {
+    statusCode: res.statusCode,
+    writableEnded: res.writableEnded,
+  }));
+  timing('request_start', { method: req.method });
+  const sse = createSseWriter(res, timing, () => clientAborted);
+
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -5578,14 +5656,11 @@ Do not add any question after the exit offer. The person chooses the next move.
   }
 
   // ── REQUEST INSTRUMENTATION ──────────────────────────────────────────────
-  const requestId = Math.random().toString(36).slice(2, 10);
-  const startedAt = Date.now();
-  console.log('[interpret] start', {
-    requestId,
+  timing('request_body_parsed', {
     queryLength: (rawQuery || prompt || '').length,
     hasMessages: Array.isArray(messages) && messages.length > 0,
     messageCount: Array.isArray(messages) ? messages.length : 0,
-    userEmail: userEmail ? 'present' : 'absent',
+    hasEmail: Boolean(userEmail),
   });
 
   // ── CRISIS DETECTION ──────────────────────────────────────────────────────
@@ -5624,18 +5699,46 @@ Do not add any question after the exit offer. The person chooses the next move.
   })();
 
   if (detectChildAbuse(lastUserText)) {
+    timing('safety_complete', { outcome: 'child_abuse_intercept' });
     return res.status(200).json({ child_abuse: true });
   }
 
   if (detectCrisis(lastUserText)) {
+    timing('safety_complete', { outcome: 'crisis_intercept' });
     return res.status(200).json({ crisis: true });
   }
+  timing('safety_complete', { outcome: 'clear' });
 
   // ── SUBSCRIBER PATH ───────────────────────────────────────────────────────
   try {
     if (userEmail) {
-      const subscriber = await getSubscriber(userEmail);
-      const redemption = await getCodeRedemption(userEmail);
+      timing('subscriber_lookup_start');
+      let subscriber;
+      try {
+        subscriber = await getSubscriber(userEmail);
+        timing('subscriber_lookup_end', {
+          outcome: 'success',
+          found: Boolean(subscriber),
+          active: subscriber?.status === 'active',
+        });
+      } catch (err) {
+        timing('subscriber_lookup_end', { outcome: 'error' });
+        throw err;
+      }
+
+      timing('redemption_lookup_start');
+      let redemption;
+      try {
+        redemption = await getCodeRedemption(userEmail);
+        timing('redemption_lookup_end', {
+          outcome: 'success',
+          found: Boolean(redemption),
+        });
+      } catch (err) {
+        timing('redemption_lookup_end', { outcome: 'error' });
+        throw err;
+      }
+
       if ((subscriber && subscriber.status === 'active') || redemption) {
         const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
         if (!apiMessages || apiMessages.length === 0) {
@@ -5646,8 +5749,21 @@ Do not add any question after the exit offer. The person chooses the next move.
 
         const isFollowUpCheck = isFollowUp || (messages && messages.length > 1);
         if (!isFollowUpCheck && subscriber) {
-          const quota = await checkSubscriberQuota(subscriber);
+          timing('quota_check_start');
+          let quota;
+          try {
+            quota = await checkSubscriberQuota(subscriber);
+            timing('quota_check_end', {
+              outcome: 'success',
+              allowed: quota.allowed,
+              tier,
+            });
+          } catch (err) {
+            timing('quota_check_end', { outcome: 'error', tier });
+            throw err;
+          }
           if (!quota.allowed) {
+            timing('access_complete', { route: 'subscriber', allowed: false, tier });
             return res.status(200).json({
               quota_exceeded: true,
               tier,
@@ -5660,6 +5776,7 @@ Do not add any question after the exit offer. The person chooses the next move.
             });
           }
         }
+        timing('access_complete', { route: 'subscriber', allowed: true, tier });
 
         const queryType = (() => {
           if (/^[1-9][a-z]+ \d+:\d+/i.test(lastUserText.trim())) return 'verse_reference';
@@ -5675,9 +5792,9 @@ Do not add any question after the exit offer. The person chooses the next move.
 
         // RAG: retrieve relevant corpus passages before AI call
         // Pass null for classification — getRetrievedContext will retrieve for all queries
-        console.time(`[interpret:${requestId}] rag`);
-        const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
-        console.timeEnd(`[interpret:${requestId}] rag`);
+        timing('rag_start');
+        const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null, timing);
+        timing('rag_complete', { contextChars: ragContext.length });
 
         const closureInjection = buildClosureInjection(apiMessages);
         const inquiryClassification = null;
@@ -5696,6 +5813,11 @@ Do not add any question after the exit offer. The person chooses the next move.
           + ragContext
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
+        timing('prompt_assembly_complete', {
+          promptChars: enhancedSystemPrompt.length,
+          approxTokens: Math.round(enhancedSystemPrompt.length / 4),
+          messageCount: apiMessages.length,
+        });
 
         console.log(`[interpret:${requestId}] prompt-composition`, {
           basePromptChars: PRISM_SYSTEM_PROMPT.length,
@@ -5708,7 +5830,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           elapsedMs: Date.now() - startedAt,
         });
 
-        console.time(`[interpret:${requestId}] anthropic-call`);
+        timing('anthropic_request_start');
         const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -5725,7 +5847,10 @@ Do not add any question after the exit offer. The person chooses the next move.
           })
         });
 
-        console.timeEnd(`[interpret:${requestId}] anthropic-call`);
+        timing('anthropic_headers_received', {
+          status: anthropicRes.status,
+          ok: anthropicRes.ok,
+        });
         console.log(`[interpret:${requestId}] anthropic-response`, {
           status: anthropicRes.status,
           ok: anthropicRes.ok,
@@ -5738,7 +5863,10 @@ Do not add any question after the exit offer. The person chooses the next move.
             status: anthropicRes.status,
             body: errText.slice(0, 500),
           });
-          res.write(`data: ${JSON.stringify({ type: 'error', error: errText })}\n\n`);
+          sse.write(
+            { type: 'error', error: errText },
+            { source: 'anthropic_response', status: anthropicRes.status },
+          );
           return res.end();
         }
 
@@ -5747,6 +5875,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         let buffer = '';
         let fullResponse = '';
         let streamDone = false;
+        let firstUpstreamDeltaSeen = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -5761,13 +5890,17 @@ Do not add any question after the exit offer. The person chooses the next move.
               try {
                 const parsed = JSON.parse(data);
                 if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                  if (!firstUpstreamDeltaSeen) {
+                    firstUpstreamDeltaSeen = true;
+                    timing('first_upstream_delta');
+                  }
                   fullResponse += parsed.delta.text;
-                  res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+                  sse.write({ type: 'delta', text: parsed.delta.text });
                 } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-                  res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
+                  sse.write({ type: 'truncated' });
                 } else if (parsed.type === 'message_stop') {
-                  res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
                   streamDone = true;
+                  timing('anthropic_message_stop');
                 }
               } catch {}
             }
@@ -5782,13 +5915,17 @@ Do not add any question after the exit offer. The person chooses the next move.
               try {
                 const parsed = JSON.parse(data);
                 if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                  if (!firstUpstreamDeltaSeen) {
+                    firstUpstreamDeltaSeen = true;
+                    timing('first_upstream_delta');
+                  }
                   fullResponse += parsed.delta.text;
-                  res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+                  sse.write({ type: 'delta', text: parsed.delta.text });
                 } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-                  res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
+                  sse.write({ type: 'truncated' });
                 } else if (parsed.type === 'message_stop') {
-                  res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
                   streamDone = true;
+                  timing('anthropic_message_stop');
                 }
               } catch {}
             }
@@ -5801,16 +5938,27 @@ Do not add any question after the exit offer. The person chooses the next move.
         // event to the client before the done event fires.
         if (streamDone) {
           const userTurnCount = apiMessages.filter(m => m.role === 'user').length;
+          timing('coherence_start');
           const checkedResponse = await buildCoherenceCheck(userTurnCount, fullResponse, lastUserText);
+          timing('coherence_complete', { corrected: checkedResponse !== fullResponse });
           if (checkedResponse !== fullResponse) {
             // Send corrected event — client replaces accumulated fullText
-            res.write(`data: ${JSON.stringify({ type: 'corrected', text: checkedResponse })}\n\n`);
+            sse.write({ type: 'corrected', text: checkedResponse });
             fullResponse = checkedResponse;
           }
-          res.write(`data: ${JSON.stringify({ type: 'done', tier })}\n\n`);
+          sse.write(
+            { type: 'done', tier },
+            { source: 'post_coherence', tier },
+          );
+        } else {
+          sse.write(
+            { type: 'error', error: 'UPSTREAM_STREAM_INCOMPLETE' },
+            { source: 'upstream_stream_incomplete', tier },
+          );
         }
 
         if (streamDone && userId) {
+          timing('persistence_start', { followUp: Boolean(isFollowUp || (messages && messages.length > 1)) });
           const isFollowUpQuery = isFollowUp || (messages && messages.length > 1);
           if (!isFollowUpQuery) {
             const threadId = await saveThread({
@@ -5824,6 +5972,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           } else {
             await updateQueryCount({ userId, tier, threadId: null });
           }
+          timing('persistence_complete');
         }
 
         console.log(`[interpret:${requestId}] complete`, {
@@ -5831,10 +5980,20 @@ Do not add any question after the exit offer. The person chooses the next move.
           responseLength: fullResponse.length,
           durationMs: Date.now() - startedAt,
         });
+        timing('request_complete', {
+          route: 'subscriber',
+          streamDone,
+          responseChars: fullResponse.length,
+          tier,
+        });
         return res.end();
       }
     }
   } catch (err) {
+    timing('subscriber_path_exception', {
+      name: err?.name || 'Error',
+      headersSent: res.headersSent,
+    });
     console.error('[interpret] subscriber-fatal', {
       requestId,
       name: err?.name,
@@ -5845,9 +6004,15 @@ Do not add any question after the exit offer. The person chooses the next move.
     if (!res.headersSent) {
       return res.status(500).json({ error: 'INTERPRET_FAILED', message: err?.message || 'Unknown error' });
     }
+    sse.write(
+      { type: 'error', error: err?.message || 'INTERPRET_FAILED' },
+      { source: 'subscriber_path_exception' },
+    );
+    return res.end();
   }
 
   // ── FREE / ANONYMOUS PATH ─────────────────────────────────────────────────
+  timing('anonymous_access_start');
   try {
     const log = await getQueryLog(ip);
     if (log) {
@@ -5857,6 +6022,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         await resetQueryLog(ip);
       } else if (log.query_count >= QUERY_LIMIT) {
         const hoursRemaining = Math.ceil(WINDOW_HOURS - hoursSinceFirst);
+        timing('access_complete', { route: 'free', allowed: false });
         return res.status(429).json({
           error: 'Query limit reached',
           message: `You've used all ${QUERY_LIMIT} free queries. Access resets in ${hoursRemaining} hour${hoursRemaining !== 1 ? 's' : ''}.`,
@@ -5869,8 +6035,10 @@ Do not add any question after the exit offer. The person chooses the next move.
       await insertQueryLog(ip);
     }
   } catch (err) {
+    timing('anonymous_access_error');
     console.error('Rate limit check failed:', err.message);
   }
+  timing('access_complete', { route: 'free', allowed: true, tier: 'free' });
 
   const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
   if (!apiMessages || apiMessages.length === 0) {
@@ -5886,7 +6054,9 @@ Do not add any question after the exit offer. The person chooses the next move.
 
     // RAG: retrieve relevant corpus passages before AI call
     // Pass null for classification — getRetrievedContext will retrieve for all queries
-    const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null);
+    timing('rag_start');
+    const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null, timing);
+    timing('rag_complete', { contextChars: ragContext.length });
     const closureInjection = buildClosureInjection(apiMessages);
     const inquiryClassification = null;
     const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
@@ -5896,6 +6066,11 @@ Do not add any question after the exit offer. The person chooses the next move.
           + ragContext
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
+        timing('prompt_assembly_complete', {
+          promptChars: enhancedSystemPrompt.length,
+          approxTokens: Math.round(enhancedSystemPrompt.length / 4),
+          messageCount: apiMessages.length,
+        });
 
         console.log(`[interpret:${requestId}] prompt-composition-free`, {
           totalChars: enhancedSystemPrompt.length,
@@ -5905,7 +6080,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           elapsedMs: Date.now() - startedAt,
         });
 
-    console.time(`[interpret:${requestId}] anthropic-call-free`);
+    timing('anthropic_request_start');
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -5922,9 +6097,17 @@ Do not add any question after the exit offer. The person chooses the next move.
       })
     });
 
+    timing('anthropic_headers_received', {
+      status: anthropicRes.status,
+      ok: anthropicRes.ok,
+    });
+
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();
-      res.write(`data: ${JSON.stringify({ type: 'error', error: errText })}\n\n`);
+      sse.write(
+        { type: 'error', error: errText },
+        { source: 'anthropic_response', status: anthropicRes.status },
+      );
       return res.end();
     }
 
@@ -5933,6 +6116,7 @@ Do not add any question after the exit offer. The person chooses the next move.
     let buffer = '';
     let fullResponseFree = '';
     let streamDoneFree = false;
+    let firstUpstreamDeltaSeenFree = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -5947,12 +6131,17 @@ Do not add any question after the exit offer. The person chooses the next move.
           try {
             const parsed = JSON.parse(data);
             if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              if (!firstUpstreamDeltaSeenFree) {
+                firstUpstreamDeltaSeenFree = true;
+                timing('first_upstream_delta');
+              }
               fullResponseFree += parsed.delta.text;
-              res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+              sse.write({ type: 'delta', text: parsed.delta.text });
             } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-              res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
+              sse.write({ type: 'truncated' });
             } else if (parsed.type === 'message_stop') {
               streamDoneFree = true;
+              timing('anthropic_message_stop');
             }
           } catch {}
         }
@@ -5967,12 +6156,17 @@ Do not add any question after the exit offer. The person chooses the next move.
           try {
             const parsed = JSON.parse(data);
             if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              if (!firstUpstreamDeltaSeenFree) {
+                firstUpstreamDeltaSeenFree = true;
+                timing('first_upstream_delta');
+              }
               fullResponseFree += parsed.delta.text;
-              res.write(`data: ${JSON.stringify({ type: 'delta', text: parsed.delta.text })}\n\n`);
+              sse.write({ type: 'delta', text: parsed.delta.text });
             } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-              res.write(`data: ${JSON.stringify({ type: 'truncated' })}\n\n`);
+              sse.write({ type: 'truncated' });
             } else if (parsed.type === 'message_stop') {
               streamDoneFree = true;
+              timing('anthropic_message_stop');
             }
           } catch {}
         }
@@ -5982,16 +6176,35 @@ Do not add any question after the exit offer. The person chooses the next move.
     // ── COHERENCE CHECK — post-generation landing detection ────────────
     if (streamDoneFree) {
       const userTurnCountFree = apiMessages.filter(m => m.role === 'user').length;
+      timing('coherence_start');
       const checkedResponseFree = await buildCoherenceCheck(userTurnCountFree, fullResponseFree, lastUserText);
+      timing('coherence_complete', { corrected: checkedResponseFree !== fullResponseFree });
       if (checkedResponseFree !== fullResponseFree) {
-        res.write(`data: ${JSON.stringify({ type: 'corrected', text: checkedResponseFree })}\n\n`);
+        sse.write({ type: 'corrected', text: checkedResponseFree });
       }
-      res.write(`data: ${JSON.stringify({ type: 'done', tier: 'free' })}\n\n`);
+      sse.write(
+        { type: 'done', tier: 'free' },
+        { source: 'post_coherence', tier: 'free' },
+      );
+    } else {
+      sse.write(
+        { type: 'error', error: 'UPSTREAM_STREAM_INCOMPLETE' },
+        { source: 'upstream_stream_incomplete', tier: 'free' },
+      );
     }
 
+    timing('request_complete', {
+      route: 'free',
+      streamDone: streamDoneFree,
+      responseChars: fullResponseFree.length,
+      tier: 'free',
+    });
     return res.end();
   } catch (err) {
-    res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+    sse.write(
+      { type: 'error', error: err.message },
+      { source: 'free_path_exception' },
+    );
     return res.end();
   }
 }

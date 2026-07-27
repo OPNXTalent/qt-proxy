@@ -17,6 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/realtime.js" defer></script>
+<script type="module" src="/lib/stream-json.js"></script>
 <style>
   :root {
     --void: #06060a;
@@ -1036,6 +1037,16 @@
     font-style: italic;
     line-height: 1.65;
     margin: 0;
+  }
+
+  .early-recognition-progress {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    padding: 0 0 20px;
+    text-align: center;
   }
 
   /* Recognition threshold */
@@ -2515,6 +2526,46 @@ const inputTypes = {
 let currentType = 'verse';
 let conversationHistory = [];  // stores {role, content} pairs
 let currentSubject = '';       // the original subject for context
+const prismBrowserTimelines = new Map();
+const prismEarlyRecognitionRequests = new Set();
+
+function createPrismRequestId() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return 'prism-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+function markPrismBrowserTiming(requestId, event, details) {
+  const now = Date.now();
+  if (!prismBrowserTimelines.has(requestId)) prismBrowserTimelines.set(requestId, now);
+  console.info('[prism-browser-timing]', {
+    requestId: requestId,
+    event: event,
+    timestamp: new Date(now).toISOString(),
+    elapsedMs: now - prismBrowserTimelines.get(requestId),
+    ...(details || {})
+  });
+}
+
+function showEarlyRecognition(recognition, requestId) {
+  if (typeof recognition !== 'string' || !recognition.trim()) return false;
+  if (prismEarlyRecognitionRequests.has(requestId)) return false;
+
+  prismEarlyRecognitionRequests.add(requestId);
+  document.getElementById('resultContent').innerHTML =
+    '<div id="earlyRecognition" aria-live="polite">' +
+      '<div class="orientation-block"><p>' + escHtml(recognition.trim()) + '</p></div>' +
+      '<div class="early-recognition-progress">Continuing the interpretation<span id="streamDots">...</span></div>' +
+    '</div>';
+
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      markPrismBrowserTiming(requestId, 'first_recognition_visible', { source: 'incremental' });
+    });
+  });
+  return true;
+}
 
 function setType(type, el) {
   // No-op: type selector removed in Phase 1. Type is now inferred by the model.
@@ -2703,6 +2754,11 @@ async function runInterpretation() {
   const _isAnon = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
   const _isPaidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
   if ((_isAnon || !_isPaidTier) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  const requestId = createPrismRequestId();
+  markPrismBrowserTiming(requestId, 'submit', {
+    queryLength: input.length,
+    followUp: false
+  });
 
   // Reset conversation for new subject
   conversationHistory = [];
@@ -2713,12 +2769,13 @@ async function runInterpretation() {
   document.getElementById('inputSection').style.pointerEvents = 'none';
   document.getElementById('loadingBlock').classList.add('visible');
   document.getElementById('resultBlock').classList.remove('visible');
+  markPrismBrowserTiming(requestId, 'wait_indicator_visible');
 
   const prompt = buildPrompt('freetext', input); // type inferred by model — single field input
   conversationHistory.push({ role: 'user', content: prompt });
 
   try {
-    const apiRawText = await callProxy(conversationHistory, input);
+    const apiRawText = await callProxy(conversationHistory, input, requestId);
   
   // Store a condensed version in history to prevent payload bloat on follow-ups
   const condensed = apiRawText.length > 1000 
@@ -2784,6 +2841,16 @@ async function runInterpretation() {
     }
 
     showResult();
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        if (parsed.recognition && !prismEarlyRecognitionRequests.has(requestId)) {
+          markPrismBrowserTiming(requestId, 'first_recognition_visible', { source: 'complete' });
+        }
+        markPrismBrowserTiming(requestId, 'structured_result_visible');
+        prismEarlyRecognitionRequests.delete(requestId);
+        prismBrowserTimelines.delete(requestId);
+      });
+    });
 
     // Show subject banner, follow-up, and download button
     document.getElementById('subjectText').textContent = input;
@@ -2829,6 +2896,11 @@ async function runInterpretation() {
     }
 
   } catch (err) {
+    markPrismBrowserTiming(requestId, 'request_failed', {
+      errorType: err.type || 'application'
+    });
+    prismEarlyRecognitionRequests.delete(requestId);
+    prismBrowserTimelines.delete(requestId);
     if (err.message === 'RATE_LIMITED') return;
     if (err.message === 'CRISIS_DETECTED') return;
     if (err.message === 'SURVEY_DETECTED') return;
@@ -2855,12 +2927,18 @@ async function runFollowUp() {
   const _isAnonFU = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
   const _isPaidTierFU = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
   if ((_isAnonFU || !_isPaidTierFU) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  const requestId = createPrismRequestId();
+  markPrismBrowserTiming(requestId, 'submit', {
+    queryLength: input.length,
+    followUp: true
+  });
 
   document.getElementById('followUpBtn').disabled = true;
   document.getElementById('followUpInput').style.opacity = '0.4';
   document.getElementById('followUpInput').style.pointerEvents = 'none';
   document.getElementById('followUpLoading').style.display = 'block';
   document.getElementById('followUpLoading').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  markPrismBrowserTiming(requestId, 'wait_indicator_visible');
 
   // Build follow-up prompt that stays within Prism framework
   const followUpPrompt = `RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER
@@ -2992,8 +3070,11 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
       [{ role: 'user', content: followUpPrompt }],
       followUpTextEl,
       input,
-      true  // isFollowUp — prevents saving as new thread
+      true,  // isFollowUp — prevents saving as new thread
+      requestId
     );
+    markPrismBrowserTiming(requestId, 'response_complete');
+    prismBrowserTimelines.delete(requestId);
 
     document.getElementById('followUpInput').value = '';
 
@@ -3025,6 +3106,10 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
     followUpEl.appendChild(buildNodeControls(tempNodeId, input));
 
   } catch (err) {
+    markPrismBrowserTiming(requestId, 'request_failed', {
+      errorType: err.type || 'application'
+    });
+    prismBrowserTimelines.delete(requestId);
     if (err.message === 'RATE_LIMITED') return;
     if (err.message === 'QUOTA_EXCEEDED') return;
     errEl.style.marginTop = '20px';
@@ -3048,7 +3133,7 @@ function getTheodicyDebugMode() {
   return undefined;
 }
 
-async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
+async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, requestId) {
   // Streams plain text response directly into targetEl
   const userEmail = localStorage.getItem('qt_user_email') || null;
   let response;
@@ -3057,13 +3142,25 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
     response = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '', isFollowUp: isFollowUp || false, debugMode: getTheodicyDebugMode() })
+      body: JSON.stringify({
+        messages,
+        email: userEmail,
+        rawQuery: rawQuery || '',
+        isFollowUp: isFollowUp || false,
+        debugMode: getTheodicyDebugMode(),
+        requestId
+      })
     });
   } catch (networkErr) {
     const err = new Error('NETWORK_ERROR');
     err.type = 'network';
     throw err;
   }
+  const echoedRequestId = response.headers.get('x-prism-request-id');
+  markPrismBrowserTiming(requestId, 'response_headers_received', {
+    status: response.status,
+    requestIdMatched: !echoedRequestId || echoedRequestId === requestId
+  });
 
   if (response.status === 429) {
 
@@ -3093,6 +3190,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
   const decoder = new TextDecoder();
   let buffer = '';
   let fullText = '';
+  let firstVisibleDeltaSeen = false;
 
   // Show streaming cursor in target element
   if (targetEl) targetEl.innerHTML = '<span style="opacity:0.4; font-family:var(--mono); font-size:14px; letter-spacing:0.12em;">interpreting…</span>';
@@ -3110,6 +3208,10 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
           const parsed = JSON.parse(data);
           if (parsed.type === 'delta' && parsed.text) {
             fullText += parsed.text;
+            if (!firstVisibleDeltaSeen) {
+              firstVisibleDeltaSeen = true;
+              markPrismBrowserTiming(requestId, 'first_response_text_visible');
+            }
             // Render accumulated text as formatted prose
             if (targetEl) {
               const paras = fullText.split(/\n\n/);
@@ -3128,7 +3230,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp) {
   return fullText;
 }
 
-async function callProxy(messages, rawQuery) {
+async function callProxy(messages, rawQuery, requestId) {
   const userEmail = localStorage.getItem('qt_user_email') || null;
   let response;
 
@@ -3136,13 +3238,24 @@ async function callProxy(messages, rawQuery) {
     response = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, email: userEmail, rawQuery: rawQuery || '', debugMode: getTheodicyDebugMode() })
+      body: JSON.stringify({
+        messages,
+        email: userEmail,
+        rawQuery: rawQuery || '',
+        debugMode: getTheodicyDebugMode(),
+        requestId
+      })
     });
   } catch (networkErr) {
     const err = new Error('NETWORK_ERROR');
     err.type = 'network';
     throw err;
   }
+  const echoedRequestId = response.headers.get('x-prism-request-id');
+  markPrismBrowserTiming(requestId, 'response_headers_received', {
+    status: response.status,
+    requestIdMatched: !echoedRequestId || echoedRequestId === requestId
+  });
 
   // Handle rate limit before streaming
   if (response.status === 429) {
@@ -3211,7 +3324,30 @@ async function callProxy(messages, rawQuery) {
   let fullText = '';
   let tierFromStream = null;
   let streamTruncated = false;
+  let firstDeltaSeen = false;
+  let earlyRecognitionShown = false;
+  let earlyRecognitionDisabled = false;
   window._streamTruncated = false;
+
+  function considerEarlyRecognition() {
+    if (earlyRecognitionShown || earlyRecognitionDisabled) return;
+    const extractor = window.PrismStreamJson?.extractCompleteJsonString;
+    if (typeof extractor !== 'function') return;
+
+    let extraction;
+    try {
+      extraction = extractor(fullText, 'recognition');
+    } catch {
+      extraction = { status: 'invalid' };
+    }
+
+    if (extraction.status === 'complete') {
+      earlyRecognitionShown = showEarlyRecognition(extraction.value, requestId);
+    } else if (extraction.status === 'invalid') {
+      earlyRecognitionDisabled = true;
+      markPrismBrowserTiming(requestId, 'recognition_extraction_invalid');
+    }
+  }
 
   // Show streaming indicator
   document.getElementById('loadingBlock').classList.remove('visible');
@@ -3240,7 +3376,12 @@ async function callProxy(messages, rawQuery) {
           try {
             const parsed = JSON.parse(data);
             if (parsed.type === 'delta' && parsed.text) {
+              if (!firstDeltaSeen) {
+                firstDeltaSeen = true;
+                markPrismBrowserTiming(requestId, 'first_delta_received');
+              }
               fullText += parsed.text;
+              considerEarlyRecognition();
             } else if (parsed.type === 'corrected') {
               // Coherence check trimmed a momentum question — replace accumulated text
               fullText = parsed.text;
@@ -3267,7 +3408,12 @@ async function callProxy(messages, rawQuery) {
           try {
             const parsed = JSON.parse(data);
             if (parsed.type === 'delta' && parsed.text) {
+              if (!firstDeltaSeen) {
+                firstDeltaSeen = true;
+                markPrismBrowserTiming(requestId, 'first_delta_received');
+              }
               fullText += parsed.text;
+              considerEarlyRecognition();
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
             }
