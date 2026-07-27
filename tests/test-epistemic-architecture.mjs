@@ -70,6 +70,16 @@ assert.match(
   /FOLLOW-UP RULE:[\s\S]*On a Destination, stop without a question/,
   'The first-response rule must not force questions after follow-up destinations',
 );
+assert.match(
+  interpretSource,
+  /FIRST-EXCHANGE PRECEDENCE — NON-NEGOTIABLE:[\s\S]*must never suppress the Context-Derived Open Door/,
+  'Follow-up destination rules must not override the first-response open door',
+);
+assert.match(
+  interpretSource,
+  /prefer Destination when uncertain applies only after the first exchange/,
+  'Destination preference must be explicitly limited to follow-up exchanges',
+);
 
 const genericFrameworkCallout =
   "If you'd like to see how the Prism's framework is interpreting this question";
