@@ -2676,10 +2676,17 @@ function applyQuotaLock(message) {
 
 function submitComposer() {
   const composer = document.getElementById('queryComposer');
-  const followUpSection = document.getElementById('followUpSection');
-  return composer && composer.parentElement === followUpSection
+  return composer && composer.dataset.mode === 'followUp'
     ? runFollowUp()
     : runInterpretation();
+}
+
+function stageComposerBelowResponse() {
+  const section = document.getElementById('followUpSection');
+  const composer = document.getElementById('queryComposer');
+  if (!section || !composer) return;
+  section.style.display = 'block';
+  section.appendChild(composer);
 }
 
 function showFollowUpComposer() {
@@ -2688,6 +2695,7 @@ function showFollowUpComposer() {
   if (!section || !composer) return;
   section.style.display = 'block';
   section.appendChild(composer);
+  composer.dataset.mode = 'followUp';
   document.getElementById('userInput').placeholder =
     'Ask a follow-up question, test the response, or continue the dialogue…';
   document.getElementById('submitBtn').textContent = 'Ask →';
@@ -2699,6 +2707,7 @@ function showOpeningComposer() {
   const composer = document.getElementById('queryComposer');
   if (!slot || !composer) return;
   slot.appendChild(composer);
+  composer.dataset.mode = 'opening';
   document.getElementById('userInput').placeholder =
     'A verse, a question, or whatever is on your mind…';
   document.getElementById('submitBtn').textContent = 'Interpret →';
@@ -2725,6 +2734,7 @@ async function runInterpretation() {
   document.getElementById('submitBtn').disabled = true;
   document.getElementById('inputSection').style.opacity = '0.4';
   document.getElementById('inputSection').style.pointerEvents = 'none';
+  stageComposerBelowResponse();
   document.getElementById('loadingBlock').classList.add('visible');
   document.getElementById('resultBlock').classList.remove('visible');
   markPrismBrowserTiming(requestId, 'wait_indicator_visible');

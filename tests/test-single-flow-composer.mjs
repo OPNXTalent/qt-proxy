@@ -30,8 +30,13 @@ assert.match(
 );
 assert.match(
   frontend,
-  /function submitComposer\(\)[\s\S]*composer\.parentElement === followUpSection[\s\S]*runFollowUp\(\)[\s\S]*runInterpretation\(\)/,
-  'Submission behavior must follow the composer position',
+  /function submitComposer\(\)[\s\S]*composer\.dataset\.mode === 'followUp'[\s\S]*runFollowUp\(\)[\s\S]*runInterpretation\(\)/,
+  'Submission behavior must follow the explicit composer mode',
+);
+assert.match(
+  frontend,
+  /function stageComposerBelowResponse\(\)[\s\S]*section\.appendChild\(composer\)[\s\S]*async function runInterpretation\(\)[\s\S]*stageComposerBelowResponse\(\)[\s\S]*loadingBlock/,
+  'The composer must move below the response as soon as interpretation begins',
 );
 
 console.log('Single-flow composer contract checks passed.');
