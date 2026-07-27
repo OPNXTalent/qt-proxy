@@ -48,6 +48,16 @@ assert.match(
   /the experience of participating is not logical proof of metaphysical independence/,
   'Phenomenological evidence must not be presented as metaphysical proof',
 );
+assert.match(
+  interpretSource,
+  /identity with the process is compatible with determinism/,
+  'Being the self-moving system must not be treated as a refutation of determinism',
+);
+assert.match(
+  interpretSource,
+  /non-reducibility requires an independent argument or direct Scriptural warrant/,
+  'Non-reducibility must not be asserted without its own warrant',
+);
 
 assert.match(
   interpretSource,
@@ -89,8 +99,18 @@ assert.match(
 const qtSource = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 assert.match(
   qtSource,
-  /if \(d\.open_door_question\)[\s\S]*qt-open-door[\s\S]*d\.open_door_question/,
+  /openDoorQuestion[\s\S]*qt-open-door[\s\S]*openDoorQuestion/,
   'The dedicated open-door question must render after the core insight',
+);
+assert.match(
+  qtSource,
+  /function findLastContextQuestion[\s\S]*findLastContextQuestion\(recognitionText\)/,
+  'A context-derived Recognition question must provide a non-generic rendering fallback',
+);
+assert.match(
+  qtSource,
+  /recognitionText = recognitionText\.replace\(openDoorQuestion/,
+  'A fallback question moved to the conclusion must not be duplicated in Recognition',
 );
 assert.match(
   interpretSource,

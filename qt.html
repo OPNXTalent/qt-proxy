@@ -3481,6 +3481,18 @@ function showResult() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function findLastContextQuestion(text) {
+  const source = String(text || '').trim();
+  const end = source.lastIndexOf('?');
+  if (end < 0) return '';
+  const previousBoundary = Math.max(
+    source.lastIndexOf('.', end),
+    source.lastIndexOf('!', end),
+    source.lastIndexOf('?', end - 1)
+  );
+  return source.slice(previousBoundary + 1, end + 1).trim();
+}
+
 function renderResult(d) {
   const sections = [
     { num: '00', title: 'Echad b\'Emet', hebrew: 'אֶחָד בֶאֱמֶת', content: d.prism_summary },
@@ -3492,6 +3504,20 @@ function renderResult(d) {
   ];
 
   let html = '';
+  let recognitionText = d.recognition || '';
+  let openDoorQuestion = String(d.open_door_question || '').trim();
+  if (!openDoorQuestion) {
+    openDoorQuestion = findLastContextQuestion(d.core_insight);
+  }
+  if (!openDoorQuestion) {
+    openDoorQuestion = findLastContextQuestion(recognitionText);
+    if (openDoorQuestion) {
+      recognitionText = recognitionText.replace(openDoorQuestion, '').replace(/\s{2,}/g, ' ').trim();
+    }
+  }
+  if (!openDoorQuestion) {
+    openDoorQuestion = String(d.orientation_question || '').trim();
+  }
 
   // ── 1. FRAMEWORK FOR INTERPRETATION (collapsed, top of response) ─────────────
   const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0);
@@ -3516,8 +3542,8 @@ function renderResult(d) {
   }
 
   // ── 2. LEAD — orientation block ───────────────────────────────────────────────
-  if (d.recognition) {
-    html += '<div class="orientation-block"><p>' + escHtml(d.recognition) + '</p></div>';
+  if (recognitionText) {
+    html += '<div class="orientation-block"><p>' + escHtml(recognitionText) + '</p></div>';
   }
 
   // ── 3. INTERPRETATION ─────────────────────────────────────────────────────────
@@ -3528,8 +3554,8 @@ function renderResult(d) {
   if (d.core_insight) {
     html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
   }
-  if (d.open_door_question) {
-    html += '<div class="qt-core-insight qt-open-door"><p>' + escHtml(d.open_door_question) + '</p></div>';
+  if (openDoorQuestion) {
+    html += '<div class="qt-core-insight qt-open-door"><p>' + escHtml(openDoorQuestion) + '</p></div>';
   }
 
   // Kingdom implication — hidden, preserved for compatibility
