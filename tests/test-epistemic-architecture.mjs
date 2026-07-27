@@ -58,6 +58,21 @@ assert.match(
   /non-reducibility requires an independent argument or direct Scriptural warrant/,
   'Non-reducibility must not be asserted without its own warrant',
 );
+assert.match(
+  interpretSource,
+  /moral commands, calls to teshuvah, and biblical accountability do not by themselves demonstrate a particular causal mechanism/,
+  'Biblical accountability must not be confused with proof of a causal mechanism',
+);
+assert.match(
+  interpretSource,
+  /defining it as the part of a person that escapes causal determination is not textually explicit/,
+  'Tselem Elohim must not be used as unstated proof against determinism',
+);
+assert.match(
+  interpretSource,
+  /Do not say a person is “not the passive recipient of a deterministic chain” unless determinism has first been independently refuted/,
+  'The exact live determinism regression must be prohibited',
+);
 
 assert.match(
   interpretSource,
