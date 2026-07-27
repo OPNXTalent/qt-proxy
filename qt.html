@@ -484,9 +484,11 @@
     display: none;
     flex-direction: column;
     gap: 0;
-    margin-bottom: 32px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid rgba(42,42,64,0.18);
+    margin-top: 24px;
+    margin-bottom: 0;
+    padding-top: 20px;
+    padding-bottom: 0;
+    border-top: 1px solid rgba(42,42,64,0.18);
   }
   /* Governance transitions — opacity only, no layout shift */
   .query-state-label,
@@ -2687,6 +2689,14 @@ function stageComposerBelowResponse() {
   if (!section || !composer) return;
   section.style.display = 'block';
   section.appendChild(composer);
+  positionSharingBelowComposer(section);
+}
+
+function positionSharingBelowComposer(section) {
+  const governance = document.getElementById('sessionGovernance');
+  if (section && governance) {
+    section.appendChild(governance);
+  }
 }
 
 function showFollowUpComposer() {
@@ -2695,6 +2705,7 @@ function showFollowUpComposer() {
   if (!section || !composer) return;
   section.style.display = 'block';
   section.appendChild(composer);
+  positionSharingBelowComposer(section);
   composer.dataset.mode = 'followUp';
   document.getElementById('userInput').placeholder =
     'Ask a follow-up question, test the response, or continue the dialogue…';

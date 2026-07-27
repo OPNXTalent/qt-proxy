@@ -40,6 +40,16 @@ assert.match(
 );
 assert.match(
   frontend,
+  /function positionSharingBelowComposer\(section\)[\s\S]*section\.appendChild\(governance\)/,
+  'Sharing controls must be positioned beneath the shared composer',
+);
+assert.match(
+  frontend,
+  /function showFollowUpComposer\(\)[\s\S]*section\.appendChild\(composer\)[\s\S]*positionSharingBelowComposer\(section\)/,
+  'The composer and sharing controls must remain at the end of the progression',
+);
+assert.match(
+  frontend,
   /function showResult\(preserveScroll\)[\s\S]*if \(!preserveScroll\)/,
   'Result rendering must support preserving the reading position',
 );
