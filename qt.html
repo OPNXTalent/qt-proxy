@@ -2579,70 +2579,6 @@ function updateCharCount() {
   el.style.color = len > 500 ? 'var(--warn)' : 'var(--text-muted)';
 }
 
-function buildPrompt(type, input) {
-  // Single-field input: type is always inferred by the model
-  const humanCareProtocol = `HUMAN CARE PROTOCOL \u2014 SILENT MODE
-This instruction operates beneath all framework activity. It never announces itself.
-
-As you read each message, remain attentive to signals that suggest the person may be in genuine personal distress \u2014 not theological distress, but human distress. Lament psalms, Job, Ecclesiastes, and suffering theology are not signals. Personal statements of hopelessness, worthlessness, desire to disappear, or references to self-harm or ending one\u2019s life are signals.
-
-When you detect a potential signal:
-- Do not deliver a framework interpretation.
-- Shift seamlessly into warm, plainspoken presence. No Prism terminology. No lenses.
-- Begin with acknowledgment. Let them know they have been heard.
-- Ask one gentle qualifying question at a time to understand what they are carrying. Do not interrogate. Do not rush.
-- Weave in naturally, without preaching: they matter, they are seen, they are loved by the One who knows them completely.
-
-As the exchange clarifies:
-- If it resolves as theological or academic engagement \u2014 return to normal interpretation without comment.
-- If genuine distress is confirmed but not imminent \u2014 offer warmly: "You don\u2019t have to carry this alone. Please reach out to the 988 Suicide and Crisis Lifeline (call or text 988) or the Crisis Text Line (text HOME to 741741). Someone is ready to listen right now."
-- If there is any indication of imminent risk or active attempt \u2014 respond with urgency and care: "Please call 911 now. You matter, and help can reach you. After you call, 988 and the Crisis Text Line (text HOME to 741741) are also there for you."
-
-The thread memorializes this exchange. Hold it with care.`;
-
-  const constitutionalLayer = `RESPONSE BEHAVIOR \u2014 CONSTITUTIONAL LAYER
-These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.
-
-Recognition \u2192 Curiosity \u2192 Resonance \u2192 Interpretation \u2192 Architecture \u2192 Ontology. Never begin at ontology. Never escort the reader to the conclusion \u2014 clear the ground until the conclusion is what remains.
-
-Compression Over Explanation: When a formulation captures the insight completely, stop.
-End Open, Not Closed: Leave one thread slightly unresolved \u2014 not as manipulation, but as honest invitation.`;
-
-  return `RESPOND WITH ONLY A RAW JSON OBJECT. NO MARKDOWN. NO CODE FENCES. START WITH { END WITH }.
-
-${constitutionalLayer}
-
-${humanCareProtocol}
-
-You are The Prism framework interpreter. The user has submitted: "${input}"
-
-Infer the query type from the content \u2014 verse reference, phrase, theme, or open question. Apply the complete Prism framework regardless of input type.
-
-Prism Framework: Echad b\u2019Emet (God\u2019s unified relational truth), Entanglement (God\u2019s initiation), Coherence (alignment/obedience), Decoherence (ego/sin/fragmentation), Telos (Christ-shaped destiny), Olam HaZeh (this world) vs Olam HaBa (world to come).
-
-Return this exact JSON:
-{
-  "recognition": "2-4 sentences of plain-language recognition before any Prism category. Name what the person is actually carrying. No framework vocabulary.",
-  "core_insight": "The single most important thing the framework sees in this query. One paragraph. Framework language now permitted \u2014 only after recognition has landed. Aphoristic compression preferred. Example compression: 'The noise is not epistemic. It is volitional.'",
-  "suggested_threads": [
-    "A specific door that emerged from this encounter. Concrete, not generic. Example: 'The word translated know here is yada \u2014 that changes the entire question you came with.'",
-    "A second specific door. Example: 'Job asked the same thing from the ash heap. Want to go there?'",
-    "A third specific door \u2014 only if genuinely present. May return only 2 threads if only 2 are honest."
-  ],
-  "verse_identified": "Most relevant Scripture",
-  "verse_text": "Verse quoted accurately",
-  "prism_summary": "Two sharp sentences \u2014 Section 00 Echad b\u2019Emet",
-  "entanglement": "God\u2019s initiation here",
-  "coherence_alignment": "How this calls toward alignment",
-  "noise_decoherence": "What distortions this exposes",
-  "telos_insight": "Christ-form being called toward",
-  "olam_haba": "Time-transcendent view",
-  "kingdom_implication": "One crisp Kingdom punchline \u2014 ceremonial arrival, not summary",
-  "key_terms": [{"term": "Term", "hebrew": "Hebrew if applicable", "prism_meaning": "Prism meaning"}]
-}`;
-}
-
-
 // --- Query limit state ---
 let sessionQueryCount = 0;
 const QUERY_LIMIT = 3;
@@ -2771,8 +2707,9 @@ async function runInterpretation() {
   document.getElementById('resultBlock').classList.remove('visible');
   markPrismBrowserTiming(requestId, 'wait_indicator_visible');
 
-  const prompt = buildPrompt('freetext', input); // type inferred by model — single field input
-  conversationHistory.push({ role: 'user', content: prompt });
+  // The backend owns the Constitution and output contract. Preserve the
+  // person's query verbatim instead of wrapping it in a competing prompt.
+  conversationHistory.push({ role: 'user', content: input });
 
   try {
     const apiRawText = await callProxy(conversationHistory, input, requestId);
@@ -3481,6 +3418,18 @@ function showResult() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function findLastContextQuestion(text) {
+  const source = String(text || '').trim();
+  const end = source.lastIndexOf('?');
+  if (end < 0) return '';
+  const previousBoundary = Math.max(
+    source.lastIndexOf('.', end),
+    source.lastIndexOf('!', end),
+    source.lastIndexOf('?', end - 1)
+  );
+  return source.slice(previousBoundary + 1, end + 1).trim();
+}
+
 function renderResult(d) {
   const sections = [
     { num: '00', title: 'Echad b\'Emet', hebrew: 'אֶחָד בֶאֱמֶת', content: d.prism_summary },
@@ -3492,6 +3441,20 @@ function renderResult(d) {
   ];
 
   let html = '';
+  let recognitionText = d.recognition || '';
+  let openDoorQuestion = String(d.open_door_question || '').trim();
+  if (!openDoorQuestion) {
+    openDoorQuestion = findLastContextQuestion(d.core_insight);
+  }
+  if (!openDoorQuestion) {
+    openDoorQuestion = findLastContextQuestion(recognitionText);
+    if (openDoorQuestion) {
+      recognitionText = recognitionText.replace(openDoorQuestion, '').replace(/\s{2,}/g, ' ').trim();
+    }
+  }
+  if (!openDoorQuestion) {
+    openDoorQuestion = String(d.orientation_question || '').trim();
+  }
 
   // ── 1. FRAMEWORK FOR INTERPRETATION (collapsed, top of response) ─────────────
   const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0);
@@ -3516,8 +3479,8 @@ function renderResult(d) {
   }
 
   // ── 2. LEAD — orientation block ───────────────────────────────────────────────
-  if (d.recognition) {
-    html += '<div class="orientation-block"><p>' + escHtml(d.recognition) + '</p></div>';
+  if (recognitionText) {
+    html += '<div class="orientation-block"><p>' + escHtml(recognitionText) + '</p></div>';
   }
 
   // ── 3. INTERPRETATION ─────────────────────────────────────────────────────────
@@ -3527,6 +3490,9 @@ function renderResult(d) {
 
   if (d.core_insight) {
     html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
+  }
+  if (openDoorQuestion) {
+    html += '<div class="qt-core-insight qt-open-door"><p>' + escHtml(openDoorQuestion) + '</p></div>';
   }
 
   // Kingdom implication — hidden, preserved for compatibility
