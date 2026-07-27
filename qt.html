@@ -3528,6 +3528,9 @@ function renderResult(d) {
   if (d.core_insight) {
     html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
   }
+  if (d.open_door_question) {
+    html += '<div class="qt-core-insight qt-open-door"><p>' + escHtml(d.open_door_question) + '</p></div>';
+  }
 
   // Kingdom implication — hidden, preserved for compatibility
   html += '<div class="kingdom-block" style="display:none;"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(d.kingdom_implication || '') + '</div></div>';

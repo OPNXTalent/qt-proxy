@@ -2415,6 +2415,7 @@ async function saveThread({ userId, query, queryType, response, tier }) {
         response_mode:       parsed?.response_mode       || 'reflective',
         recognition:         parsed?.recognition         || '',
         core_insight:        parsed?.core_insight        || '',
+        open_door_question:  parsed?.open_door_question  || '',
         verse_identified:    parsed?.verse_identified    || '',
         verse_text:          parsed?.verse_text          || '',
         prism_summary:       parsed?.prism_summary       || '',

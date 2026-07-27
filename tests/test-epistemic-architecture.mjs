@@ -71,6 +71,28 @@ assert.match(
   'The first-response rule must not force questions after follow-up destinations',
 );
 assert.match(
+  outputContract,
+  /"open_door_question": "REQUIRED on every response from this initial-query endpoint/,
+  'The initial response schema must carry a dedicated open-door field',
+);
+assert.match(
+  outputContract,
+  /open_door_question[\s\S]*Never return an empty string/,
+  'The dedicated initial-response open door must be required',
+);
+assert.match(
+  interpretSource,
+  /open_door_question:\s+parsed\?\.open_door_question/,
+  'Saved threads must preserve the dedicated open-door question',
+);
+
+const qtSource = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
+assert.match(
+  qtSource,
+  /if \(d\.open_door_question\)[\s\S]*qt-open-door[\s\S]*d\.open_door_question/,
+  'The dedicated open-door question must render after the core insight',
+);
+assert.match(
   interpretSource,
   /FIRST-EXCHANGE PRECEDENCE — NON-NEGOTIABLE:[\s\S]*must never suppress the Context-Derived Open Door/,
   'Follow-up destination rules must not override the first-response open door',
