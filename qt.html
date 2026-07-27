@@ -2111,23 +2111,25 @@
   <!-- Anonymous back link — shown only to non-subscribers -->
   <!-- Anonymous back link row removed — Learn more / Expand Your Access no longer needed -->
 
-  <!-- INPUT FORM -->
-  <div id="inputSection">
-    <div class="input-wrap">
-      <div style="position:relative;">
-        <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
-        <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+  <div id="initialComposerSlot">
+    <!-- One composer serves both the opening query and every follow-up. -->
+    <div id="queryComposer">
+    <div id="inputSection">
+      <div class="input-wrap">
+        <div style="position:relative;">
+          <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+          <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+        </div>
+        <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
+        <div id="charCount" style="font-family:var(--mono); font-size:20px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 600</div>
       </div>
-      <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
-      <div id="charCount" style="font-family:var(--mono); font-size:20px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 600</div>
     </div>
 
-  </div><!-- /#inputSection closes here -->
-
-  <!-- SUBMIT ROW — lives outside inputSection so opacity fade never affects it -->
-  <div class="submit-row" id="submitRow">
-    <button id="newSubjectTopBtn" onclick="resetForm()" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--gold-dim)'" style="display:none;font-family:var(--cinzel);font-size:16px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-pale);background:transparent;border:1px solid var(--gold-dim);padding:16px 28px;cursor:pointer;transition:all 0.25s;">↺ New Subject</button>
-    <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
+    <div class="submit-row" id="submitRow">
+      <button id="newSubjectTopBtn" onclick="resetForm()" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--gold-dim)'" style="display:none;font-family:var(--cinzel);font-size:16px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-pale);background:transparent;border:1px solid var(--gold-dim);padding:16px 28px;cursor:pointer;transition:all 0.25s;">↺ New Subject</button>
+      <button class="submit-btn" id="submitBtn" onclick="submitComposer()">Interpret →</button>
+    </div>
+    </div>
   </div>
 
     <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
@@ -2352,18 +2354,8 @@
     <!-- THREAD SEED BANNER — shown when continuing from a completed thread -->
     <div id="qt-seed-banner" style="display:none; font-family:var(--crimson); font-size:18px; font-style:italic; line-height:1.6; color:var(--text-muted); border-left:2px solid var(--gold-dim); padding:10px 16px; margin-bottom:24px; margin-top:40px;"></div>
 
-    <!-- FOLLOW-UP -->
+    <!-- The shared composer is moved here once a result is available. -->
     <div id="followUpSection" style="display:none; margin-top:40px; border-top:1px solid var(--border); padding-top:32px;">
-      <div style="font-family:var(--mono); font-size:20px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:12px;">Continue the Exploration</div>
-      <div style="position:relative; margin-bottom:16px;">
-        <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question — go deeper on any section, connect it to another passage, or explore a related theme…" rows="3" style="padding-right:52px;"></textarea>
-        <button id="followUpMicBtn" onclick="toggleFollowUpMic()" title="Speak your follow-up" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
-      </div>
-      <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-bottom:10px; text-transform:uppercase;"></div>
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <button class="new-query-btn" onclick="resetForm()">↺ New Subject</button>
-        <button class="submit-btn" id="followUpBtn" onclick="runFollowUp()">Ask →</button>
-      </div>
       <div id="followUpLoading" style="display:none; text-align:center; padding:32px 0;">
         <div style="font-family:var(--cinzel); font-size:27px; color:var(--gold-dim); animation: pulse 2s ease-in-out infinite;">✦</div>
         <div style="font-family:var(--mono); font-size:20px; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); margin-top:12px;">Reading the relational field…</div>
@@ -2682,6 +2674,36 @@ function applyQuotaLock(message) {
     prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+function submitComposer() {
+  const composer = document.getElementById('queryComposer');
+  const followUpSection = document.getElementById('followUpSection');
+  return composer && composer.parentElement === followUpSection
+    ? runFollowUp()
+    : runInterpretation();
+}
+
+function showFollowUpComposer() {
+  const section = document.getElementById('followUpSection');
+  const composer = document.getElementById('queryComposer');
+  if (!section || !composer) return;
+  section.style.display = 'block';
+  section.appendChild(composer);
+  document.getElementById('userInput').placeholder =
+    'Ask a follow-up question, test the response, or continue the dialogue…';
+  document.getElementById('submitBtn').textContent = 'Ask →';
+  document.getElementById('newSubjectTopBtn').style.display = 'block';
+}
+
+function showOpeningComposer() {
+  const slot = document.getElementById('initialComposerSlot');
+  const composer = document.getElementById('queryComposer');
+  if (!slot || !composer) return;
+  slot.appendChild(composer);
+  document.getElementById('userInput').placeholder =
+    'A verse, a question, or whatever is on your mind…';
+  document.getElementById('submitBtn').textContent = 'Interpret →';
+}
+
 async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
@@ -2792,7 +2814,7 @@ async function runInterpretation() {
     // Show subject banner, follow-up, and download button
     document.getElementById('subjectText').textContent = input;
     document.getElementById('subjectBanner').style.display = 'block';
-    document.getElementById('followUpSection').style.display = 'block';
+    showFollowUpComposer();
     // downloadRow hidden — controls rendered per-node
     document.getElementById('downloadRow').style.display = 'none';
     // Show session governance bar
@@ -2814,7 +2836,7 @@ async function runInterpretation() {
     }
 
     // Show sidebar after first successful query
-    const queryText = document.getElementById('userInput').value.trim();
+    const queryText = input;
     showSidebarAfterQuery(queryText);
 
     // Save full response to localStorage keyed by thread id
@@ -2831,6 +2853,8 @@ async function runInterpretation() {
     } else {
       console.warn('Save skipped — activeThreadId:', activeThreadId, 'parsed:', !!parsed);
     }
+    document.getElementById('userInput').value = '';
+    updateCharCount();
 
   } catch (err) {
     markPrismBrowserTiming(requestId, 'request_failed', {
@@ -2857,7 +2881,7 @@ async function runInterpretation() {
 }
 
 async function runFollowUp() {
-  const input = document.getElementById('followUpInput').value.trim();
+  const input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
   // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
@@ -2870,9 +2894,9 @@ async function runFollowUp() {
     followUp: true
   });
 
-  document.getElementById('followUpBtn').disabled = true;
-  document.getElementById('followUpInput').style.opacity = '0.4';
-  document.getElementById('followUpInput').style.pointerEvents = 'none';
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('inputSection').style.opacity = '0.4';
+  document.getElementById('inputSection').style.pointerEvents = 'none';
   document.getElementById('followUpLoading').style.display = 'block';
   document.getElementById('followUpLoading').scrollIntoView({ behavior: 'smooth', block: 'center' });
   markPrismBrowserTiming(requestId, 'wait_indicator_visible');
@@ -3013,7 +3037,8 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
     markPrismBrowserTiming(requestId, 'response_complete');
     prismBrowserTimelines.delete(requestId);
 
-    document.getElementById('followUpInput').value = '';
+    document.getElementById('userInput').value = '';
+    updateCharCount();
 
     // Increment counter and apply lock for non-subscribers after successful follow-up
     sessionQueryCount++;
@@ -3054,9 +3079,9 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
     document.getElementById('resultContent').appendChild(errEl);
   } finally {
     document.getElementById('followUpLoading').style.display = 'none';
-    document.getElementById('followUpInput').style.opacity = '';
-    document.getElementById('followUpInput').style.pointerEvents = '';
-    document.getElementById('followUpBtn').disabled = false;
+    document.getElementById('inputSection').style.opacity = '';
+    document.getElementById('inputSection').style.pointerEvents = '';
+    document.getElementById('submitBtn').disabled = false;
   }
 }
 
@@ -3550,7 +3575,7 @@ function toggleFramework(btn) {
 }
 
 function submitSuggestedThread(text, btnEl) {
-  const fuInput = document.getElementById('followUpInput');
+  const fuInput = document.getElementById('userInput');
   if (!fuInput) return;
 
   // Only disable the button that was actually clicked — the other two
@@ -3579,7 +3604,7 @@ function startNewThreadWithSummary(summaryText) {
   sessionStorage.setItem('qt_thread_seed', summaryText);
 
   // Scroll to input and focus
-  const input = document.getElementById('queryInput') || document.getElementById('followUpInput');
+  const input = document.getElementById('queryInput') || document.getElementById('userInput');
   if (input) {
     input.value = '';
     input.focus();
@@ -3635,29 +3660,21 @@ function resetForm() {
   localStorage.removeItem('qt_resume_snapshot');
   closeSidebarOverlay();
   document.getElementById('resultBlock').classList.remove('visible');
+  showOpeningComposer();
   document.getElementById('downloadRow').style.display = 'none';
   document.getElementById('followUpSection').style.display = 'none';
   document.getElementById('subjectBanner').style.display = 'none';
   document.getElementById('resultContent').innerHTML = '';
   document.getElementById('userInput').value = '';
-  if (document.getElementById('followUpInput')) document.getElementById('followUpInput').value = '';
   document.getElementById('newSubjectTopBtn').style.display = 'none';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Enter key submits — plain Enter on main input and follow-up input
-// Shift+Enter inserts a newline (standard textarea behaviour preserved)
+// Enter submits the one shared composer; Shift+Enter inserts a newline.
 document.getElementById('userInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
-    runInterpretation();
-  }
-});
-
-document.getElementById('followUpInput').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    runFollowUp();
+    submitComposer();
   }
 });
 
@@ -3842,24 +3859,9 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
       btn: micBtn,
       statusEl: micStatus,
       textarea: textarea,
-      onDone: function() { runInterpretation(); }
+      onDone: function() { submitComposer(); }
     });
     window.toggleMic = function() { mainRecorder.toggle(); };
-  }
-
-  // ── Follow-up mic ─────────────────────────────────────────────────────
-  const followUpMicBtn = document.getElementById('followUpMicBtn');
-  const followUpMicStatus = document.getElementById('followUpMicStatus');
-  const followUpTextarea = document.getElementById('followUpInput');
-  if (followUpMicBtn && followUpMicStatus && followUpTextarea) {
-    followUpMicBtn.style.display = 'block';
-    const followUpRecorder = createVoiceRecorder({
-      btn: followUpMicBtn,
-      statusEl: followUpMicStatus,
-      textarea: followUpTextarea,
-      onDone: function() { runFollowUp(); }
-    });
-    window.toggleFollowUpMic = function() { followUpRecorder.toggle(); };
   }
 
   // ── Refractions (chat) mic ────────────────────────────────────────────
@@ -4512,7 +4514,8 @@ function selectThread(id) {
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
     var govBar = document.getElementById('sessionGovernance'); if (govBar) govBar.style.display = 'flex';
-    var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
+    showFollowUpComposer();
+    if (inputEl) inputEl.value = '';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     window._shareHandlingFollowUps = false;
     // Reset to root node when a new interpretation loads
@@ -4671,6 +4674,8 @@ function selectThread(id) {
     if (discRow) discRow.style.display = 'none';
     if (!window._shareHandlingFollowUps) restoreFollowUps(id);
   } else {
+    currentSubject = '';
+    showOpeningComposer();
     var rb = document.getElementById('resultBlock');      if (rb)  rb.classList.remove('visible');
     var sb = document.getElementById('subjectBanner');    if (sb)  sb.style.display = 'none';
     var fs = document.getElementById('followUpSection'); if (fs)  fs.style.display = 'none';
@@ -4839,7 +4844,7 @@ function renderFUWithSource(list, shouldScroll) {
 
   var fuSec = document.getElementById('followUpSection');
   if (!fuSec) return;
-  fuSec.style.display = 'block';
+  showFollowUpComposer();
 
   // Find resultContent — follow-ups render there alongside streamed ones
   var container = document.getElementById('resultContent') || fuSec;
@@ -7921,8 +7926,7 @@ function restoreResumeSnapshot() {
   if (sText) sText.textContent = currentSubject;
   var sBan = document.getElementById('subjectBanner');
   if (sBan) sBan.style.display = 'block';
-  var fuSec = document.getElementById('followUpSection');
-  if (fuSec) fuSec.style.display = 'block';
+  showFollowUpComposer();
   var govBar = document.getElementById('sessionGovernance');
   if (govBar) govBar.style.display = 'flex';
 
