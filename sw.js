@@ -8,7 +8,7 @@
 // itself; this service worker exists to satisfy installability and speed
 // up shell loading, not to provide offline AI responses.
 
-const CACHE_NAME = 'prism-shell-v1';
+const CACHE_NAME = 'prism-shell-v2';
 
 // Keep this list small and static-only. Do not add qt.html here as a
 // blanket precache target beyond what's needed for install — it changes
@@ -51,8 +51,33 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate: serve from cache instantly if available, and
-  // quietly refresh the cache in the background for next time.
+  const isNavigation = event.request.mode === 'navigate'
+    || event.request.destination === 'document'
+    || url.pathname.endsWith('.html');
+  const isCodeAsset = ['script', 'style', 'worker', 'manifest']
+    .includes(event.request.destination);
+
+  // The interpreter and its executable assets are network-first. Installed
+  // PWAs therefore receive the current qt.html and matching JavaScript on
+  // every online launch instead of displaying a previously cached release.
+  // A cached copy remains available only as an offline fallback.
+  if (isNavigation || isCodeAsset) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Images and other non-executable static assets remain
+  // stale-while-revalidate for fast launches.
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const networkFetch = fetch(event.request)
