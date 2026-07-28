@@ -2291,16 +2291,14 @@
     </div>
     <div id="resultContent"></div>
 
-    <!-- Highlight-to-note bottom sheet — appears the moment text is
-         selected within a response, offering 5 highlight colors. Tapping
-         one marks the selection and creates a new Notes section using
-         that text as the title. -->
+    <!-- Response-highlight bottom sheet — appears when text is selected
+         within a response and offers five visual highlight colors. -->
     <div id="highlightSheet">
-      <button class="highlight-swatch" style="background:rgba(201,168,76,0.85);" title="Gold" onclick="applyHighlightAndCreateNote('rgba(201,168,76,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(74,106,170,0.85);" title="Blue" onclick="applyHighlightAndCreateNote('rgba(74,106,170,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(212,83,110,0.85);" title="Rose" onclick="applyHighlightAndCreateNote('rgba(212,83,110,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(29,158,117,0.85);" title="Teal" onclick="applyHighlightAndCreateNote('rgba(29,158,117,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(127,119,221,0.85);" title="Violet" onclick="applyHighlightAndCreateNote('rgba(127,119,221,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(201,168,76,0.85);" title="Gold" onclick="applyHighlight('rgba(201,168,76,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(74,106,170,0.85);" title="Blue" onclick="applyHighlight('rgba(74,106,170,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(212,83,110,0.85);" title="Rose" onclick="applyHighlight('rgba(212,83,110,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(29,158,117,0.85);" title="Teal" onclick="applyHighlight('rgba(29,158,117,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(127,119,221,0.85);" title="Violet" onclick="applyHighlight('rgba(127,119,221,0.32)')"></button>
     </div>
 
 
@@ -3866,8 +3864,8 @@ document.getElementById('userInput').addEventListener('keydown', function(e) {
     };
   }
 
-  // Exposed globally — note blocks are created dynamically (highlighting,
-  // "+ New section"), so each one needs its own recorder instance wired up
+  // Exposed globally — note blocks are created dynamically from
+  // "+ New section", so each one needs its own recorder instance wired up
   // at creation time, not just the static textareas already on the page.
   window.createVoiceRecorder = createVoiceRecorder;
 
@@ -6528,12 +6526,11 @@ function buildNoteBlock(n) {
   return div;
 }
 
-// ── Highlight-to-note ──────────────────────────────────────────────────
+// ── Response highlighting ──────────────────────────────────────────────
 // Selecting text anywhere inside a response reveals a bottom sheet of
-// highlight colors (see #highlightSheet). Tapping one both marks the
-// selection in the response and creates a new Notes section using that
-// exact text as the title — "the highlight becomes the title."
-(function initHighlightToNote() {
+// highlight colors (see #highlightSheet). Highlighting is visual only;
+// Refractions notes are created deliberately from within Refractions.
+(function initResponseHighlighting() {
   var sheet = document.getElementById('highlightSheet');
   if (!sheet) return;
   var resultContent = document.getElementById('resultContent');
@@ -6554,20 +6551,9 @@ function buildNoteBlock(n) {
   });
 })();
 
-// Truncates at a word boundary rather than cutting mid-word, so a long
-// highlighted phrase becomes a clean title instead of an awkward partial
-// word followed by "…".
-function truncateForTitle(text, maxLen) {
-  if (text.length <= maxLen) return text;
-  var cut = text.slice(0, maxLen);
-  var lastSpace = cut.lastIndexOf(' ');
-  if (lastSpace > maxLen * 0.6) cut = cut.slice(0, lastSpace); // only trim to the word boundary if it's not TOO far back
-  return cut.trim() + '…';
-}
-
 // The actual unwrap mechanics — pulls a <mark> back out to plain text.
 // Shared by the user-facing removal below (which confirms first) and the
-// automatic overlap cleanup in applyHighlightAndCreateNote (which doesn't
+// automatic overlap cleanup in applyHighlight (which doesn't
 // need to confirm, since it's just clearing the way for a replacement
 // color, not deleting anything the person didn't just ask for).
 function unwrapMark(mark) {
@@ -6578,22 +6564,17 @@ function unwrapMark(mark) {
   parent.normalize(); // merge adjacent text nodes back together
 }
 
-// Removes just the visual highlight — unwraps the <mark> back to plain
-// text. Deliberately doesn't touch the note it created; that's real
-// written content and shouldn't disappear just because the mark in the
-// original text got removed. Delete the note itself from the Notes panel
-// if that's actually what's wanted.
+// Removes the visual highlight and unwraps the <mark> back to plain text.
 function removeHighlightMark(mark) {
-  if (!confirm('Remove this highlight? The note itself will stay in Notes.')) return;
+  if (!confirm('Remove this highlight?')) return;
   unwrapMark(mark);
 }
 
-async function applyHighlightAndCreateNote(color) {
+function applyHighlight(color) {
   var sel = window.getSelection();
   if (!sel || sel.isCollapsed) return;
   var range = sel.getRangeAt(0);
-  var text = sel.toString().trim();
-  if (!text) return;
+  if (!sel.toString().trim()) return;
 
   // Clear any existing highlight(s) this selection overlaps, so a new
   // color replaces the old one cleanly instead of nesting inside it and
@@ -6631,38 +6612,8 @@ async function applyHighlightAndCreateNote(color) {
     range.insertNode(mark);
   }
 
-  // Which node this belongs to — the enclosing response block, or root
-  // if the highlight was made in the original interpretation itself.
-  var fuBlock = mark.closest ? mark.closest('.fu-block') : null;
-  var nodeId = (fuBlock && fuBlock.dataset.nodeId) ? fuBlock.dataset.nodeId : 'root';
-
   sel.removeAllRanges();
   document.getElementById('highlightSheet').classList.remove('visible');
-
-  var identityHeaders = noteIdentityHeaders();
-  if (!identityHeaders) {
-    showQueryActionConfirm && showQueryActionConfirm('Sign in to save notes');
-    return;
-  }
-
-  try {
-    await fetch('/api/followups?kind=note', {
-      method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json' }, identityHeaders),
-      body: JSON.stringify({
-        threadId: activeThreadId,
-        nodeId:   nodeId,
-        title:    truncateForTitle(text, 60),
-        quote:    text, // full original phrase preserved here, even though only the (possibly shortened) title shows and is editable
-        content:  ''
-      })
-    });
-  } catch (e) { console.error('Highlight note create error:', e); }
-
-  // Open Refractions for this node, on Private View, showing the new section
-  if (_refractionView !== 'private') toggleEntryVisibility(); // flips correctly from whatever it currently is
-  _notesLastCount = -1;
-  focusRefractionNode(nodeId, '');
 }
 
 function buildNewSectionButton() {

@@ -102,4 +102,22 @@ assert.doesNotMatch(
   'Archive must not reopen itself from saved or populated state',
 );
 
+const applyHighlightStart = frontend.indexOf('function applyHighlight(color) {');
+const applyHighlightEnd = frontend.indexOf('function buildNewSectionButton()', applyHighlightStart);
+assert.ok(
+  applyHighlightStart >= 0 && applyHighlightEnd > applyHighlightStart,
+  'Visual response highlighting flow must exist',
+);
+const applyHighlightFlow = frontend.slice(applyHighlightStart, applyHighlightEnd);
+assert.doesNotMatch(
+  applyHighlightFlow,
+  /kind=note|focusRefractionNode|toggleEntryVisibility|noteIdentityHeaders/,
+  'Highlighting must not create or open Refractions automatically',
+);
+assert.doesNotMatch(
+  frontend,
+  /applyHighlightAndCreateNote/,
+  'Highlight controls must use the visual-only highlighting flow',
+);
+
 console.log('Single-flow composer contract checks passed.');
