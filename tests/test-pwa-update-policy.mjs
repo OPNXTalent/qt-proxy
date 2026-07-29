@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const serviceWorker = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+const interpreter = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 const manifest = JSON.parse(
   readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'),
 );
@@ -13,8 +14,8 @@ assert.equal(
 );
 assert.match(
   serviceWorker,
-  /const CACHE_NAME = 'prism-shell-v2'/,
-  'A new cache version must retire stale v1 responses',
+  /const CACHE_NAME = 'prism-shell-v3'/,
+  'A new cache version must retire stale earlier responses',
 );
 assert.match(
   serviceWorker,
@@ -35,6 +36,21 @@ assert.doesNotMatch(
   serviceWorker.match(/const APP_SHELL = \[[\s\S]*?\];/)?.[0] || '',
   /qt\.html/,
   'qt.html must not be blanket-precached',
+);
+assert.match(
+  interpreter,
+  /serviceWorker\.register\('\/sw\.js', \{ updateViaCache: 'none' \}\)/,
+  'PWA launches must bypass the HTTP cache when checking the worker script',
+);
+assert.match(
+  interpreter,
+  /registration\.update\(\)/,
+  'PWA launches must explicitly check for a newer worker',
+);
+assert.match(
+  interpreter,
+  /serviceWorker\.addEventListener\('controllerchange'[\s\S]*window\.location\.reload\(\)/,
+  'An existing installation must reload once when an updated worker takes control',
 );
 
 console.log('PWA update policy checks passed.');
