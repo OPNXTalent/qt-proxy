@@ -8297,11 +8297,35 @@ document.addEventListener('DOMContentLoaded', function() {
 // Share sheet), so the button only appears on browsers that support it
 // (Chrome/Edge on Android and desktop) — this is expected, not a bug.
 
+var _pwaControllerAtLoad = 'serviceWorker' in navigator
+  ? navigator.serviceWorker.controller
+  : null;
+var _pwaReloadingForUpdate = false;
+
 if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    // A first-time install has no previous controller and does not need a
+    // reload. Existing installations reload once when a newer worker takes
+    // control so they cannot remain pinned to an obsolete app shell.
+    if (!_pwaControllerAtLoad) {
+      _pwaControllerAtLoad = navigator.serviceWorker.controller;
+      return;
+    }
+    if (_pwaReloadingForUpdate) return;
+    _pwaReloadingForUpdate = true;
+    window.location.reload();
+  });
+
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/sw.js').catch(function(err) {
-      console.warn('[PWA] service worker registration failed:', err.message);
-    });
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+      .then(function(registration) {
+        // Do not wait for the browser's periodic update interval. Every
+        // online launch checks the service-worker script for a new release.
+        return registration.update();
+      })
+      .catch(function(err) {
+        console.warn('[PWA] service worker registration failed:', err.message);
+      });
   });
 }
 
