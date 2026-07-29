@@ -484,9 +484,11 @@
     display: none;
     flex-direction: column;
     gap: 0;
-    margin-bottom: 32px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid rgba(42,42,64,0.18);
+    margin-top: 24px;
+    margin-bottom: 0;
+    padding-top: 20px;
+    padding-bottom: 0;
+    border-top: 1px solid rgba(42,42,64,0.18);
   }
   /* Governance transitions — opacity only, no layout shift */
   .query-state-label,
@@ -838,7 +840,7 @@
     font-size:21.5px;
     color: var(--text-dim);
     font-style: italic;
-    max-width: 560px;
+    max-width: 780px;
     margin: 0 auto;
     line-height: 1.75;
   }
@@ -2105,29 +2107,31 @@
     <div style="font-family:var(--crimson); font-size:27px; color:var(--hebrew); letter-spacing:0.08em; margin-bottom:16px; direction:rtl;">אֶחָד בֶּאֱמֶת</div>
     <div class="header-sub">Framework Interpreter</div>
     <div class="header-rule"></div>
-    <p class="header-premise">A verse, a question, or whatever is on your mind. The Prism surfaces the relational architecture already present in the text.</p>
+    <p class="header-premise"><strong>Not a foundation. A relation. Reality stands between you and the question.</strong><br><strong>We all have faith in reality.</strong></p>
   </header>
 
   <!-- Anonymous back link — shown only to non-subscribers -->
   <!-- Anonymous back link row removed — Learn more / Expand Your Access no longer needed -->
 
-  <!-- INPUT FORM -->
-  <div id="inputSection">
-    <div class="input-wrap">
-      <div style="position:relative;">
-        <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
-        <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+  <div id="initialComposerSlot">
+    <!-- One composer serves both the opening query and every follow-up. -->
+    <div id="queryComposer">
+    <div id="inputSection">
+      <div class="input-wrap">
+        <div style="position:relative;">
+          <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+          <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+        </div>
+        <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
+        <div id="charCount" style="font-family:var(--mono); font-size:20px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 600</div>
       </div>
-      <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
-      <div id="charCount" style="font-family:var(--mono); font-size:20px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 600</div>
     </div>
 
-  </div><!-- /#inputSection closes here -->
-
-  <!-- SUBMIT ROW — lives outside inputSection so opacity fade never affects it -->
-  <div class="submit-row" id="submitRow">
-    <button id="newSubjectTopBtn" onclick="resetForm()" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--gold-dim)'" style="display:none;font-family:var(--cinzel);font-size:16px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-pale);background:transparent;border:1px solid var(--gold-dim);padding:16px 28px;cursor:pointer;transition:all 0.25s;">↺ New Subject</button>
-    <button class="submit-btn" id="submitBtn" onclick="runInterpretation()">Interpret →</button>
+    <div class="submit-row" id="submitRow">
+      <button id="newSubjectTopBtn" onclick="resetForm()" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--gold-dim)'" style="display:none;font-family:var(--cinzel);font-size:16px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-pale);background:transparent;border:1px solid var(--gold-dim);padding:16px 28px;cursor:pointer;transition:all 0.25s;">↺ New Subject</button>
+      <button class="submit-btn" id="submitBtn" onclick="submitComposer()">Interpret →</button>
+    </div>
+    </div>
   </div>
 
     <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
@@ -2136,9 +2140,7 @@
 
       <!-- Disclaimer -->
       <div style="font-family:var(--crimson); font-style:italic; font-size:19px; color:var(--text-muted); line-height:1.8; text-align:left; border-top:1px solid var(--border); padding-top:24px; margin-bottom:28px;">
-        The Prism is a lens, not an authority. It surfaces relational architecture already present within the text and the questions surrounding it — it does not think for you, conclude for you, or require agreement in order to engage.<br><br>
-        Its purpose is not to replace judgment, tradition, skepticism, faith, or personal inquiry, but to provide a structured way of examining difficult ideas without reducing them to slogans, tribal reflexes, or inherited assumptions.<br><br>
-        The Prism is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
+        <strong>The Prism is a lens, not an authority.</strong> It surfaces relational architecture already present — it doesn't think or conclude for you, and doesn't replace your own judgment or inquiry. It's a tool for examining hard questions honestly, without slogans, treating the search itself as relational, not just intellectual.
       </div>
 
       <!-- Four-option wall — visible immediately; account creation only interrupts on actual purchase click, via the existing "Create Your Free Account" modal -->
@@ -2250,8 +2252,11 @@
           <span class="query-state-dot" id="queryStateDot"
             style="position:absolute;left:calc(5.5em + 10px);"></span>
         </div>
-        <!-- Right: artifact governance — anchored, never moves -->
-        <div style="display:flex;align-items:center;gap:0;flex-shrink:0;"></div>
+        <!-- Right: the one persistent artifact action -->
+        <div style="display:flex;align-items:center;gap:0;flex-shrink:0;">
+          <button class="query-secondary-btn" id="queryPrintBtn"
+            onclick="window.print()" title="Print this conversation">Print</button>
+        </div>
       </div>
 
       <!-- Address layer — always mounted, fades in/out -->
@@ -2286,16 +2291,14 @@
     </div>
     <div id="resultContent"></div>
 
-    <!-- Highlight-to-note bottom sheet — appears the moment text is
-         selected within a response, offering 5 highlight colors. Tapping
-         one marks the selection and creates a new Notes section using
-         that text as the title. -->
+    <!-- Response-highlight bottom sheet — appears when text is selected
+         within a response and offers five visual highlight colors. -->
     <div id="highlightSheet">
-      <button class="highlight-swatch" style="background:rgba(201,168,76,0.85);" title="Gold" onclick="applyHighlightAndCreateNote('rgba(201,168,76,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(74,106,170,0.85);" title="Blue" onclick="applyHighlightAndCreateNote('rgba(74,106,170,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(212,83,110,0.85);" title="Rose" onclick="applyHighlightAndCreateNote('rgba(212,83,110,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(29,158,117,0.85);" title="Teal" onclick="applyHighlightAndCreateNote('rgba(29,158,117,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(127,119,221,0.85);" title="Violet" onclick="applyHighlightAndCreateNote('rgba(127,119,221,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(201,168,76,0.85);" title="Gold" onclick="applyHighlight('rgba(201,168,76,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(74,106,170,0.85);" title="Blue" onclick="applyHighlight('rgba(74,106,170,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(212,83,110,0.85);" title="Rose" onclick="applyHighlight('rgba(212,83,110,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(29,158,117,0.85);" title="Teal" onclick="applyHighlight('rgba(29,158,117,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(127,119,221,0.85);" title="Violet" onclick="applyHighlight('rgba(127,119,221,0.32)')"></button>
     </div>
 
 
@@ -2352,18 +2355,8 @@
     <!-- THREAD SEED BANNER — shown when continuing from a completed thread -->
     <div id="qt-seed-banner" style="display:none; font-family:var(--crimson); font-size:18px; font-style:italic; line-height:1.6; color:var(--text-muted); border-left:2px solid var(--gold-dim); padding:10px 16px; margin-bottom:24px; margin-top:40px;"></div>
 
-    <!-- FOLLOW-UP -->
+    <!-- The shared composer is moved here once a result is available. -->
     <div id="followUpSection" style="display:none; margin-top:40px; border-top:1px solid var(--border); padding-top:32px;">
-      <div style="font-family:var(--mono); font-size:20px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:12px;">Continue the Exploration</div>
-      <div style="position:relative; margin-bottom:16px;">
-        <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question — go deeper on any section, connect it to another passage, or explore a related theme…" rows="3" style="padding-right:52px;"></textarea>
-        <button id="followUpMicBtn" onclick="toggleFollowUpMic()" title="Speak your follow-up" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
-      </div>
-      <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-bottom:10px; text-transform:uppercase;"></div>
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <button class="new-query-btn" onclick="resetForm()">↺ New Subject</button>
-        <button class="submit-btn" id="followUpBtn" onclick="runFollowUp()">Ask →</button>
-      </div>
       <div id="followUpLoading" style="display:none; text-align:center; padding:32px 0;">
         <div style="font-family:var(--cinzel); font-size:27px; color:var(--gold-dim); animation: pulse 2s ease-in-out infinite;">✦</div>
         <div style="font-family:var(--mono); font-size:20px; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); margin-top:12px;">Reading the relational field…</div>
@@ -2494,9 +2487,7 @@
   </div>
 
   <div class="disclaimer">
-    The Prism is a lens, not an authority. It surfaces relational architecture already present within the text and the questions surrounding it — it does not think for you, conclude for you, or require agreement in order to engage.<br><br>
-    Its purpose is not to replace judgment, tradition, skepticism, faith, or personal inquiry, but to provide a structured way of examining difficult ideas without reducing them to slogans, tribal reflexes, or inherited assumptions.<br><br>
-    The Prism is not offered as a final voice, but as a framework for exploration — one intended to deepen honesty, attention, and meaningful engagement with the questions themselves, and with the reality that sincere inquiry often becomes relational rather than merely intellectual.
+    <strong>The Prism is a lens, not an authority.</strong> It surfaces relational architecture already present — it doesn't think or conclude for you, and doesn't replace your own judgment or inquiry. It's a tool for examining hard questions honestly, without slogans, treating the search itself as relational, not just intellectual.
   </div>
 
 </div><!-- /.shell -->
@@ -2682,6 +2673,54 @@ function applyQuotaLock(message) {
     prompt.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+function submitComposer() {
+  const composer = document.getElementById('queryComposer');
+  return composer && composer.dataset.mode === 'followUp'
+    ? runFollowUp()
+    : runInterpretation();
+}
+
+function stageComposerBelowResponse() {
+  const section = document.getElementById('followUpSection');
+  const composer = document.getElementById('queryComposer');
+  if (!section || !composer) return;
+  section.style.display = 'block';
+  section.appendChild(composer);
+  positionSharingBelowComposer(section);
+}
+
+function positionSharingBelowComposer(section) {
+  const governance = document.getElementById('sessionGovernance');
+  if (section && governance) {
+    section.appendChild(governance);
+  }
+}
+
+function showFollowUpComposer() {
+  const section = document.getElementById('followUpSection');
+  const composer = document.getElementById('queryComposer');
+  if (!section || !composer) return;
+  section.style.display = 'block';
+  section.appendChild(composer);
+  positionSharingBelowComposer(section);
+  composer.dataset.mode = 'followUp';
+  document.getElementById('userInput').placeholder =
+    'Ask a follow-up question, test the response, or continue the dialogue…';
+  document.getElementById('submitBtn').textContent = 'Ask →';
+  document.getElementById('newSubjectTopBtn').style.display = 'block';
+}
+
+function showOpeningComposer() {
+  const slot = document.getElementById('initialComposerSlot');
+  const composer = document.getElementById('queryComposer');
+  if (!slot || !composer) return;
+  slot.appendChild(composer);
+  composer.dataset.mode = 'opening';
+  document.getElementById('userInput').placeholder =
+    'A verse, a question, or whatever is on your mind…';
+  document.getElementById('submitBtn').textContent = 'Interpret →';
+}
+
 async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
@@ -2703,6 +2742,7 @@ async function runInterpretation() {
   document.getElementById('submitBtn').disabled = true;
   document.getElementById('inputSection').style.opacity = '0.4';
   document.getElementById('inputSection').style.pointerEvents = 'none';
+  stageComposerBelowResponse();
   document.getElementById('loadingBlock').classList.add('visible');
   document.getElementById('resultBlock').classList.remove('visible');
   markPrismBrowserTiming(requestId, 'wait_indicator_visible');
@@ -2777,7 +2817,7 @@ async function runInterpretation() {
       document.getElementById('resultContent').appendChild(truncNotice);
     }
 
-    showResult();
+    showResult(true);
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
         if (parsed.recognition && !prismEarlyRecognitionRequests.has(requestId)) {
@@ -2792,7 +2832,7 @@ async function runInterpretation() {
     // Show subject banner, follow-up, and download button
     document.getElementById('subjectText').textContent = input;
     document.getElementById('subjectBanner').style.display = 'block';
-    document.getElementById('followUpSection').style.display = 'block';
+    showFollowUpComposer();
     // downloadRow hidden — controls rendered per-node
     document.getElementById('downloadRow').style.display = 'none';
     // Show session governance bar
@@ -2814,7 +2854,7 @@ async function runInterpretation() {
     }
 
     // Show sidebar after first successful query
-    const queryText = document.getElementById('userInput').value.trim();
+    const queryText = input;
     showSidebarAfterQuery(queryText);
 
     // Save full response to localStorage keyed by thread id
@@ -2831,6 +2871,8 @@ async function runInterpretation() {
     } else {
       console.warn('Save skipped — activeThreadId:', activeThreadId, 'parsed:', !!parsed);
     }
+    document.getElementById('userInput').value = '';
+    updateCharCount();
 
   } catch (err) {
     markPrismBrowserTiming(requestId, 'request_failed', {
@@ -2857,7 +2899,7 @@ async function runInterpretation() {
 }
 
 async function runFollowUp() {
-  const input = document.getElementById('followUpInput').value.trim();
+  const input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
   // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
@@ -2870,9 +2912,9 @@ async function runFollowUp() {
     followUp: true
   });
 
-  document.getElementById('followUpBtn').disabled = true;
-  document.getElementById('followUpInput').style.opacity = '0.4';
-  document.getElementById('followUpInput').style.pointerEvents = 'none';
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('inputSection').style.opacity = '0.4';
+  document.getElementById('inputSection').style.pointerEvents = 'none';
   document.getElementById('followUpLoading').style.display = 'block';
   document.getElementById('followUpLoading').scrollIntoView({ behavior: 'smooth', block: 'center' });
   markPrismBrowserTiming(requestId, 'wait_indicator_visible');
@@ -3013,7 +3055,8 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
     markPrismBrowserTiming(requestId, 'response_complete');
     prismBrowserTimelines.delete(requestId);
 
-    document.getElementById('followUpInput').value = '';
+    document.getElementById('userInput').value = '';
+    updateCharCount();
 
     // Increment counter and apply lock for non-subscribers after successful follow-up
     sessionQueryCount++;
@@ -3054,9 +3097,9 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
     document.getElementById('resultContent').appendChild(errEl);
   } finally {
     document.getElementById('followUpLoading').style.display = 'none';
-    document.getElementById('followUpInput').style.opacity = '';
-    document.getElementById('followUpInput').style.pointerEvents = '';
-    document.getElementById('followUpBtn').disabled = false;
+    document.getElementById('inputSection').style.opacity = '';
+    document.getElementById('inputSection').style.pointerEvents = '';
+    document.getElementById('submitBtn').disabled = false;
   }
 }
 
@@ -3411,11 +3454,13 @@ function getErrorMessage(err) {
   </div>`;
 }
 
-function showResult() {
+function showResult(preserveScroll) {
   document.getElementById('loadingBlock').classList.remove('visible');
   document.getElementById('resultBlock').classList.add('visible');
   document.getElementById('newSubjectTopBtn').style.display = 'block';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!preserveScroll) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 function findLastContextQuestion(text) {
@@ -3474,7 +3519,7 @@ function renderResult(d) {
       frameworkHtml += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span><span class="qt-section-title">Key Terms</span><span class="qt-section-hebrew">מִלִּים</span></div><div class="qt-section-body">' + termItems + '</div></div>';
     }
 
-    html += '<p class="qt-framework-callout">ⓘ Every interpretation in The Prism is guided by the same interpretive framework. Expand the sections below to examine the reasoning behind this conclusion.</p>';
+    html += '<p class="qt-framework-callout">ⓘ Same framework behind every interpretation. Expand to see the reasoning.</p>';
     html += '<button class="qt-framework-toggle" onclick="toggleFramework(this)" aria-expanded="false">Framework for Interpretation</button><div class="qt-framework-body" id="qtFrameworkBody">' + frameworkHtml + '</div>';
   }
 
@@ -3550,7 +3595,7 @@ function toggleFramework(btn) {
 }
 
 function submitSuggestedThread(text, btnEl) {
-  const fuInput = document.getElementById('followUpInput');
+  const fuInput = document.getElementById('userInput');
   if (!fuInput) return;
 
   // Only disable the button that was actually clicked — the other two
@@ -3579,7 +3624,7 @@ function startNewThreadWithSummary(summaryText) {
   sessionStorage.setItem('qt_thread_seed', summaryText);
 
   // Scroll to input and focus
-  const input = document.getElementById('queryInput') || document.getElementById('followUpInput');
+  const input = document.getElementById('queryInput') || document.getElementById('userInput');
   if (input) {
     input.value = '';
     input.focus();
@@ -3635,29 +3680,21 @@ function resetForm() {
   localStorage.removeItem('qt_resume_snapshot');
   closeSidebarOverlay();
   document.getElementById('resultBlock').classList.remove('visible');
+  showOpeningComposer();
   document.getElementById('downloadRow').style.display = 'none';
   document.getElementById('followUpSection').style.display = 'none';
   document.getElementById('subjectBanner').style.display = 'none';
   document.getElementById('resultContent').innerHTML = '';
   document.getElementById('userInput').value = '';
-  if (document.getElementById('followUpInput')) document.getElementById('followUpInput').value = '';
   document.getElementById('newSubjectTopBtn').style.display = 'none';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Enter key submits — plain Enter on main input and follow-up input
-// Shift+Enter inserts a newline (standard textarea behaviour preserved)
+// Enter submits the one shared composer; Shift+Enter inserts a newline.
 document.getElementById('userInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
-    runInterpretation();
-  }
-});
-
-document.getElementById('followUpInput').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    runFollowUp();
+    submitComposer();
   }
 });
 
@@ -3827,8 +3864,8 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
     };
   }
 
-  // Exposed globally — note blocks are created dynamically (highlighting,
-  // "+ New section"), so each one needs its own recorder instance wired up
+  // Exposed globally — note blocks are created dynamically from
+  // "+ New section", so each one needs its own recorder instance wired up
   // at creation time, not just the static textareas already on the page.
   window.createVoiceRecorder = createVoiceRecorder;
 
@@ -3842,24 +3879,9 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
       btn: micBtn,
       statusEl: micStatus,
       textarea: textarea,
-      onDone: function() { runInterpretation(); }
+      onDone: function() { submitComposer(); }
     });
     window.toggleMic = function() { mainRecorder.toggle(); };
-  }
-
-  // ── Follow-up mic ─────────────────────────────────────────────────────
-  const followUpMicBtn = document.getElementById('followUpMicBtn');
-  const followUpMicStatus = document.getElementById('followUpMicStatus');
-  const followUpTextarea = document.getElementById('followUpInput');
-  if (followUpMicBtn && followUpMicStatus && followUpTextarea) {
-    followUpMicBtn.style.display = 'block';
-    const followUpRecorder = createVoiceRecorder({
-      btn: followUpMicBtn,
-      statusEl: followUpMicStatus,
-      textarea: followUpTextarea,
-      onDone: function() { runFollowUp(); }
-    });
-    window.toggleFollowUpMic = function() { followUpRecorder.toggle(); };
   }
 
   // ── Refractions (chat) mic ────────────────────────────────────────────
@@ -4316,17 +4338,11 @@ function enterSharedThread(share) {
   // which would be wrong here), so that has to happen here instead.
   var sidebarEl = document.getElementById('sidebar');
   var toggleEl  = document.getElementById('sidebarToggle');
-  if (sidebarEl) sidebarEl.classList.add('visible');
-  if (toggleEl)  toggleEl.classList.add('visible');
-  var emailNow = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
-  if (!emailNow) {
-    // Anonymous — same default-open behavior ordinary anon browsing
-    // already uses in initSidebar()'s own "no identity" branch.
-    if (sidebarEl) sidebarEl.classList.add('open');
-    if (toggleEl)  toggleEl.textContent = '‹';
-    var mcEl = document.getElementById('mainContent');
-    if (mcEl) mcEl.classList.add('sidebar-open');
-  }
+  if (sidebarEl) { sidebarEl.classList.add('visible'); sidebarEl.classList.remove('open'); }
+  if (toggleEl)  { toggleEl.classList.add('visible'); toggleEl.textContent = '☰'; }
+  var mcEl = document.getElementById('mainContent');
+  if (mcEl) mcEl.classList.remove('sidebar-open');
+  sidebarOpen = false;
 
   // Sender attribution — "so-and-so shared this with you." Falls back to
   // a generic phrase if no display name is on file. NOTE: #sharedByBanner
@@ -4512,7 +4528,8 @@ function selectThread(id) {
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
     var govBar = document.getElementById('sessionGovernance'); if (govBar) govBar.style.display = 'flex';
-    var fuSec = document.getElementById('followUpSection'); if (fuSec)   fuSec.style.display = 'block';
+    showFollowUpComposer();
+    if (inputEl) inputEl.value = '';
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     window._shareHandlingFollowUps = false;
     // Reset to root node when a new interpretation loads
@@ -4671,6 +4688,8 @@ function selectThread(id) {
     if (discRow) discRow.style.display = 'none';
     if (!window._shareHandlingFollowUps) restoreFollowUps(id);
   } else {
+    currentSubject = '';
+    showOpeningComposer();
     var rb = document.getElementById('resultBlock');      if (rb)  rb.classList.remove('visible');
     var sb = document.getElementById('subjectBanner');    if (sb)  sb.style.display = 'none';
     var fs = document.getElementById('followUpSection'); if (fs)  fs.style.display = 'none';
@@ -4839,7 +4858,7 @@ function renderFUWithSource(list, shouldScroll) {
 
   var fuSec = document.getElementById('followUpSection');
   if (!fuSec) return;
-  fuSec.style.display = 'block';
+  showFollowUpComposer();
 
   // Find resultContent — follow-ups render there alongside streamed ones
   var container = document.getElementById('resultContent') || fuSec;
@@ -5048,11 +5067,28 @@ function addThreadToSidebar(queryText) {
       .then(function(data) {
         if (!data.threads) return;
         allThreads = data.threads;
-        if (allThreads.length > 0) {
-          activeThreadId = allThreads[0].id;
-          // Auto-start Realtime for the most recent thread
-          // This ensures S1 doesn't need to click sidebar to initiate bidirectional flow
-          if (typeof selectThread === 'function') selectThread(allThreads[0].id);
+        // Keep the response already on screen. Automatically selecting the
+        // server row here races its response persistence: selectThread()
+        // interprets a not-yet-populated response as an empty thread and
+        // hides resultBlock. Re-key the local snapshot instead, then start
+        // Realtime without rerendering the active conversation.
+        if (activeThreadId === tempId && allThreads.length > 0) {
+          var realThread = allThreads.find(function(thread) {
+            return thread.query === queryText;
+          }) || allThreads[0];
+          var realId = realThread.id;
+          ['qt_response_', 'qt_input_', 'qt_followups_', 'qt_thread_title_'].forEach(function(prefix) {
+            var pendingValue = localStorage.getItem(prefix + tempId);
+            if (pendingValue != null) {
+              localStorage.setItem(prefix + realId, pendingValue);
+              localStorage.removeItem(prefix + tempId);
+            }
+          });
+          activeThreadId = realId;
+          localStorage.setItem('qt_last_thread_id', realId);
+          if (typeof startFollowUpRealtime === 'function') {
+            startFollowUpRealtime(realId);
+          }
         }
         renderThreads(allThreads);
       }).catch(function() {});
@@ -5354,6 +5390,14 @@ function initSidebar() {
 
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   var email  = userEmail();
+  var mainContent = document.getElementById('mainContent');
+
+  // Begin every visit with a clean reading surface. Archive remains
+  // available from its toggle but never opens itself.
+  sidebarOpen = false;
+  if (sidebar) sidebar.classList.remove('open');
+  if (mainContent) mainContent.classList.remove('sidebar-open');
+  if (toggle) toggle.textContent = '☰';
 
   // R1 new session — start fresh, don't load S1's thread history
   if (sessionStorage.getItem('prism_r1_session')) {
@@ -5361,11 +5405,8 @@ function initSidebar() {
     sessionStorage.setItem('prism_r1_active', '1');
     allThreads = [];
     renderThreads(allThreads);
-    if (sidebar) { sidebar.classList.add('visible'); sidebar.classList.add('open'); }
-    if (toggle)  { toggle.classList.add('visible'); toggle.textContent = '‹'; }
-    var mc = document.getElementById('mainContent');
-    if (mc) mc.classList.add('sidebar-open');
-    sidebarOpen = true;
+    if (sidebar) sidebar.classList.add('visible');
+    if (toggle)  toggle.classList.add('visible');
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
     if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
@@ -5376,11 +5417,8 @@ function initSidebar() {
   if (!email) {
     allThreads = [];
     renderThreads(allThreads);
-    if (sidebar) { sidebar.classList.add('visible'); sidebar.classList.add('open'); }
-    if (toggle)  { toggle.classList.add('visible'); toggle.textContent = '‹'; }
-    var mcAnon = document.getElementById('mainContent');
-    if (mcAnon) mcAnon.classList.add('sidebar-open');
-    sidebarOpen = true;
+    if (sidebar) sidebar.classList.add('visible');
+    if (toggle)  toggle.classList.add('visible');
     sidebarHasAppeared = true;
     loadSidebarCreditsAnon();
     return;
@@ -5396,15 +5434,9 @@ function initSidebar() {
   }
 
   var hasAppeared = localStorage.getItem('qt_sidebar_appeared') === '1';
-  var wasOpen     = localStorage.getItem('qt_sidebar_open') === '1';
   if (hasAppeared && sidebar) {
     sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
     sidebarHasAppeared = true;
-    if (wasOpen) {
-      sidebarOpen = true; sidebar.classList.add('open');
-      var mc = document.getElementById('mainContent'); if (mc) mc.classList.add('sidebar-open');
-      if (toggle) toggle.textContent = '‹';
-    }
   }
 
   fetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': email } })
@@ -5431,11 +5463,6 @@ function initSidebar() {
     if (allThreads.length > 0 && sidebar) {
       sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
       sidebarHasAppeared = true; localStorage.setItem('qt_sidebar_appeared', '1');
-      if (!sidebarOpen) {
-        sidebarOpen = true; sidebar.classList.add('open');
-        var mc2 = document.getElementById('mainContent'); if (mc2) mc2.classList.add('sidebar-open');
-        if (toggle) toggle.textContent = '‹';
-      }
     }
     renderThreads(allThreads);
 
@@ -5713,7 +5740,6 @@ async function deactivateShare() {
   allThreads = allThreads.map(function(t) {
     return t.id === activeThreadId ? Object.assign({}, t, { collaboration_open: false }) : t;
   });
-  syncNodeShareButtons();
   updateSessionGovernanceUI();
   updateSidebarSharedDot(activeThreadId, false);
 
@@ -5808,7 +5834,6 @@ async function handleShareBtn() {
 
     // Track this thread as open
     _openThreadIds.add(activeThreadId);
-    syncNodeShareButtons();
     updateSessionGovernanceUI();
     updateSidebarSharedDot(activeThreadId, true);
 
@@ -6501,12 +6526,11 @@ function buildNoteBlock(n) {
   return div;
 }
 
-// ── Highlight-to-note ──────────────────────────────────────────────────
+// ── Response highlighting ──────────────────────────────────────────────
 // Selecting text anywhere inside a response reveals a bottom sheet of
-// highlight colors (see #highlightSheet). Tapping one both marks the
-// selection in the response and creates a new Notes section using that
-// exact text as the title — "the highlight becomes the title."
-(function initHighlightToNote() {
+// highlight colors (see #highlightSheet). Highlighting is visual only;
+// Refractions notes are created deliberately from within Refractions.
+(function initResponseHighlighting() {
   var sheet = document.getElementById('highlightSheet');
   if (!sheet) return;
   var resultContent = document.getElementById('resultContent');
@@ -6527,20 +6551,9 @@ function buildNoteBlock(n) {
   });
 })();
 
-// Truncates at a word boundary rather than cutting mid-word, so a long
-// highlighted phrase becomes a clean title instead of an awkward partial
-// word followed by "…".
-function truncateForTitle(text, maxLen) {
-  if (text.length <= maxLen) return text;
-  var cut = text.slice(0, maxLen);
-  var lastSpace = cut.lastIndexOf(' ');
-  if (lastSpace > maxLen * 0.6) cut = cut.slice(0, lastSpace); // only trim to the word boundary if it's not TOO far back
-  return cut.trim() + '…';
-}
-
 // The actual unwrap mechanics — pulls a <mark> back out to plain text.
 // Shared by the user-facing removal below (which confirms first) and the
-// automatic overlap cleanup in applyHighlightAndCreateNote (which doesn't
+// automatic overlap cleanup in applyHighlight (which doesn't
 // need to confirm, since it's just clearing the way for a replacement
 // color, not deleting anything the person didn't just ask for).
 function unwrapMark(mark) {
@@ -6551,22 +6564,17 @@ function unwrapMark(mark) {
   parent.normalize(); // merge adjacent text nodes back together
 }
 
-// Removes just the visual highlight — unwraps the <mark> back to plain
-// text. Deliberately doesn't touch the note it created; that's real
-// written content and shouldn't disappear just because the mark in the
-// original text got removed. Delete the note itself from the Notes panel
-// if that's actually what's wanted.
+// Removes the visual highlight and unwraps the <mark> back to plain text.
 function removeHighlightMark(mark) {
-  if (!confirm('Remove this highlight? The note itself will stay in Notes.')) return;
+  if (!confirm('Remove this highlight?')) return;
   unwrapMark(mark);
 }
 
-async function applyHighlightAndCreateNote(color) {
+function applyHighlight(color) {
   var sel = window.getSelection();
   if (!sel || sel.isCollapsed) return;
   var range = sel.getRangeAt(0);
-  var text = sel.toString().trim();
-  if (!text) return;
+  if (!sel.toString().trim()) return;
 
   // Clear any existing highlight(s) this selection overlaps, so a new
   // color replaces the old one cleanly instead of nesting inside it and
@@ -6604,38 +6612,8 @@ async function applyHighlightAndCreateNote(color) {
     range.insertNode(mark);
   }
 
-  // Which node this belongs to — the enclosing response block, or root
-  // if the highlight was made in the original interpretation itself.
-  var fuBlock = mark.closest ? mark.closest('.fu-block') : null;
-  var nodeId = (fuBlock && fuBlock.dataset.nodeId) ? fuBlock.dataset.nodeId : 'root';
-
   sel.removeAllRanges();
   document.getElementById('highlightSheet').classList.remove('visible');
-
-  var identityHeaders = noteIdentityHeaders();
-  if (!identityHeaders) {
-    showQueryActionConfirm && showQueryActionConfirm('Sign in to save notes');
-    return;
-  }
-
-  try {
-    await fetch('/api/followups?kind=note', {
-      method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json' }, identityHeaders),
-      body: JSON.stringify({
-        threadId: activeThreadId,
-        nodeId:   nodeId,
-        title:    truncateForTitle(text, 60),
-        quote:    text, // full original phrase preserved here, even though only the (possibly shortened) title shows and is editable
-        content:  ''
-      })
-    });
-  } catch (e) { console.error('Highlight note create error:', e); }
-
-  // Open Refractions for this node, on Private View, showing the new section
-  if (_refractionView !== 'private') toggleEntryVisibility(); // flips correctly from whatever it currently is
-  _notesLastCount = -1;
-  focusRefractionNode(nodeId, '');
 }
 
 function buildNewSectionButton() {
@@ -6865,25 +6843,6 @@ function buildNodeControls(nodeId, queryText) {
   wrap.className = 'node-controls';
   wrap.dataset.nodeId = nodeId;
 
-  // Print
-  var archBtn = document.createElement('button');
-  archBtn.className = 'node-ctrl-btn';
-  archBtn.textContent = '↓ Print';
-  archBtn.title = 'Print this interpretation';
-  archBtn.addEventListener('click', function(e) { e.stopPropagation(); window.print(); });
-  wrap.appendChild(archBtn);
-
-  // Share
-  var shareBtn = document.createElement('button');
-  shareBtn.className = 'node-ctrl-btn node-share-btn';
-  shareBtn.textContent = window._shareActive ? 'Shared ✓' : 'Share';
-  if (window._shareActive) shareBtn.classList.add('share-active');
-  shareBtn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    handleShareBtn();
-  });
-  wrap.appendChild(shareBtn);
-
   // Refractions
   var refBtn = document.createElement('button');
   refBtn.className = 'node-ctrl-btn node-refraction-btn';
@@ -6896,20 +6855,6 @@ function buildNodeControls(nodeId, queryText) {
   wrap.appendChild(refBtn);
 
   return wrap;
-}
-
-// Update all node Share buttons when share state changes
-function syncNodeShareButtons() {
-  var btns = document.querySelectorAll('.node-share-btn');
-  btns.forEach(function(btn) {
-    if (window._shareActive) {
-      btn.textContent = 'Shared ✓';
-      btn.classList.add('share-active');
-    } else {
-      btn.textContent = 'Share';
-      btn.classList.remove('share-active');
-    }
-  });
 }
 
 function focusRefractionNode(nodeId, queryText) {
@@ -7921,8 +7866,7 @@ function restoreResumeSnapshot() {
   if (sText) sText.textContent = currentSubject;
   var sBan = document.getElementById('subjectBanner');
   if (sBan) sBan.style.display = 'block';
-  var fuSec = document.getElementById('followUpSection');
-  if (fuSec) fuSec.style.display = 'block';
+  showFollowUpComposer();
   var govBar = document.getElementById('sessionGovernance');
   if (govBar) govBar.style.display = 'flex';
 
