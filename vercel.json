@@ -23,6 +23,13 @@
       "schedule": "0 9 * * *"
     }
   ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/qt.html?mode=anon",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
