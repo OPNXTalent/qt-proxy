@@ -7,6 +7,7 @@ import {
   parseModelJson,
   splitApprovedResponse,
   validateAnalysis,
+  validateAnalysisStrict,
   validateInquiryState,
 } from '../lib/persistent-inquiry-runtime.js';
 
@@ -32,8 +33,16 @@ const analysis = validateAnalysis(parseModelJson(`\`\`\`json
     "evidenceBoundaries": ["Failure to locate agency is not proof of its absence."],
     "unsupportedAssumptions": [],
     "unfalsifiableClaims": [],
+    "activeAssumptions": ["Causal dependence may entail determination."],
+    "logicalClosure": "open",
+    "falsifiabilityStatus": "partially_testable",
+    "relevantConstraints": ["ontological", "logical"],
+    "retrieval": {"needed": true, "focus": "agency and causal dependence"},
+    "questionNeeded": false,
+    "endingMode": "declarative",
     "draftPreparation": "Address the inference rather than repeat the original answer."
   },
+  "changedStateFields": ["orientation", "unresolvedClaims", "confidence"],
   "statePatch": {
     "orientation": "Where agency enters a causally conditioned process",
     "unresolvedClaims": ["Whether causal dependence entails determination"],
@@ -51,6 +60,33 @@ assert.equal(next.inquiryTrajectory.length, 1);
 assert.match(next.orientation, /Where agency enters/);
 assert.equal(next.confidence.orientation.level, 'directly_established');
 assert.equal(next.version, 0, 'Patches must not manufacture a committed version');
+
+assert.doesNotThrow(() => validateAnalysisStrict(analysis, JSON.stringify(analysis)));
+assert.throws(
+  () => validateAnalysisStrict({
+    reduction: analysis.reduction,
+    structuralDelta: analysis.structuralDelta,
+    constraintGate: { observations: [] },
+    changedStateFields: [],
+    statePatch: {},
+  }),
+  /GATE_FIELD_INVALID/,
+);
+assert.throws(
+  () => validateAnalysisStrict({
+    ...analysis,
+    constraintGate: {
+      ...analysis.constraintGate,
+      questionNeeded: true,
+      endingMode: 'declarative',
+    },
+  }),
+  /GATE_ENDING_CONTRADICTION/,
+);
+assert.throws(
+  () => validateAnalysisStrict(analysis, 'x'.repeat(12001)),
+  /REDUCER_OUTPUT_OVERSIZED/,
+);
 
 const patchedWithUnknownField = applyInquiryPatch(next, {
   secretAuthority: 'must not survive',
