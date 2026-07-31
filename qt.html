@@ -3941,12 +3941,14 @@ function submitTierEmail() {
 let activeThreadId = null;
 
 function getPersistentInquiryKey() {
-  if (activeThreadId && /^[0-9a-f-]{36}$/i.test(activeThreadId)) {
-    return 'thread:' + activeThreadId;
-  }
   var storageKey = 'qt_active_inquiry_key';
   var existing = sessionStorage.getItem(storageKey);
   if (existing) return existing;
+  if (activeThreadId && /^[0-9a-f-]{36}$/i.test(activeThreadId)) {
+    var threadKey = 'thread:' + activeThreadId;
+    sessionStorage.setItem(storageKey, threadKey);
+    return threadKey;
+  }
   var entropy = window.crypto && typeof window.crypto.randomUUID === 'function'
     ? window.crypto.randomUUID()
     : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);

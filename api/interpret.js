@@ -5341,12 +5341,13 @@ function inquiryServiceHeaders(extra = {}) {
   };
 }
 
-async function restoreCanonicalInquiryState({ inquiryKey, subject }) {
+async function restoreCanonicalInquiryState({ inquiryKey, threadId, subject }) {
   const fallback = createInitialInquiryState(subject);
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !inquiryKey) return fallback;
+  const fallbackResult = { state: fallback, inquiryKey };
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !inquiryKey) return fallbackResult;
 
-  const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/inquiry_states?inquiry_key=eq.${encodeURIComponent(inquiryKey)}&select=version,state&limit=1`,
+  let response = await fetch(
+    `${SUPABASE_URL}/rest/v1/inquiry_states?inquiry_key=eq.${encodeURIComponent(inquiryKey)}&select=inquiry_key,version,state&limit=1`,
     { headers: inquiryServiceHeaders() },
   );
   if (!response.ok) {
@@ -5355,30 +5356,38 @@ async function restoreCanonicalInquiryState({ inquiryKey, subject }) {
     // The response can proceed from a validated empty state, but no browser state
     // is promoted to canonical authority.
     console.error('Inquiry state restore failed:', response.status, detail.slice(0, 240));
-    return fallback;
+    return fallbackResult;
   }
-  const rows = await response.json();
-  if (!rows?.length) return fallback;
+  let rows = await response.json();
+  if (!rows?.length && /^[0-9a-f-]{36}$/i.test(threadId || '')) {
+    response = await fetch(
+      `${SUPABASE_URL}/rest/v1/inquiry_states?thread_id=eq.${encodeURIComponent(threadId)}&order=updated_at.desc&select=inquiry_key,version,state&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    if (response.ok) rows = await response.json();
+  }
+  if (!rows?.length) return fallbackResult;
+  const canonicalInquiryKey = rows[0].inquiry_key || inquiryKey;
   const currentCandidate = rows[0].state;
   if (currentCandidate?.schemaVersion === 1 && typeof currentCandidate.orientation === 'string') {
     const restored = validateInquiryState(currentCandidate, subject);
     restored.version = Math.max(0, Number(rows[0].version) || 0);
-    return restored;
+    return { state: restored, inquiryKey: canonicalInquiryKey };
   }
 
   const versionsResponse = await fetch(
-    `${SUPABASE_URL}/rest/v1/inquiry_state_versions?inquiry_key=eq.${encodeURIComponent(inquiryKey)}&order=version.desc&select=version,state&limit=10`,
+    `${SUPABASE_URL}/rest/v1/inquiry_state_versions?inquiry_key=eq.${encodeURIComponent(canonicalInquiryKey)}&order=version.desc&select=version,state&limit=10`,
     { headers: inquiryServiceHeaders() },
   );
-  if (!versionsResponse.ok) return fallback;
+  if (!versionsResponse.ok) return fallbackResult;
   const versions = await versionsResponse.json();
   const lastValid = versions.find(row => (
     row?.state?.schemaVersion === 1 && typeof row.state.orientation === 'string'
   ));
-  if (!lastValid) return fallback;
+  if (!lastValid) return fallbackResult;
   const restored = validateInquiryState(lastValid.state, subject);
   restored.version = Math.max(0, Number(lastValid.version) || 0);
-  return restored;
+  return { state: restored, inquiryKey: canonicalInquiryKey };
 }
 
 async function commitCanonicalInquiryState({
@@ -5481,7 +5490,9 @@ async function runPersistentInquiryFollowUp({
   };
 
   let stageStartedAt = emitStage('restore');
-  const previousState = await restoreCanonicalInquiryState({ inquiryKey, subject });
+  const restored = await restoreCanonicalInquiryState({ inquiryKey, threadId, subject });
+  const previousState = restored.state;
+  const canonicalInquiryKey = restored.inquiryKey || inquiryKey;
   completeStage('restore', stageStartedAt, { stateVersion: previousState.version });
 
   stageStartedAt = emitStage('reduce');
@@ -5573,7 +5584,7 @@ async function runPersistentInquiryFollowUp({
   const commit = isClientAborted()
     ? { committed: false, interrupted: true, state: previousState }
     : await commitCanonicalInquiryState({
-      inquiryKey,
+      inquiryKey: canonicalInquiryKey,
       expectedVersion: previousState.version,
       state: nextState,
       threadId,
