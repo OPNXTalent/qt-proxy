@@ -11,7 +11,7 @@ const migration = fs.readFileSync(
   'utf8',
 );
 
-assert.match(interpret, /if \(isFollowUp\) \{/);
+assert.match(interpret, /if \(followUpContext\.isFollowUp\) \{/);
 assert.match(interpret, /runPersistentInquiryFollowUp/);
 assert.match(interpret, /type: 'stage'/);
 assert.match(interpret, /buildAuditPrompt/);
@@ -39,17 +39,24 @@ assert.match(frontend, /const followUpPrompt = input;/);
 assert.match(frontend, /inquiryKey: isFollowUp \? getPersistentInquiryKey\(\)/);
 assert.match(frontend, /parsed\.type === 'stage'/);
 assert.match(frontend, /cachePersistentInquiryState/);
+assert.match(frontend, /parsed\.canonicalState === true/);
+assert.match(frontend, /parsed\.type === 'state_unavailable'/);
+assert.match(frontend, /STALE_INQUIRY_STATE/);
+assert.match(frontend, /beginNewPersistentInquiry\(\)/);
+assert.doesNotMatch(frontend, /sessionStorage\.removeItem\('qt_active_inquiry_key'\)/);
 
 assert.match(migration, /create table if not exists public\.inquiry_states/);
 assert.match(migration, /create table if not exists public\.inquiry_state_versions/);
 assert.match(migration, /pg_advisory_xact_lock/);
 assert.match(migration, /p_expected_version/);
+assert.match(migration, /grant select, insert, update on table public\.inquiry_states to service_role/);
+assert.match(migration, /grant execute on function public\.commit_inquiry_state/);
 
 // The initial call remains unaware of follow-up state and still omits
 // isFollowUp, preserving the canonical initial handoff.
 const initialCall = frontend.slice(
   frontend.indexOf('async function callProxy(messages'),
-  frontend.indexOf('function parseAIResponse'),
+  frontend.indexOf('async function callProxyStream'),
 );
 assert.doesNotMatch(initialCall, /inquiryKey:/);
 assert.doesNotMatch(initialCall, /isFollowUp:/);

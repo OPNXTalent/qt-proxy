@@ -2738,7 +2738,7 @@ async function runInterpretation() {
   // Reset conversation for new subject
   conversationHistory = [];
   currentSubject = input;
-  resetPersistentInquiryKey();
+  beginNewPersistentInquiry();
 
   document.getElementById('submitBtn').disabled = true;
   document.getElementById('inputSection').style.opacity = '0.4';
@@ -2984,6 +2984,8 @@ async function runFollowUp() {
     prismBrowserTimelines.delete(requestId);
     if (err.message === 'RATE_LIMITED') return;
     if (err.message === 'QUOTA_EXCEEDED') return;
+    if (err.message === 'STALE_INQUIRY_STATE') return;
+    if (err.message === 'INQUIRY_STATE_UNAVAILABLE') return;
     errEl.style.marginTop = '20px';
     errEl.innerHTML = getErrorMessage(err);
     document.getElementById('resultContent').appendChild(errEl);
@@ -3020,8 +3022,12 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
         rawQuery: rawQuery || '',
         isFollowUp: isFollowUp || false,
         inquiryKey: isFollowUp ? getPersistentInquiryKey() : undefined,
+        inquiryToken: isFollowUp && activeInquiryCredential
+          ? activeInquiryCredential.inquiryToken
+          : undefined,
         threadId: isFollowUp ? activeThreadId : undefined,
         inquirySubject: isFollowUp ? currentSubject : undefined,
+        shareId: isFollowUp ? (window._sharedViewShareId || undefined) : undefined,
         debugMode: getTheodicyDebugMode(),
         requestId
       })
@@ -3068,6 +3074,9 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
   let firstVisibleDeltaSeen = false;
   let latestInquiryState = null;
   let latestStateVersion = null;
+  let latestStateCanonical = false;
+  let stateConflict = null;
+  let stateUnavailable = null;
   let terminalStreamError = null;
 
   // Show streaming cursor in target element
@@ -3108,12 +3117,21 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
               ).join('');
             }
           } else if (parsed.type === 'done') {
-            latestInquiryState = parsed.state || null;
+            latestInquiryState = parsed.canonicalState === true ? (parsed.state || null) : null;
             latestStateVersion = parsed.stateVersion ?? null;
+            latestStateCanonical = parsed.canonicalState === true;
           } else if (parsed.type === 'state_conflict') {
+            stateConflict = parsed;
+            if (parsed.state && parsed.canonicalState === true) {
+              latestInquiryState = parsed.state;
+              latestStateVersion = parsed.stateVersion ?? null;
+              latestStateCanonical = true;
+            }
             markPrismBrowserTiming(requestId, 'followup_state_conflict', {
               stateVersion: parsed.stateVersion ?? null
             });
+          } else if (parsed.type === 'state_unavailable') {
+            stateUnavailable = parsed;
           } else if (parsed.type === 'error') {
             terminalStreamError = parsed.error || 'FOLLOWUP_RUNTIME_ERROR';
           }
@@ -3127,8 +3145,24 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
     streamError.type = 'server';
     throw streamError;
   }
-  if (latestInquiryState) {
+  if (latestInquiryState && latestStateCanonical) {
     cachePersistentInquiryState(latestInquiryState, latestStateVersion);
+  }
+  if (stateConflict) {
+    if (targetEl) {
+      targetEl.innerHTML = '<p>This inquiry changed in another session. The latest confirmed state has been restored; please submit your response again.</p>';
+    }
+    const conflictError = new Error('STALE_INQUIRY_STATE');
+    conflictError.type = 'conflict';
+    throw conflictError;
+  }
+  if (stateUnavailable) {
+    if (targetEl) {
+      targetEl.innerHTML = '<p>The response could not be committed to this inquiry. Nothing was saved; please try again.</p>';
+    }
+    const unavailableError = new Error('INQUIRY_STATE_UNAVAILABLE');
+    unavailableError.type = 'retryable';
+    throw unavailableError;
   }
   return fullText;
 }
@@ -3293,6 +3327,7 @@ async function callProxy(messages, rawQuery, requestId) {
               window._streamTruncated = true;
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
+              acceptInquiryCredential(parsed);
             } else if (parsed.type === 'error') {
               throw new Error('Stream error: ' + parsed.error);
             }
@@ -3319,6 +3354,7 @@ async function callProxy(messages, rawQuery, requestId) {
               considerEarlyRecognition();
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
+              acceptInquiryCredential(parsed);
             }
           } catch(e) { /* ignore malformed final chunk */ }
         }
@@ -3939,26 +3975,39 @@ function submitTierEmail() {
 }
 
 let activeThreadId = null;
+let activeInquiryCredential = null;
+let activeInquiryKey = null;
+
+function acceptInquiryCredential(event) {
+  if (!event || typeof event.inquiryKey !== 'string' || typeof event.inquiryToken !== 'string') return;
+  activeInquiryCredential = {
+    inquiryKey: event.inquiryKey,
+    inquiryToken: event.inquiryToken
+  };
+  activeInquiryKey = event.inquiryKey;
+}
 
 function getPersistentInquiryKey() {
-  var storageKey = 'qt_active_inquiry_key';
-  var existing = sessionStorage.getItem(storageKey);
-  if (existing) return existing;
+  if (activeInquiryCredential && activeInquiryCredential.inquiryKey) {
+    return activeInquiryCredential.inquiryKey;
+  }
+  if (activeInquiryKey) return activeInquiryKey;
   if (activeThreadId && /^[0-9a-f-]{36}$/i.test(activeThreadId)) {
-    var threadKey = 'thread:' + activeThreadId;
-    sessionStorage.setItem(storageKey, threadKey);
-    return threadKey;
+    activeInquiryKey = 'thread:' + activeThreadId;
+    return activeInquiryKey;
   }
   var entropy = window.crypto && typeof window.crypto.randomUUID === 'function'
     ? window.crypto.randomUUID()
     : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
-  var created = 'anon:' + entropy;
-  sessionStorage.setItem(storageKey, created);
-  return created;
+  activeInquiryKey = 'anon:' + entropy;
+  return activeInquiryKey;
 }
 
-function resetPersistentInquiryKey() {
-  sessionStorage.removeItem('qt_active_inquiry_key');
+function beginNewPersistentInquiry() {
+  // Begin with isolated in-memory identity. Do not delete browser storage:
+  // another tab may still own a committed inquiry under the former key.
+  activeInquiryCredential = null;
+  activeInquiryKey = null;
 }
 
 function cachePersistentInquiryState(state, version) {
@@ -4454,6 +4503,8 @@ function selectThread(id) {
     openThreadIds: Array.from(_openThreadIds)
   });
   activeThreadId = id;
+  activeInquiryCredential = null;
+  activeInquiryKey = /^[0-9a-f-]{36}$/i.test(id) ? 'thread:' + id : null;
   localStorage.setItem('qt_last_thread_id', id);
   // Pre-stamp collaboration_open if we already know this thread is open
   if (_openThreadIds.has(id)) {
