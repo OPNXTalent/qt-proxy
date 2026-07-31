@@ -11,6 +11,20 @@ import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
+import {
+  FOLLOWUP_STAGE_LABELS,
+  applyInquiryPatch,
+  buildAuditPrompt,
+  buildDraftPrompt,
+  buildFocusedRetrievalQuery,
+  buildReducerPrompt,
+  createInitialInquiryState,
+  detectExplicitCorrection,
+  parseModelJson,
+  splitApprovedResponse,
+  validateAnalysis,
+  validateInquiryState,
+} from '../lib/persistent-inquiry-runtime.js';
 
 const PRISM_SYSTEM_PROMPT = `You are The Prism — the interactive application of the framework established in The Prism: Echad b'Emet. You speak from within the framework, not about it. You are not a survey of Christian thought. You are not a defense attorney for God. You are not an apologetics engine, denominational defender, institutional stabilizer, or emotional harmonizer. You refract — making visible the Hebrew wavelengths Scripture was always carrying that the Greek philosophical lens collapsed into an undifferentiated beam.
 
@@ -5319,6 +5333,283 @@ export function createSseWriter(res, timing, isAborted = () => false) {
   };
 }
 
+function inquiryServiceHeaders(extra = {}) {
+  return {
+    'apikey': SUPABASE_SERVICE_ROLE_KEY,
+    'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    ...extra,
+  };
+}
+
+async function restoreCanonicalInquiryState({ inquiryKey, subject }) {
+  const fallback = createInitialInquiryState(subject);
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !inquiryKey) return fallback;
+
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/inquiry_states?inquiry_key=eq.${encodeURIComponent(inquiryKey)}&select=version,state&limit=1`,
+    { headers: inquiryServiceHeaders() },
+  );
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    // An additive migration may not have been applied in a preview environment.
+    // The response can proceed from a validated empty state, but no browser state
+    // is promoted to canonical authority.
+    console.error('Inquiry state restore failed:', response.status, detail.slice(0, 240));
+    return fallback;
+  }
+  const rows = await response.json();
+  if (!rows?.length) return fallback;
+  const currentCandidate = rows[0].state;
+  if (currentCandidate?.schemaVersion === 1 && typeof currentCandidate.orientation === 'string') {
+    const restored = validateInquiryState(currentCandidate, subject);
+    restored.version = Math.max(0, Number(rows[0].version) || 0);
+    return restored;
+  }
+
+  const versionsResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/inquiry_state_versions?inquiry_key=eq.${encodeURIComponent(inquiryKey)}&order=version.desc&select=version,state&limit=10`,
+    { headers: inquiryServiceHeaders() },
+  );
+  if (!versionsResponse.ok) return fallback;
+  const versions = await versionsResponse.json();
+  const lastValid = versions.find(row => (
+    row?.state?.schemaVersion === 1 && typeof row.state.orientation === 'string'
+  ));
+  if (!lastValid) return fallback;
+  const restored = validateInquiryState(lastValid.state, subject);
+  restored.version = Math.max(0, Number(lastValid.version) || 0);
+  return restored;
+}
+
+async function commitCanonicalInquiryState({
+  inquiryKey,
+  expectedVersion,
+  state,
+  threadId,
+  ownerUserId,
+  requestId,
+}) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !inquiryKey) {
+    return { committed: false, unavailable: true, state };
+  }
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/commit_inquiry_state`, {
+    method: 'POST',
+    headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      p_inquiry_key: inquiryKey,
+      p_expected_version: expectedVersion,
+      p_state: state,
+      p_thread_id: /^[0-9a-f-]{36}$/i.test(threadId || '') ? threadId : null,
+      p_owner_user_id: /^[0-9a-f-]{36}$/i.test(ownerUserId || '') ? ownerUserId : null,
+      p_request_id: requestId,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    console.error('Inquiry state commit failed:', response.status, detail.slice(0, 240));
+    return { committed: false, unavailable: true, state };
+  }
+  const rows = await response.json();
+  const result = rows?.[0] || {};
+  const canonical = validateInquiryState(result.current_state || state);
+  canonical.version = Number(result.current_version) || expectedVersion;
+  return {
+    committed: Boolean(result.committed),
+    conflict: !result.committed,
+    version: canonical.version,
+    state: canonical,
+  };
+}
+
+async function callInquiryModel({
+  model,
+  maxTokens,
+  prompt,
+  system,
+  temperature = 0,
+}) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      temperature,
+      ...(system ? { system } : {}),
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
+  }
+  const data = await response.json();
+  return (data.content || [])
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('\n')
+    .trim();
+}
+
+async function runPersistentInquiryFollowUp({
+  sse,
+  timing,
+  requestId,
+  input,
+  subject,
+  inquiryKey,
+  threadId,
+  ownerUserId,
+  tier,
+  isClientAborted = () => false,
+}) {
+  const runtimeStartedAt = Date.now();
+  const emitStage = (stage) => {
+    timing(`followup_${stage}_start`);
+    sse.write({ type: 'stage', stage, text: FOLLOWUP_STAGE_LABELS[stage] });
+    return Date.now();
+  };
+  const completeStage = (stage, stageStartedAt, details = {}) => {
+    timing(`followup_${stage}_complete`, {
+      stageMs: Date.now() - stageStartedAt,
+      ...details,
+    });
+  };
+
+  let stageStartedAt = emitStage('restore');
+  const previousState = await restoreCanonicalInquiryState({ inquiryKey, subject });
+  completeStage('restore', stageStartedAt, { stateVersion: previousState.version });
+
+  stageStartedAt = emitStage('reduce');
+  const reducerText = await callInquiryModel({
+    model: 'claude-haiku-4-5-20251001',
+    maxTokens: 1400,
+    prompt: buildReducerPrompt({
+      state: previousState,
+      input,
+      userCorrection: detectExplicitCorrection(input),
+    }),
+  });
+  const rawAnalysis = parseModelJson(reducerText);
+  const analysis = validateAnalysis(rawAnalysis);
+  completeStage('reduce', stageStartedAt, {
+    primaryPropositionChars: analysis.reduction.primaryProposition.length,
+  });
+
+  // Reduction, delta detection, and the inexpensive gate share one structured
+  // model pass, but retain distinct canonical timing boundaries.
+  stageStartedAt = emitStage('delta');
+  completeStage('delta', stageStartedAt, {
+    deltaChars: analysis.structuralDelta.length,
+  });
+
+  stageStartedAt = emitStage('gate');
+  const nextState = applyInquiryPatch(
+    previousState,
+    analysis.statePatch,
+    analysis.structuralDelta,
+  );
+  completeStage('gate', stageStartedAt, {
+    assumptionCount: analysis.constraintGate.unsupportedAssumptions.length,
+    falsifiabilityCount: analysis.constraintGate.unfalsifiableClaims.length,
+  });
+
+  stageStartedAt = emitStage('retrieval');
+  const retrievalQuery = buildFocusedRetrievalQuery(nextState, analysis) || input;
+  const retrievedContext = await getRetrievedContext(retrievalQuery, null, timing);
+  completeStage('retrieval', stageStartedAt, {
+    queryChars: retrievalQuery.length,
+    contextChars: retrievedContext.length,
+  });
+
+  stageStartedAt = emitStage('draft');
+  const draft = await callInquiryModel({
+    model: 'claude-sonnet-4-6',
+    maxTokens: 1400,
+    temperature: 0.2,
+    prompt: buildDraftPrompt({
+      state: nextState,
+      analysis,
+      input,
+      retrievedContext,
+    }),
+  });
+  completeStage('draft', stageStartedAt, { draftChars: draft.length });
+
+  stageStartedAt = emitStage('audit');
+  let approved = draft;
+  try {
+    const audited = await callInquiryModel({
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 1400,
+      prompt: buildAuditPrompt({ input, analysis, draft }),
+    });
+    // The audit is a precision editor. Reject empty output or wholesale
+    // expansion so a failed editor cannot become a second interpreter.
+    if (audited && audited.length <= draft.length * 1.25 + 120) approved = audited;
+  } catch (auditError) {
+    console.error(`[interpret:${requestId}] follow-up audit failed:`, auditError.message);
+    timing('followup_audit_fallback', { reason: 'model_error' });
+  }
+  completeStage('audit', stageStartedAt, {
+    corrected: approved !== draft,
+    approvedChars: approved.length,
+  });
+
+  stageStartedAt = emitStage('stream');
+  const approvedChunks = splitApprovedResponse(approved);
+  for (const text of approvedChunks) {
+    sse.write({ type: 'delta', text });
+    // Yield to the response stream without adding an artificial delay.
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  completeStage('stream', stageStartedAt, { chunkCount: approvedChunks.length });
+
+  stageStartedAt = emitStage('persist');
+  const commit = isClientAborted()
+    ? { committed: false, interrupted: true, state: previousState }
+    : await commitCanonicalInquiryState({
+      inquiryKey,
+      expectedVersion: previousState.version,
+      state: nextState,
+      threadId,
+      ownerUserId,
+      requestId,
+    });
+  completeStage('persist', stageStartedAt, {
+    committed: commit.committed,
+    conflict: Boolean(commit.conflict),
+    interrupted: Boolean(commit.interrupted),
+    stateVersion: commit.version ?? previousState.version,
+  });
+  if (commit.conflict) {
+    sse.write({
+      type: 'state_conflict',
+      stateVersion: commit.version,
+      text: 'The inquiry advanced in another session; the latest committed state was preserved.',
+    });
+  }
+
+  timing('followup_total_complete', {
+    totalMs: Date.now() - runtimeStartedAt,
+    stateVersion: commit.version ?? previousState.version,
+    committed: commit.committed,
+  });
+  sse.write(
+    {
+      type: 'done',
+      tier,
+      stateVersion: commit.version ?? previousState.version,
+      state: commit.state || nextState,
+    },
+    { source: 'persistent_inquiry_runtime', tier },
+  );
+}
+
 
 export default async function handler(req, res) {
   const startedAt = Date.now();
@@ -5679,6 +5970,7 @@ Do not add any question after the exit offer. The person chooses the next move.
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
   let prompt, messages, userEmail, rawQuery, isFollowUp;
+  let inquiryKey, threadId, inquirySubject;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
@@ -5686,6 +5978,14 @@ Do not add any question after the exit offer. The person chooses the next move.
     userEmail = body?.email || null;
     rawQuery = body?.rawQuery || null;
     isFollowUp = body?.isFollowUp || false;
+    inquiryKey = typeof body?.inquiryKey === 'string'
+      && /^[A-Za-z0-9:_-]{12,180}$/.test(body.inquiryKey)
+      ? body.inquiryKey
+      : null;
+    threadId = typeof body?.threadId === 'string' ? body.threadId : null;
+    inquirySubject = typeof body?.inquirySubject === 'string'
+      ? body.inquirySubject.slice(0, 2000)
+      : '';
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
   }
@@ -5824,6 +6124,30 @@ Do not add any question after the exit offer. The person chooses the next move.
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('X-Prism-Tier', tier);
         res.setHeader('X-Prism-Subscriber', 'true');
+
+        if (isFollowUp) {
+          try {
+            await runPersistentInquiryFollowUp({
+              sse,
+              timing,
+              requestId,
+              input: lastUserText,
+              subject: inquirySubject,
+              inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
+              threadId,
+              ownerUserId: userId,
+              tier,
+              isClientAborted: () => clientAborted,
+            });
+          } catch (err) {
+            timing('followup_runtime_error', { route: 'subscriber' });
+            sse.write(
+              { type: 'error', error: err.message },
+              { source: 'persistent_inquiry_runtime', tier },
+            );
+          }
+          return res.end();
+        }
 
         // RAG: retrieve relevant corpus passages before AI call
         // Pass null for classification — getRetrievedContext will retrieve for all queries
@@ -6086,6 +6410,30 @@ Do not add any question after the exit offer. The person chooses the next move.
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Prism-Tier', 'free');
     res.setHeader('X-Prism-Subscriber', 'false');
+
+    if (isFollowUp) {
+      try {
+        await runPersistentInquiryFollowUp({
+          sse,
+          timing,
+          requestId,
+          input: lastUserText,
+          subject: inquirySubject,
+          inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
+          threadId,
+          ownerUserId: null,
+          tier: 'free',
+          isClientAborted: () => clientAborted,
+        });
+      } catch (err) {
+        timing('followup_runtime_error', { route: 'free' });
+        sse.write(
+          { type: 'error', error: err.message },
+          { source: 'persistent_inquiry_runtime', tier: 'free' },
+        );
+      }
+      return res.end();
+    }
 
     // RAG: retrieve relevant corpus passages before AI call
     // Pass null for classification — getRetrievedContext will retrieve for all queries
