@@ -26,6 +26,13 @@ create index if not exists inquiry_states_thread_id_idx
 alter table public.inquiry_states enable row level security;
 alter table public.inquiry_state_versions enable row level security;
 
+-- These tables are backend-only. RLS remains enabled as defense in depth;
+-- the service-role API is the sole data-plane principal.
+revoke all on table public.inquiry_states from anon, authenticated;
+revoke all on table public.inquiry_state_versions from anon, authenticated;
+grant select, insert, update on table public.inquiry_states to service_role;
+grant select, insert on table public.inquiry_state_versions to service_role;
+
 -- Atomic optimistic commit. The immutable versions table preserves the last
 -- valid committed representation if a stream is interrupted or tabs race.
 create or replace function public.commit_inquiry_state(
@@ -41,7 +48,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_current inquiry_states%rowtype;
+  v_current public.inquiry_states%rowtype;
   v_next_version integer;
   v_committed_state jsonb;
 begin
@@ -53,7 +60,7 @@ begin
   perform pg_advisory_xact_lock(hashtext(p_inquiry_key));
 
   select * into v_current
-  from inquiry_states
+  from public.inquiry_states
   where inquiry_key = p_inquiry_key
   for update;
 
@@ -74,17 +81,17 @@ begin
     to_jsonb(v_next_version),
     true
   );
-  insert into inquiry_state_versions(inquiry_key, version, state, request_id)
+  insert into public.inquiry_state_versions(inquiry_key, version, state, request_id)
   values (p_inquiry_key, v_next_version, v_committed_state, p_request_id);
 
-  insert into inquiry_states(
+  insert into public.inquiry_states as current_inquiry(
     inquiry_key, thread_id, owner_user_id, version, state, updated_at
   ) values (
     p_inquiry_key, p_thread_id, p_owner_user_id, v_next_version, v_committed_state, now()
   )
   on conflict (inquiry_key) do update set
-    thread_id = coalesce(inquiry_states.thread_id, excluded.thread_id),
-    owner_user_id = coalesce(inquiry_states.owner_user_id, excluded.owner_user_id),
+    thread_id = coalesce(current_inquiry.thread_id, excluded.thread_id),
+    owner_user_id = coalesce(current_inquiry.owner_user_id, excluded.owner_user_id),
     version = excluded.version,
     state = excluded.state,
     updated_at = now();
@@ -96,3 +103,9 @@ $$;
 revoke all on function public.commit_inquiry_state(
   text, integer, jsonb, uuid, uuid, text
 ) from public;
+revoke all on function public.commit_inquiry_state(
+  text, integer, jsonb, uuid, uuid, text
+) from anon, authenticated;
+grant execute on function public.commit_inquiry_state(
+  text, integer, jsonb, uuid, uuid, text
+) to service_role;

@@ -1,6 +1,8 @@
 # Persistent Inquiry Runtime — Release Verification Gate
 
-Status: **not ready for preview until the pre-preview blockers in this document are corrected**.
+Status: **pre-preview corrections complete; automated gate passes**. Migration,
+push, deployment, and live preview verification remain separately authorized
+release actions.
 
 This is an executable release gate for `agent/persistent-inquiry-runtime`. It is
 not an architecture summary. Record evidence for every check. A section passes
@@ -50,9 +52,9 @@ Verified statically:
 
 Difference:
 
-- `runInterpretation` now calls `resetPersistentInquiryKey()`. The call is a
-  local state side effect and is currently unguarded; a storage exception could
-  block an initial request. Correct this before preview.
+- `runInterpretation` begins an isolated, in-memory inquiry identity. It does
+  not delete browser storage and therefore cannot interrupt the initial request
+  or invalidate another tab's committed inquiry.
 
 Procedure:
 
@@ -229,7 +231,9 @@ Pass:
 - No habitual question is appended.
 - An audit failure produces a recoverable error and exposes no draft.
 
-Current blocker: the implementation catches audit failure and streams the draft.
+Automated integration forces provider error, timeout/abort, malformed output,
+validation failure, and client interruption. Every case exposes no draft and
+does not mutate canonical state.
 
 ## 8. Streaming gate
 
@@ -262,8 +266,8 @@ Pass:
 - Initial response streaming is unchanged.
 - Exactly one terminal SSE event appears.
 
-Automated integration confirms stage order and that successful unaudited text
-does not appear. Audit-failure behavior currently fails this gate.
+Automated integration confirms stage order, single terminal behavior, and that
+no unaudited text appears on either successful or failed audit paths.
 
 ## 9. Persistence, recovery, and corrigibility
 
@@ -299,9 +303,10 @@ Pass:
   and records a correction in trajectory.
 - The next response honors reliability.
 
-Current automated integration passes sequential versions and simultaneous-tab
-conflict preservation. Write-failure and visible stale-response handling require
-pre-preview correction.
+Automated integration passes sequential versions, simultaneous-tab conflict
+preservation, interrupted requests, and write failure. Static browser contracts
+require canonical server confirmation before caching and render explicit retry
+notices for stale or unavailable state.
 
 ## 10. Browser and installed-PWA parity
 
@@ -361,10 +366,10 @@ Measured against the first vehicle correction with no retrieved passage:
 
 | Call | Characters | Approx. tokens |
 |---|---:|---:|
-| Haiku reduction + delta + gate | 1,959 | 490 |
-| Sonnet draft | 3,070 | 768 |
-| Haiku precision audit | 1,135 | 284 |
-| Total model input | 6,164 | 1,542 |
+| Haiku reduction + delta + gate | 2,321 | 580 |
+| Sonnet draft | 3,240 | 810 |
+| Haiku precision audit | 1,207 | 302 |
+| Total model input | 6,768 | 1,692 |
 
 ### Typical later follow-up
 
@@ -395,51 +400,39 @@ unresolved claims; Supabase returns up to four passages.
 Required conclusion: **Follow-ups no longer receive the full constitution.**
 The implementation uses separate compact prompts for all three stages.
 
-Worst-case findings:
+Worst-case contracts:
 
-- Validated state can reach 39,930 characters (~9,983 tokens).
-- Reducer input can reach 45,259 characters (~11,315 tokens).
-- Draft input without RAG can reach 107,865 characters (~26,966 tokens) using
-  synthetic maximum fields.
-- Audit input can reach 31,047 characters (~7,762 tokens).
-- RAG passage text has no application-level character cap, so the true
-  worst-case prompt is not finitely bounded by this implementation.
-- `statePatch` is duplicated inside the draft's serialized analysis even though
-  the validated updated state is already present.
+- Validated canonical state is capped at 16,000 characters.
+- Raw reducer output and validated analysis are each capped at 12,000
+  characters.
+- Retrieved text is capped at 2,200 characters per item and 9,000 total.
+- Every assembled follow-up prompt is capped at 48,000 characters.
+- Older trajectory entries compact into one summary plus the nine newest
+  movements.
+- Draft context omits the already-applied `statePatch`.
 
-Classification: state/analysis size and RAG caps are pre-preview corrections.
-Normal prompt weight is a large improvement, but the unbounded path can recreate
-latency/context pressure.
+Oversized input fails before the next model stage; no unbounded follow-up prompt
+path remains.
 
 ## 12. Execution boundary
 
 Current determination:
 
 ```js
-isFollowUp = body?.isFollowUp || false;
+isFollowUp = body?.isFollowUp === true;
 ```
 
 Findings:
 
-- The browser sends Boolean `true` from `runFollowUp`.
-- Any truthy client value, including string `"false"`, activates the runtime.
-- A false positive sends an initial request into the new runtime.
-- A false negative sends a follow-up through the initial interpreter. Existing
-  quota logic separately treats `messages.length > 1` as follow-up, producing
-  inconsistent classification.
-- Restored and bidirectionally shared threads use the same composer and normally
-  send `true`.
-- Empty or corrupt state does not determine classification.
-- The backend validates only inquiry-key syntax; it does not independently
-  verify thread ownership/participation or that thread context exists.
-
-Pass before preview:
-
-- Accept only a strict Boolean or a server-verifiable follow-up context.
-- Use one canonical classification for execution and quota behavior.
-- Verify owned/shared/restored thread context server-side where available.
-- Cover truthy strings, missing flags, missing keys, corrupt state, restored
-  threads, and shared participation with boundary tests.
+- The client Boolean is only a candidate hint.
+- The server classifies context using an HMAC inquiry credential, committed
+  state, owned/participating thread, or active bidirectional share.
+- The same canonical classification controls execution and quota behavior.
+- Forged-hint false positives and credential-backed false negatives are covered
+  by automated boundary tests.
+- `PERSISTENT_INQUIRY_RUNTIME_ENABLED` is fail-closed: only exact `true`
+  enables Phase II. When false or absent, verified follow-ups use one compact
+  legacy response call; initial requests are unchanged.
 
 ## 13. Migration readiness
 
@@ -463,13 +456,12 @@ Defaults/nullability:
 - Thread, owner, and request ID are nullable.
 - Timestamps default to `now()`.
 
-Blocking privilege defect:
+Privileges:
 
-- The script revokes RPC execution from `public` but does not explicitly grant
-  it to `service_role`.
-- It also relies on project default table grants for PostgREST service-role
-  reads/writes.
-- Add explicit least-privilege grants before migration.
+- `anon` and `authenticated` receive no table or RPC privileges.
+- `service_role` receives select/insert/update on canonical state,
+  select/insert on immutable versions, and execute on the commit RPC.
+- RLS remains enabled on both backend-only tables.
 
 Expected locking/execution:
 
@@ -582,7 +574,7 @@ The service role must never be exposed to browser code.
 
 ## 14. Protected-preview runbook
 
-Do not execute until blockers are corrected and separately approved.
+Do not execute until the migration itself is separately approved.
 
 1. Verify branch and worktree:
 
@@ -698,8 +690,8 @@ and cannot establish latency.
 - Later dependency: requires frontend context from `38ab6a4`.
 - Rollback: returns backend to the existing interpreter; additive tables remain
   inert.
-- Concern: audit-failure fallback exposes unaudited draft; classification trusts
-  client input; no kill switch; unbounded RAG.
+- Pre-preview correction: audits now fail closed, classification is
+  server-verified, the follow-up kill switch is fail-closed, and RAG is bounded.
 
 ### `38ab6a4` — Connect follow-up UX to persistent inquiry runtime
 
@@ -708,8 +700,8 @@ and cannot establish latency.
 - Files: `qt.html`, execution-contract test.
 - Later dependency: continuity hardening in `9d23fc4`.
 - Rollback: old frontend is incompatible with the new continuity contract.
-- Concern: unguarded initial-path storage reset; conflict is logged but not
-  visibly recoverable.
+- Pre-preview correction: initial identity is isolated in memory and conflicts
+  are visibly recoverable.
 
 ### `9d23fc4` — Harden inquiry continuity and concurrent recovery
 
@@ -720,8 +712,7 @@ and cannot establish latency.
 - Later dependency: none.
 - Rollback: loses concurrency/interruption safeguards and should not be reverted
   independently while retaining earlier commits.
-- Concern: write-failure response still returns an uncommitted next state to the
-  browser cache.
+- Pre-preview correction: write failure returns no cacheable uncommitted state.
 
 The commits are logically reviewable, contain no unrelated feature work, and
 must not be squashed. Dependencies mean later commits should not be selectively
@@ -729,16 +720,15 @@ reverted without their predecessors.
 
 ## 17. Issues and disposition
 
-| Severity | Evidence | Correction | Blocks Preview |
+| Severity | Evidence | Disposition | Blocks Preview |
 |---|---|---|---|
-| Critical | Audit catch retains `approved = draft` | Fail recoverably; never emit draft | Yes |
-| Critical | Migration revokes `public` RPC execution without granting `service_role` | Add explicit function/table grants | Yes |
-| High | Truthy client `isFollowUp` controls execution; no thread-context validation | Strict/canonical server classification and tests | Yes |
-| High | No runtime kill switch | Add follow-up-only server environment flag | Yes |
-| High | State write failure returns/caches uncommitted next state | Return previous canonical state and visible retry status | Yes |
-| High | State/RAG prompt worst case is unbounded or excessive | Cap total state, sanitized analysis, and retrieved text | Yes |
-| Medium | Gate omits logical closure, relevant constraints, `questionNeeded` | Extend compact structured contract | Yes |
-| Medium | Stale answer conflict is timing-only in UI | Display a recoverable conflict/retry notice | Yes |
-| Medium | Initial inquiry-key reset can throw | Guard local storage cleanup | Yes |
-| Low | Draft prompt serializes `statePatch` after applying it | Omit duplicate patch from draft context | No; pre-preview optimization |
-
+| Critical | Audit error/timeout/malformed/interruption fixtures | Corrected and tested fail-closed | No |
+| Critical | Backend-only migration privileges | Explicit least-privilege grants added | No |
+| High | Client-controlled classification | Replaced with canonical server classification | No |
+| High | Follow-up-only kill switch | Added, exact-`true`, fail-closed | No |
+| High | Uncommitted state caching | Canonical confirmation required; retry surfaced | No |
+| High | Unbounded state/RAG/prompt path | Explicit per-field and total bounds enforced | No |
+| Medium | Incomplete gate contract | Closure, falsifiability, constraints, retrieval, ending, and changes required | No |
+| Medium | Timing-only stale conflict | Visible retry notice added | No |
+| Medium | Initial storage cleanup | Replaced by isolated in-memory start | No |
+| Low | Duplicate applied patch in draft | Removed | No |
