@@ -1,17 +1,23 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { createHmac } from 'node:crypto';
 
 process.env.SUPABASE_URL = 'https://example.supabase.co';
 process.env.SUPABASE_ANON_KEY = 'anon-test-key';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-test-key';
 process.env.OPENAI_API_KEY = 'openai-test-key';
 process.env.ANTHROPIC_API_KEY = 'anthropic-test-key';
+process.env.PERSISTENT_INQUIRY_RUNTIME_ENABLED = 'true';
 
 let auditCompleted = false;
 let modelCallCount = 0;
 const committedBodies = [];
 let canonicalState = null;
 let canonicalVersion = 0;
+let auditMode = 'valid';
+let commitMode = 'valid';
+let activeRequest = null;
+let allowKillSwitchDelta = false;
 
 globalThis.fetch = async (url, options = {}) => {
   const target = String(url);
@@ -22,6 +28,9 @@ globalThis.fetch = async (url, options = {}) => {
     return new Response('', { status: 201 });
   }
   if (target.includes('/inquiry_states?')) {
+    if (!target.includes(encodeURIComponent('anon:integration-test-12345'))) {
+      return Response.json([]);
+    }
     return Response.json(canonicalState
       ? [{ version: canonicalVersion, state: canonicalState }]
       : []);
@@ -31,6 +40,9 @@ globalThis.fetch = async (url, options = {}) => {
   }
   if (target.includes('/rpc/match_corpus')) return Response.json([]);
   if (target.includes('/rpc/commit_inquiry_state')) {
+    if (commitMode === 'unavailable') {
+      return Response.json({ error: 'storage unavailable' }, { status: 503 });
+    }
     const committedBody = JSON.parse(options.body);
     committedBodies.push(committedBody);
     if (committedBody.p_expected_version !== canonicalVersion) {
@@ -70,8 +82,16 @@ globalThis.fetch = async (url, options = {}) => {
             evidenceBoundaries: ['Non-identification is not proof of absence.'],
             unsupportedAssumptions: [],
             unfalsifiableClaims: [],
+            activeAssumptions: ['Causal dependence may entail determination.'],
+            logicalClosure: 'open',
+            falsifiabilityStatus: 'partially_testable',
+            relevantConstraints: ['ontological', 'logical'],
+            retrieval: { needed: true, focus: 'agency and causal dependence' },
+            questionNeeded: false,
+            endingMode: 'declarative',
             draftPreparation: 'Test the inference directly.',
           },
+          changedStateFields: ['orientation', 'unresolvedClaims'],
           statePatch: {
             orientation: 'Where agency enters a conditioned process',
             unresolvedClaims: ['Whether causal dependence entails determination'],
@@ -82,6 +102,21 @@ globalThis.fetch = async (url, options = {}) => {
     }
     if (prompt.includes('precision epistemic editor')) {
       auditCompleted = true;
+      if (auditMode === 'provider_error') {
+        return Response.json({ error: 'provider unavailable' }, { status: 503 });
+      }
+      if (auditMode === 'timeout') {
+        throw new DOMException('The audit timed out', 'AbortError');
+      }
+      if (auditMode === 'malformed') {
+        return Response.json({ content: [{ type: 'text', text: '' }] });
+      }
+      if (auditMode === 'invalid') {
+        return Response.json({ content: [{ type: 'text', text: 'AUDIT: rejected' }] });
+      }
+      if (auditMode === 'interrupted') {
+        activeRequest?.emit('aborted');
+      }
       return Response.json({
         content: [{
           type: 'text',
@@ -99,7 +134,11 @@ globalThis.fetch = async (url, options = {}) => {
   throw new Error(`Unexpected fetch: ${target}`);
 };
 
-const { default: handler } = await import('../api/interpret.js');
+const {
+  classifyFollowUpContext,
+  default: handler,
+  persistentInquiryRuntimeEnabled,
+} = await import('../api/interpret.js');
 
 class MockResponse extends EventEmitter {
   constructor() {
@@ -117,7 +156,11 @@ class MockResponse extends EventEmitter {
     this.headersSent = true;
     const line = String(value);
     if (line.includes('"type":"delta"')) {
-      assert.equal(auditCompleted, true, 'Unaudited prose reached the response stream');
+      assert.equal(
+        auditCompleted || allowKillSwitchDelta,
+        true,
+        'Unaudited prose reached the response stream',
+      );
     }
     this.output += line;
     return true;
@@ -134,6 +177,7 @@ class MockResponse extends EventEmitter {
 async function executeFollowUp(requestId, query) {
   auditCompleted = false;
   const req = new EventEmitter();
+  activeRequest = req;
   req.method = 'POST';
   req.url = '/api/interpret';
   req.headers = { host: 'localhost', 'x-forwarded-for': '127.0.0.1' };
@@ -143,12 +187,23 @@ async function executeFollowUp(requestId, query) {
     rawQuery: query,
     isFollowUp: true,
     inquiryKey: 'anon:integration-test-12345',
+    inquiryToken: createHmac('sha256', process.env.SUPABASE_SERVICE_ROLE_KEY)
+      .update('prism-inquiry:anon:integration-test-12345')
+      .digest('base64url'),
     inquirySubject: 'Whether responsibility survives prior causes',
     requestId,
   };
   const res = new MockResponse();
   await handler(req, res);
+  activeRequest = null;
   return res;
+}
+
+function streamEvents(response) {
+  return response.output
+    .split('\n')
+    .filter(line => line.startsWith('data: '))
+    .map(line => JSON.parse(line.slice(6)));
 }
 
 const res = await executeFollowUp('integration_123', 'Where exactly does agency enter?');
@@ -217,5 +272,80 @@ assert.equal(
   1,
   'The stale tab did not receive a state conflict event',
 );
+
+const falsePositive = await classifyFollowUpContext({
+  clientHint: true,
+  inquiryKey: 'anon:forged-client-hint',
+  inquiryToken: 'x'.repeat(43),
+  threadId: null,
+  ownerUserId: null,
+  shareId: null,
+});
+assert.equal(falsePositive.isFollowUp, false, 'A forged client hint classified as follow-up');
+const falseNegativeKey = 'server:false-negative-check';
+const falseNegative = await classifyFollowUpContext({
+  clientHint: false,
+  inquiryKey: falseNegativeKey,
+  inquiryToken: createHmac('sha256', process.env.SUPABASE_SERVICE_ROLE_KEY)
+    .update(`prism-inquiry:${falseNegativeKey}`)
+    .digest('base64url'),
+  threadId: null,
+  ownerUserId: null,
+  shareId: null,
+});
+assert.equal(falseNegative.isFollowUp, true, 'Server-authenticated context was missed');
+
+process.env.PERSISTENT_INQUIRY_RUNTIME_ENABLED = 'false';
+allowKillSwitchDelta = true;
+assert.equal(persistentInquiryRuntimeEnabled(), false);
+const commitsBeforeKillSwitch = committedBodies.length;
+const callsBeforeKillSwitch = modelCallCount;
+const disabledRuntime = await executeFollowUp(
+  'integration_runtime_disabled',
+  'A follow-up while the persistent runtime is disabled.',
+);
+const disabledEvents = streamEvents(disabledRuntime);
+assert.equal(modelCallCount, callsBeforeKillSwitch + 1);
+assert.equal(committedBodies.length, commitsBeforeKillSwitch);
+assert.equal(disabledEvents.some(event => event.type === 'stage'), false);
+assert.equal(disabledEvents.at(-1)?.runtimeDisabled, true);
+process.env.PERSISTENT_INQUIRY_RUNTIME_ENABLED = 'true';
+allowKillSwitchDelta = false;
+
+for (const mode of ['provider_error', 'timeout', 'malformed', 'invalid', 'interrupted']) {
+  auditMode = mode;
+  const commitsBefore = committedBodies.length;
+  const stateBefore = JSON.stringify(canonicalState);
+  const failure = await executeFollowUp(
+    `integration_audit_${mode}`,
+    `Audit failure case: ${mode}`,
+  );
+  const failureEvents = streamEvents(failure);
+  assert.equal(
+    failureEvents.some(event => event.type === 'delta'),
+    false,
+    `${mode} leaked unaudited prose`,
+  );
+  assert.equal(committedBodies.length, commitsBefore, `${mode} mutated canonical state`);
+  assert.equal(JSON.stringify(canonicalState), stateBefore, `${mode} changed canonical state`);
+  if (mode !== 'interrupted') {
+    assert.equal(failureEvents.at(-1)?.type, 'error', `${mode} did not fail closed`);
+  }
+}
+auditMode = 'valid';
+
+commitMode = 'unavailable';
+const commitsBeforeUnavailable = committedBodies.length;
+const unavailable = await executeFollowUp(
+  'integration_persist_unavailable',
+  'A response whose state commit will fail.',
+);
+const unavailableEvents = streamEvents(unavailable);
+assert.equal(committedBodies.length, commitsBeforeUnavailable);
+assert.equal(unavailableEvents.some(event => event.type === 'state_unavailable'), true);
+const unavailableDone = unavailableEvents.find(event => event.type === 'done');
+assert.equal(unavailableDone.committed, false);
+assert.equal(unavailableDone.canonicalState, false);
+commitMode = 'valid';
 
 console.log('Persistent follow-up pipeline integration checks passed.');

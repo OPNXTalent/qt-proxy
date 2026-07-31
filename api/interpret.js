@@ -8,12 +8,15 @@ export const config = {
 };
 
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
 import {
   FOLLOWUP_STAGE_LABELS,
   applyInquiryPatch,
+  assertFollowUpPromptSize,
+  boundRetrievedContext,
   buildAuditPrompt,
   buildDraftPrompt,
   buildFocusedRetrievalQuery,
@@ -22,7 +25,7 @@ import {
   detectExplicitCorrection,
   parseModelJson,
   splitApprovedResponse,
-  validateAnalysis,
+  validateAnalysisStrict,
   validateInquiryState,
 } from '../lib/persistent-inquiry-runtime.js';
 
@@ -5341,6 +5344,129 @@ function inquiryServiceHeaders(extra = {}) {
   };
 }
 
+export function persistentInquiryRuntimeEnabled() {
+  return process.env.PERSISTENT_INQUIRY_RUNTIME_ENABLED === 'true';
+}
+
+function signInquiryKey(inquiryKey) {
+  if (!SUPABASE_SERVICE_ROLE_KEY || !inquiryKey) return null;
+  return createHmac('sha256', SUPABASE_SERVICE_ROLE_KEY)
+    .update(`prism-inquiry:${inquiryKey}`)
+    .digest('base64url');
+}
+
+function issueInquiryCredential() {
+  try {
+    if (!SUPABASE_SERVICE_ROLE_KEY) return null;
+    const inquiryKey = `server:${randomBytes(18).toString('base64url')}`;
+    return { inquiryKey, inquiryToken: signInquiryKey(inquiryKey) };
+  } catch {
+    return null;
+  }
+}
+
+function verifyInquiryCredential(inquiryKey, inquiryToken) {
+  if (!inquiryKey || !inquiryToken) return false;
+  const expected = signInquiryKey(inquiryKey);
+  if (!expected) return false;
+  const actualBuffer = Buffer.from(inquiryToken);
+  const expectedBuffer = Buffer.from(expected);
+  return actualBuffer.length === expectedBuffer.length
+    && timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+export async function classifyFollowUpContext({
+  clientHint,
+  inquiryKey,
+  inquiryToken,
+  threadId,
+  ownerUserId,
+  shareId,
+}) {
+  if (verifyInquiryCredential(inquiryKey, inquiryToken)) {
+    return { isFollowUp: true, reason: 'server_credential' };
+  }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return { isFollowUp: false, reason: 'context_unavailable' };
+  }
+
+  if (inquiryKey) {
+    const stateResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/inquiry_states?inquiry_key=eq.${encodeURIComponent(inquiryKey)}&select=inquiry_key,version,state&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    if (stateResponse.ok) {
+      const rows = await stateResponse.json();
+      const row = rows?.[0];
+      if (row?.version >= 1 && row?.state?.schemaVersion === 1) {
+        return { isFollowUp: true, reason: 'committed_state' };
+      }
+    }
+  }
+
+  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && ownerUserId) {
+    const [ownedResponse, participantResponse] = await Promise.all([
+      fetch(
+        `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&select=id&limit=1`,
+        { headers: inquiryServiceHeaders() },
+      ),
+      fetch(
+        `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&active=eq.true&select=id&limit=1`,
+        { headers: inquiryServiceHeaders() },
+      ),
+    ]);
+    const owned = ownedResponse.ok ? await ownedResponse.json() : [];
+    const participant = participantResponse.ok ? await participantResponse.json() : [];
+    if (owned?.length || participant?.length) {
+      return { isFollowUp: true, reason: owned?.length ? 'owned_thread' : 'participant' };
+    }
+  }
+
+  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && shareId) {
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}&thread_id=eq.${encodeURIComponent(threadId)}&status=eq.active&select=id,collaboration_mode,collaboration_open&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    const rows = response.ok ? await response.json() : [];
+    const share = rows?.[0];
+    const mode = share?.collaboration_mode
+      || (share?.collaboration_open ? 'bidirectional' : 'read_only');
+    if (mode === 'bidirectional') return { isFollowUp: true, reason: 'shared_thread' };
+  }
+
+  return {
+    isFollowUp: false,
+    reason: clientHint ? 'unverified_client_hint' : 'no_followup_context',
+  };
+}
+
+async function runDisabledFollowUpFallback({ sse, timing, input, subject, tier }) {
+  const startedAt = Date.now();
+  timing('followup_fallback_start');
+  const response = await callInquiryModel({
+    model: 'claude-sonnet-4-6',
+    maxTokens: 900,
+    temperature: 0.2,
+    prompt: `Respond directly to this follow-up in plain prose.
+Do not return JSON or narrate internal processing. Do not infer psychology.
+Apply evidential standards symmetrically and do not manufacture certainty.
+Ask a question only if ambiguity prevents a responsible answer.
+
+Original inquiry: ${String(subject || '').slice(0, 2000)}
+Follow-up: ${String(input || '').slice(0, 4000)}`,
+    system: PRISM_RESPONSE_REFRESH,
+  });
+  for (const text of splitApprovedResponse(response)) {
+    sse.write({ type: 'delta', text });
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  timing('followup_fallback_complete', { totalMs: Date.now() - startedAt });
+  sse.write(
+    { type: 'done', tier, runtimeDisabled: true },
+    { source: 'followup_kill_switch_fallback', tier },
+  );
+}
+
 async function restoreCanonicalInquiryState({ inquiryKey, threadId, subject }) {
   const fallback = createInitialInquiryState(subject);
   const fallbackResult = { state: fallback, inquiryKey };
@@ -5436,22 +5562,34 @@ async function callInquiryModel({
   prompt,
   system,
   temperature = 0,
+  timeoutMs = 15000,
 }) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      temperature,
-      ...(system ? { system } : {}),
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort('MODEL_TIMEOUT'), timeoutMs);
+  let response;
+  try {
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        ...(system ? { system } : {}),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
     throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
@@ -5506,7 +5644,7 @@ async function runPersistentInquiryFollowUp({
     }),
   });
   const rawAnalysis = parseModelJson(reducerText);
-  const analysis = validateAnalysis(rawAnalysis);
+  const analysis = validateAnalysisStrict(rawAnalysis, reducerText);
   completeStage('reduce', stageStartedAt, {
     primaryPropositionChars: analysis.reduction.primaryProposition.length,
   });
@@ -5531,41 +5669,54 @@ async function runPersistentInquiryFollowUp({
 
   stageStartedAt = emitStage('retrieval');
   const retrievalQuery = buildFocusedRetrievalQuery(nextState, analysis) || input;
-  const retrievedContext = await getRetrievedContext(retrievalQuery, null, timing);
+  const rawRetrievedContext = analysis.constraintGate.retrieval.needed
+    ? await getRetrievedContext(retrievalQuery, null, timing)
+    : '';
+  const boundedRetrieval = boundRetrievedContext(rawRetrievedContext);
+  const retrievedContext = boundedRetrieval.context;
+  if (boundedRetrieval.compacted) {
+    timing('followup_payload_compacted', {
+      target: 'rag',
+      originalChars: boundedRetrieval.originalChars,
+      retainedChars: retrievedContext.length,
+    });
+  }
   completeStage('retrieval', stageStartedAt, {
     queryChars: retrievalQuery.length,
     contextChars: retrievedContext.length,
   });
 
   stageStartedAt = emitStage('draft');
+  const draftPrompt = assertFollowUpPromptSize(buildDraftPrompt({
+    state: nextState,
+    analysis,
+    input,
+    retrievedContext,
+  }));
   const draft = await callInquiryModel({
     model: 'claude-sonnet-4-6',
     maxTokens: 1400,
     temperature: 0.2,
-    prompt: buildDraftPrompt({
-      state: nextState,
-      analysis,
-      input,
-      retrievedContext,
-    }),
+    prompt: draftPrompt,
   });
   completeStage('draft', stageStartedAt, { draftChars: draft.length });
 
   stageStartedAt = emitStage('audit');
-  let approved = draft;
-  try {
-    const audited = await callInquiryModel({
-      model: 'claude-haiku-4-5-20251001',
-      maxTokens: 1400,
-      prompt: buildAuditPrompt({ input, analysis, draft }),
-    });
-    // The audit is a precision editor. Reject empty output or wholesale
-    // expansion so a failed editor cannot become a second interpreter.
-    if (audited && audited.length <= draft.length * 1.25 + 120) approved = audited;
-  } catch (auditError) {
-    console.error(`[interpret:${requestId}] follow-up audit failed:`, auditError.message);
-    timing('followup_audit_fallback', { reason: 'model_error' });
+  if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
+  const audited = await callInquiryModel({
+    model: 'claude-haiku-4-5-20251001',
+    maxTokens: 1400,
+    timeoutMs: 8000,
+    prompt: assertFollowUpPromptSize(buildAuditPrompt({ input, analysis, draft })),
+  });
+  if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
+  if (!audited
+    || audited.length < Math.min(40, Math.floor(draft.length * 0.2))
+    || audited.length > draft.length * 1.25 + 120
+    || /^(?:```|\{|\s*AUDIT\b)/i.test(audited)) {
+    throw new Error('AUDIT_RESPONSE_INVALID');
   }
+  const approved = audited;
   completeStage('audit', stageStartedAt, {
     corrected: approved !== draft,
     approvedChars: approved.length,
@@ -5604,6 +5755,12 @@ async function runPersistentInquiryFollowUp({
       text: 'The inquiry advanced in another session; the latest committed state was preserved.',
     });
   }
+  if (commit.unavailable) {
+    sse.write({
+      type: 'state_unavailable',
+      text: 'Your response could not be safely attached to this inquiry. Please retry.',
+    });
+  }
 
   timing('followup_total_complete', {
     totalMs: Date.now() - runtimeStartedAt,
@@ -5615,7 +5772,9 @@ async function runPersistentInquiryFollowUp({
       type: 'done',
       tier,
       stateVersion: commit.version ?? previousState.version,
-      state: commit.state || nextState,
+      committed: Boolean(commit.committed),
+      canonicalState: Boolean(commit.committed || commit.conflict),
+      state: commit.committed || commit.conflict ? commit.state : previousState,
     },
     { source: 'persistent_inquiry_runtime', tier },
   );
@@ -5981,25 +6140,31 @@ Do not add any question after the exit offer. The person chooses the next move.
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
   let prompt, messages, userEmail, rawQuery, isFollowUp;
-  let inquiryKey, threadId, inquirySubject;
+  let inquiryKey, inquiryToken, threadId, inquirySubject, sharedFollowUpId;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
     messages = body?.messages;
     userEmail = body?.email || null;
     rawQuery = body?.rawQuery || null;
-    isFollowUp = body?.isFollowUp || false;
+    isFollowUp = body?.isFollowUp === true;
     inquiryKey = typeof body?.inquiryKey === 'string'
       && /^[A-Za-z0-9:_-]{12,180}$/.test(body.inquiryKey)
       ? body.inquiryKey
+      : null;
+    inquiryToken = typeof body?.inquiryToken === 'string'
+      && /^[A-Za-z0-9_-]{32,100}$/.test(body.inquiryToken)
+      ? body.inquiryToken
       : null;
     threadId = typeof body?.threadId === 'string' ? body.threadId : null;
     inquirySubject = typeof body?.inquirySubject === 'string'
       ? body.inquirySubject.slice(0, 2000)
       : '';
+    sharedFollowUpId = typeof body?.shareId === 'string' ? body.shareId : null;
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
   }
+  const initialInquiryCredential = issueInquiryCredential();
 
   // ── REQUEST INSTRUMENTATION ──────────────────────────────────────────────
   timing('request_body_parsed', {
@@ -6093,7 +6258,24 @@ Do not add any question after the exit offer. The person chooses the next move.
         const tier = normalizeTier(subscriber?.tier || 'free');
         const userId = subscriber?.id || null;
 
-        const isFollowUpCheck = isFollowUp || (messages && messages.length > 1);
+        const hasFollowUpCandidate = Boolean(
+          isFollowUp || inquiryKey || inquiryToken || threadId || sharedFollowUpId,
+        );
+        const followUpContext = hasFollowUpCandidate
+          ? await classifyFollowUpContext({
+            clientHint: isFollowUp,
+            inquiryKey,
+            inquiryToken,
+            threadId,
+            ownerUserId: userId,
+            shareId: sharedFollowUpId,
+          })
+          : { isFollowUp: false, reason: 'no_candidate_context' };
+        timing('followup_classification_complete', {
+          classified: followUpContext.isFollowUp,
+          reason: followUpContext.reason,
+        });
+        const isFollowUpCheck = followUpContext.isFollowUp;
         if (!isFollowUpCheck && subscriber) {
           timing('quota_check_start');
           let quota;
@@ -6136,20 +6318,30 @@ Do not add any question after the exit offer. The person chooses the next move.
         res.setHeader('X-Prism-Tier', tier);
         res.setHeader('X-Prism-Subscriber', 'true');
 
-        if (isFollowUp) {
+        if (followUpContext.isFollowUp) {
           try {
-            await runPersistentInquiryFollowUp({
-              sse,
-              timing,
-              requestId,
-              input: lastUserText,
-              subject: inquirySubject,
-              inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
-              threadId,
-              ownerUserId: userId,
-              tier,
-              isClientAborted: () => clientAborted,
-            });
+            if (persistentInquiryRuntimeEnabled()) {
+              await runPersistentInquiryFollowUp({
+                sse,
+                timing,
+                requestId,
+                input: lastUserText,
+                subject: inquirySubject,
+                inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
+                threadId,
+                ownerUserId: userId,
+                tier,
+                isClientAborted: () => clientAborted,
+              });
+            } else {
+              await runDisabledFollowUpFallback({
+                sse,
+                timing,
+                input: lastUserText,
+                subject: inquirySubject,
+                tier,
+              });
+            }
           } catch (err) {
             timing('followup_runtime_error', { route: 'subscriber' });
             sse.write(
@@ -6317,7 +6509,7 @@ Do not add any question after the exit offer. The person chooses the next move.
             fullResponse = checkedResponse;
           }
           sse.write(
-            { type: 'done', tier },
+            { type: 'done', tier, ...(initialInquiryCredential || {}) },
             { source: 'post_coherence', tier },
           );
         } else {
@@ -6422,20 +6614,48 @@ Do not add any question after the exit offer. The person chooses the next move.
     res.setHeader('X-Prism-Tier', 'free');
     res.setHeader('X-Prism-Subscriber', 'false');
 
-    if (isFollowUp) {
+    const hasFollowUpCandidate = Boolean(
+      isFollowUp || inquiryKey || inquiryToken || threadId || sharedFollowUpId,
+    );
+    const followUpContext = hasFollowUpCandidate
+      ? await classifyFollowUpContext({
+        clientHint: isFollowUp,
+        inquiryKey,
+        inquiryToken,
+        threadId,
+        ownerUserId: null,
+        shareId: sharedFollowUpId,
+      })
+      : { isFollowUp: false, reason: 'no_candidate_context' };
+    timing('followup_classification_complete', {
+      classified: followUpContext.isFollowUp,
+      reason: followUpContext.reason,
+    });
+
+    if (followUpContext.isFollowUp) {
       try {
-        await runPersistentInquiryFollowUp({
-          sse,
-          timing,
-          requestId,
-          input: lastUserText,
-          subject: inquirySubject,
-          inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
-          threadId,
-          ownerUserId: null,
-          tier: 'free',
-          isClientAborted: () => clientAborted,
-        });
+        if (persistentInquiryRuntimeEnabled()) {
+          await runPersistentInquiryFollowUp({
+            sse,
+            timing,
+            requestId,
+            input: lastUserText,
+            subject: inquirySubject,
+            inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
+            threadId,
+            ownerUserId: null,
+            tier: 'free',
+            isClientAborted: () => clientAborted,
+          });
+        } else {
+          await runDisabledFollowUpFallback({
+            sse,
+            timing,
+            input: lastUserText,
+            subject: inquirySubject,
+            tier: 'free',
+          });
+        }
       } catch (err) {
         timing('followup_runtime_error', { route: 'free' });
         sse.write(
@@ -6577,7 +6797,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         sse.write({ type: 'corrected', text: checkedResponseFree });
       }
       sse.write(
-        { type: 'done', tier: 'free' },
+        { type: 'done', tier: 'free', ...(initialInquiryCredential || {}) },
         { source: 'post_coherence', tier: 'free' },
       );
     } else {
