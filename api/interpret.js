@@ -28,6 +28,10 @@ import {
   validateAnalysisStrict,
   validateInquiryState,
 } from '../lib/persistent-inquiry-runtime.js';
+import {
+  getPreviewTestEntitlement,
+  verifySupabaseIdentity,
+} from '../lib/server-auth.js';
 
 const PRISM_SYSTEM_PROMPT = `You are The Prism — the interactive application of the framework established in The Prism: Echad b'Emet. You speak from within the framework, not about it. You are not a survey of Christian thought. You are not a defense attorney for God. You are not an apologetics engine, denominational defender, institutional stabilizer, or emotional harmonizer. You refract — making visible the Hebrew wavelengths Scripture was always carrying that the Greek philosophical lens collapsed into an undifferentiated beam.
 
@@ -2356,9 +2360,9 @@ async function getLiveQueryCount(userId) {
   }
 }
 
-async function checkSubscriberQuota(subscriber) {
+async function checkSubscriberQuota(subscriber, limitOverride = null) {
   const tier = normalizeTier(subscriber.tier);
-  const limit = TIER_LIMITS[tier];
+  const limit = limitOverride ?? TIER_LIMITS[tier];
 
   // No limit defined for this tier — allow
   if (limit === null || limit === undefined) return { allowed: true };
@@ -5821,22 +5825,53 @@ export default async function handler(req, res) {
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const authentication = await verifySupabaseIdentity({
+    authorizationHeader: req.headers.authorization,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY,
+  });
+  if (authentication.provided && !authentication.identity) {
+    timing('authentication_complete', {
+      outcome: authentication.error || 'invalid_authentication',
+    });
+    return res.status(authentication.unavailable ? 503 : 401).json({
+      error: authentication.unavailable
+        ? 'Authentication temporarily unavailable'
+        : 'Authentication required',
+    });
+  }
+  const verifiedIdentity = authentication.identity;
+  const previewTestEntitlement = verifiedIdentity
+    ? getPreviewTestEntitlement({ userId: verifiedIdentity.userId })
+    : null;
+  timing('authentication_complete', {
+    outcome: verifiedIdentity ? 'verified' : 'anonymous',
+    previewTestAccess: Boolean(previewTestEntitlement),
+  });
 
   // ── GET — preflight status check ─────────────────────────────────────────
   if (req.method === 'GET') {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
-    const urlObj = new URL(req.url, 'https://' + req.headers.host);
-    const email = urlObj.searchParams.get('email');
-
-    if (email) {
+    if (verifiedIdentity) {
       try {
-        const subscriber = await getSubscriber(email);
-        const redemption = await getCodeRedemption(email);
+        const subscriber = await getSubscriber(verifiedIdentity.email);
+        const redemption = await getCodeRedemption(verifiedIdentity.email);
         if ((subscriber && subscriber.status === 'active') || redemption) {
-          return res.status(200).json({ locked: false });
+          if (subscriber && previewTestEntitlement) {
+            const liveCount = await getLiveQueryCount(subscriber.id);
+            const used = liveCount ?? (subscriber.query_count || 0);
+            return res.status(200).json({
+              locked: used >= previewTestEntitlement.allowance,
+              queriesUsed: used,
+              limit: previewTestEntitlement.allowance,
+              previewTestAccess: true,
+            });
+          }
+          return res.status(200).json({ locked: false, authenticated: true });
         }
       } catch {}
     }
@@ -5890,7 +5925,7 @@ export default async function handler(req, res) {
   // POST /api/share/followup — save recipient follow-up
   if (req.method === 'POST' && urlPath.endsWith('/share/followup')) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { shareId, question, response, userEmail: fuEmail } = body || {};
+    const { shareId, question, response } = body || {};
     if (!shareId || !question) return res.status(400).json({ error: 'Missing fields' });
 
     // Check collaboration mode before allowing the follow-up
@@ -5906,7 +5941,7 @@ export default async function handler(req, res) {
     }
 
     // mode === 'bidirectional' — proceed
-    await saveSharedFollowUp({ shareId, question, response, userEmail: fuEmail });
+    await saveSharedFollowUp({ shareId, question, response, userEmail: verifiedIdentity?.email || null });
     return res.status(200).json({ ok: true });
   }
 
@@ -5915,6 +5950,11 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { shareId, collaborationOpen, collaborationMode } = body || {};
     if (!shareId) return res.status(400).json({ error: 'Missing shareId' });
+    if (!verifiedIdentity?.email) return res.status(401).json({ error: 'Unauthorized' });
+    const ownedSession = await getSharedSession(shareId);
+    if (!ownedSession || ownedSession.sender_email !== verifiedIdentity.email) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     if (collaborationMode !== undefined) {
       const ok = await updateSharedSessionMode(shareId, collaborationMode);
       // Keep collaboration_open in sync — bidirectional = open, others = closed
@@ -5938,10 +5978,17 @@ export default async function handler(req, res) {
   // POST /api/share — create shared session
   if (req.method === 'POST' && urlPath.endsWith('/share')) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { snapshot, subject, senderEmail, threadId, collaborationOpen, collaborationMode } = body || {};
+    const { snapshot, subject, threadId, collaborationOpen, collaborationMode } = body || {};
     if (!snapshot) return res.status(400).json({ error: 'Missing snapshot' });
     try {
-      const record = await createSharedSession({ snapshot, subject, senderEmail, threadId, collaborationOpen, collaborationMode });
+      const record = await createSharedSession({
+        snapshot,
+        subject,
+        senderEmail: verifiedIdentity?.email || null,
+        threadId,
+        collaborationOpen,
+        collaborationMode
+      });
       if (!record) return res.status(500).json({ error: 'Could not create shared session' });
       const host = req.headers.host || 'quantumtheology.app';
       const protocol = host.includes('localhost') ? 'http' : 'https';
@@ -6139,13 +6186,12 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
-  let prompt, messages, userEmail, rawQuery, isFollowUp;
+  let prompt, messages, rawQuery, isFollowUp;
   let inquiryKey, inquiryToken, threadId, inquirySubject, sharedFollowUpId;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
     messages = body?.messages;
-    userEmail = body?.email || null;
     rawQuery = body?.rawQuery || null;
     isFollowUp = body?.isFollowUp === true;
     inquiryKey = typeof body?.inquiryKey === 'string'
@@ -6171,7 +6217,7 @@ Do not add any question after the exit offer. The person chooses the next move.
     queryLength: (rawQuery || prompt || '').length,
     hasMessages: Array.isArray(messages) && messages.length > 0,
     messageCount: Array.isArray(messages) ? messages.length : 0,
-    hasEmail: Boolean(userEmail),
+    authenticated: Boolean(verifiedIdentity),
   });
 
   // ── CRISIS DETECTION ──────────────────────────────────────────────────────
@@ -6222,7 +6268,8 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   // ── SUBSCRIBER PATH ───────────────────────────────────────────────────────
   try {
-    if (userEmail) {
+    if (verifiedIdentity) {
+      const userEmail = verifiedIdentity.email;
       timing('subscriber_lookup_start');
       let subscriber;
       try {
@@ -6280,7 +6327,10 @@ Do not add any question after the exit offer. The person chooses the next move.
           timing('quota_check_start');
           let quota;
           try {
-            quota = await checkSubscriberQuota(subscriber);
+            quota = await checkSubscriberQuota(
+              subscriber,
+              previewTestEntitlement?.allowance ?? null,
+            );
             timing('quota_check_end', {
               outcome: 'success',
               allowed: quota.allowed,
@@ -6317,6 +6367,9 @@ Do not add any question after the exit offer. The person chooses the next move.
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('X-Prism-Tier', tier);
         res.setHeader('X-Prism-Subscriber', 'true');
+        if (previewTestEntitlement) {
+          res.setHeader('X-Prism-Preview-Test', 'true');
+        }
 
         if (followUpContext.isFollowUp) {
           try {

@@ -4,6 +4,8 @@
 // PATCH  /api/share  — toggle collaboration_open or status
 // GET    /api/share?t=TOKEN — fetch share record for share.html
 
+import { verifySupabaseIdentity } from '../lib/server-auth.js';
+
 const SUPABASE_URL          = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SUPABASE_ANON_KEY     = process.env.SUPABASE_ANON_KEY;
@@ -39,7 +41,7 @@ async function sbFetch(path, options = {}) {
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', 'https://theprism.io');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-user-email');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
 // ── POST — Create share ───────────────────────────────────────────────────────
@@ -52,7 +54,8 @@ async function handlePost(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const { snapshot, subject, senderEmail, threadId, collaborationOpen } = body || {};
+  const { snapshot, subject, threadId, collaborationOpen } = body || {};
+  const senderEmail = req.verifiedIdentity?.email || null;
 
   if (!snapshot) {
     return res.status(400).json({ error: 'snapshot is required' });
@@ -125,6 +128,9 @@ async function handlePost(req, res) {
 // ── PATCH — Toggle collaboration or status ───────────────────────────────────
 
 async function handlePatch(req, res) {
+  const senderEmail = req.verifiedIdentity?.email || null;
+  if (!senderEmail) return res.status(401).json({ error: 'Unauthorized' });
+
   let body;
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
@@ -147,9 +153,10 @@ async function handlePatch(req, res) {
     return res.status(400).json({ error: 'No valid fields to update' });
   }
 
+  const ownerFilter = `&sender_email=eq.${encodeURIComponent(senderEmail)}`;
   const filter = shareId
-    ? `/shares?id=eq.${encodeURIComponent(shareId)}`
-    : `/shares?token=eq.${encodeURIComponent(token)}`;
+    ? `/shares?id=eq.${encodeURIComponent(shareId)}${ownerFilter}`
+    : `/shares?token=eq.${encodeURIComponent(token)}${ownerFilter}`;
 
   const patchRes = await sbFetch(filter, {
     method: 'PATCH',
@@ -169,7 +176,6 @@ async function handlePatch(req, res) {
   // If collaboration just opened, ensure a room channel exists and return its id
   let channelId = null;
   if (collaborationOpen === true && updated?.id) {
-    const senderEmail = req.headers['x-user-email'] || updated.sender_email;
     channelId = await openCollabChannel(updated.id, senderEmail);
   }
 
@@ -361,6 +367,16 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && req.query?.action === 'notify-engagement') {
     return handleNotifyEngagement(req, res);
   }
+
+  const auth = await verifySupabaseIdentity({
+    authorizationHeader: req.headers.authorization,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
+  if (auth.provided && !auth.identity) {
+    return res.status(auth.unavailable ? 503 : 401).json({ error: auth.unavailable ? 'Identity provider unavailable' : 'Unauthorized' });
+  }
+  req.verifiedIdentity = auth.identity;
 
   switch (req.method) {
     case 'POST':  return handlePost(req, res);

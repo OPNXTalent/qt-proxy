@@ -33,7 +33,10 @@
 // only ever affects what the MUTER sees — never removes anything for anyone
 // else, never notifies the muted person.
 
+import { verifySupabaseIdentity } from '../lib/server-auth.js';
+
 const SUPABASE_URL              = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY         = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function sbHeaders(extra) {
@@ -98,9 +101,10 @@ async function handleClaimAnonSession(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const { anonId, userEmail, threadId } = body || {};
+  const { anonId, threadId } = body || {};
+  const userEmail = req.verifiedIdentity?.email || null;
   if (!anonId || !userEmail || !threadId) {
-    return res.status(400).json({ error: 'anonId, userEmail, and threadId are required' });
+    return res.status(400).json({ error: 'anonId, authenticated user, and threadId are required' });
   }
 
   const userId = await getSubscriberId(userEmail);
@@ -156,7 +160,7 @@ async function handleClaimAnonSession(req, res) {
 // rather than an anon session. Confirmed-only, on purpose — see the
 // consolidation notes on why silent auto-join on link-open was rejected.
 async function handleJoinCircle(req, res) {
-  const userEmail = req.headers['x-user-email'] || null;
+  const userEmail = req.verifiedIdentity?.email || null;
   if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
 
   let body;
@@ -198,7 +202,7 @@ async function handleJoinCircle(req, res) {
 // deletable by whoever wrote it. quote is optional — a note can exist with
 // or without a highlighted passage attached.
 async function handleNoteRequest(req, res) {
-  const userEmail = req.headers['x-user-email']   || null;
+  const userEmail = req.verifiedIdentity?.email || null;
   const anonId    = req.headers['x-anon-session'] || null;
   if (!userEmail && !anonId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -328,8 +332,18 @@ async function handleNoteRequest(req, res) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-user-email, x-share-id');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-share-id');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const auth = await verifySupabaseIdentity({
+    authorizationHeader: req.headers.authorization,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
+  if (auth.provided && !auth.identity) {
+    return res.status(auth.unavailable ? 503 : 401).json({ error: auth.unavailable ? 'Identity provider unavailable' : 'Unauthorized' });
+  }
+  req.verifiedIdentity = auth.identity;
 
   // Route to the notes branch before anything else — completely separate
   // logic, sharing only the file (and the sbHeaders/getSubscriberId helpers)
@@ -346,7 +360,7 @@ export default async function handler(req, res) {
     return handleJoinCircle(req, res);
   }
 
-  const userEmail = req.headers['x-user-email'] || null;
+  const userEmail = req.verifiedIdentity?.email || null;
   const shareId   = req.headers['x-share-id']   || null;
 
   // ── GET — fetch follow-ups for a thread ──────────────────────────────────

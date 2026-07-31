@@ -23,5 +23,25 @@ assert.match(
   /The backend owns the Constitution and output contract/,
   'Ownership of interpretation instructions must remain explicit',
 );
+assert.match(
+  qtSource,
+  /client\.auth\.getSession\(\)/,
+  'Browser and installed PWA requests must obtain the active Supabase session',
+);
+assert.match(
+  qtSource,
+  /headers\.Authorization = 'Bearer ' \+ token/,
+  'Authenticated interpretation requests must send the access token in a header',
+);
+assert.doesNotMatch(
+  qtSource.match(/async function callProxyStream[\s\S]*?async function callProxy\(/)?.[0] || '',
+  /email:\s*userEmail/,
+  'The streaming request must not transmit local email as authorization identity',
+);
+assert.doesNotMatch(
+  qtSource.match(/async function callProxy\([\s\S]*?function getErrorMessage/)?.[0] || '',
+  /email:\s*userEmail/,
+  'The initial request must not transmit local email as authorization identity',
+);
 
 console.log('Frontend query handoff checks passed.');
