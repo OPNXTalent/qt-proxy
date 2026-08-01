@@ -92,6 +92,22 @@ assert.deepEqual(
   aliasedConstraints.constraintGate.relevantConstraints,
   ['ontological', 'logical', 'relational'],
 );
+const repairedConstraints = validateAnalysisStrict({
+  ...analysis,
+  constraintGate: {
+    ...analysis.constraintGate,
+    relevantConstraints: ['empirical', 'epistemological', { unsafe: true }],
+  },
+});
+assert.deepEqual(repairedConstraints.constraintGate.relevantConstraints, ['phenomenological']);
+const defaultedConstraints = validateAnalysisStrict({
+  ...analysis,
+  constraintGate: {
+    ...analysis.constraintGate,
+    relevantConstraints: [],
+  },
+});
+assert.deepEqual(defaultedConstraints.constraintGate.relevantConstraints, ['logical']);
 const inferredChangeSet = validateAnalysisStrict({
   ...analysis,
   changedStateFields: [],
