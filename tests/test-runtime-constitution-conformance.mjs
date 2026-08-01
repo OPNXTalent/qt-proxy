@@ -38,7 +38,11 @@ assert.ok(migration.includes('unique (artifact_id, artifact_revision, sequence)'
 assert.ok(migration.includes('perform pg_advisory_xact_lock(hashtext(p_completion_key))'));
 assert.ok(migration.includes('complete_followup_interpretation_artifact'));
 assert.ok(migration.includes('revoke all on table public.interpretation_artifacts from anon, authenticated'));
-assert.ok(migration.includes("p_usage_credit_source = 'signal_credit'"));
+assert.ok(api.includes("usageCreditSource === 'signal_credit'"));
+assert.ok(api.includes("? 'purchased'"));
+assert.ok(api.includes("usageCreditSource === 'tier_allocation'"));
+assert.ok(api.includes("? 'monthly'"));
+assert.ok(migration.includes("p_usage_credit_source = 'purchased'"));
 assert.ok(migration.includes('select public.draw_signal_credit(p_owner_user_id)'));
 assert.ok(migration.indexOf('select public.draw_signal_credit(p_owner_user_id)') < migration.indexOf('insert into public.query_log'));
 assert.ok(migration.includes('on conflict (packet_id) do nothing'));

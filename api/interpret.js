@@ -5689,6 +5689,11 @@ function artifactRpcBody(artifact, packets, {
   usageCreditSource,
   threadPayload = null,
 }) {
+  const durableCreditSource = usageCreditSource === 'signal_credit'
+    ? 'purchased'
+    : usageCreditSource === 'tier_allocation'
+      ? 'monthly'
+      : usageCreditSource;
   return {
     p_artifact_id: artifact.artifactId,
     p_artifact_revision: artifact.revision,
@@ -5706,7 +5711,7 @@ function artifactRpcBody(artifact, packets, {
     p_canonical_packet: packets[1],
     p_charge: Boolean(charge),
     p_usage_query_type: usageQueryType,
-    p_usage_credit_source: usageCreditSource,
+    p_usage_credit_source: durableCreditSource,
     p_usage_channel_context: 'solo',
     p_thread_payload: threadPayload,
   };

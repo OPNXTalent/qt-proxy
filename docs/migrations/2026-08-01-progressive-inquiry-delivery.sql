@@ -147,7 +147,7 @@ begin
       p_canonical_packet->>'packetType', 2, 'complete', p_canonical_packet->'content');
 
   if p_charge then
-    if p_usage_credit_source = 'signal_credit' then
+    if p_usage_credit_source = 'purchased' then
       select public.draw_signal_credit(p_owner_user_id) into v_credit_drawn;
       if not coalesce(v_credit_drawn, false) then
         raise exception 'signal credit unavailable at completion';
