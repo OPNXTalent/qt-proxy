@@ -5841,7 +5841,7 @@ async function constructAuditedArtifact({
   timing('artifact_construction_start');
   const rawCoreText = await callInquiryModel({
     model: 'claude-sonnet-4-6',
-    maxTokens: 1400,
+    maxTokens: 1800,
     temperature: 0.2,
     timeoutMs: 45000,
     system: progressiveSystemPrompt(systemPrompt, PRISM_ARTIFACT_CORE_CONTRACT),
