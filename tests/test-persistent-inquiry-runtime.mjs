@@ -81,6 +81,17 @@ assert.equal(
   aliasedFalsifiability.constraintGate.falsifiabilityStatus,
   'partially_testable',
 );
+const aliasedConstraints = validateAnalysisStrict({
+  ...analysis,
+  constraintGate: {
+    ...analysis.constraintGate,
+    relevantConstraints: ['Ontology', 'LOGIC', 'relational coherence'],
+  },
+});
+assert.deepEqual(
+  aliasedConstraints.constraintGate.relevantConstraints,
+  ['ontological', 'logical', 'relational'],
+);
 const inferredChangeSet = validateAnalysisStrict({
   ...analysis,
   changedStateFields: [],
