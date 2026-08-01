@@ -30,6 +30,9 @@ begin
 end
 $$;
 
+alter table public.threads
+  drop constraint if exists threads_user_id_fkey;
+
 update public.threads as thread
 set user_id = mapped_auth_user.id
 from public.subscribers as subscriber
@@ -54,9 +57,6 @@ begin
   end if;
 end
 $$;
-
-alter table public.threads
-  drop constraint if exists threads_user_id_fkey;
 
 alter table public.threads
   add constraint threads_user_id_fkey

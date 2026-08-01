@@ -15,4 +15,10 @@ assert.match(migration, /drop constraint if exists threads_user_id_fkey/);
 assert.match(migration, /references auth\.users\(id\)/);
 assert.doesNotMatch(migration, /references public\.subscribers/);
 
+const dropIndex = migration.indexOf('drop constraint if exists threads_user_id_fkey');
+const updateIndex = migration.indexOf('update public.threads as thread');
+const addIndex = migration.indexOf('add constraint threads_user_id_fkey');
+assert.ok(dropIndex < updateIndex, 'legacy foreign key must be dropped before owner IDs change');
+assert.ok(updateIndex < addIndex, 'auth foreign key must be added after owner IDs change');
+
 console.log('thread owner identity migration checks passed');
