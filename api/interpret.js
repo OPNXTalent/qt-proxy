@@ -13,6 +13,21 @@ import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js'
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
 import {
+  ARTIFACT_SCHEMA_VERSION,
+  PACKET_TYPES,
+  RUNTIME_CONSTITUTION_VERSION,
+  createCanonicalPackets,
+  createCompletionKey,
+  createEnrichmentPackets,
+  validateArtifactCore,
+  validateEnrichment,
+} from '../lib/interpretation-artifact.js';
+import {
+  PRISM_ARTIFACT_CORE_CONTRACT,
+  PRISM_ENRICHMENT_CONTRACT,
+  serializeArtifactForEnrichment,
+} from '../lib/prompt-modules/progressive-inquiry.js';
+import {
   FOLLOWUP_STAGE_LABELS,
   applyInquiryPatch,
   assertFollowUpPromptSize,
@@ -2376,8 +2391,9 @@ async function checkSubscriberQuota(subscriber, limitOverride = null) {
   // Over limit — check purchased_credits / banked queries
   const credits = subscriber.purchased_credits || 0;
   if (credits > 0) {
-    const drawn = await drawSignalSessionCredit(subscriber.id);
-    if (drawn) return { allowed: true, creditsUsed: true, queriesUsed: used };
+    // Admission never spends a credit. The artifact-completion transaction
+    // performs the bounded draw only after the Canonical Response is durable.
+    return { allowed: true, creditSource: 'signal_credit', queriesUsed: used };
   }
 
   return {
@@ -5658,6 +5674,342 @@ async function callInquiryModel({
   return text;
 }
 
+function progressiveSystemPrompt(systemPrompt, contract) {
+  const source = String(systemPrompt || PRISM_SYSTEM_PROMPT);
+  return source.includes(PRISM_OUTPUT_CONTRACT)
+    ? source.replace(PRISM_OUTPUT_CONTRACT, contract)
+    : `${source}\n${contract}`;
+}
+
+function artifactRpcBody(artifact, packets, {
+  inquiryKey,
+  completionKey,
+  charge,
+  usageQueryType,
+  usageCreditSource,
+  threadPayload = null,
+}) {
+  return {
+    p_artifact_id: artifact.artifactId,
+    p_artifact_revision: artifact.revision,
+    p_inquiry_id: artifact.inquiryId,
+    p_inquiry_key: inquiryKey,
+    p_thread_id: /^[0-9a-f-]{36}$/i.test(artifact.threadId || '') ? artifact.threadId : null,
+    p_owner_user_id: /^[0-9a-f-]{36}$/i.test(artifact.ownerUserId || '') ? artifact.ownerUserId : null,
+    p_completion_key: completionKey,
+    p_constitution_version: RUNTIME_CONSTITUTION_VERSION,
+    p_schema_version: ARTIFACT_SCHEMA_VERSION,
+    p_query: artifact.query,
+    p_artifact: artifact,
+    p_canonical_response: artifact.canonicalResponse,
+    p_orientation_packet: packets[0],
+    p_canonical_packet: packets[1],
+    p_charge: Boolean(charge),
+    p_usage_query_type: usageQueryType,
+    p_usage_credit_source: usageCreditSource,
+    p_usage_channel_context: 'solo',
+    p_thread_payload: threadPayload,
+  };
+}
+
+async function completeInterpretationArtifact(artifact, packets, options) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('ARTIFACT_PERSISTENCE_UNAVAILABLE');
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/complete_interpretation_artifact`, {
+    method: 'POST',
+    headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(artifactRpcBody(artifact, packets, options)),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`ARTIFACT_COMPLETION_FAILED:${response.status}:${detail.slice(0, 160)}`);
+  }
+  const rows = await response.json();
+  const result = Array.isArray(rows) ? rows[0] : rows;
+  if (!result?.completed) throw new Error('ARTIFACT_COMPLETION_UNCONFIRMED');
+  return result;
+}
+
+async function completeFollowUpArtifact({
+  artifact,
+  packets,
+  inquiryKey,
+  expectedStateVersion,
+  state,
+  requestId,
+}) {
+  const completionKey = createCompletionKey({
+    inquiryId: artifact.inquiryId,
+    revision: artifact.revision,
+  });
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/complete_followup_interpretation_artifact`, {
+    method: 'POST',
+    headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      p_expected_state_version: expectedStateVersion,
+      p_inquiry_state: state,
+      p_request_id: requestId,
+      p_artifact_id: artifact.artifactId,
+      p_artifact_revision: artifact.revision,
+      p_inquiry_id: artifact.inquiryId,
+      p_inquiry_key: inquiryKey,
+      p_thread_id: /^[0-9a-f-]{36}$/i.test(artifact.threadId || '') ? artifact.threadId : null,
+      p_owner_user_id: /^[0-9a-f-]{36}$/i.test(artifact.ownerUserId || '') ? artifact.ownerUserId : null,
+      p_completion_key: completionKey,
+      p_constitution_version: RUNTIME_CONSTITUTION_VERSION,
+      p_schema_version: ARTIFACT_SCHEMA_VERSION,
+      p_query: artifact.query,
+      p_artifact: artifact,
+      p_canonical_response: artifact.canonicalResponse,
+      p_orientation_packet: packets[0],
+      p_canonical_packet: packets[1],
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`FOLLOWUP_COMPLETION_FAILED:${response.status}:${detail.slice(0, 160)}`);
+  }
+  const rows = await response.json();
+  const result = Array.isArray(rows) ? rows[0] : rows;
+  if (result?.conflict) return { conflict: true, version: result.state_version, state: result.canonical_state };
+  if (!result?.completed) throw new Error('FOLLOWUP_COMPLETION_UNCONFIRMED');
+  return { committed: true, version: result.state_version, state: result.canonical_state };
+}
+
+async function attachInterpretationPacket(packet) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/attach_interpretation_packet`, {
+    method: 'POST',
+    headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      p_packet_id: packet.packetId,
+      p_artifact_id: packet.artifactId,
+      p_artifact_revision: packet.artifactRevision,
+      p_packet_type: packet.packetType,
+      p_sequence: packet.sequence,
+      p_status: packet.status,
+      p_content: packet.content,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`PACKET_ATTACHMENT_FAILED:${response.status}:${detail.slice(0, 160)}`);
+  }
+  const stored = await response.json();
+  return stored && typeof stored === 'object' && stored.packetId ? stored : packet;
+}
+
+function legacyThreadResponse(artifact) {
+  return JSON.stringify({
+    response_mode: artifact.responseMode,
+    recognition: artifact.orientation,
+    core_insight: artifact.canonicalResponse,
+    open_door_question: artifact.openDoorQuestion,
+    verse_identified: artifact.verseIdentified,
+    verse_text: artifact.verseText,
+  });
+}
+
+function canonicalThreadPayload({ query, queryType, artifact, tier }) {
+  const normalizedTier = normalizeTier(tier);
+  const retentionDays = RETENTION_DAYS[normalizedTier] || RETENTION_DAYS.free;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
+  const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+  return {
+    title: (queryType === 'verse_reference' && artifact.verseIdentified
+      ? artifact.verseIdentified
+      : query.slice(0, 60)).trim(),
+    query_type: queryType || 'free_text',
+    tier_at_creation: normalizedTier,
+    retention_days: retentionDays,
+    expires_at: expiresAt.toISOString(),
+    grace_ends_at: graceEndsAt.toISOString(),
+    response: JSON.parse(legacyThreadResponse(artifact)),
+  };
+}
+
+async function constructAuditedArtifact({
+  timing,
+  requestId,
+  query,
+  inquiryKey,
+  revision,
+  systemPrompt,
+  ownerUserId,
+  threadId,
+}) {
+  let started = Date.now();
+  timing('artifact_construction_start');
+  const rawCoreText = await callInquiryModel({
+    model: 'claude-sonnet-4-6',
+    maxTokens: 1800,
+    temperature: 0.2,
+    timeoutMs: 30000,
+    system: progressiveSystemPrompt(systemPrompt, PRISM_ARTIFACT_CORE_CONTRACT),
+    prompt: query,
+  });
+  let rawCore = parseModelJson(rawCoreText);
+  let artifact = validateArtifactCore(rawCore, {
+    inquiryId: inquiryKey,
+    inquiryKey,
+    revision,
+    query,
+    ownerUserId,
+    threadId,
+  });
+  timing('artifact_construction_complete', {
+    stageMs: Date.now() - started,
+    artifactChars: JSON.stringify(artifact).length,
+  });
+
+  started = Date.now();
+  timing('canonical_audit_start');
+  const auditedCanonical = await callInquiryModel({
+    model: 'claude-haiku-4-5-20251001',
+    maxTokens: 1400,
+    timeoutMs: 8000,
+    prompt: `Audit the Canonical Response against the sealed artifact candidate and the user's query.
+Apply the Prism Epistemic Contract symmetrically. Preserve sound prose. Correct only material overclaim, unsupported psychology, contradiction, or failure to answer. Do not add Framework exposition. Return only the complete approved response in plain prose.
+
+Query:\n${query}\n\nArtifact candidate:\n${JSON.stringify(artifact)}\n\nCanonical Response:\n${artifact.canonicalResponse}`,
+  });
+  if (!auditedCanonical || auditedCanonical.length < 40 || /^(?:```|\{)/.test(auditedCanonical)) {
+    throw new Error('CANONICAL_AUDIT_INVALID');
+  }
+  const unauditedCanonical = rawCore.canonical_response;
+  rawCore = { ...rawCore, canonical_response: auditedCanonical };
+  artifact = validateArtifactCore(rawCore, {
+    inquiryId: inquiryKey,
+    inquiryKey,
+    revision,
+    query,
+    ownerUserId,
+    threadId,
+  });
+  timing('canonical_audit_complete', {
+    stageMs: Date.now() - started,
+    corrected: auditedCanonical !== unauditedCanonical,
+    canonicalChars: auditedCanonical.length,
+  });
+  return artifact;
+}
+
+async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing }) {
+  const started = Date.now();
+  timing('progressive_analysis_start');
+  try {
+    const rawText = await callInquiryModel({
+      model: 'claude-sonnet-4-6',
+      maxTokens: 1800,
+      temperature: 0.2,
+      timeoutMs: 30000,
+      system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
+      prompt: `Sealed Interpretation Artifact:\n${serializeArtifactForEnrichment(artifact)}`,
+    });
+    timing('progressive_analysis_audit_start');
+    const auditedText = await callInquiryModel({
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 1800,
+      timeoutMs: 8000,
+      prompt: `Audit this enrichment against the sealed Interpretation Artifact.
+Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.
+
+Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText}`,
+    });
+    const enrichment = validateEnrichment(parseModelJson(auditedText));
+    timing('progressive_analysis_audit_complete');
+    const packets = createEnrichmentPackets(artifact, enrichment);
+    for (const packet of packets) {
+      const durablePacket = await attachInterpretationPacket(packet);
+      sse.write({ type: 'packet', packet: durablePacket });
+      timing('progressive_packet_complete', {
+        packetType: durablePacket.packetType,
+        sequence: durablePacket.sequence,
+      });
+    }
+    timing('progressive_analysis_complete', { stageMs: Date.now() - started });
+    sse.write({ type: 'analysis_status', status: 'complete' });
+    return { complete: true };
+  } catch (error) {
+    timing('progressive_analysis_incomplete', {
+      stageMs: Date.now() - started,
+      error: String(error?.message || error).slice(0, 180),
+    });
+    sse.write({
+      type: 'analysis_status',
+      status: 'incomplete',
+      message: 'Prism Analysis incomplete.',
+      retryablePackets: [PACKET_TYPES.CONTEXT, PACKET_TYPES.ANALYSIS],
+      artifactId: artifact.artifactId,
+      artifactRevision: artifact.revision,
+    });
+    return { complete: false, error };
+  }
+}
+
+async function runProgressiveInitialInquiry({
+  sse,
+  timing,
+  requestId,
+  query,
+  queryType,
+  systemPrompt,
+  tier,
+  inquiryCredential,
+  ownerUserId = null,
+  usageQueryType,
+  usageCreditSource,
+}) {
+  if (!inquiryCredential?.inquiryKey) throw new Error('INQUIRY_CREDENTIAL_UNAVAILABLE');
+  let artifact = await constructAuditedArtifact({
+    timing,
+    requestId,
+    query,
+    inquiryKey: inquiryCredential.inquiryKey,
+    revision: 1,
+    systemPrompt,
+    ownerUserId,
+  });
+
+  let threadId = null;
+
+  const packets = createCanonicalPackets(artifact);
+  const completionKey = createCompletionKey({ inquiryId: artifact.inquiryId, revision: artifact.revision });
+  timing('canonical_completion_start');
+  const completion = await completeInterpretationArtifact(artifact, packets, {
+    inquiryKey: inquiryCredential.inquiryKey,
+    completionKey,
+    charge: true,
+    usageQueryType,
+    usageCreditSource,
+    threadPayload: ownerUserId
+      ? canonicalThreadPayload({ query, queryType, artifact, tier })
+      : null,
+  });
+  threadId = completion.thread_id || threadId;
+  timing('canonical_completion_complete', {
+    artifactId: artifact.artifactId,
+    artifactRevision: artifact.revision,
+  });
+
+  for (const packet of packets) sse.write({ type: 'packet', packet });
+  sse.write({
+    type: 'canonical_complete',
+    tier,
+    artifactId: artifact.artifactId,
+    artifactRevision: artifact.revision,
+    threadId,
+    ...inquiryCredential,
+  });
+  timing('canonical_response_available', { artifactId: artifact.artifactId });
+
+  await generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing });
+  sse.write(
+    { type: 'done', tier, artifactId: artifact.artifactId, artifactRevision: artifact.revision },
+    { source: 'progressive_inquiry_delivery', tier },
+  );
+  return artifact;
+}
+
 async function runPersistentInquiryFollowUp({
   sse,
   timing,
@@ -5779,44 +6131,94 @@ async function runPersistentInquiryFollowUp({
     approvedChars: approved.length,
   });
 
-  stageStartedAt = emitStage('stream');
-  const approvedChunks = splitApprovedResponse(approved);
-  for (const text of approvedChunks) {
-    sse.write({ type: 'delta', text });
-    // Yield to the response stream without adding an artificial delay.
-    await new Promise(resolve => setImmediate(resolve));
-  }
-  completeStage('stream', stageStartedAt, { chunkCount: approvedChunks.length });
-
   stageStartedAt = emitStage('persist');
   if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
-  const pendingCommitToken = issuePendingInquiryCommit({
+  const followUpArtifact = validateArtifactCore({
+    proposition: analysis.reduction.primaryProposition,
+    scope: subject || previousState.orientation,
+    jurisdiction: 'domain-appropriate inquiry',
+    governing_authority: 'The authority legitimately governing the inquiry domain',
+    observations: analysis.constraintGate.observations,
+    inferences: analysis.constraintGate.inferences,
+    assumptions: [
+      ...analysis.constraintGate.activeAssumptions,
+      ...analysis.constraintGate.unsupportedAssumptions,
+    ],
+    epistemic_boundaries: analysis.constraintGate.evidenceBoundaries,
+    thesis: approved.split(/(?<=[.!?])\s/)[0] || approved,
+    conclusions: [approved],
+    qualifications: analysis.constraintGate.evidenceBoundaries,
+    unresolved: nextState.unresolvedClaims,
+    orientation: nextState.orientation || analysis.reduction.primaryProposition,
+    canonical_response: approved,
+    response_mode: 'reflective',
+  }, {
+    inquiryId: canonicalInquiryKey,
     inquiryKey: canonicalInquiryKey,
-    expectedVersion: previousState.version,
-    state: nextState,
-    threadId,
+    revision: previousState.version + 1,
+    query: input,
     ownerUserId,
+    threadId,
+  });
+  const canonicalPackets = createCanonicalPackets(followUpArtifact);
+  const commit = await completeFollowUpArtifact({
+    artifact: followUpArtifact,
+    packets: canonicalPackets,
+    inquiryKey: canonicalInquiryKey,
+    expectedStateVersion: previousState.version,
+    state: nextState,
     requestId,
   });
-  if (!pendingCommitToken) throw new Error('INQUIRY_STATE_UNAVAILABLE');
+  if (commit.conflict) {
+    sse.write({
+      type: 'state_conflict',
+      canonicalState: true,
+      stateVersion: commit.version,
+      state: commit.state,
+    });
+    throw new Error('STALE_INQUIRY_STATE');
+  }
   completeStage('persist', stageStartedAt, {
-    pendingAcknowledgement: true,
-    stateVersion: previousState.version,
+    artifactId: followUpArtifact.artifactId,
+    artifactRevision: followUpArtifact.revision,
+    stateVersion: commit.version,
+  });
+
+  stageStartedAt = emitStage('stream');
+  for (const packet of canonicalPackets) sse.write({ type: 'packet', packet });
+  sse.write({
+    type: 'canonical_complete',
+    tier,
+    artifactId: followUpArtifact.artifactId,
+    artifactRevision: followUpArtifact.revision,
+    stateVersion: commit.version,
+    state: commit.state,
+    committed: true,
+    canonicalState: true,
+  });
+  completeStage('stream', stageStartedAt, { packetCount: canonicalPackets.length });
+
+  await generateAndAttachEnrichment({
+    artifact: followUpArtifact,
+    systemPrompt: PRISM_RESPONSE_REFRESH,
+    sse,
+    timing,
   });
 
   timing('followup_total_complete', {
     totalMs: Date.now() - runtimeStartedAt,
-    stateVersion: previousState.version,
-    pendingAcknowledgement: true,
+    stateVersion: commit.version,
+    artifactRevision: followUpArtifact.revision,
   });
   sse.write(
     {
       type: 'done',
       tier,
-      stateVersion: previousState.version,
-      committed: false,
-      canonicalState: false,
-      pendingCommitToken,
+      artifactId: followUpArtifact.artifactId,
+      artifactRevision: followUpArtifact.revision,
+      stateVersion: commit.version,
+      committed: true,
+      canonicalState: true,
     },
     { source: 'persistent_inquiry_runtime', tier },
   );
@@ -5918,6 +6320,41 @@ export default async function handler(req, res) {
   }
 
   // ── GET — preflight status check ─────────────────────────────────────────
+  if (req.method === 'POST' && correlationBody?.operation === 'retry_artifact_analysis') {
+    const artifactId = correlationBody.artifactId;
+    const artifactRevision = Number(correlationBody.artifactRevision);
+    if (!/^[0-9a-f-]{36}$/i.test(artifactId || '')
+      || !Number.isInteger(artifactRevision)
+      || artifactRevision < 1) {
+      return res.status(400).json({ error: 'Invalid artifact reference' });
+    }
+    const artifactResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact,inquiry_key,owner_user_id&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    const rows = artifactResponse.ok ? await artifactResponse.json() : [];
+    const row = rows?.[0];
+    if (!row?.artifact) return res.status(404).json({ error: 'Artifact not found' });
+    if (row.owner_user_id) {
+      if (!verifiedIdentity) return res.status(401).json({ error: 'Authentication required' });
+      if (row.owner_user_id !== verifiedIdentity.userId) return res.status(403).json({ error: 'Forbidden' });
+    } else if (correlationBody.inquiryKey !== row.inquiry_key
+      || !verifyInquiryCredential(row.inquiry_key, correlationBody.inquiryToken)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const packets = [];
+    const result = await generateAndAttachEnrichment({
+      artifact: Object.freeze(row.artifact),
+      systemPrompt: PRISM_SYSTEM_PROMPT,
+      sse: { write(event) { if (event?.type === 'packet') packets.push(event.packet); return true; } },
+      timing,
+    });
+    if (!result.complete) {
+      return res.status(503).json({ error: 'Prism Analysis incomplete.', retryable: true });
+    }
+    return res.status(200).json({ packets, charged: false });
+  }
+
   if (req.method === 'GET') {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
     if (verifiedIdentity) {
@@ -6395,9 +6832,9 @@ Do not add any question after the exit offer. The person chooses the next move.
           reason: followUpContext.reason,
         });
         const isFollowUpCheck = followUpContext.isFollowUp;
+        let quota = null;
         if (!isFollowUpCheck && quotaIdentity) {
           timing('quota_check_start');
-          let quota;
           try {
             quota = await checkSubscriberQuota(
               quotaIdentity,
@@ -6519,6 +6956,22 @@ Do not add any question after the exit offer. The person chooses the next move.
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
           elapsedMs: Date.now() - startedAt,
         });
+
+        await runProgressiveInitialInquiry({
+          sse,
+          timing,
+          requestId,
+          query: lastUserText,
+          queryType,
+          systemPrompt: enhancedSystemPrompt,
+          tier,
+          inquiryCredential: initialInquiryCredential,
+          ownerUserId: userId,
+          usageQueryType: 'subscriber',
+          usageCreditSource: quota?.creditSource || 'tier_allocation',
+        });
+        timing('request_complete', { route: 'subscriber', tier });
+        return res.end();
 
         timing('anthropic_request_start');
         const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -6718,11 +7171,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           message: `You've used all ${QUERY_LIMIT} free queries. Access resets in ${hoursRemaining} hour${hoursRemaining !== 1 ? 's' : ''}.`,
           hoursRemaining
         });
-      } else {
-        await incrementQueryLog(ip, log.query_count);
       }
-    } else {
-      await insertQueryLog(ip);
     }
   } catch (err) {
     timing('anonymous_access_error');
@@ -6824,6 +7273,23 @@ Do not add any question after the exit offer. The person chooses the next move.
           relationalSalvationLoaded: relationalSalvationModule,
           elapsedMs: Date.now() - startedAt,
         });
+
+    await runProgressiveInitialInquiry({
+      sse,
+      timing,
+      requestId,
+      query: lastUserText,
+      queryType: /^[1-9][a-z]+ \d+:\d+/i.test(lastUserText.trim())
+        ? 'verse_reference'
+        : 'free_text',
+      systemPrompt: enhancedSystemPrompt,
+      tier: 'free',
+      inquiryCredential: initialInquiryCredential,
+      usageQueryType: `ip:${ip}`,
+      usageCreditSource: 'free_tier',
+    });
+    timing('request_complete', { route: 'free', tier: 'free' });
+    return res.end();
 
     timing('anthropic_request_start');
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {

@@ -15,7 +15,8 @@ assert.match(interpret, /if \(followUpContext\.isFollowUp\) \{/);
 assert.match(interpret, /runPersistentInquiryFollowUp/);
 assert.match(interpret, /type: 'stage'/);
 assert.match(interpret, /buildAuditPrompt/);
-assert.match(interpret, /splitApprovedResponse\(approved\)/);
+assert.match(interpret, /constructAuditedArtifact/);
+assert.match(interpret, /createCanonicalPackets\(artifact\)/);
 assert.match(
   interpret,
   /model: 'claude-sonnet-4-6',[\s\S]*?timeoutMs: 25000,[\s\S]*?prompt: draftPrompt/,
@@ -29,7 +30,6 @@ for (const stage of [
   'retrieval',
   'draft',
   'audit',
-  'stream',
   'persist',
 ]) {
   assert.ok(
@@ -44,6 +44,8 @@ assert.match(frontend, /inquiryKey: isFollowUp \? getPersistentInquiryKey\(\)/);
 assert.match(frontend, /parsed\.type === 'stage'/);
 assert.match(frontend, /cachePersistentInquiryState/);
 assert.match(frontend, /parsed\.canonicalState === true/);
+assert.match(frontend, /parsed\.type === 'canonical_complete'/);
+assert.match(frontend, /renderFollowUpPacket/);
 assert.match(frontend, /parsed\.type === 'state_unavailable'/);
 assert.match(frontend, /STALE_INQUIRY_STATE/);
 assert.match(frontend, /beginNewPersistentInquiry\(\)/);

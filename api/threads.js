@@ -28,6 +28,42 @@ function sbHeaders(extra) {
   };
 }
 
+function responseFromArtifact(artifactRow, packetRows) {
+  const artifact = artifactRow?.artifact;
+  if (!artifact) return null;
+  const response = {
+    response_mode: artifact.responseMode || 'reflective',
+    recognition: artifact.orientation || '',
+    core_insight: artifact.canonicalResponse || '',
+    open_door_question: artifact.openDoorQuestion || '',
+    verse_identified: artifact.verseIdentified || '',
+    verse_text: artifact.verseText || '',
+    key_terms: [],
+    _artifactId: artifact.artifactId,
+    _artifactRevision: artifact.revision,
+  };
+  for (const packet of packetRows || []) {
+    const content = packet.content || {};
+    if (packet.packet_type === 'interpretive_context') {
+      response.interpretive_context = content.text || '';
+    } else if (packet.packet_type === 'prism_analysis') {
+      const framework = content.framework || {};
+      response.prism_summary = framework.prismSummary || '';
+      response.entanglement = framework.entanglement || '';
+      response.coherence_alignment = framework.coherenceAlignment || '';
+      response.noise_decoherence = framework.noiseDecoherence || '';
+      response.telos_insight = framework.telosInsight || '';
+      response.olam_haba = framework.olamHaba || '';
+      response.key_terms = (content.keyTerms || []).map(term => ({
+        term: term.term || '',
+        hebrew: term.original || '',
+        prism_meaning: term.meaning || '',
+      }));
+    }
+  }
+  return response;
+}
+
 async function getSubscriberProfile(userEmail) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id,tier,display_name&limit=1`,
@@ -107,6 +143,43 @@ export default async function handler(req, res) {
         }
       }
 
+      // Restore completed root artifacts and enrichments from the server.
+      const threadIds = [...byId.keys()];
+      const artifactByThread = new Map();
+      const packetsByArtifact = new Map();
+      if (threadIds.length) {
+        try {
+          const idsFilter = threadIds.map(id => `"${id}"`).join(',');
+          const artifactRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/interpretation_artifacts?thread_id=in.(${idsFilter})&artifact_revision=eq.1&select=thread_id,artifact_id,artifact_revision,artifact`,
+            { headers: sbHeaders() },
+          );
+          const artifacts = artifactRes.ok ? await artifactRes.json() : [];
+          for (const artifact of Array.isArray(artifacts) ? artifacts : []) {
+            artifactByThread.set(artifact.thread_id, artifact);
+          }
+          const artifactIds = [...new Set((Array.isArray(artifacts) ? artifacts : [])
+            .map(row => row.artifact_id))];
+          if (artifactIds.length) {
+            const artifactFilter = artifactIds.map(id => `"${id}"`).join(',');
+            const packetRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/interpretation_packets?artifact_id=in.(${artifactFilter})&artifact_revision=eq.1&status=eq.complete&order=sequence.asc&select=artifact_id,packet_type,sequence,content`,
+              { headers: sbHeaders() },
+            );
+            const packets = packetRes.ok ? await packetRes.json() : [];
+            for (const packet of Array.isArray(packets) ? packets : []) {
+              const list = packetsByArtifact.get(packet.artifact_id) || [];
+              list.push(packet);
+              packetsByArtifact.set(packet.artifact_id, list);
+            }
+          }
+        } catch (artifactRestoreError) {
+          // A rollout where the artifact schema is not yet present must not
+          // make the legacy Archive unavailable.
+          console.warn('artifact restoration unavailable:', artifactRestoreError.message);
+        }
+      }
+
       // For each Trust Circle thread, count contributions made by OTHERS
       // since this person's last_seen_at — the passive "3 new" indicator for
       // someone who has stepped back or just hasn't opened it in a while.
@@ -150,7 +223,12 @@ export default async function handler(req, res) {
           supabaseId:   t.id,
           title:        t.title || t.query?.substring(0, 60) || 'Untitled',
           query:        t.query || '',
-          response:     t.response || null,
+          response:     artifactByThread.has(t.id)
+            ? responseFromArtifact(
+              artifactByThread.get(t.id),
+              packetsByArtifact.get(artifactByThread.get(t.id).artifact_id),
+            )
+            : (t.response || null),
           queryType:    t.query_type || 'free_text',
           createdAt:    new Date(t.created_at).getTime(),
           daysLeft,

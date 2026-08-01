@@ -60,6 +60,33 @@ globalThis.fetch = async (url, options = {}) => {
       current_state: canonicalState,
     }]);
   }
+  if (target.includes('/rpc/complete_followup_interpretation_artifact')) {
+    if (commitMode === 'unavailable') {
+      return Response.json({ error: 'storage unavailable' }, { status: 503 });
+    }
+    const body = JSON.parse(options.body);
+    committedBodies.push({
+      p_expected_version: body.p_expected_state_version,
+      p_state: body.p_inquiry_state,
+    });
+    if (body.p_expected_state_version !== canonicalVersion) {
+      return Response.json([{
+        completed: false,
+        conflict: true,
+        state_version: canonicalVersion,
+        canonical_state: canonicalState,
+      }]);
+    }
+    canonicalVersion += 1;
+    canonicalState = { ...body.p_inquiry_state, version: canonicalVersion };
+    return Response.json([{
+      completed: true,
+      conflict: false,
+      state_version: canonicalVersion,
+      canonical_state: canonicalState,
+    }]);
+  }
+  if (target.includes('/rpc/attach_interpretation_packet')) return Response.json(true);
   if (target.includes('api.anthropic.com')) {
     modelCallCount += 1;
     const body = JSON.parse(options.body);
@@ -123,6 +150,21 @@ globalThis.fetch = async (url, options = {}) => {
           text: 'Not locating agency independently of prior causes does not establish that agency is absent. It establishes the present boundary of the argument.',
         }],
       });
+    }
+    if (body.system?.includes('Generate inspectable enrichment')) {
+      return Response.json({
+        content: [{ type: 'text', text: JSON.stringify({
+          interpretive_context: 'The argument concerns causal dependence and agency.',
+          framework: { noise_decoherence: 'Non-identification was promoted to proof of absence.' },
+          key_terms: [],
+          constraint_findings: ['The conclusion exceeds the stated observation.'],
+          future_analysis_projections: [],
+        }) }],
+      });
+    }
+    if (prompt.includes('Audit this enrichment')) {
+      const source = prompt.slice(prompt.indexOf('Enrichment:') + 'Enrichment:'.length);
+      return Response.json({ content: [{ type: 'text', text: source.trim() }] });
     }
     return Response.json({
       content: [{
@@ -207,33 +249,12 @@ function streamEvents(response) {
     .map(line => JSON.parse(line.slice(6)));
 }
 
-async function acknowledge(response, requestId = 'acknowledge_123') {
-  const done = streamEvents(response).find(event => event.type === 'done');
-  assert.equal(typeof done?.pendingCommitToken, 'string', 'Missing pending commit token');
-  const req = new EventEmitter();
-  req.method = 'POST';
-  req.url = '/api/interpret';
-  req.headers = { host: 'localhost', 'x-forwarded-for': '127.0.0.1' };
-  req.socket = { remoteAddress: '127.0.0.1' };
-  req.body = {
-    operation: 'commit_inquiry_state',
-    pendingCommitToken: done.pendingCommitToken,
-    requestId,
-  };
-  const res = new MockResponse();
-  await handler(req, res);
-  return { res, body: JSON.parse(res.output) };
-}
-
 const res = await executeFollowUp('integration_123', 'Where exactly does agency enter?');
 
 assert.equal(res.statusCode, 200);
 assert.equal(res.writableEnded, true);
-assert.equal(modelCallCount, 3, 'Expected reducer/gate, draft, and precision audit');
-assert.equal(committedBodies.length, 0, 'State committed before browser acknowledgement');
-const firstAcknowledgement = await acknowledge(res, 'acknowledge_first');
-assert.equal(firstAcknowledgement.body.committed, true);
-assert.equal(committedBodies.length, 1, 'Acknowledged canonical state was not committed');
+assert.equal(modelCallCount, 5, 'Expected reducer, draft, canonical audit, enrichment, and packet audit');
+assert.equal(committedBodies.length, 1, 'Canonical state was not durably completed before delivery');
 assert.equal(committedBodies[0].p_expected_version, 0);
 assert.equal(committedBodies[0].p_state.turn, 1);
 assert.equal(committedBodies[0].p_state.inquiryTrajectory.length, 1);
@@ -251,25 +272,31 @@ assert.deepEqual(stages, [
   'retrieval',
   'draft',
   'audit',
-  'stream',
   'persist',
+  'stream',
 ]);
 assert.equal(events.filter(event => event.type === 'done').length, 1);
 assert.equal(events.at(-1).type, 'done');
 assert.match(
-  events.filter(event => event.type === 'delta').map(event => event.text).join(''),
+  events.filter(event => event.type === 'packet' && event.packet.packetType === 'canonical_response')
+    .map(event => event.packet.content.text).join(''),
   /present boundary of the argument/,
 );
 assert.doesNotMatch(res.output, /draft that must remain hidden/i);
+assert.deepEqual(
+  events.filter(event => event.type === 'packet').map(event => event.packet.sequence),
+  [1, 2, 3, 4],
+);
+assert.ok(
+  events.findIndex(event => event.type === 'canonical_complete')
+    > events.findIndex(event => event.type === 'packet' && event.packet.sequence === 2),
+);
 
 const continuation = await executeFollowUp(
   'integration_456',
   'But non-identification still leaves agency without a location.',
 );
-assert.equal(modelCallCount, 6);
-assert.equal(committedBodies.length, 1, 'Continuation committed before acknowledgement');
-const continuationAcknowledgement = await acknowledge(continuation, 'acknowledge_continuation');
-assert.equal(continuationAcknowledgement.body.committed, true);
+assert.equal(modelCallCount, 10);
 assert.equal(committedBodies.length, 2);
 assert.equal(committedBodies[1].p_expected_version, 1);
 assert.equal(committedBodies[1].p_state.turn, 2);
@@ -278,24 +305,19 @@ const continuationEvents = continuation.output
   .split('\n')
   .filter(line => line.startsWith('data: '))
   .map(line => JSON.parse(line.slice(6)));
-assert.equal(continuationEvents.at(-1).stateVersion, 1);
+assert.equal(continuationEvents.at(-1).stateVersion, 2);
 
 const [tabA, tabB] = await Promise.all([
   executeFollowUp('integration_tab_a', 'A follow-up from the first tab.'),
   executeFollowUp('integration_tab_b', 'A simultaneous follow-up from the second tab.'),
-]);
-assert.equal(committedBodies.length, 2, 'Racing responses committed before acknowledgement');
-const [tabAAcknowledgement, tabBAcknowledgement] = await Promise.all([
-  acknowledge(tabA, 'acknowledge_tab_a'),
-  acknowledge(tabB, 'acknowledge_tab_b'),
 ]);
 assert.equal(committedBodies.length, 4);
 assert.equal(committedBodies[2].p_expected_version, 2);
 assert.equal(committedBodies[3].p_expected_version, 2);
 assert.equal(canonicalVersion, 3, 'A racing tab overwrote canonical state');
 assert.equal(
-  [tabAAcknowledgement.body, tabBAcknowledgement.body]
-    .filter(result => result.conflict).length,
+  [tabA, tabB].map(streamEvents)
+    .filter(tabEvents => tabEvents.some(event => event.type === 'state_conflict')).length,
   1,
   'The stale tab did not receive a state conflict event',
 );
@@ -369,36 +391,9 @@ const unavailable = await executeFollowUp(
 );
 const unavailableEvents = streamEvents(unavailable);
 assert.equal(committedBodies.length, commitsBeforeUnavailable);
-const unavailableDone = unavailableEvents.find(event => event.type === 'done');
-assert.equal(unavailableDone.committed, false);
-assert.equal(unavailableDone.canonicalState, false);
-const unavailableAcknowledgement = await acknowledge(unavailable, 'acknowledge_unavailable');
-assert.equal(unavailableAcknowledgement.res.statusCode, 503);
-assert.equal(unavailableAcknowledgement.body.unavailable, true);
+assert.equal(unavailableEvents.some(event => event.type === 'packet'), false);
+assert.equal(unavailableEvents.at(-1)?.type, 'error');
 assert.equal(committedBodies.length, commitsBeforeUnavailable);
 commitMode = 'valid';
-
-const validPending = streamEvents(await executeFollowUp(
-  'integration_tamper_source',
-  'A response whose pending state must resist tampering.',
-)).find(event => event.type === 'done')?.pendingCommitToken;
-assert.ok(verifyPendingInquiryCommit(validPending));
-const tamperedPending = `${validPending.slice(0, -1)}${validPending.endsWith('A') ? 'B' : 'A'}`;
-assert.equal(verifyPendingInquiryCommit(tamperedPending), null);
-const commitsBeforeTamper = committedBodies.length;
-const tamperReq = new EventEmitter();
-tamperReq.method = 'POST';
-tamperReq.url = '/api/interpret';
-tamperReq.headers = { host: 'localhost', 'x-forwarded-for': '127.0.0.1' };
-tamperReq.socket = { remoteAddress: '127.0.0.1' };
-tamperReq.body = {
-  operation: 'commit_inquiry_state',
-  pendingCommitToken: tamperedPending,
-  requestId: 'acknowledge_tampered',
-};
-const tamperRes = new MockResponse();
-await handler(tamperReq, tamperRes);
-assert.equal(tamperRes.statusCode, 400);
-assert.equal(committedBodies.length, commitsBeforeTamper);
 
 console.log('Persistent follow-up pipeline integration checks passed.');

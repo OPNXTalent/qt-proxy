@@ -3097,6 +3097,43 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
   let stateUnavailable = null;
   let terminalStreamError = null;
   let pendingCommitToken = null;
+  let followUpOrientation = '';
+  let progressiveFollowUp = false;
+
+  function renderFollowUpPacket(packet) {
+    progressiveFollowUp = true;
+    var content = packet.content || {};
+    if (packet.packetType === 'inquiry_orientation') {
+      followUpOrientation = content.text || '';
+      if (targetEl) targetEl.innerHTML = '<div class="orientation-block"><p>' + escHtml(followUpOrientation) + '</p></div>' +
+        '<div class="early-recognition-progress">Preparing the response…</div>';
+      markPrismBrowserTiming(requestId, 'inquiry_orientation_visible');
+    } else if (packet.packetType === 'canonical_response') {
+      fullText = content.text || '';
+      if (targetEl) targetEl.innerHTML =
+        (followUpOrientation ? '<div class="orientation-block"><p>' + escHtml(followUpOrientation) + '</p></div>' : '') +
+        fullText.split(/\n\n/).map(function(p) { return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>'; }).join('') +
+        '<div class="early-recognition-progress" data-progressive-analysis>Prism Analysis continuing…</div>';
+      markPrismBrowserTiming(requestId, 'canonical_response_visible');
+    } else if (packet.packetType === 'interpretive_context' && targetEl) {
+      var progress = targetEl.querySelector('[data-progressive-analysis]');
+      var context = document.createElement('div');
+      context.className = 'qt-interpretive-context';
+      context.innerHTML = '<div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(content.text || '') + '</p>';
+      targetEl.insertBefore(context, progress || null);
+      markPrismBrowserTiming(requestId, 'interpretive_context_visible');
+    } else if (packet.packetType === 'prism_analysis' && targetEl) {
+      var analysis = document.createElement('details');
+      analysis.className = 'qt-framework-body open';
+      var findings = (content.constraintFindings || []).map(function(item) {
+        return '<li>' + escHtml(item) + '</li>';
+      }).join('');
+      analysis.innerHTML = '<summary>Prism Analysis</summary>' + (findings ? '<ul>' + findings + '</ul>' : '');
+      var loading = targetEl.querySelector('[data-progressive-analysis]');
+      if (loading) loading.replaceWith(analysis); else targetEl.appendChild(analysis);
+      markPrismBrowserTiming(requestId, 'prism_analysis_visible');
+    }
+  }
 
   // Show streaming cursor in target element
   if (targetEl) targetEl.innerHTML = '<span style="opacity:0.4; font-family:var(--mono); font-size:14px; letter-spacing:0.12em;">interpreting…</span>';
@@ -3112,7 +3149,25 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
         const data = line.slice(6).trim();
         try {
           const parsed = JSON.parse(data);
-          if (parsed.type === 'stage' && parsed.text) {
+          if (parsed.type === 'packet' && parsed.packet) {
+            renderFollowUpPacket(parsed.packet);
+          } else if (parsed.type === 'canonical_complete') {
+            latestInquiryState = parsed.canonicalState === true ? (parsed.state || null) : null;
+            latestStateVersion = parsed.stateVersion ?? null;
+            latestStateCanonical = parsed.canonicalState === true;
+            document.getElementById('inputSection').style.opacity = '';
+            document.getElementById('inputSection').style.pointerEvents = '';
+            document.getElementById('submitBtn').disabled = false;
+            markPrismBrowserTiming(requestId, 'canonical_completion_available');
+          } else if (parsed.type === 'analysis_status' && parsed.status === 'incomplete') {
+            if (targetEl) {
+              var progress = targetEl.querySelector('[data-progressive-analysis]');
+              if (progress) progress.innerHTML = 'Prism Analysis incomplete. ' +
+                '<button type="button" class="query-secondary-btn" data-artifact-id="' + escHtml(parsed.artifactId || '') +
+                '" data-artifact-revision="' + escHtml(String(parsed.artifactRevision || '')) +
+                '" onclick="retryFollowUpAnalysis(this)">Retry Analysis</button>';
+            }
+          } else if (parsed.type === 'stage' && parsed.text) {
             markPrismBrowserTiming(requestId, 'followup_stage_visible', {
               stage: parsed.stage || 'unknown'
             });
@@ -3168,7 +3223,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
     streamError.type = 'server';
     throw streamError;
   }
-  if (pendingCommitToken) {
+  if (pendingCommitToken && !progressiveFollowUp) {
     let acknowledgement;
     try {
       const acknowledgementResponse = await fetch('/api/interpret', {
@@ -3218,6 +3273,130 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
     throw unavailableError;
   }
   return fullText;
+}
+
+function applyProgressivePacket(result, packet) {
+  result = result || { response_mode: 'reflective', key_terms: [] };
+  var content = packet && packet.content ? packet.content : {};
+  if (packet.packetType === 'inquiry_orientation') {
+    result.recognition = content.text || '';
+  } else if (packet.packetType === 'canonical_response') {
+    result.core_insight = content.text || '';
+    result.open_door_question = content.openDoorQuestion || '';
+    result.verse_identified = content.verseIdentified || '';
+    result.verse_text = content.verseText || '';
+    result.response_mode = content.responseMode || result.response_mode;
+    result._analysisPending = true;
+  } else if (packet.packetType === 'interpretive_context') {
+    result.interpretive_context = content.text || '';
+  } else if (packet.packetType === 'prism_analysis') {
+    var framework = content.framework || {};
+    result.prism_summary = framework.prismSummary || '';
+    result.entanglement = framework.entanglement || '';
+    result.coherence_alignment = framework.coherenceAlignment || '';
+    result.noise_decoherence = framework.noiseDecoherence || '';
+    result.telos_insight = framework.telosInsight || '';
+    result.olam_haba = framework.olamHaba || '';
+    result.key_terms = (content.keyTerms || []).map(function(term) {
+      return {
+        term: term.term || '',
+        hebrew: term.original || '',
+        prism_meaning: term.meaning || ''
+      };
+    });
+    result.constraint_findings = content.constraintFindings || [];
+    result.future_analysis_projections = content.futureAnalysisProjections || [];
+    result._analysisPending = false;
+    result._analysisIncomplete = false;
+  }
+  result._artifactId = packet.artifactId;
+  result._artifactRevision = packet.artifactRevision;
+  return result;
+}
+
+function showProgressiveAnalysisIncomplete(status) {
+  var content = document.getElementById('resultContent');
+  if (!content || document.getElementById('prismAnalysisIncomplete')) return;
+  var notice = document.createElement('div');
+  notice.id = 'prismAnalysisIncomplete';
+  notice.className = 'qt-framework-callout';
+  notice.innerHTML = '<span>Prism Analysis incomplete.</span> ' +
+    '<button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button>';
+  notice.dataset.artifactId = status.artifactId || '';
+  notice.dataset.artifactRevision = String(status.artifactRevision || '');
+  content.appendChild(notice);
+}
+
+async function retryProgressiveAnalysis(button) {
+  var notice = button && button.closest ? button.closest('#prismAnalysisIncomplete') : null;
+  if (!notice) return;
+  button.disabled = true;
+  button.textContent = 'Retrying…';
+  try {
+    var response = await fetch('/api/interpret', {
+      method: 'POST',
+      headers: await getInterpretRequestHeaders(),
+      body: JSON.stringify({
+        operation: 'retry_artifact_analysis',
+        artifactId: notice.dataset.artifactId,
+        artifactRevision: Number(notice.dataset.artifactRevision),
+        inquiryKey: getPersistentInquiryKey(),
+        inquiryToken: activeInquiryCredential ? activeInquiryCredential.inquiryToken : undefined,
+        requestId: createPrismRequestId()
+      })
+    });
+    if (!response.ok) throw new Error('ANALYSIS_RETRY_FAILED');
+    var payload = await response.json();
+    (payload.packets || []).forEach(function(packet) {
+      window._lastParsedResult = applyProgressivePacket(window._lastParsedResult || {}, packet);
+    });
+    renderResult(window._lastParsedResult || {});
+  } catch {
+    button.disabled = false;
+    button.textContent = 'Retry Analysis';
+  }
+}
+
+async function retryFollowUpAnalysis(button) {
+  var target = button && button.closest ? button.closest('.assistant-msg, .followup-assistant, [data-followup-response]') : null;
+  if (!target) target = button.parentElement && button.parentElement.parentElement;
+  button.disabled = true;
+  button.textContent = 'Retryingâ€¦';
+  try {
+    var response = await fetch('/api/interpret', {
+      method: 'POST',
+      headers: await getInterpretRequestHeaders(),
+      body: JSON.stringify({
+        operation: 'retry_artifact_analysis',
+        artifactId: button.dataset.artifactId,
+        artifactRevision: Number(button.dataset.artifactRevision),
+        inquiryKey: getPersistentInquiryKey(),
+        inquiryToken: activeInquiryCredential ? activeInquiryCredential.inquiryToken : undefined,
+        requestId: createPrismRequestId()
+      })
+    });
+    if (!response.ok) throw new Error('ANALYSIS_RETRY_FAILED');
+    var payload = await response.json();
+    (payload.packets || []).forEach(function(packet) {
+      var content = packet.content || {};
+      if (packet.packetType === 'interpretive_context') {
+        var context = document.createElement('div');
+        context.className = 'qt-interpretive-context';
+        context.innerHTML = '<div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(content.text || '') + '</p>';
+        target.insertBefore(context, button.parentElement);
+      } else if (packet.packetType === 'prism_analysis') {
+        var analysis = document.createElement('details');
+        analysis.className = 'qt-framework-body open';
+        analysis.innerHTML = '<summary>Prism Analysis</summary><ul>' +
+          (content.constraintFindings || []).map(function(item) { return '<li>' + escHtml(item) + '</li>'; }).join('') + '</ul>';
+        target.insertBefore(analysis, button.parentElement);
+      }
+    });
+    button.parentElement.remove();
+  } catch (_) {
+    button.disabled = false;
+    button.textContent = 'Retry Analysis';
+  }
 }
 
 async function callProxy(messages, rawQuery, requestId) {
@@ -3316,6 +3495,8 @@ async function callProxy(messages, rawQuery, requestId) {
   let firstDeltaSeen = false;
   let earlyRecognitionShown = false;
   let earlyRecognitionDisabled = false;
+  let progressiveResult = null;
+  let canonicalAvailable = false;
   window._streamTruncated = false;
 
   function considerEarlyRecognition() {
@@ -3364,7 +3545,41 @@ async function callProxy(messages, rawQuery, requestId) {
           const data = line.slice(6).trim();
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type === 'delta' && parsed.text) {
+            if (parsed.type === 'packet' && parsed.packet) {
+              progressiveResult = applyProgressivePacket(progressiveResult, parsed.packet);
+              window._lastParsedResult = progressiveResult;
+              renderResult(progressiveResult);
+              showResult(true);
+              if (parsed.packet.packetType === 'inquiry_orientation') {
+                markPrismBrowserTiming(requestId, 'inquiry_orientation_visible');
+              } else if (parsed.packet.packetType === 'canonical_response') {
+                markPrismBrowserTiming(requestId, 'canonical_response_visible');
+              } else if (parsed.packet.packetType === 'interpretive_context') {
+                markPrismBrowserTiming(requestId, 'interpretive_context_visible');
+              } else if (parsed.packet.packetType === 'prism_analysis') {
+                markPrismBrowserTiming(requestId, 'prism_analysis_visible');
+              }
+            } else if (parsed.type === 'canonical_complete') {
+              canonicalAvailable = true;
+              tierFromStream = parsed.tier || tierFromStream;
+              acceptInquiryCredential(parsed);
+              if (parsed.threadId) activeThreadId = parsed.threadId;
+              document.getElementById('subjectText').textContent = rawQuery || currentSubject || '';
+              document.getElementById('subjectBanner').style.display = 'block';
+              showFollowUpComposer();
+              document.getElementById('inputSection').style.opacity = '';
+              document.getElementById('inputSection').style.pointerEvents = '';
+              document.getElementById('submitBtn').disabled = false;
+              markPrismBrowserTiming(requestId, 'canonical_completion_available');
+            } else if (parsed.type === 'analysis_status' && parsed.status === 'incomplete') {
+              progressiveResult._analysisIncomplete = true;
+              progressiveResult._analysisPending = false;
+              progressiveResult._artifactId = parsed.artifactId || progressiveResult._artifactId;
+              progressiveResult._artifactRevision = parsed.artifactRevision || progressiveResult._artifactRevision;
+              window._lastParsedResult = progressiveResult;
+              renderResult(progressiveResult);
+              showProgressiveAnalysisIncomplete(parsed);
+            } else if (parsed.type === 'delta' && parsed.text) {
               if (!firstDeltaSeen) {
                 firstDeltaSeen = true;
                 markPrismBrowserTiming(requestId, 'first_delta_received');
@@ -3397,7 +3612,14 @@ async function callProxy(messages, rawQuery, requestId) {
           const data = line.slice(6).trim();
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type === 'delta' && parsed.text) {
+            if (parsed.type === 'packet' && parsed.packet) {
+              progressiveResult = applyProgressivePacket(progressiveResult, parsed.packet);
+              renderResult(progressiveResult);
+            } else if (parsed.type === 'canonical_complete') {
+              canonicalAvailable = true;
+              tierFromStream = parsed.tier || tierFromStream;
+              acceptInquiryCredential(parsed);
+            } else if (parsed.type === 'delta' && parsed.text) {
               if (!firstDeltaSeen) {
                 firstDeltaSeen = true;
                 markPrismBrowserTiming(requestId, 'first_delta_received');
@@ -3416,7 +3638,7 @@ async function callProxy(messages, rawQuery, requestId) {
     clearInterval(dotInterval);
   }
 
-  if (!fullText) {
+  if (!fullText && !progressiveResult) {
     const err = new Error('Empty stream response.');
     err.type = 'empty';
     throw err;
@@ -3431,6 +3653,11 @@ async function callProxy(messages, rawQuery, requestId) {
     if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
 
+  if (progressiveResult) {
+    progressiveResult._canonicalAvailable = canonicalAvailable;
+    window._lastParsedResult = progressiveResult;
+    return JSON.stringify(progressiveResult);
+  }
   return fullText;
 }
 
@@ -3513,9 +3740,13 @@ function renderResult(d) {
   }
 
   // ── 1. FRAMEWORK FOR INTERPRETATION (collapsed, top of response) ─────────────
-  const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0);
+  const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0) || d._analysisPending;
   if (hasFramework) {
     let frameworkHtml = '';
+
+    if (d._analysisPending) {
+      frameworkHtml += '<div class="early-recognition-progress">Prism Analysis continuing… Completed packets will appear here.</div>';
+    }
 
     sections.forEach(function(s) {
       if (!s.content) return;
@@ -3580,6 +3811,12 @@ function renderResult(d) {
       });
       html += '</div></div>';
     }
+  }
+
+  if (d._analysisIncomplete) {
+    html += '<div id="prismAnalysisIncomplete" class="qt-framework-callout" data-artifact-id="' +
+      escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+      '<span>Prism Analysis incomplete.</span> <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
   }
 
   document.getElementById('resultContent').innerHTML = html;
@@ -4029,6 +4266,13 @@ function submitTierEmail() {
 let activeThreadId = null;
 let activeInquiryCredential = null;
 let activeInquiryKey = null;
+try {
+  var restoredInquiryCredential = JSON.parse(sessionStorage.getItem('prism_active_inquiry_credential') || 'null');
+  if (restoredInquiryCredential && restoredInquiryCredential.inquiryKey && restoredInquiryCredential.inquiryToken) {
+    activeInquiryCredential = restoredInquiryCredential;
+    activeInquiryKey = restoredInquiryCredential.inquiryKey;
+  }
+} catch (_) {}
 
 function acceptInquiryCredential(event) {
   if (!event || typeof event.inquiryKey !== 'string' || typeof event.inquiryToken !== 'string') return;
@@ -4037,6 +4281,9 @@ function acceptInquiryCredential(event) {
     inquiryToken: event.inquiryToken
   };
   activeInquiryKey = event.inquiryKey;
+  try {
+    sessionStorage.setItem('prism_active_inquiry_credential', JSON.stringify(activeInquiryCredential));
+  } catch (_) {}
 }
 
 function getPersistentInquiryKey() {
@@ -4060,6 +4307,7 @@ function beginNewPersistentInquiry() {
   // another tab may still own a committed inquiry under the former key.
   activeInquiryCredential = null;
   activeInquiryKey = null;
+  try { sessionStorage.removeItem('prism_active_inquiry_credential'); } catch (_) {}
 }
 
 function cachePersistentInquiryState(state, version) {
