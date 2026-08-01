@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const qtSource = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
+const gatewaySource = readFileSync(new URL('../qt-gateway.html', import.meta.url), 'utf8');
 
 assert.doesNotMatch(
   qtSource,
@@ -32,6 +33,11 @@ assert.match(
   qtSource,
   /headers\.Authorization = 'Bearer ' \+ token/,
   'Authenticated interpretation requests must send the access token in a header',
+);
+assert.match(
+  gatewaySource,
+  /key\.startsWith\('sb-'\) && key\.endsWith\('-auth-token'\)/,
+  'Post-login cleanup must preserve the verified Supabase session token',
 );
 assert.doesNotMatch(
   qtSource.match(/async function callProxyStream[\s\S]*?async function callProxy\(/)?.[0] || '',

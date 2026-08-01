@@ -810,7 +810,8 @@ var flowCopies = {
         // Preserve all thread data — only clear session identity keys
         var preservePrefixes = ['qt_response_', 'qt_input_', 'qt_followups_', 'qt_thread_title_'];
         var preserveKeys = ['qt_user_email', 'qt_user_tier', 'qt_sidebar_appeared', 'qt_sidebar_open', 'qt_threads'];
-        var shouldPreserve = preserveKeys.indexOf(key) !== -1 ||
+        var isSupabaseAuthToken = key.startsWith('sb-') && key.endsWith('-auth-token');
+        var shouldPreserve = isSupabaseAuthToken || preserveKeys.indexOf(key) !== -1 ||
           preservePrefixes.some(function(p) { return key.startsWith(p); });
         if (!shouldPreserve) {
           localStorage.removeItem(key);
