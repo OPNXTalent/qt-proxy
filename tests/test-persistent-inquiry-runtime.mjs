@@ -108,6 +108,22 @@ const defaultedConstraints = validateAnalysisStrict({
   },
 });
 assert.deepEqual(defaultedConstraints.constraintGate.relevantConstraints, ['logical']);
+const aliasedEndingMode = validateAnalysisStrict({
+  ...analysis,
+  constraintGate: {
+    ...analysis.constraintGate,
+    endingMode: 'declarative closure',
+  },
+});
+assert.equal(aliasedEndingMode.constraintGate.endingMode, 'declarative');
+const derivedEndingMode = validateAnalysisStrict({
+  ...analysis,
+  constraintGate: {
+    ...analysis.constraintGate,
+    endingMode: 'provider-specific-label',
+  },
+});
+assert.equal(derivedEndingMode.constraintGate.endingMode, 'declarative');
 const inferredChangeSet = validateAnalysisStrict({
   ...analysis,
   changedStateFields: [],
