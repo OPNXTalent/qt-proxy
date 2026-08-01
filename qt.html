@@ -8102,7 +8102,10 @@ async function runPreflightCheck() {
     if (!res.ok) return;
     var data = await res.json();
     previewTestAccess = data.previewTestAccess === true;
-    if (data.locked) {
+    // Preview validation allowance is granted only by the verified server
+    // identity returned above. Do not render the ordinary free-tier wall for
+    // that server-authorized test session.
+    if (!previewTestAccess && data.locked) {
       var hrs  = data.hoursRemaining || 0;
       var secs = data.secondsRemaining || hrs * 3600;
       var msg  = "You've used your " + (data.queriesUsed || 3) + " free queries. Access resets in " + hrs + " hour" + (hrs !== 1 ? "s" : "") + ".";

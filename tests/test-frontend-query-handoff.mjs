@@ -39,6 +39,14 @@ assert.match(
   /key\.startsWith\('sb-'\) && key\.endsWith\('-auth-token'\)/,
   'Post-login cleanup must preserve the verified Supabase session token',
 );
+const preflightSource = qtSource.match(
+  /async function runPreflightCheck\(\)[\s\S]*?async function handleCreditsAdded\(\)/,
+)?.[0] || '';
+assert.match(
+  preflightSource,
+  /previewTestAccess = data\.previewTestAccess === true;[\s\S]*?if \(!previewTestAccess && data\.locked\)/,
+  'The startup quota wall must yield to a server-authorized Preview test entitlement',
+);
 assert.doesNotMatch(
   qtSource.match(/async function callProxyStream[\s\S]*?async function callProxy\(/)?.[0] || '',
   /email:\s*userEmail/,
