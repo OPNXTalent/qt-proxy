@@ -5705,6 +5705,7 @@ async function runPersistentInquiryFollowUp({
     model: 'claude-sonnet-4-6',
     maxTokens: 1400,
     temperature: 0.2,
+    timeoutMs: 25000,
     prompt: draftPrompt,
   });
   completeStage('draft', stageStartedAt, { draftChars: draft.length });

@@ -16,6 +16,10 @@ assert.match(interpret, /runPersistentInquiryFollowUp/);
 assert.match(interpret, /type: 'stage'/);
 assert.match(interpret, /buildAuditPrompt/);
 assert.match(interpret, /splitApprovedResponse\(approved\)/);
+assert.match(
+  interpret,
+  /model: 'claude-sonnet-4-6',[\s\S]*?timeoutMs: 25000,[\s\S]*?prompt: draftPrompt/,
+);
 
 for (const stage of [
   'restore',
