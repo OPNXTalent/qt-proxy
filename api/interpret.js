@@ -5379,6 +5379,54 @@ function verifyInquiryCredential(inquiryKey, inquiryToken) {
     && timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
+const PENDING_COMMIT_TTL_MS = 10 * 60 * 1000;
+
+function pendingCommitSignature(encodedPayload) {
+  if (!SUPABASE_SERVICE_ROLE_KEY || !encodedPayload) return null;
+  return createHmac('sha256', SUPABASE_SERVICE_ROLE_KEY)
+    .update(`prism-pending-commit:${encodedPayload}`)
+    .digest('base64url');
+}
+
+export function issuePendingInquiryCommit(payload, now = Date.now()) {
+  if (!SUPABASE_SERVICE_ROLE_KEY) return null;
+  const encodedPayload = Buffer.from(JSON.stringify({
+    version: 1,
+    expiresAt: now + PENDING_COMMIT_TTL_MS,
+    ...payload,
+  })).toString('base64url');
+  const signature = pendingCommitSignature(encodedPayload);
+  return signature ? `${encodedPayload}.${signature}` : null;
+}
+
+export function verifyPendingInquiryCommit(token, now = Date.now()) {
+  if (typeof token !== 'string' || token.length > 30000) return null;
+  const separator = token.lastIndexOf('.');
+  if (separator < 20) return null;
+  const encodedPayload = token.slice(0, separator);
+  const actualSignature = token.slice(separator + 1);
+  const expectedSignature = pendingCommitSignature(encodedPayload);
+  if (!expectedSignature) return null;
+  const actualBuffer = Buffer.from(actualSignature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (actualBuffer.length !== expectedBuffer.length
+    || !timingSafeEqual(actualBuffer, expectedBuffer)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    if (payload?.version !== 1
+      || !Number.isFinite(payload.expiresAt)
+      || payload.expiresAt < now
+      || typeof payload.inquiryKey !== 'string'
+      || !Number.isInteger(payload.expectedVersion)
+      || payload.expectedVersion < 0
+      || !payload.state
+      || payload.state.schemaVersion !== 1) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 export async function classifyFollowUpContext({
   clientHint,
   inquiryKey,
@@ -5741,49 +5789,34 @@ async function runPersistentInquiryFollowUp({
   completeStage('stream', stageStartedAt, { chunkCount: approvedChunks.length });
 
   stageStartedAt = emitStage('persist');
-  const commit = isClientAborted()
-    ? { committed: false, interrupted: true, state: previousState }
-    : await commitCanonicalInquiryState({
-      inquiryKey: canonicalInquiryKey,
-      expectedVersion: previousState.version,
-      state: nextState,
-      threadId,
-      ownerUserId,
-      requestId,
-    });
-  completeStage('persist', stageStartedAt, {
-    committed: commit.committed,
-    conflict: Boolean(commit.conflict),
-    interrupted: Boolean(commit.interrupted),
-    stateVersion: commit.version ?? previousState.version,
+  if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
+  const pendingCommitToken = issuePendingInquiryCommit({
+    inquiryKey: canonicalInquiryKey,
+    expectedVersion: previousState.version,
+    state: nextState,
+    threadId,
+    ownerUserId,
+    requestId,
   });
-  if (commit.conflict) {
-    sse.write({
-      type: 'state_conflict',
-      stateVersion: commit.version,
-      text: 'The inquiry advanced in another session; the latest committed state was preserved.',
-    });
-  }
-  if (commit.unavailable) {
-    sse.write({
-      type: 'state_unavailable',
-      text: 'Your response could not be safely attached to this inquiry. Please retry.',
-    });
-  }
+  if (!pendingCommitToken) throw new Error('INQUIRY_STATE_UNAVAILABLE');
+  completeStage('persist', stageStartedAt, {
+    pendingAcknowledgement: true,
+    stateVersion: previousState.version,
+  });
 
   timing('followup_total_complete', {
     totalMs: Date.now() - runtimeStartedAt,
-    stateVersion: commit.version ?? previousState.version,
-    committed: commit.committed,
+    stateVersion: previousState.version,
+    pendingAcknowledgement: true,
   });
   sse.write(
     {
       type: 'done',
       tier,
-      stateVersion: commit.version ?? previousState.version,
-      committed: Boolean(commit.committed),
-      canonicalState: Boolean(commit.committed || commit.conflict),
-      state: commit.committed || commit.conflict ? commit.state : previousState,
+      stateVersion: previousState.version,
+      committed: false,
+      canonicalState: false,
+      pendingCommitToken,
     },
     { source: 'persistent_inquiry_runtime', tier },
   );
@@ -5857,6 +5890,32 @@ export default async function handler(req, res) {
     outcome: verifiedIdentity ? 'verified' : 'anonymous',
     previewTestAccess: Boolean(previewTestEntitlement),
   });
+
+  if (req.method === 'POST' && correlationBody?.operation === 'commit_inquiry_state') {
+    const pending = verifyPendingInquiryCommit(correlationBody.pendingCommitToken);
+    if (!pending) return res.status(400).json({ error: 'Invalid or expired pending commit' });
+    if (pending.ownerUserId && !verifiedIdentity) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (pending.ownerUserId && pending.ownerUserId !== verifiedIdentity?.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const commit = await commitCanonicalInquiryState(pending);
+    timing('followup_acknowledgement_complete', {
+      committed: Boolean(commit.committed),
+      conflict: Boolean(commit.conflict),
+      unavailable: Boolean(commit.unavailable),
+      stateVersion: commit.version ?? pending.expectedVersion,
+    });
+    return res.status(commit.unavailable ? 503 : 200).json({
+      committed: Boolean(commit.committed),
+      conflict: Boolean(commit.conflict),
+      unavailable: Boolean(commit.unavailable),
+      canonicalState: Boolean(commit.committed || commit.conflict),
+      stateVersion: commit.version ?? pending.expectedVersion,
+      state: commit.committed || commit.conflict ? commit.state : null,
+    });
+  }
 
   // ── GET — preflight status check ─────────────────────────────────────────
   if (req.method === 'GET') {
@@ -6307,7 +6366,10 @@ Do not add any question after the exit offer. The person chooses the next move.
           return res.status(400).json({ error: 'No messages provided' });
         }
         const tier = normalizeTier(subscriber?.tier || 'free');
-        const userId = subscriber?.id || (previewTestEntitlement ? verifiedIdentity.userId : null);
+        // Canonical inquiry ownership is always bound to the identity verified by
+        // Supabase Auth. The subscriber row is quota/billing metadata, not an
+        // authorization principal (and its UUID may differ from auth.users.id).
+        const userId = verifiedIdentity.userId;
         const quotaIdentity = subscriber || (previewTestEntitlement ? {
           id: verifiedIdentity.userId,
           tier: 'free',

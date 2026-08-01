@@ -137,6 +137,7 @@ globalThis.fetch = async (url, options = {}) => {
 const {
   classifyFollowUpContext,
   default: handler,
+  verifyPendingInquiryCommit,
   persistentInquiryRuntimeEnabled,
 } = await import('../api/interpret.js');
 
@@ -206,12 +207,33 @@ function streamEvents(response) {
     .map(line => JSON.parse(line.slice(6)));
 }
 
+async function acknowledge(response, requestId = 'acknowledge_123') {
+  const done = streamEvents(response).find(event => event.type === 'done');
+  assert.equal(typeof done?.pendingCommitToken, 'string', 'Missing pending commit token');
+  const req = new EventEmitter();
+  req.method = 'POST';
+  req.url = '/api/interpret';
+  req.headers = { host: 'localhost', 'x-forwarded-for': '127.0.0.1' };
+  req.socket = { remoteAddress: '127.0.0.1' };
+  req.body = {
+    operation: 'commit_inquiry_state',
+    pendingCommitToken: done.pendingCommitToken,
+    requestId,
+  };
+  const res = new MockResponse();
+  await handler(req, res);
+  return { res, body: JSON.parse(res.output) };
+}
+
 const res = await executeFollowUp('integration_123', 'Where exactly does agency enter?');
 
 assert.equal(res.statusCode, 200);
 assert.equal(res.writableEnded, true);
 assert.equal(modelCallCount, 3, 'Expected reducer/gate, draft, and precision audit');
-assert.equal(committedBodies.length, 1, 'Canonical state was not committed');
+assert.equal(committedBodies.length, 0, 'State committed before browser acknowledgement');
+const firstAcknowledgement = await acknowledge(res, 'acknowledge_first');
+assert.equal(firstAcknowledgement.body.committed, true);
+assert.equal(committedBodies.length, 1, 'Acknowledged canonical state was not committed');
 assert.equal(committedBodies[0].p_expected_version, 0);
 assert.equal(committedBodies[0].p_state.turn, 1);
 assert.equal(committedBodies[0].p_state.inquiryTrajectory.length, 1);
@@ -245,6 +267,9 @@ const continuation = await executeFollowUp(
   'But non-identification still leaves agency without a location.',
 );
 assert.equal(modelCallCount, 6);
+assert.equal(committedBodies.length, 1, 'Continuation committed before acknowledgement');
+const continuationAcknowledgement = await acknowledge(continuation, 'acknowledge_continuation');
+assert.equal(continuationAcknowledgement.body.committed, true);
 assert.equal(committedBodies.length, 2);
 assert.equal(committedBodies[1].p_expected_version, 1);
 assert.equal(committedBodies[1].p_state.turn, 2);
@@ -253,22 +278,24 @@ const continuationEvents = continuation.output
   .split('\n')
   .filter(line => line.startsWith('data: '))
   .map(line => JSON.parse(line.slice(6)));
-assert.equal(continuationEvents.at(-1).stateVersion, 2);
+assert.equal(continuationEvents.at(-1).stateVersion, 1);
 
 const [tabA, tabB] = await Promise.all([
   executeFollowUp('integration_tab_a', 'A follow-up from the first tab.'),
   executeFollowUp('integration_tab_b', 'A simultaneous follow-up from the second tab.'),
 ]);
+assert.equal(committedBodies.length, 2, 'Racing responses committed before acknowledgement');
+const [tabAAcknowledgement, tabBAcknowledgement] = await Promise.all([
+  acknowledge(tabA, 'acknowledge_tab_a'),
+  acknowledge(tabB, 'acknowledge_tab_b'),
+]);
 assert.equal(committedBodies.length, 4);
 assert.equal(committedBodies[2].p_expected_version, 2);
 assert.equal(committedBodies[3].p_expected_version, 2);
 assert.equal(canonicalVersion, 3, 'A racing tab overwrote canonical state');
-const concurrentEvents = [tabA, tabB].flatMap(response => response.output
-  .split('\n')
-  .filter(line => line.startsWith('data: '))
-  .map(line => JSON.parse(line.slice(6))));
 assert.equal(
-  concurrentEvents.filter(event => event.type === 'state_conflict').length,
+  [tabAAcknowledgement.body, tabBAcknowledgement.body]
+    .filter(result => result.conflict).length,
   1,
   'The stale tab did not receive a state conflict event',
 );
@@ -342,10 +369,36 @@ const unavailable = await executeFollowUp(
 );
 const unavailableEvents = streamEvents(unavailable);
 assert.equal(committedBodies.length, commitsBeforeUnavailable);
-assert.equal(unavailableEvents.some(event => event.type === 'state_unavailable'), true);
 const unavailableDone = unavailableEvents.find(event => event.type === 'done');
 assert.equal(unavailableDone.committed, false);
 assert.equal(unavailableDone.canonicalState, false);
+const unavailableAcknowledgement = await acknowledge(unavailable, 'acknowledge_unavailable');
+assert.equal(unavailableAcknowledgement.res.statusCode, 503);
+assert.equal(unavailableAcknowledgement.body.unavailable, true);
+assert.equal(committedBodies.length, commitsBeforeUnavailable);
 commitMode = 'valid';
+
+const validPending = streamEvents(await executeFollowUp(
+  'integration_tamper_source',
+  'A response whose pending state must resist tampering.',
+)).find(event => event.type === 'done')?.pendingCommitToken;
+assert.ok(verifyPendingInquiryCommit(validPending));
+const tamperedPending = `${validPending.slice(0, -1)}${validPending.endsWith('A') ? 'B' : 'A'}`;
+assert.equal(verifyPendingInquiryCommit(tamperedPending), null);
+const commitsBeforeTamper = committedBodies.length;
+const tamperReq = new EventEmitter();
+tamperReq.method = 'POST';
+tamperReq.url = '/api/interpret';
+tamperReq.headers = { host: 'localhost', 'x-forwarded-for': '127.0.0.1' };
+tamperReq.socket = { remoteAddress: '127.0.0.1' };
+tamperReq.body = {
+  operation: 'commit_inquiry_state',
+  pendingCommitToken: tamperedPending,
+  requestId: 'acknowledge_tampered',
+};
+const tamperRes = new MockResponse();
+await handler(tamperReq, tamperRes);
+assert.equal(tamperRes.statusCode, 400);
+assert.equal(committedBodies.length, commitsBeforeTamper);
 
 console.log('Persistent follow-up pipeline integration checks passed.');

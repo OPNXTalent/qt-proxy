@@ -100,6 +100,7 @@ assert.equal(getPreviewTestEntitlement({
 
 let requestedSubscriberEmail = null;
 let queryLogReads = 0;
+let acknowledgedOwner = null;
 globalThis.fetch = async (url, options = {}) => {
   const target = String(url);
   if (target.endsWith('/auth/v1/user')) {
@@ -148,10 +149,19 @@ globalThis.fetch = async (url, options = {}) => {
       { id: 3, query_type: 'ip:127.0.0.1', cost: 1, created_at: now },
     ]);
   }
+  if (target.includes('/rpc/commit_inquiry_state')) {
+    const body = JSON.parse(options.body);
+    acknowledgedOwner = body.p_owner_user_id;
+    return Response.json([{
+      committed: true,
+      current_version: 1,
+      current_state: body.p_state,
+    }]);
+  }
   throw new Error(`Unexpected fetch: ${target}`);
 };
 
-const { default: handler } = await import('../api/interpret.js');
+const { default: handler, issuePendingInquiryCommit } = await import('../api/interpret.js');
 
 class MockResponse extends EventEmitter {
   constructor() {
@@ -254,5 +264,45 @@ await handler(request({
 assert.equal(res.statusCode, 429);
 assert.equal(requestedSubscriberEmail, null);
 assert.ok(queryLogReads > 0);
+
+const ownedPendingCommit = issuePendingInquiryCommit({
+  inquiryKey: 'thread:authorization-test',
+  expectedVersion: 0,
+  state: { schemaVersion: 1, turn: 1 },
+  threadId: 'authorization-test',
+  ownerUserId: OTHER_USER_ID,
+  requestId: 'authorization_pending_commit',
+});
+res = new MockResponse();
+await handler(request({
+  method: 'POST',
+  token: 'subscriber-token',
+  body: {
+    operation: 'commit_inquiry_state',
+    pendingCommitToken: ownedPendingCommit,
+    requestId: 'authorization_acknowledgement',
+  },
+}), res);
+assert.equal(res.statusCode, 200);
+assert.equal(JSON.parse(res.output).committed, true);
+assert.equal(
+  acknowledgedOwner,
+  OTHER_USER_ID,
+  'Canonical state must be owned by the verified auth.users identity, not the subscriber row UUID',
+);
+
+acknowledgedOwner = null;
+res = new MockResponse();
+await handler(request({
+  method: 'POST',
+  token: 'preview-only-token',
+  body: {
+    operation: 'commit_inquiry_state',
+    pendingCommitToken: ownedPendingCommit,
+    requestId: 'authorization_cross_account_acknowledgement',
+  },
+}), res);
+assert.equal(res.statusCode, 403);
+assert.equal(acknowledgedOwner, null, 'A different verified identity must not commit pending state');
 
 console.log('subscriber authorization security tests passed');

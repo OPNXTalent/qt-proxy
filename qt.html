@@ -3096,6 +3096,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
   let stateConflict = null;
   let stateUnavailable = null;
   let terminalStreamError = null;
+  let pendingCommitToken = null;
 
   // Show streaming cursor in target element
   if (targetEl) targetEl.innerHTML = '<span style="opacity:0.4; font-family:var(--mono); font-size:14px; letter-spacing:0.12em;">interpreting…</span>';
@@ -3138,6 +3139,9 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
             latestInquiryState = parsed.canonicalState === true ? (parsed.state || null) : null;
             latestStateVersion = parsed.stateVersion ?? null;
             latestStateCanonical = parsed.canonicalState === true;
+            pendingCommitToken = typeof parsed.pendingCommitToken === 'string'
+              ? parsed.pendingCommitToken
+              : null;
           } else if (parsed.type === 'state_conflict') {
             stateConflict = parsed;
             if (parsed.state && parsed.canonicalState === true) {
@@ -3163,6 +3167,36 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
     const streamError = new Error(terminalStreamError);
     streamError.type = 'server';
     throw streamError;
+  }
+  if (pendingCommitToken) {
+    let acknowledgement;
+    try {
+      const acknowledgementResponse = await fetch('/api/interpret', {
+        method: 'POST',
+        headers: await getInterpretRequestHeaders(),
+        body: JSON.stringify({
+          operation: 'commit_inquiry_state',
+          pendingCommitToken,
+          requestId: createPrismRequestId()
+        })
+      });
+      if (!acknowledgementResponse.ok) throw new Error('ACKNOWLEDGEMENT_FAILED');
+      acknowledgement = await acknowledgementResponse.json();
+    } catch {
+      stateUnavailable = { type: 'state_unavailable' };
+    }
+    if (acknowledgement?.conflict) {
+      stateConflict = acknowledgement;
+    } else if (acknowledgement?.committed && acknowledgement.canonicalState === true) {
+      latestInquiryState = acknowledgement.state || null;
+      latestStateVersion = acknowledgement.stateVersion ?? null;
+      latestStateCanonical = true;
+      markPrismBrowserTiming(requestId, 'followup_state_committed', {
+        stateVersion: latestStateVersion
+      });
+    } else if (acknowledgement && !acknowledgement.committed) {
+      stateUnavailable = { type: 'state_unavailable' };
+    }
   }
   if (latestInquiryState && latestStateCanonical) {
     cachePersistentInquiryState(latestInquiryState, latestStateVersion);
