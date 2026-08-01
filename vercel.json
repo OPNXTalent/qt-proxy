@@ -1,19 +1,15 @@
 {
   "functions": {
     "api/interpret.js": {
-      "memory": 128,
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/notify.js": {
-      "memory": 128,
       "maxDuration": 10
     },
     "api/webhook.js": {
-      "memory": 128,
       "maxDuration": 10
     },
     "api/redeem.js": {
-      "memory": 128,
       "maxDuration": 10
     }
   },
@@ -31,9 +27,21 @@
     }
   ],
   "rewrites": [
-    { "source": "/terms", "destination": "/terms.html" },
-    { "source": "/privacy", "destination": "/privacy.html" },
-    { "source": "/reset-password", "destination": "/reset-password.html" },
-    { "source": "/:token([a-z0-9]{8,})", "destination": "/share.html?t=:token" }
+    {
+      "source": "/terms",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/reset-password",
+      "destination": "/reset-password.html"
+    },
+    {
+      "source": "/:token([a-z0-9]{8,})",
+      "destination": "/share.html?t=:token"
+    }
   ]
 }
