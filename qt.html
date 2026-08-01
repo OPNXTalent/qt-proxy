@@ -2654,6 +2654,23 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
       checkLimitEmailGate();
     }
   }
+
+function releaseServerAuthorizedPreviewLock() {
+    // This only restores the controls. The API remains the authority that
+    // grants or denies allowance on every request.
+    if (!previewTestAccess) return;
+    if (_tickerInterval) {
+      clearInterval(_tickerInterval);
+      _tickerInterval = null;
+    }
+    const prompt = document.getElementById('limitPrompt');
+    if (prompt) prompt.style.display = 'none';
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) submitBtn.style.display = '';
+    const newSubjectBtn = document.getElementById('newSubjectTopBtn');
+    if (newSubjectBtn) newSubjectBtn.style.display = '';
+}
+
 function applyQuotaLock(message) {
     document.getElementById('submitBtn').style.display = 'none';
     document.getElementById('newSubjectTopBtn').style.display = 'none';
@@ -5319,6 +5336,7 @@ async function loadSidebarCreditsAnon() {
     });
     const data = await res.json();
     previewTestAccess = data.previewTestAccess === true;
+    releaseServerAuthorizedPreviewLock();
     const countEl = document.getElementById('sidebarQueryCountText');
     const wrapEl  = document.getElementById('sidebarCredits');
     if (!countEl || !wrapEl) return;
@@ -8102,6 +8120,7 @@ async function runPreflightCheck() {
     if (!res.ok) return;
     var data = await res.json();
     previewTestAccess = data.previewTestAccess === true;
+    releaseServerAuthorizedPreviewLock();
     // Preview validation allowance is granted only by the verified server
     // identity returned above. Do not render the ordinary free-tier wall for
     // that server-authorized test session.

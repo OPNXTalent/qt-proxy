@@ -44,8 +44,13 @@ const preflightSource = qtSource.match(
 )?.[0] || '';
 assert.match(
   preflightSource,
-  /previewTestAccess = data\.previewTestAccess === true;[\s\S]*?if \(!previewTestAccess && data\.locked\)/,
-  'The startup quota wall must yield to a server-authorized Preview test entitlement',
+  /previewTestAccess = data\.previewTestAccess === true;\s*releaseServerAuthorizedPreviewLock\(\);[\s\S]*?if \(!previewTestAccess && data\.locked\)/,
+  'The startup quota wall must be released after a server-authorized Preview test entitlement resolves',
+);
+assert.match(
+  qtSource,
+  /function releaseServerAuthorizedPreviewLock\(\) \{[\s\S]*?if \(!previewTestAccess\) return;[\s\S]*?submitBtn\.style\.display = '';[\s\S]*?newSubjectBtn\.style\.display = '';/,
+  'Preview lock release must be guarded by the server-derived entitlement flag',
 );
 assert.doesNotMatch(
   qtSource.match(/async function callProxyStream[\s\S]*?async function callProxy\(/)?.[0] || '',
