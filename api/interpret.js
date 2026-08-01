@@ -5858,19 +5858,18 @@ export default async function handler(req, res) {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
     if (verifiedIdentity) {
       try {
+        if (previewTestEntitlement) {
+          const used = await getLiveQueryCount(verifiedIdentity.userId) ?? 0;
+          return res.status(200).json({
+            locked: used >= previewTestEntitlement.allowance,
+            queriesUsed: used,
+            limit: previewTestEntitlement.allowance,
+            previewTestAccess: true,
+          });
+        }
         const subscriber = await getSubscriber(verifiedIdentity.email);
         const redemption = await getCodeRedemption(verifiedIdentity.email);
         if ((subscriber && subscriber.status === 'active') || redemption) {
-          if (subscriber && previewTestEntitlement) {
-            const liveCount = await getLiveQueryCount(subscriber.id);
-            const used = liveCount ?? (subscriber.query_count || 0);
-            return res.status(200).json({
-              locked: used >= previewTestEntitlement.allowance,
-              queriesUsed: used,
-              limit: previewTestEntitlement.allowance,
-              previewTestAccess: true,
-            });
-          }
           return res.status(200).json({ locked: false, authenticated: true });
         }
       } catch {}
@@ -6297,13 +6296,19 @@ Do not add any question after the exit offer. The person chooses the next move.
         throw err;
       }
 
-      if ((subscriber && subscriber.status === 'active') || redemption) {
+      if (previewTestEntitlement || (subscriber && subscriber.status === 'active') || redemption) {
         const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
         if (!apiMessages || apiMessages.length === 0) {
           return res.status(400).json({ error: 'No messages provided' });
         }
         const tier = normalizeTier(subscriber?.tier || 'free');
-        const userId = subscriber?.id || null;
+        const userId = subscriber?.id || (previewTestEntitlement ? verifiedIdentity.userId : null);
+        const quotaIdentity = subscriber || (previewTestEntitlement ? {
+          id: verifiedIdentity.userId,
+          tier: 'free',
+          query_count: 0,
+          purchased_credits: 0,
+        } : null);
 
         const hasFollowUpCandidate = Boolean(
           isFollowUp || inquiryKey || inquiryToken || threadId || sharedFollowUpId,
@@ -6323,12 +6328,12 @@ Do not add any question after the exit offer. The person chooses the next move.
           reason: followUpContext.reason,
         });
         const isFollowUpCheck = followUpContext.isFollowUp;
-        if (!isFollowUpCheck && subscriber) {
+        if (!isFollowUpCheck && quotaIdentity) {
           timing('quota_check_start');
           let quota;
           try {
             quota = await checkSubscriberQuota(
-              subscriber,
+              quotaIdentity,
               previewTestEntitlement?.allowance ?? null,
             );
             timing('quota_check_end', {

@@ -106,6 +106,12 @@ globalThis.fetch = async (url, options = {}) => {
     if (options.headers.Authorization === 'Bearer valid-token') {
       return Response.json({ id: TEST_USER_ID, email: 'actual.user@example.com' });
     }
+    if (options.headers.Authorization === 'Bearer subscriber-token') {
+      return Response.json({ id: OTHER_USER_ID, email: 'actual.user@example.com' });
+    }
+    if (options.headers.Authorization === 'Bearer preview-only-token') {
+      return Response.json({ id: TEST_USER_ID, email: 'preview.only@example.com' });
+    }
     if (options.headers.Authorization === 'Bearer non-subscriber-token') {
       return Response.json({ id: OTHER_USER_ID, email: 'non.subscriber@example.com' });
     }
@@ -198,11 +204,21 @@ assert.equal(requestedSubscriberEmail, null);
 res = new MockResponse();
 requestedSubscriberEmail = null;
 await handler(request({
-  token: 'valid-token',
+  token: 'subscriber-token',
   url: '/api/interpret?email=paid.customer%40example.com',
 }), res);
 assert.equal(res.statusCode, 200);
 assert.equal(requestedSubscriberEmail, 'actual.user@example.com');
+assert.deepEqual(JSON.parse(res.output), {
+  locked: false,
+  authenticated: true,
+});
+
+res = new MockResponse();
+requestedSubscriberEmail = null;
+await handler(request({ token: 'preview-only-token' }), res);
+assert.equal(res.statusCode, 200);
+assert.equal(requestedSubscriberEmail, null, 'Preview entitlement must not require a billing subscriber row');
 assert.deepEqual(JSON.parse(res.output), {
   locked: false,
   queriesUsed: 0,
