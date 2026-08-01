@@ -81,6 +81,14 @@ assert.equal(
   aliasedFalsifiability.constraintGate.falsifiabilityStatus,
   'partially_testable',
 );
+const inferredChangeSet = validateAnalysisStrict({
+  ...analysis,
+  changedStateFields: [],
+});
+assert.deepEqual(
+  inferredChangeSet.changedStateFields.sort(),
+  ['confidence', 'orientation', 'unresolvedClaims'].sort(),
+);
 assert.throws(
   () => validateAnalysisStrict({
     reduction: analysis.reduction,
