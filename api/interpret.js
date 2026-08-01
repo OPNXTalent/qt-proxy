@@ -5599,11 +5599,15 @@ async function callInquiryModel({
     throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
   }
   const data = await response.json();
-  return (data.content || [])
+  const text = (data.content || [])
     .filter(block => block.type === 'text')
     .map(block => block.text)
     .join('\n')
     .trim();
+  if (data.stop_reason === 'max_tokens') {
+    throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
+  }
+  return text;
 }
 
 async function runPersistentInquiryFollowUp({
@@ -5640,7 +5644,7 @@ async function runPersistentInquiryFollowUp({
   stageStartedAt = emitStage('reduce');
   const reducerText = await callInquiryModel({
     model: 'claude-haiku-4-5-20251001',
-    maxTokens: 1400,
+    maxTokens: 1800,
     prompt: buildReducerPrompt({
       state: previousState,
       input,
@@ -6401,7 +6405,10 @@ Do not add any question after the exit offer. The person chooses the next move.
               });
             }
           } catch (err) {
-            timing('followup_runtime_error', { route: 'subscriber' });
+            timing('followup_runtime_error', {
+              route: 'subscriber',
+              error: String(err?.message || err).slice(0, 160),
+            });
             sse.write(
               { type: 'error', error: err.message },
               { source: 'persistent_inquiry_runtime', tier },
@@ -6715,7 +6722,10 @@ Do not add any question after the exit offer. The person chooses the next move.
           });
         }
       } catch (err) {
-        timing('followup_runtime_error', { route: 'free' });
+        timing('followup_runtime_error', {
+          route: 'free',
+          error: String(err?.message || err).slice(0, 160),
+        });
         sse.write(
           { type: 'error', error: err.message },
           { source: 'persistent_inquiry_runtime', tier: 'free' },

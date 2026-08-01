@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   applyInquiryPatch,
+  buildReducerPrompt,
   buildFocusedRetrievalQuery,
   createInitialInquiryState,
   detectExplicitCorrection,
@@ -15,6 +16,13 @@ const initial = createInitialInquiryState('Whether agency can survive prior caus
 assert.equal(initial.version, 0);
 assert.equal(initial.turn, 0);
 assert.equal(initial.inquiryTrajectory.length, 0);
+
+const reducerPrompt = buildReducerPrompt({
+  state: initial,
+  input: 'But where does agency enter?',
+});
+assert.match(reducerPrompt, /under 6,000 characters/);
+assert.match(reducerPrompt, /at most 3 entries per array/);
 
 const analysis = validateAnalysis(parseModelJson(`\`\`\`json
 {
