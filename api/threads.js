@@ -28,7 +28,7 @@ function sbHeaders(extra) {
   };
 }
 
-async function getSubscriberId(userEmail) {
+async function getSubscriberProfile(userEmail) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id,tier,display_name&limit=1`,
     { headers: sbHeaders() }
@@ -53,6 +53,7 @@ export default async function handler(req, res) {
     return res.status(auth.unavailable ? 503 : 401).json({ error: auth.unavailable ? 'Identity provider unavailable' : 'Unauthorized' });
   }
   const userEmail = auth.identity?.email || null;
+  const verifiedUserId = auth.identity?.userId || null;
 
   if (!userEmail) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -61,9 +62,10 @@ export default async function handler(req, res) {
   // ── GET — fetch thread list (owned + Trust Circle threads joined) ─────────
   if (req.method === 'GET') {
     try {
-      const subscriber = await getSubscriberId(userEmail);
-      if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
-      const { id: userId, tier, display_name } = subscriber;
+      const subscriber = await getSubscriberProfile(userEmail);
+      const userId = verifiedUserId;
+      const tier = subscriber?.tier || 'free';
+      const display_name = subscriber?.display_name || null;
 
       // Threads this person owns — unchanged query, now also pulling visibility.
       const ownedRes = await fetch(
@@ -188,9 +190,7 @@ export default async function handler(req, res) {
       const { threadId } = req.body || {};
       if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
-      const subscriber = await getSubscriberId(userEmail);
-      if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
-      const userId = subscriber.id;
+      const userId = verifiedUserId;
 
       const participantsRes = await fetch(
         `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&select=id,user_id`,
@@ -246,9 +246,9 @@ export default async function handler(req, res) {
       const { threadId, title, action, targetUserId } = req.body || {};
       if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
-      const subscriber = await getSubscriberId(userEmail);
-      if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
-      const { id: userId, tier } = subscriber;
+      const subscriber = await getSubscriberProfile(userEmail);
+      const userId = verifiedUserId;
+      const tier = subscriber?.tier || 'free';
 
       // ── Toggle thread-level visibility ──────────────────────────────────
       // No special privileges for the creator here, same as everywhere

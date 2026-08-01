@@ -75,4 +75,50 @@ try {
   globalThis.fetch = originalFetch;
 }
 
+const TEST_USER_ID = '11111111-1111-4111-8111-111111111111';
+let privilegedOwnerLookup = null;
+globalThis.fetch = async (url, options = {}) => {
+  const target = String(url);
+  if (target.endsWith('/auth/v1/user')) {
+    assert.equal(options.headers.Authorization, 'Bearer preview-token');
+    return Response.json({ id: TEST_USER_ID, email: 'preview@example.com' });
+  }
+  if (target.includes('/subscribers?')) return Response.json([]);
+  if (target.includes('/threads?user_id=eq.')) {
+    privilegedOwnerLookup = target;
+    return Response.json([{
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      user_id: TEST_USER_ID,
+      title: 'Persisted inquiry',
+      query: 'What persists?',
+      response: { recognition: 'The inquiry persists.' },
+      created_at: '2026-07-31T00:00:00.000Z',
+      expires_at: '2026-08-02T00:00:00.000Z',
+      grace_ends_at: '2026-09-01T00:00:00.000Z',
+      retention_days: 1,
+      visibility: 'private',
+    }]);
+  }
+  if (target.includes('/thread_participants?')) return Response.json([]);
+  throw new Error(`Unexpected fetch: ${target}`);
+};
+
+try {
+  const previewThreads = await invoke(threadsHandler, {
+    method: 'GET',
+    headers: {
+      authorization: 'Bearer preview-token',
+      'x-user-email': 'victim@example.com',
+    },
+  });
+  assert.equal(previewThreads.status, 200);
+  assert.equal(previewThreads.body.tier, 'free');
+  assert.equal(previewThreads.body.userId, TEST_USER_ID);
+  assert.equal(previewThreads.body.threads.length, 1);
+  assert.match(privilegedOwnerLookup, new RegExp(`user_id=eq\\.${TEST_USER_ID}`));
+  assert.doesNotMatch(privilegedOwnerLookup, /victim/);
+} finally {
+  globalThis.fetch = originalFetch;
+}
+
 console.log('resource authorization security tests passed');
