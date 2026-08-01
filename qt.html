@@ -3004,6 +3004,7 @@ async function runFollowUp() {
     if (err.message === 'QUOTA_EXCEEDED') return;
     if (err.message === 'STALE_INQUIRY_STATE') return;
     if (err.message === 'INQUIRY_STATE_UNAVAILABLE') return;
+    const errEl = document.createElement('div');
     errEl.style.marginTop = '20px';
     errEl.innerHTML = getErrorMessage(err);
     document.getElementById('resultContent').appendChild(errEl);
