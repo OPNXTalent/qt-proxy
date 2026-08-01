@@ -4,12 +4,22 @@
 create table if not exists public.inquiry_states (
   inquiry_key text primary key,
   thread_id uuid null references public.threads(id) on delete cascade,
-  owner_user_id uuid null references public.subscribers(id) on delete cascade,
+  owner_user_id uuid null references auth.users(id) on delete cascade,
   version integer not null default 0 check (version >= 0),
   state jsonb not null,
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
+
+-- Early Preview validation exposed that inquiry ownership must follow the
+-- verified Supabase authentication identity, not the optional billing record.
+-- Keep this repair in the additive migration so it is safe when the earlier
+-- draft of the table has already been applied.
+alter table public.inquiry_states
+  drop constraint if exists inquiry_states_owner_user_id_fkey;
+alter table public.inquiry_states
+  add constraint inquiry_states_owner_user_id_fkey
+  foreign key (owner_user_id) references auth.users(id) on delete cascade;
 
 create table if not exists public.inquiry_state_versions (
   inquiry_key text not null,

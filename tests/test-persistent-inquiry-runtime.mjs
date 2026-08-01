@@ -89,6 +89,27 @@ assert.deepEqual(
   inferredChangeSet.changedStateFields.sort(),
   ['confidence', 'orientation', 'unresolvedClaims'].sort(),
 );
+const reducerEcho = validateAnalysisStrict({
+  ...analysis,
+  statePatch: {
+    ...analysis.statePatch,
+    version: 99,
+    turn: 99,
+    lastStructuralChange: 'model-controlled value',
+    inquiryTrajectory: [{ turn: 99, change: 'model-controlled value' }],
+  },
+});
+assert.equal(reducerEcho.statePatch.version, undefined);
+assert.equal(reducerEcho.statePatch.turn, undefined);
+assert.equal(reducerEcho.statePatch.lastStructuralChange, undefined);
+assert.equal(reducerEcho.statePatch.inquiryTrajectory, undefined);
+assert.throws(
+  () => validateAnalysisStrict({
+    ...analysis,
+    statePatch: { ...analysis.statePatch, secretAuthority: true },
+  }),
+  /STATE_PATCH_FIELD_INVALID/,
+);
 assert.throws(
   () => validateAnalysisStrict({
     reduction: analysis.reduction,

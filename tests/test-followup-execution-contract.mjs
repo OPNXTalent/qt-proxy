@@ -47,6 +47,8 @@ assert.doesNotMatch(frontend, /sessionStorage\.removeItem\('qt_active_inquiry_ke
 
 assert.match(migration, /create table if not exists public\.inquiry_states/);
 assert.match(migration, /create table if not exists public\.inquiry_state_versions/);
+assert.match(migration, /owner_user_id uuid null references auth\.users\(id\)/);
+assert.doesNotMatch(migration, /owner_user_id uuid null references public\.subscribers\(id\)/);
 assert.match(migration, /pg_advisory_xact_lock/);
 assert.match(migration, /p_expected_version/);
 assert.match(migration, /grant select, insert, update on table public\.inquiry_states to service_role/);
