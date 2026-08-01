@@ -70,6 +70,17 @@ assert.equal(next.confidence.orientation.level, 'directly_established');
 assert.equal(next.version, 0, 'Patches must not manufacture a committed version');
 
 assert.doesNotThrow(() => validateAnalysisStrict(analysis, JSON.stringify(analysis)));
+const aliasedFalsifiability = validateAnalysisStrict({
+  ...analysis,
+  constraintGate: {
+    ...analysis.constraintGate,
+    falsifiabilityStatus: 'partially falsifiable',
+  },
+});
+assert.equal(
+  aliasedFalsifiability.constraintGate.falsifiabilityStatus,
+  'partially_testable',
+);
 assert.throws(
   () => validateAnalysisStrict({
     reduction: analysis.reduction,
