@@ -5854,7 +5854,27 @@ async function constructAuditedArtifact({
     system: progressiveSystemPrompt(systemPrompt, PRISM_ARTIFACT_CORE_CONTRACT),
     prompt: query,
   });
-  let rawCore = parseModelJson(rawCoreText);
+  let rawCore;
+  try {
+    rawCore = parseModelJson(rawCoreText);
+  } catch (error) {
+    timing('artifact_json_repair_start', {
+      reason: error?.message || 'MODEL_JSON_INVALID',
+      candidateChars: rawCoreText.length,
+    });
+    const repairedCoreText = await callInquiryModel({
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 2000,
+      timeoutMs: 12000,
+      system: PRISM_ARTIFACT_CORE_CONTRACT,
+      prompt: `Repair serialization only. Convert the candidate below into the exact JSON contract without changing its substantive interpretation, thesis, conclusions, qualifications, or canonical response. Fill only structurally required fields from the query when absent. Return JSON only.\n\nQuery:\n${query}\n\nCandidate:\n${rawCoreText}`,
+    });
+    rawCore = parseModelJson(repairedCoreText);
+    timing('artifact_json_repair_complete', {
+      candidateChars: rawCoreText.length,
+      repairedChars: repairedCoreText.length,
+    });
+  }
   let artifact = validateArtifactCore(rawCore, {
     inquiryId: inquiryKey,
     inquiryKey,
