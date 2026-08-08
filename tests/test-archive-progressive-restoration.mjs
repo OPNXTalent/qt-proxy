@@ -4,6 +4,14 @@ import fs from 'node:fs';
 const client = fs.readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 const threadsApi = fs.readFileSync(new URL('../api/threads.js', import.meta.url), 'utf8');
 
+// Authenticated Archive hydration must not reuse a pre-enrichment response.
+assert.match(threadsApi, /setHeader\('Cache-Control', 'private, no-store'\)/);
+assert.match(
+  client,
+  /authenticatedFetch\(API_BASE \+ '\/api\/threads', \{\s*cache: 'no-store',\s*headers: \{ 'Content-Type': 'application\/json', 'x-user-email': email \}/,
+  'The registered Archive fetch must bypass browser response caching',
+);
+
 // A canonical-only browser snapshot can exist before enrichment attachment.
 // Reopening Archive must prefer the server-reconstructed artifact revision.
 assert.match(

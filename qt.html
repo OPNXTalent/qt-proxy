@@ -5778,7 +5778,10 @@ function initSidebar() {
     sidebarHasAppeared = true;
   }
 
-  authenticatedFetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': email } })
+  authenticatedFetch(API_BASE + '/api/threads', {
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'x-user-email': email }
+  })
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (!data.threads) return;
