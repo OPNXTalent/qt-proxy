@@ -2,7 +2,7 @@
   "functions": {
     "api/interpret.js": {
       "memory": 128,
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/notify.js": {
       "memory": 128,
