@@ -24,6 +24,7 @@ import {
 } from '../lib/interpretation-artifact.js';
 import {
   PRISM_ARTIFACT_CORE_CONTRACT,
+  PRISM_ARTIFACT_CORE_SCHEMA,
   PRISM_ENRICHMENT_CONTRACT,
   serializeArtifactForEnrichment,
 } from '../lib/prompt-modules/progressive-inquiry.js';
@@ -5631,6 +5632,8 @@ async function callInquiryModel({
   system,
   temperature = 0,
   timeoutMs = 15000,
+  structuredOutputSchema = null,
+  structuredOutputName = 'emit_structured_output',
 }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort('MODEL_TIMEOUT'), timeoutMs);
@@ -5649,6 +5652,14 @@ async function callInquiryModel({
         max_tokens: maxTokens,
         temperature,
         ...(system ? { system } : {}),
+        ...(structuredOutputSchema ? {
+          tools: [{
+            name: structuredOutputName,
+            description: 'Return the requested structured result without commentary.',
+            input_schema: structuredOutputSchema,
+          }],
+          tool_choice: { type: 'tool', name: structuredOutputName },
+        } : {}),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -5670,6 +5681,15 @@ async function callInquiryModel({
     .trim();
   if (data.stop_reason === 'max_tokens') {
     throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
+  }
+  if (structuredOutputSchema) {
+    const structured = (data.content || []).find(
+      block => block.type === 'tool_use' && block.name === structuredOutputName,
+    );
+    if (!structured?.input || typeof structured.input !== 'object' || Array.isArray(structured.input)) {
+      throw new Error('INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING');
+    }
+    return structured.input;
   }
   return text;
 }
@@ -5862,17 +5882,20 @@ async function constructAuditedArtifact({
       reason: error?.message || 'MODEL_JSON_INVALID',
       candidateChars: rawCoreText.length,
     });
-    const repairedCoreText = await callInquiryModel({
+    const repairedCore = await callInquiryModel({
       model: 'claude-haiku-4-5-20251001',
       maxTokens: 2000,
       timeoutMs: 12000,
       system: PRISM_ARTIFACT_CORE_CONTRACT,
       prompt: `Repair serialization only. Convert the candidate below into the exact JSON contract without changing its substantive interpretation, thesis, conclusions, qualifications, or canonical response. Fill only structurally required fields from the query when absent. Return JSON only.\n\nQuery:\n${query}\n\nCandidate:\n${rawCoreText}`,
+      structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
+      structuredOutputName: 'emit_interpretation_artifact',
     });
-    rawCore = parseModelJson(repairedCoreText);
+    rawCore = repairedCore;
     timing('artifact_json_repair_complete', {
       candidateChars: rawCoreText.length,
-      repairedChars: repairedCoreText.length,
+      repairedChars: JSON.stringify(repairedCore).length,
+      boundary: 'forced_tool_schema',
     });
   }
   let artifact = validateArtifactCore(rawCore, {
