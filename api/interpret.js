@@ -5902,9 +5902,11 @@ Query:\n${query}\n\nArtifact candidate:\n${JSON.stringify(artifact)}\n\nCanonica
   if (!auditedCanonical || auditedCanonical.length < 40 || /^(?:```|\{)/.test(auditedCanonical)) {
     throw new Error('CANONICAL_AUDIT_INVALID');
   }
-  const auditReturnedMeta = /(?:^|\n)\s*#?\s*Audit Result\b/i.test(auditedCanonical)
+  const auditReturnedMeta = /(?:^|\n)\s*(?:[#>*_`~-]+\s*)*Audit Result\b/i.test(auditedCanonical)
     || /\bVerification against (?:the )?contract\b/i.test(auditedCanonical)
-    || /\bNo corrections required\b/i.test(auditedCanonical);
+    || /\bNo corrections required\b/i.test(auditedCanonical)
+    || /\bMaterial claims verified\b/i.test(auditedCanonical)
+    || /\bAPPROVED RESPONSE\b/i.test(auditedCanonical);
   const unauditedCanonical = rawCore.canonical_response;
   rawCore = {
     ...rawCore,
