@@ -138,6 +138,16 @@ assert.match(archiveTransferSource, /packetType: 'prism_analysis'/);
 assert.match(archiveTransferSource, /artifactId: responseData\._artifactId/);
 assert.match(archiveTransferSource, /artifactRevision: responseData\._artifactRevision/);
 
+// Replaying legacy empty analysis must preserve the server-authoritative
+// incomplete state. Only substantive enrichment may clear that state.
+const packetApplyStart = client.indexOf('function applyProgressivePacket(');
+const packetApplyEnd = client.indexOf('\nfunction ', packetApplyStart + 1);
+assert.ok(packetApplyStart >= 0 && packetApplyEnd > packetApplyStart);
+const packetApplySource = client.slice(packetApplyStart, packetApplyEnd);
+assert.match(packetApplySource, /var hasSubstantiveAnalysis = progressiveAnalysisHasSubstance\(content\)/);
+assert.match(packetApplySource, /if \(hasSubstantiveAnalysis\) result\._analysisIncomplete = false/);
+assert.doesNotMatch(packetApplySource, /\n\s*result\._analysisIncomplete = false/);
+
 // The temporary Preview diagnostic compares the raw Archive payload with the
 // exact object handed to renderResult without exposing response content.
 assert.match(client, /\[prism:archive-client-boundary\]/);

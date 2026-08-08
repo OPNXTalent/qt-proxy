@@ -3275,6 +3275,34 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
   return fullText;
 }
 
+function progressiveAnalysisHasSubstance(content) {
+  content = content && typeof content === 'object' ? content : {};
+  var framework = content.framework && typeof content.framework === 'object' ? content.framework : {};
+  var frameworkFields = [
+    framework.prismSummary,
+    framework.entanglement,
+    framework.coherenceAlignment,
+    framework.noiseDecoherence,
+    framework.telosInsight,
+    framework.olamHaba
+  ];
+  var hasFramework = frameworkFields.some(function(value) {
+    return typeof value === 'string' && value.trim().length > 0;
+  });
+  var hasKeyTerms = Array.isArray(content.keyTerms) && content.keyTerms.some(function(term) {
+    return term && [term.term, term.original, term.meaning].some(function(value) {
+      return typeof value === 'string' && value.trim().length > 0;
+    });
+  });
+  var hasFindings = Array.isArray(content.constraintFindings) && content.constraintFindings.some(function(value) {
+    return typeof value === 'string' ? value.trim().length > 0 : !!value;
+  });
+  var hasProjections = Array.isArray(content.futureAnalysisProjections) && content.futureAnalysisProjections.some(function(value) {
+    return typeof value === 'string' ? value.trim().length > 0 : !!value;
+  });
+  return hasFramework || hasKeyTerms || hasFindings || hasProjections;
+}
+
 function applyProgressivePacket(result, packet) {
   result = result || { response_mode: 'reflective', key_terms: [] };
   var content = packet && packet.content ? packet.content : {};
@@ -3291,6 +3319,7 @@ function applyProgressivePacket(result, packet) {
     result.interpretive_context = content.text || '';
   } else if (packet.packetType === 'prism_analysis') {
     var framework = content.framework || {};
+    var hasSubstantiveAnalysis = progressiveAnalysisHasSubstance(content);
     result.prism_summary = framework.prismSummary || '';
     result.entanglement = framework.entanglement || '';
     result.coherence_alignment = framework.coherenceAlignment || '';
@@ -3307,7 +3336,7 @@ function applyProgressivePacket(result, packet) {
     result.constraint_findings = content.constraintFindings || [];
     result.future_analysis_projections = content.futureAnalysisProjections || [];
     result._analysisPending = false;
-    result._analysisIncomplete = false;
+    if (hasSubstantiveAnalysis) result._analysisIncomplete = false;
   }
   result._artifactId = packet.artifactId;
   result._artifactRevision = packet.artifactRevision;
