@@ -19,6 +19,7 @@ import {
   createCanonicalPackets,
   createCompletionKey,
   createEnrichmentPackets,
+  hasSubstantiveEnrichment,
   hasSubstantiveEnrichmentPacket,
   validateArtifactCore,
   validateEnrichment,
@@ -27,6 +28,7 @@ import {
   PRISM_ARTIFACT_CORE_CONTRACT,
   PRISM_ARTIFACT_CORE_SCHEMA,
   PRISM_ENRICHMENT_CONTRACT,
+  PRISM_ENRICHMENT_SCHEMA,
   serializeArtifactForEnrichment,
 } from '../lib/prompt-modules/progressive-inquiry.js';
 import {
@@ -6026,18 +6028,39 @@ async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing
       system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
       prompt: `Sealed Interpretation Artifact:\n${serializeArtifactForEnrichment(artifact)}`,
     });
+    const generatedEnrichment = validateEnrichment(parseModelJson(rawText));
+    if (!hasSubstantiveEnrichment(generatedEnrichment)) throw new Error('ENRICHMENT_EMPTY');
+    timing('progressive_analysis_generation_complete', { substantive: true });
+    const auditPrompt = `Audit this enrichment against the sealed Interpretation Artifact.
+Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.
+
+Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText}`;
     timing('progressive_analysis_audit_start');
     const auditedText = await callInquiryModel({
       model: 'claude-haiku-4-5-20251001',
       maxTokens: 1800,
       timeoutMs: 40000,
-      prompt: `Audit this enrichment against the sealed Interpretation Artifact.
-Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.
-
-Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText}`,
+      prompt: auditPrompt,
     });
-    const enrichment = validateEnrichment(parseModelJson(auditedText));
+    let enrichment = validateEnrichment(parseModelJson(auditedText));
     timing('progressive_analysis_audit_complete');
+    if (!hasSubstantiveEnrichment(enrichment)) {
+      timing('progressive_analysis_audit_empty', { error: 'ENRICHMENT_AUDIT_EMPTY' });
+      timing('progressive_analysis_audit_retry_start');
+      const retriedAudit = await callInquiryModel({
+        model: 'claude-haiku-4-5-20251001',
+        maxTokens: 1800,
+        timeoutMs: 40000,
+        prompt: auditPrompt,
+        structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,
+        structuredOutputName: 'emit_audited_enrichment',
+      });
+      enrichment = validateEnrichment(retriedAudit);
+      timing('progressive_analysis_audit_retry_complete', {
+        substantive: hasSubstantiveEnrichment(enrichment),
+      });
+      if (!hasSubstantiveEnrichment(enrichment)) throw new Error('ENRICHMENT_AUDIT_EMPTY');
+    }
     const packets = createEnrichmentPackets(artifact, enrichment);
     for (const packet of packets) {
       const durablePacket = await attachInterpretationPacket(packet, { replaceInvalidEmpty });
