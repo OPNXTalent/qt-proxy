@@ -5997,7 +5997,7 @@ async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing
       model: 'claude-sonnet-4-6',
       maxTokens: 1800,
       temperature: 0.2,
-      timeoutMs: 30000,
+      timeoutMs: 60000,
       system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
       prompt: `Sealed Interpretation Artifact:\n${serializeArtifactForEnrichment(artifact)}`,
     });
