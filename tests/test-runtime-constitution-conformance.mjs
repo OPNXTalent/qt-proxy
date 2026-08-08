@@ -17,6 +17,10 @@ for (const event of [
 assert.ok(api.indexOf('await completeInterpretationArtifact') < api.indexOf("type: 'canonical_complete'"));
 assert.ok(api.includes("operation === 'retry_artifact_analysis'"));
 assert.ok(api.includes("charged: false"));
+assert.ok(api.includes('replaceInvalidEmpty: true'));
+assert.ok(api.includes('PACKET_REPLACEMENT_UNCONFIRMED'));
+assert.ok(api.includes('hasSubstantiveEnrichmentPacket(stored)'));
+assert.ok(api.includes('hasSubstantiveEnrichmentPacket(packet)'));
 assert.ok(api.includes('completeFollowUpArtifact'));
 assert.ok(api.includes('progressive_analysis_audit_start'));
 

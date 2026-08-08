@@ -19,6 +19,7 @@ import {
   createCanonicalPackets,
   createCompletionKey,
   createEnrichmentPackets,
+  hasSubstantiveEnrichmentPacket,
   validateArtifactCore,
   validateEnrichment,
 } from '../lib/interpretation-artifact.js';
@@ -5838,7 +5839,7 @@ async function completeFollowUpArtifact({
   return { committed: true, version: result.state_version, state: result.canonical_state };
 }
 
-async function attachInterpretationPacket(packet) {
+async function attachInterpretationPacket(packet, { replaceInvalidEmpty = false } = {}) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/attach_interpretation_packet`, {
     method: 'POST',
     headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
@@ -5857,6 +5858,30 @@ async function attachInterpretationPacket(packet) {
     throw new Error(`PACKET_ATTACHMENT_FAILED:${response.status}:${detail.slice(0, 160)}`);
   }
   const stored = await response.json();
+  if (replaceInvalidEmpty
+    && stored?.packetId === packet.packetId
+    && !hasSubstantiveEnrichmentPacket(stored)
+    && hasSubstantiveEnrichmentPacket(packet)) {
+    const replacement = await fetch(
+      `${SUPABASE_URL}/rest/v1/interpretation_packets?packet_id=eq.${encodeURIComponent(packet.packetId)}`,
+      {
+        method: 'PATCH',
+        headers: inquiryServiceHeaders({
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        }),
+        body: JSON.stringify({ content: packet.content, status: packet.status }),
+      },
+    );
+    if (!replacement.ok) {
+      const detail = await replacement.text().catch(() => '');
+      throw new Error(`PACKET_REPLACEMENT_FAILED:${replacement.status}:${detail.slice(0, 160)}`);
+    }
+    const rows = await replacement.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error('PACKET_REPLACEMENT_UNCONFIRMED');
+    return packet;
+  }
   return stored && typeof stored === 'object' && stored.packetId ? stored : packet;
 }
 
@@ -5989,7 +6014,7 @@ Query:\n${query}\n\nArtifact candidate:\n${JSON.stringify(artifact)}\n\nCanonica
   return artifact;
 }
 
-async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing }) {
+async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing, replaceInvalidEmpty = false }) {
   const started = Date.now();
   timing('progressive_analysis_start');
   try {
@@ -6015,7 +6040,7 @@ Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText
     timing('progressive_analysis_audit_complete');
     const packets = createEnrichmentPackets(artifact, enrichment);
     for (const packet of packets) {
-      const durablePacket = await attachInterpretationPacket(packet);
+      const durablePacket = await attachInterpretationPacket(packet, { replaceInvalidEmpty });
       sse.write({ type: 'packet', packet: durablePacket });
       timing('progressive_packet_complete', {
         packetType: durablePacket.packetType,
@@ -6446,6 +6471,7 @@ export default async function handler(req, res) {
       systemPrompt: PRISM_SYSTEM_PROMPT,
       sse: { write(event) { if (event?.type === 'packet') packets.push(event.packet); return true; } },
       timing,
+      replaceInvalidEmpty: true,
     });
     if (!result.complete) {
       return res.status(503).json({ error: 'Prism Analysis incomplete.', retryable: true });

@@ -4,6 +4,8 @@ import {
   createCanonicalPackets,
   createCompletionKey,
   createEnrichmentPackets,
+  hasSubstantiveEnrichment,
+  hasSubstantiveEnrichmentPacket,
   stableArtifactId,
   validateArtifactCore,
   validateEnrichment,
@@ -66,6 +68,28 @@ assert.deepEqual(attached.map(packet => packet.packetType), [
 assert.deepEqual(attached.map(packet => packet.sequence), [3, 4]);
 assert.equal(createEnrichmentPackets(artifact, enrichment)[1].packetId, attached[1].packetId);
 
+const emptyEnrichment = validateEnrichment({
+  interpretive_context: '',
+  framework: {
+    prism_summary: '',
+    entanglement: '',
+    coherence_alignment: '',
+    noise_decoherence: '',
+    telos_insight: '',
+    olam_haba: '',
+  },
+  key_terms: [],
+  constraint_findings: [],
+  future_analysis_projections: [],
+});
+assert.equal(hasSubstantiveEnrichment(emptyEnrichment), false);
+assert.throws(() => createEnrichmentPackets(artifact, emptyEnrichment), /ENRICHMENT_EMPTY/);
+assert.equal(hasSubstantiveEnrichmentPacket({
+  packetType: 'prism_analysis',
+  content: { framework: emptyEnrichment.framework, keyTerms: [] },
+}), false);
+assert.equal(hasSubstantiveEnrichmentPacket(attached[1]), true);
+
 const completionKey = createCompletionKey({ inquiryId: artifact.inquiryId, revision: 1 });
 assert.equal(completionKey, createCompletionKey({ inquiryId: artifact.inquiryId, revision: 1 }));
 assert.notEqual(completionKey, createCompletionKey({ inquiryId: artifact.inquiryId, revision: 2 }));
@@ -78,4 +102,3 @@ assert.throws(() => validateArtifactCore({}, {
 }), /ARTIFACT_CORE_INCOMPLETE/);
 
 console.log('progressive inquiry delivery contract tests passed');
-
