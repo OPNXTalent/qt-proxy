@@ -112,6 +112,14 @@ assert.match(client, /topLevelKeys: keys/);
 assert.match(client, /hasInterpretiveContext: keys\.indexOf\('interpretive_context'\) !== -1/);
 assert.match(client, /hasPrismAnalysis: keys\.indexOf\('prism_analysis'\) !== -1/);
 assert.match(client, /hasFlattenedCompatibilityFields: flattenedFields\.some/);
+assert.match(client, /interpretiveContextShape: archiveDiagnosticValueShape/);
+assert.match(client, /prismAnalysisFrameworkKeys: expectedNestedKeys\.reduce/);
+assert.match(client, /flattenedValueShape: flattenedValueShape/);
+assert.match(client, /keyTermsCardinality: Array\.isArray\(keyTerms\) \? keyTerms\.length : 0/);
+assert.match(client, /computedHasFramework: computedHasFramework/);
+assert.match(client, /computedHasInterpretiveContext: !!\(value && value\.interpretive_context\)/);
+assert.match(client, /analysisPending: !!\(value && value\._analysisPending\)/);
+assert.match(client, /analysisIncomplete: !!\(value && value\._analysisIncomplete\)/);
 assert.doesNotMatch(
   client.slice(client.indexOf('function archiveDiagnosticShape('), client.indexOf('\nfunction ', client.indexOf('function archiveDiagnosticShape(') + 1)),
   /core_insight|recognition|open_door_question|canonicalResponse|userInput/,

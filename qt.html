@@ -5146,6 +5146,36 @@ function archiveDiagnosticShape(response) {
     'olam_haba',
     'key_terms'
   ];
+  var frameworkFields = [
+    'prism_summary',
+    'entanglement',
+    'coherence_alignment',
+    'noise_decoherence',
+    'telos_insight',
+    'olam_haba'
+  ];
+  var prismAnalysis = value ? value.prism_analysis : null;
+  var prismFramework = prismAnalysis && typeof prismAnalysis === 'object'
+    ? prismAnalysis.framework
+    : null;
+  var expectedNestedKeys = [
+    'prismSummary',
+    'entanglement',
+    'coherenceAlignment',
+    'noiseDecoherence',
+    'telosInsight',
+    'olamHaba'
+  ];
+  var flattenedValueShape = {};
+  frameworkFields.forEach(function(field) {
+    flattenedValueShape[field] = archiveDiagnosticValueShape(value ? value[field] : null);
+  });
+  var keyTerms = value ? value.key_terms : null;
+  var computedHasFramework = !!(value && (
+    frameworkFields.some(function(field) { return !!value[field]; }) ||
+    (Array.isArray(keyTerms) && keyTerms.length > 0) ||
+    value._analysisPending
+  ));
   return {
     artifactId: value && value._artifactId ? value._artifactId : null,
     artifactRevision: value && value._artifactRevision != null ? value._artifactRevision : null,
@@ -5156,8 +5186,39 @@ function archiveDiagnosticShape(response) {
     hasPrismAnalysis: keys.indexOf('prism_analysis') !== -1,
     hasFlattenedCompatibilityFields: flattenedFields.some(function(field) {
       return keys.indexOf(field) !== -1;
-    })
+    }),
+    interpretiveContextShape: archiveDiagnosticValueShape(value ? value.interpretive_context : null),
+    prismAnalysisShape: archiveDiagnosticValueShape(prismAnalysis),
+    prismAnalysisFrameworkExists: !!prismFramework,
+    prismAnalysisFrameworkShape: archiveDiagnosticValueShape(prismFramework),
+    prismAnalysisFrameworkKeys: expectedNestedKeys.reduce(function(result, key) {
+      result[key] = !!(prismFramework && Object.prototype.hasOwnProperty.call(prismFramework, key));
+      return result;
+    }, {}),
+    flattenedValueShape: flattenedValueShape,
+    keyTermsType: Array.isArray(keyTerms) ? 'array' : archiveDiagnosticRuntimeType(keyTerms),
+    keyTermsCardinality: Array.isArray(keyTerms) ? keyTerms.length : 0,
+    computedHasFramework: computedHasFramework,
+    computedHasInterpretiveContext: !!(value && value.interpretive_context),
+    analysisPending: !!(value && value._analysisPending),
+    analysisIncomplete: !!(value && value._analysisIncomplete)
   };
+}
+
+function archiveDiagnosticRuntimeType(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+function archiveDiagnosticValueShape(value) {
+  var type = archiveDiagnosticRuntimeType(value);
+  var nonEmpty = false;
+  if (type === 'string') nonEmpty = value.trim().length > 0;
+  else if (type === 'array') nonEmpty = value.length > 0;
+  else if (type === 'object') nonEmpty = Object.keys(value).length > 0;
+  else nonEmpty = !!value;
+  return { type: type, nonEmpty: nonEmpty };
 }
 
 async function getInterpretRequestHeaders() {
