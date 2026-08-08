@@ -6005,7 +6005,7 @@ async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing
     const auditedText = await callInquiryModel({
       model: 'claude-haiku-4-5-20251001',
       maxTokens: 1800,
-      timeoutMs: 8000,
+      timeoutMs: 20000,
       prompt: `Audit this enrichment against the sealed Interpretation Artifact.
 Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.
 
