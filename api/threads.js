@@ -42,11 +42,14 @@ function responseFromArtifact(artifactRow, packetRows) {
     _artifactId: artifact.artifactId,
     _artifactRevision: artifact.revision,
   };
+  let hasCompletedEnrichmentPacket = false;
   for (const packet of packetRows || []) {
     const content = packet.content || {};
     if (packet.packet_type === 'interpretive_context') {
+      hasCompletedEnrichmentPacket = true;
       response.interpretive_context = content.text || '';
     } else if (packet.packet_type === 'prism_analysis') {
+      hasCompletedEnrichmentPacket = true;
       response.prism_analysis = content;
       const framework = content.framework || {};
       response.prism_summary = framework.prismSummary || '';
@@ -61,6 +64,18 @@ function responseFromArtifact(artifactRow, packetRows) {
         prism_meaning: term.meaning || '',
       }));
     }
+  }
+  if (hasCompletedEnrichmentPacket) {
+    const analysis = response.prism_analysis || {};
+    const framework = analysis.framework || {};
+    const hasSubstantiveEnrichment = Boolean(
+      response.interpretive_context
+      || Object.values(framework).some(value => typeof value === 'string' && value.trim())
+      || response.key_terms.length
+      || (Array.isArray(analysis.constraintFindings) && analysis.constraintFindings.some(value => typeof value === 'string' && value.trim()))
+      || (Array.isArray(analysis.futureAnalysisProjections) && analysis.futureAnalysisProjections.some(value => typeof value === 'string' && value.trim()))
+    );
+    if (!hasSubstantiveEnrichment) response._analysisIncomplete = true;
   }
   return response;
 }

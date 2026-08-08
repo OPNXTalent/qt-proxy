@@ -90,6 +90,42 @@ assert.equal(restored.prism_analysis.framework.prismSummary, 'Summary');
 assert.equal(restored.prism_summary, 'Summary');
 assert.equal(restored.entanglement, 'Entanglement');
 assert.equal(restored.key_terms[0].term, 'Tov');
+assert.notEqual(restored._analysisIncomplete, true);
+
+const legacyEmpty = responseFromArtifact({
+  artifact_id: artifactId,
+  artifact_revision: 1,
+  artifact: {
+    artifactId,
+    revision: 1,
+    responseMode: 'reflective',
+    orientation: 'Orientation',
+    canonicalResponse: 'Canonical response',
+    openDoorQuestion: 'Open door?',
+  },
+}, [
+  { packet_type: 'interpretive_context', content: { text: '' } },
+  {
+    packet_type: 'prism_analysis',
+    content: {
+      framework: {
+        prismSummary: '',
+        entanglement: '',
+        coherenceAlignment: '',
+        noiseDecoherence: '',
+        telosInsight: '',
+        olamHaba: '',
+      },
+      keyTerms: [],
+      constraintFindings: [],
+      futureAnalysisProjections: [],
+    },
+  },
+]);
+assert.equal(legacyEmpty._artifactId, artifactId);
+assert.equal(legacyEmpty._artifactRevision, 1);
+assert.equal(legacyEmpty.core_insight, 'Canonical response');
+assert.equal(legacyEmpty._analysisIncomplete, true);
 
 // Client transfer remains server-first and re-applies the preserved analysis
 // packet to the same object before the existing renderer receives it.
