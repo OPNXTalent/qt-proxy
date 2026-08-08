@@ -5920,7 +5920,7 @@ async function constructAuditedArtifact({
     });
     const repairedCore = await callInquiryModel({
       model: 'claude-haiku-4-5-20251001',
-      maxTokens: 2000,
+      maxTokens: 3000,
       timeoutMs: 20000,
       system: PRISM_ARTIFACT_CORE_CONTRACT,
       prompt: `Repair serialization only. Convert the candidate below into the exact JSON contract without changing its substantive interpretation, thesis, conclusions, qualifications, or canonical response. Fill only structurally required fields from the query when absent. Return JSON only.\n\nQuery:\n${query}\n\nCandidate:\n${rawCoreText}`,
