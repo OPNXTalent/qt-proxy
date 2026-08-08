@@ -4324,6 +4324,7 @@ function cachePersistentInquiryState(state, version) {
 // SIDEBAR STATE
 let renameOpenId  = null;
 let allThreads    = [];
+var _archiveRawResponseDiagnostics = new Map();
 let sidebarOpen   = false;
 let sidebarHasAppeared = false;
 
@@ -4832,6 +4833,11 @@ function selectThread(id) {
     // Set _lastParsedResult so Share button works on sidebar-loaded threads
     window._lastParsedResult = responseData;
     currentSubject = savedInput;
+    console.info('[prism:archive-client-boundary]', {
+      threadId: id,
+      rawApiThreads: _archiveRawResponseDiagnostics.get(id) || archiveDiagnosticShape(supaResp),
+      beforeRenderResult: archiveDiagnosticShape(responseData)
+    });
     renderResult(responseData);
     showResult();
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
@@ -5126,6 +5132,32 @@ function archiveResponseForRender(serverResponse, localResponse) {
     });
   }
   return responseData;
+}
+
+function archiveDiagnosticShape(response) {
+  var value = response && typeof response === 'object' ? response : null;
+  var keys = value ? Object.keys(value).sort() : [];
+  var flattenedFields = [
+    'prism_summary',
+    'entanglement',
+    'coherence_alignment',
+    'noise_decoherence',
+    'telos_insight',
+    'olam_haba',
+    'key_terms'
+  ];
+  return {
+    artifactId: value && value._artifactId ? value._artifactId : null,
+    artifactRevision: value && value._artifactRevision != null ? value._artifactRevision : null,
+    topLevelKeys: keys,
+    hasArtifactId: keys.indexOf('_artifactId') !== -1,
+    hasArtifactRevision: keys.indexOf('_artifactRevision') !== -1,
+    hasInterpretiveContext: keys.indexOf('interpretive_context') !== -1,
+    hasPrismAnalysis: keys.indexOf('prism_analysis') !== -1,
+    hasFlattenedCompatibilityFields: flattenedFields.some(function(field) {
+      return keys.indexOf(field) !== -1;
+    })
+  };
 }
 
 async function getInterpretRequestHeaders() {
@@ -5802,6 +5834,10 @@ function initSidebar() {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (!data.threads) return;
+    _archiveRawResponseDiagnostics.clear();
+    data.threads.forEach(function(thread) {
+      _archiveRawResponseDiagnostics.set(thread.id, archiveDiagnosticShape(thread.response));
+    });
     allThreads = data.threads;
     // Cache display_name for chat attribution
     if (data.display_name) {

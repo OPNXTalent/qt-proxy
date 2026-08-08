@@ -102,4 +102,19 @@ assert.match(archiveTransferSource, /packetType: 'prism_analysis'/);
 assert.match(archiveTransferSource, /artifactId: responseData\._artifactId/);
 assert.match(archiveTransferSource, /artifactRevision: responseData\._artifactRevision/);
 
+// The temporary Preview diagnostic compares the raw Archive payload with the
+// exact object handed to renderResult without exposing response content.
+assert.match(client, /\[prism:archive-client-boundary\]/);
+assert.match(client, /rawApiThreads: _archiveRawResponseDiagnostics\.get\(id\)/);
+assert.match(client, /beforeRenderResult: archiveDiagnosticShape\(responseData\)/);
+assert.match(client, /topLevelKeys: keys/);
+assert.match(client, /hasInterpretiveContext: keys\.indexOf\('interpretive_context'\) !== -1/);
+assert.match(client, /hasPrismAnalysis: keys\.indexOf\('prism_analysis'\) !== -1/);
+assert.match(client, /hasFlattenedCompatibilityFields: flattenedFields\.some/);
+assert.doesNotMatch(
+  client.slice(client.indexOf('function archiveDiagnosticShape('), client.indexOf('\nfunction ', client.indexOf('function archiveDiagnosticShape(') + 1)),
+  /core_insight|recognition|open_door_question|canonicalResponse|userInput/,
+  'Archive boundary diagnostic must not inspect or log user/model content',
+);
+
 console.log('Archive progressive packet restoration regression passed.');
