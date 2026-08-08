@@ -1,56 +1,22 @@
--- Runtime Constitution v1.0: immutable Interpretation Artifacts and packets.
--- Additive and backend-only. Apply to Preview before enabling progressive delivery.
+-- Phase II Preview correction: separate artifact ownership from usage identity.
+--
+-- This migration changes only the two completion RPCs. It is wrapped in one
+-- transaction so the previous definitions remain available if any statement
+-- fails. It does not alter tables, policies, or persisted data.
 
-create table if not exists public.interpretation_artifacts (
-  artifact_id uuid not null,
-  artifact_revision integer not null check (artifact_revision >= 1),
-  inquiry_id text not null,
-  inquiry_key text not null,
-  thread_id uuid null references public.threads(id) on delete set null,
-  owner_user_id uuid null references auth.users(id) on delete set null,
-  completion_key text not null unique,
-  constitution_version text not null,
-  schema_version integer not null,
-  query text not null,
-  artifact jsonb not null,
-  canonical_response text not null,
-  status text not null default 'sealed' check (status = 'sealed'),
-  created_at timestamptz not null default now(),
-  sealed_at timestamptz not null default now(),
-  primary key (artifact_id, artifact_revision)
+begin;
+
+drop function if exists public.complete_followup_interpretation_artifact(
+  integer, jsonb, text, uuid, integer, text, text, uuid, uuid, text,
+  text, integer, text, jsonb, text, jsonb, jsonb
 );
 
-create table if not exists public.interpretation_packets (
-  packet_id text primary key,
-  artifact_id uuid not null,
-  artifact_revision integer not null,
-  packet_type text not null,
-  sequence integer not null check (sequence >= 1),
-  status text not null check (status in ('complete', 'failed')),
-  content jsonb not null,
-  created_at timestamptz not null default now(),
-  unique (artifact_id, artifact_revision, sequence),
-  foreign key (artifact_id, artifact_revision)
-    references public.interpretation_artifacts(artifact_id, artifact_revision)
-    on delete cascade
+drop function if exists public.complete_interpretation_artifact(
+  uuid, integer, text, text, uuid, uuid, text, text, integer, text, jsonb,
+  text, jsonb, jsonb, boolean, text, text, text, jsonb
 );
 
-create index if not exists interpretation_artifacts_inquiry_idx
-  on public.interpretation_artifacts(inquiry_key, artifact_revision desc);
-create index if not exists interpretation_artifacts_thread_idx
-  on public.interpretation_artifacts(thread_id, artifact_revision desc);
-
-alter table public.interpretation_artifacts enable row level security;
-alter table public.interpretation_packets enable row level security;
-revoke all on table public.interpretation_artifacts from anon, authenticated;
-revoke all on table public.interpretation_packets from anon, authenticated;
-grant select, insert on table public.interpretation_artifacts to service_role;
-grant select, insert, update on table public.interpretation_packets to service_role;
-
--- The insert is the canonical idempotency boundary. Usage is recorded only for
--- the first successful completion. query_log remains the authoritative quota
--- source; subscriber counters are intentionally outside this transaction.
-create or replace function public.complete_interpretation_artifact(
+create function public.complete_interpretation_artifact(
   p_artifact_id uuid,
   p_artifact_revision integer,
   p_inquiry_id text,
@@ -175,53 +141,7 @@ grant execute on function public.complete_interpretation_artifact(
   text, jsonb, jsonb, boolean, uuid, text, text, text, jsonb
 ) to service_role;
 
-create or replace function public.attach_interpretation_packet(
-  p_packet_id text,
-  p_artifact_id uuid,
-  p_artifact_revision integer,
-  p_packet_type text,
-  p_sequence integer,
-  p_status text,
-  p_content jsonb
-) returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.interpretation_packets(
-    packet_id, artifact_id, artifact_revision, packet_type, sequence, status, content
-  ) values (
-    p_packet_id, p_artifact_id, p_artifact_revision, p_packet_type,
-    p_sequence, p_status, p_content
-  ) on conflict (packet_id) do nothing;
-
-  return (
-    select jsonb_build_object(
-      'packetId', p.packet_id,
-      'artifactId', p.artifact_id,
-      'artifactRevision', p.artifact_revision,
-      'packetType', p.packet_type,
-      'sequence', p.sequence,
-      'status', p.status,
-      'content', p.content
-    )
-    from public.interpretation_packets p
-    where p.packet_id = p_packet_id
-  );
-end;
-$$;
-
-revoke all on function public.attach_interpretation_packet(
-  text, uuid, integer, text, integer, text, jsonb
-) from public, anon, authenticated;
-grant execute on function public.attach_interpretation_packet(
-  text, uuid, integer, text, integer, text, jsonb
-) to service_role;
-
--- Follow-up completion binds the inquiry-state revision and artifact revision
--- in one transaction. A stale state conflict creates no artifact or charge.
-create or replace function public.complete_followup_interpretation_artifact(
+create function public.complete_followup_interpretation_artifact(
   p_expected_state_version integer,
   p_inquiry_state jsonb,
   p_request_id text,
@@ -284,3 +204,5 @@ grant execute on function public.complete_followup_interpretation_artifact(
   integer, jsonb, text, uuid, integer, text, text, uuid, uuid, text,
   text, integer, text, jsonb, text, jsonb, jsonb
 ) to service_role;
+
+commit;

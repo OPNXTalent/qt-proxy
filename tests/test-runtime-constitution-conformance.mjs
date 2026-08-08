@@ -42,9 +42,11 @@ assert.ok(api.includes("usageCreditSource === 'signal_credit'"));
 assert.ok(api.includes("? 'purchased'"));
 assert.ok(api.includes("usageCreditSource === 'tier_allocation'"));
 assert.ok(api.includes("? 'monthly'"));
+assert.ok(api.includes('p_usage_user_id: usageUserId || null'));
+assert.ok(api.includes('usageUserId: subscriber?.id || null'));
 assert.ok(migration.includes("p_usage_credit_source = 'purchased'"));
-assert.ok(migration.includes('select public.draw_signal_credit(p_owner_user_id)'));
-assert.ok(migration.indexOf('select public.draw_signal_credit(p_owner_user_id)') < migration.indexOf('insert into public.query_log'));
+assert.ok(migration.includes('select public.draw_signal_credit(p_usage_user_id)'));
+assert.ok(migration.indexOf('select public.draw_signal_credit(p_usage_user_id)') < migration.indexOf('insert into public.query_log'));
 assert.ok(migration.includes('on conflict (packet_id) do nothing'));
 assert.ok(migration.includes('insert into public.threads'));
 

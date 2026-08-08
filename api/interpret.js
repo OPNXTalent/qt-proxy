@@ -5685,6 +5685,7 @@ function artifactRpcBody(artifact, packets, {
   inquiryKey,
   completionKey,
   charge,
+  usageUserId,
   usageQueryType,
   usageCreditSource,
   threadPayload = null,
@@ -5710,6 +5711,7 @@ function artifactRpcBody(artifact, packets, {
     p_orientation_packet: packets[0],
     p_canonical_packet: packets[1],
     p_charge: Boolean(charge),
+    p_usage_user_id: usageUserId || null,
     p_usage_query_type: usageQueryType,
     p_usage_credit_source: durableCreditSource,
     p_usage_channel_context: 'solo',
@@ -5961,6 +5963,7 @@ async function runProgressiveInitialInquiry({
   tier,
   inquiryCredential,
   ownerUserId = null,
+  usageUserId = null,
   usageQueryType,
   usageCreditSource,
 }) {
@@ -5984,6 +5987,7 @@ async function runProgressiveInitialInquiry({
     inquiryKey: inquiryCredential.inquiryKey,
     completionKey,
     charge: true,
+    usageUserId,
     usageQueryType,
     usageCreditSource,
     threadPayload: ownerUserId
@@ -6972,6 +6976,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           tier,
           inquiryCredential: initialInquiryCredential,
           ownerUserId: userId,
+          usageUserId: subscriber?.id || null,
           usageQueryType: 'subscriber',
           usageCreditSource: quota?.creditSource || 'tier_allocation',
         });
@@ -7290,6 +7295,7 @@ Do not add any question after the exit offer. The person chooses the next move.
       systemPrompt: enhancedSystemPrompt,
       tier: 'free',
       inquiryCredential: initialInquiryCredential,
+      usageUserId: null,
       usageQueryType: `ip:${ip}`,
       usageCreditSource: 'free_tier',
     });
