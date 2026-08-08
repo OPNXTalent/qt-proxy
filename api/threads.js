@@ -80,7 +80,24 @@ function responseFromArtifact(artifactRow, packetRows) {
   return response;
 }
 
-export { responseFromArtifact };
+function selectAuthoritativeArtifacts(artifacts) {
+  const byThread = new Map();
+  for (const artifact of Array.isArray(artifacts) ? artifacts : []) {
+    const current = byThread.get(artifact.thread_id);
+    // `server:` identifies the server-minted inquiry lineage. `thread:` is the
+    // client recovery fallback and must not supersede that lineage in Archive.
+    const isServerIssued = typeof artifact.inquiry_key === 'string'
+      && artifact.inquiry_key.startsWith('server:');
+    const currentIsServerIssued = typeof current?.inquiry_key === 'string'
+      && current.inquiry_key.startsWith('server:');
+    if (!current || (isServerIssued && !currentIsServerIssued)) {
+      byThread.set(artifact.thread_id, artifact);
+    }
+  }
+  return byThread;
+}
+
+export { responseFromArtifact, selectAuthoritativeArtifacts };
 
 async function getSubscriberProfile(userEmail) {
   const res = await fetch(
@@ -164,22 +181,18 @@ export default async function handler(req, res) {
 
       // Restore completed root artifacts and enrichments from the server.
       const threadIds = [...byId.keys()];
-      const artifactByThread = new Map();
+      let artifactByThread = new Map();
       const packetsByArtifact = new Map();
       const packetsByLineage = new Map();
       if (threadIds.length) {
         try {
           const idsFilter = threadIds.map(id => `"${id}"`).join(',');
           const artifactRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/interpretation_artifacts?thread_id=in.(${idsFilter})&order=artifact_revision.desc&select=thread_id,artifact_id,artifact_revision,artifact`,
+            `${SUPABASE_URL}/rest/v1/interpretation_artifacts?thread_id=in.(${idsFilter})&order=artifact_revision.desc&select=thread_id,artifact_id,artifact_revision,inquiry_key,artifact`,
             { headers: sbHeaders() },
           );
           const artifacts = artifactRes.ok ? await artifactRes.json() : [];
-          for (const artifact of Array.isArray(artifacts) ? artifacts : []) {
-            if (!artifactByThread.has(artifact.thread_id)) {
-              artifactByThread.set(artifact.thread_id, artifact);
-            }
-          }
+          artifactByThread = selectAuthoritativeArtifacts(artifacts);
           const artifactIds = [...new Set((Array.isArray(artifacts) ? artifacts : [])
             .map(row => row.artifact_id))];
           if (artifactIds.length) {

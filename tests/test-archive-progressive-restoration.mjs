@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const { responseFromArtifact } = await import('../api/threads.js');
+const { responseFromArtifact, selectAuthoritativeArtifacts } = await import('../api/threads.js');
 
 const client = fs.readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 const threadsApi = fs.readFileSync(new URL('../api/threads.js', import.meta.url), 'utf8');
@@ -24,7 +24,8 @@ assert.match(
 
 // The server reconstruction must select the newest artifact revision and retain
 // current or inherited enrichment packets from the same artifact lineage.
-assert.match(threadsApi, /order=artifact_revision\.desc&select=thread_id,artifact_id,artifact_revision,artifact/);
+assert.match(threadsApi, /order=artifact_revision\.desc&select=thread_id,artifact_id,artifact_revision,inquiry_key,artifact/);
+assert.match(threadsApi, /artifact\.inquiry_key\.startsWith\('server:'\)/);
 assert.match(threadsApi, /order=artifact_revision\.desc,sequence\.asc/);
 assert.match(threadsApi, /const packetsByLineage = new Map\(\)/);
 assert.match(threadsApi, /packetTypes\.has\(packet\.packet_type\)/);
@@ -94,6 +95,26 @@ assert.equal(restored.prism_summary, 'Summary');
 assert.equal(restored.entanglement, 'Entanglement');
 assert.equal(restored.key_terms[0].term, 'Tov');
 assert.notEqual(restored._analysisIncomplete, true);
+
+const authoritativeByThread = selectAuthoritativeArtifacts([
+  {
+    thread_id: 'thread-1',
+    artifact_id: 'unrelated-root',
+    artifact_revision: 1,
+    inquiry_key: 'thread:thread-1',
+  },
+  {
+    thread_id: 'thread-1',
+    artifact_id: artifactId,
+    artifact_revision: 1,
+    inquiry_key: 'server:constitutional-inquiry',
+  },
+]);
+assert.equal(
+  authoritativeByThread.get('thread-1').artifact_id,
+  artifactId,
+  'Archive must prefer the server-issued inquiry lineage over a thread fallback root',
+);
 
 const legacyEmpty = responseFromArtifact({
   artifact_id: artifactId,
