@@ -47,6 +47,7 @@ function responseFromArtifact(artifactRow, packetRows) {
     if (packet.packet_type === 'interpretive_context') {
       response.interpretive_context = content.text || '';
     } else if (packet.packet_type === 'prism_analysis') {
+      response.prism_analysis = content;
       const framework = content.framework || {};
       response.prism_summary = framework.prismSummary || '';
       response.entanglement = framework.entanglement || '';
@@ -63,6 +64,8 @@ function responseFromArtifact(artifactRow, packetRows) {
   }
   return response;
 }
+
+export { responseFromArtifact };
 
 async function getSubscriberProfile(userEmail) {
   const res = await fetch(

@@ -4826,7 +4826,7 @@ function selectThread(id) {
   // Archive hydration is server-authoritative. A local response snapshot may
   // have been written at canonical completion, before progressive packets
   // attached, so it must not mask the complete persisted artifact revision.
-  var responseData = supaResp || localParsed;
+  var responseData = archiveResponseForRender(supaResp, localParsed);
 
   if (responseData) {
     // Set _lastParsedResult so Share button works on sidebar-loaded threads
@@ -5109,6 +5109,23 @@ function getSupabaseClient() {
   var anon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
   _supabaseClient = window.supabase.createClient(url, anon);
   return _supabaseClient;
+}
+
+function archiveResponseForRender(serverResponse, localResponse) {
+  var responseData = serverResponse || localResponse;
+  if (!serverResponse || !responseData || typeof responseData !== 'object') return responseData;
+
+  // Preserve the persisted packet as the authoritative Archive state while
+  // retaining the flattened fields consumed by the existing Framework UI.
+  if (responseData.prism_analysis && typeof responseData.prism_analysis === 'object') {
+    applyProgressivePacket(responseData, {
+      packetType: 'prism_analysis',
+      content: responseData.prism_analysis,
+      artifactId: responseData._artifactId,
+      artifactRevision: responseData._artifactRevision
+    });
+  }
+  return responseData;
 }
 
 async function getInterpretRequestHeaders() {
