@@ -5634,6 +5634,7 @@ async function callInquiryModel({
   timeoutMs = 15000,
   structuredOutputSchema = null,
   structuredOutputName = 'emit_structured_output',
+  structuredOutputDiagnostic = null,
 }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort('MODEL_TIMEOUT'), timeoutMs);
@@ -5671,6 +5672,24 @@ async function callInquiryModel({
   }
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
+    if (structuredOutputSchema && typeof structuredOutputDiagnostic === 'function') {
+      let providerErrorCode = null;
+      try {
+        const parsed = JSON.parse(detail);
+        const candidate = parsed?.error?.type || parsed?.error?.code || parsed?.type || parsed?.code;
+        if (typeof candidate === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(candidate)) {
+          providerErrorCode = candidate;
+        }
+      } catch (_) {
+        // Provider detail is intentionally excluded from diagnostics.
+      }
+      structuredOutputDiagnostic({
+        outcome: 'provider_rejection',
+        providerStatus: response.status,
+        providerErrorCode,
+        toolUseReturned: false,
+      });
+    }
     throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
   }
   const data = await response.json();
@@ -5687,7 +5706,24 @@ async function callInquiryModel({
       block => block.type === 'tool_use' && block.name === structuredOutputName,
     );
     if (!structured?.input || typeof structured.input !== 'object' || Array.isArray(structured.input)) {
+      if (typeof structuredOutputDiagnostic === 'function') {
+        structuredOutputDiagnostic({
+          outcome: 'tool_use_missing',
+          providerStatus: response.status,
+          providerErrorCode: null,
+          toolUseReturned: false,
+          errorCode: 'INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING',
+        });
+      }
       throw new Error('INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING');
+    }
+    if (typeof structuredOutputDiagnostic === 'function') {
+      structuredOutputDiagnostic({
+        outcome: 'tool_use_returned',
+        providerStatus: response.status,
+        providerErrorCode: null,
+        toolUseReturned: true,
+      });
     }
     return structured.input;
   }
@@ -5890,6 +5926,7 @@ async function constructAuditedArtifact({
       prompt: `Repair serialization only. Convert the candidate below into the exact JSON contract without changing its substantive interpretation, thesis, conclusions, qualifications, or canonical response. Fill only structurally required fields from the query when absent. Return JSON only.\n\nQuery:\n${query}\n\nCandidate:\n${rawCoreText}`,
       structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
       structuredOutputName: 'emit_interpretation_artifact',
+      structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', diagnostic),
     });
     rawCore = repairedCore;
     timing('artifact_json_repair_complete', {
