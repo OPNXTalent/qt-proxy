@@ -4833,11 +4833,11 @@ function selectThread(id) {
     // Set _lastParsedResult so Share button works on sidebar-loaded threads
     window._lastParsedResult = responseData;
     currentSubject = savedInput;
-    console.info('[prism:archive-client-boundary]', {
+    console.info('[prism:archive-client-boundary] ' + JSON.stringify({
       threadId: id,
       rawApiThreads: _archiveRawResponseDiagnostics.get(id) || archiveDiagnosticShape(supaResp),
       beforeRenderResult: archiveDiagnosticShape(responseData)
-    });
+    }));
     renderResult(responseData);
     showResult();
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;

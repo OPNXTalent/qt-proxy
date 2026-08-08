@@ -105,6 +105,7 @@ assert.match(archiveTransferSource, /artifactRevision: responseData\._artifactRe
 // The temporary Preview diagnostic compares the raw Archive payload with the
 // exact object handed to renderResult without exposing response content.
 assert.match(client, /\[prism:archive-client-boundary\]/);
+assert.match(client, /console\.info\('\[prism:archive-client-boundary\] ' \+ JSON\.stringify\(\{/);
 assert.match(client, /rawApiThreads: _archiveRawResponseDiagnostics\.get\(id\)/);
 assert.match(client, /beforeRenderResult: archiveDiagnosticShape\(responseData\)/);
 assert.match(client, /topLevelKeys: keys/);
