@@ -4823,7 +4823,10 @@ function selectThread(id) {
   var localParsed = null;
   if (localRaw) { try { localParsed = JSON.parse(localRaw); } catch(e) {} }
   var supaResp = (thread.response && typeof thread.response === 'object' && Object.keys(thread.response).length > 0) ? thread.response : null;
-  var responseData = localParsed || supaResp;
+  // Archive hydration is server-authoritative. A local response snapshot may
+  // have been written at canonical completion, before progressive packets
+  // attached, so it must not mask the complete persisted artifact revision.
+  var responseData = supaResp || localParsed;
 
   if (responseData) {
     // Set _lastParsedResult so Share button works on sidebar-loaded threads
