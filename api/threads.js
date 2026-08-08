@@ -225,10 +225,29 @@ export default async function handler(req, res) {
           title:        t.title || t.query?.substring(0, 60) || 'Untitled',
           query:        t.query || '',
           response:     artifactByThread.has(t.id)
-            ? responseFromArtifact(
-              artifactByThread.get(t.id),
-              packetsByArtifact.get(artifactByThread.get(t.id).artifact_id),
-            )
+            ? (() => {
+              const artifactRow = artifactByThread.get(t.id);
+              const packetRows = packetsByArtifact.get(artifactRow.artifact_id);
+              const restoredResponse = responseFromArtifact(artifactRow, packetRows);
+              console.info('archive restoration response boundary:', {
+                threadId: t.id,
+                artifactId: artifactRow.artifact_id,
+                artifactRevision: artifactRow.artifact_revision,
+                packetTypes: (packetRows || []).map(packet => packet.packet_type),
+                hasArtifactId: Boolean(restoredResponse?._artifactId),
+                hasArtifactRevision: restoredResponse?._artifactRevision !== undefined
+                  && restoredResponse?._artifactRevision !== null,
+                hasInterpretiveContext: Object.prototype.hasOwnProperty.call(
+                  restoredResponse || {},
+                  'interpretive_context',
+                ),
+                hasPrismAnalysis: Object.prototype.hasOwnProperty.call(
+                  restoredResponse || {},
+                  'prism_analysis',
+                ),
+              });
+              return restoredResponse;
+            })()
             : (t.response || null),
           queryType:    t.query_type || 'free_text',
           createdAt:    new Date(t.created_at).getTime(),
