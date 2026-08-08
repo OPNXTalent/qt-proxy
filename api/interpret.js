@@ -5995,7 +5995,7 @@ async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing
   try {
     const rawText = await callInquiryModel({
       model: 'claude-sonnet-4-6',
-      maxTokens: 1800,
+      maxTokens: 3000,
       temperature: 0.2,
       timeoutMs: 60000,
       system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
