@@ -38,9 +38,15 @@ for (const stage of [
   );
 }
 assert.match(interpret, /followup_total_complete/);
+assert.match(interpret, /FOLLOWUP_ARTIFACT_LINEAGE_INVALID/);
+assert.match(interpret, /artifact_id=eq\.\$\{encodeURIComponent\(artifactId\)\}/);
+assert.match(interpret, /revision: Math\.max\(previousState\.version \+ 1, restored\.artifactRevision \+ 1\)/);
 
 assert.match(frontend, /const followUpPrompt = input;/);
 assert.match(frontend, /inquiryKey: isFollowUp \? getPersistentInquiryKey\(\)/);
+assert.match(frontend, /artifactId: isFollowUp && window\._lastParsedResult/);
+assert.match(frontend, /window\._lastParsedResult\._artifactRevision/);
+assert.match(frontend, /window\._lastParsedResult\._artifactRevision = packet\.artifactRevision/);
 assert.match(frontend, /parsed\.type === 'stage'/);
 assert.match(frontend, /cachePersistentInquiryState/);
 assert.match(frontend, /parsed\.canonicalState === true/);

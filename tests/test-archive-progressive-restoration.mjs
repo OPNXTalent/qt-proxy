@@ -22,9 +22,12 @@ assert.match(
   'Archive restoration must prefer the server-authoritative response over a stale local snapshot',
 );
 
-// The server reconstruction must retain both completed revision-1 packet types
-// and map their persisted camelCase content into the legacy renderer contract.
-assert.match(threadsApi, /artifact_revision=eq\.1&status=eq\.complete/);
+// The server reconstruction must select the newest artifact revision and retain
+// current or inherited enrichment packets from the same artifact lineage.
+assert.match(threadsApi, /order=artifact_revision\.desc&select=thread_id,artifact_id,artifact_revision,artifact/);
+assert.match(threadsApi, /order=artifact_revision\.desc,sequence\.asc/);
+assert.match(threadsApi, /const packetsByLineage = new Map\(\)/);
+assert.match(threadsApi, /packetTypes\.has\(packet\.packet_type\)/);
 assert.match(threadsApi, /packet\.packet_type === 'interpretive_context'/);
 assert.match(threadsApi, /response\.interpretive_context = content\.text \|\| ''/);
 assert.match(threadsApi, /packet\.packet_type === 'prism_analysis'/);

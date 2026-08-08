@@ -166,30 +166,37 @@ export default async function handler(req, res) {
       const threadIds = [...byId.keys()];
       const artifactByThread = new Map();
       const packetsByArtifact = new Map();
+      const packetsByLineage = new Map();
       if (threadIds.length) {
         try {
           const idsFilter = threadIds.map(id => `"${id}"`).join(',');
           const artifactRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/interpretation_artifacts?thread_id=in.(${idsFilter})&artifact_revision=eq.1&select=thread_id,artifact_id,artifact_revision,artifact`,
+            `${SUPABASE_URL}/rest/v1/interpretation_artifacts?thread_id=in.(${idsFilter})&order=artifact_revision.desc&select=thread_id,artifact_id,artifact_revision,artifact`,
             { headers: sbHeaders() },
           );
           const artifacts = artifactRes.ok ? await artifactRes.json() : [];
           for (const artifact of Array.isArray(artifacts) ? artifacts : []) {
-            artifactByThread.set(artifact.thread_id, artifact);
+            if (!artifactByThread.has(artifact.thread_id)) {
+              artifactByThread.set(artifact.thread_id, artifact);
+            }
           }
           const artifactIds = [...new Set((Array.isArray(artifacts) ? artifacts : [])
             .map(row => row.artifact_id))];
           if (artifactIds.length) {
             const artifactFilter = artifactIds.map(id => `"${id}"`).join(',');
             const packetRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/interpretation_packets?artifact_id=in.(${artifactFilter})&artifact_revision=eq.1&status=eq.complete&order=sequence.asc&select=artifact_id,packet_type,sequence,content`,
+              `${SUPABASE_URL}/rest/v1/interpretation_packets?artifact_id=in.(${artifactFilter})&status=eq.complete&order=artifact_revision.desc,sequence.asc&select=artifact_id,artifact_revision,packet_type,sequence,content`,
               { headers: sbHeaders() },
             );
             const packets = packetRes.ok ? await packetRes.json() : [];
             for (const packet of Array.isArray(packets) ? packets : []) {
-              const list = packetsByArtifact.get(packet.artifact_id) || [];
+              const key = `${packet.artifact_id}:${packet.artifact_revision}`;
+              const list = packetsByArtifact.get(key) || [];
               list.push(packet);
-              packetsByArtifact.set(packet.artifact_id, list);
+              packetsByArtifact.set(key, list);
+              const lineage = packetsByLineage.get(packet.artifact_id) || [];
+              lineage.push(packet);
+              packetsByLineage.set(packet.artifact_id, lineage);
             }
           }
         } catch (artifactRestoreError) {
@@ -245,7 +252,16 @@ export default async function handler(req, res) {
           response:     artifactByThread.has(t.id)
             ? (() => {
               const artifactRow = artifactByThread.get(t.id);
-              const packetRows = packetsByArtifact.get(artifactRow.artifact_id);
+              const exactKey = `${artifactRow.artifact_id}:${artifactRow.artifact_revision}`;
+              const packetRows = [...(packetsByArtifact.get(exactKey) || [])];
+              const packetTypes = new Set(packetRows.map(packet => packet.packet_type));
+              for (const packet of packetsByLineage.get(artifactRow.artifact_id) || []) {
+                if (packet.artifact_revision > artifactRow.artifact_revision
+                  || packetTypes.has(packet.packet_type)
+                  || !['interpretive_context', 'prism_analysis'].includes(packet.packet_type)) continue;
+                packetRows.push(packet);
+                packetTypes.add(packet.packet_type);
+              }
               const restoredResponse = responseFromArtifact(artifactRow, packetRows);
               console.info('archive restoration response boundary:', {
                 threadId: t.id,

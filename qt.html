@@ -3044,6 +3044,12 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
           : undefined,
         threadId: isFollowUp ? activeThreadId : undefined,
         inquirySubject: isFollowUp ? currentSubject : undefined,
+        artifactId: isFollowUp && window._lastParsedResult
+          ? window._lastParsedResult._artifactId
+          : undefined,
+        artifactRevision: isFollowUp && window._lastParsedResult
+          ? window._lastParsedResult._artifactRevision
+          : undefined,
         shareId: isFollowUp ? (window._sharedViewShareId || undefined) : undefined,
         debugMode: getTheodicyDebugMode(),
         requestId
@@ -3101,6 +3107,10 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
   let progressiveFollowUp = false;
 
   function renderFollowUpPacket(packet) {
+    if (packet && packet.artifactId && packet.artifactRevision && window._lastParsedResult) {
+      window._lastParsedResult._artifactId = packet.artifactId;
+      window._lastParsedResult._artifactRevision = packet.artifactRevision;
+    }
     progressiveFollowUp = true;
     var content = packet.content || {};
     if (packet.packetType === 'inquiry_orientation') {

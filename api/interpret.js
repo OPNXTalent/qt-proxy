@@ -5539,10 +5539,41 @@ Follow-up: ${String(input || '').slice(0, 4000)}`,
   );
 }
 
-async function restoreCanonicalInquiryState({ inquiryKey, threadId, subject }) {
+async function restoreCanonicalInquiryState({
+  inquiryKey,
+  threadId,
+  subject,
+  artifactId,
+  artifactRevision,
+  ownerUserId,
+}) {
   const fallback = createInitialInquiryState(subject);
-  const fallbackResult = { state: fallback, inquiryKey };
+  const fallbackResult = {
+    state: fallback,
+    inquiryKey,
+    artifactId: null,
+    artifactRevision: 0,
+  };
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !inquiryKey) return fallbackResult;
+
+  let lineageArtifact = null;
+  if (/^[0-9a-f-]{36}$/i.test(artifactId || '')
+    && Number.isInteger(artifactRevision)
+    && artifactRevision >= 1) {
+    const artifactResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact_id,artifact_revision,inquiry_key,thread_id,owner_user_id&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    const artifactRows = artifactResponse.ok ? await artifactResponse.json() : [];
+    const candidate = artifactRows?.[0];
+    const threadMatches = !candidate?.thread_id || candidate.thread_id === threadId;
+    const ownerMatches = Boolean(ownerUserId) && candidate?.owner_user_id === ownerUserId;
+    if (!candidate || !threadMatches || !ownerMatches) {
+      throw new Error('FOLLOWUP_ARTIFACT_LINEAGE_INVALID');
+    }
+    lineageArtifact = candidate;
+    inquiryKey = candidate.inquiry_key;
+  }
 
   let response = await fetch(
     `${SUPABASE_URL}/rest/v1/inquiry_states?inquiry_key=eq.${encodeURIComponent(inquiryKey)}&select=inquiry_key,version,state&limit=1`,
@@ -5570,7 +5601,12 @@ async function restoreCanonicalInquiryState({ inquiryKey, threadId, subject }) {
   if (currentCandidate?.schemaVersion === 1 && typeof currentCandidate.orientation === 'string') {
     const restored = validateInquiryState(currentCandidate, subject);
     restored.version = Math.max(0, Number(rows[0].version) || 0);
-    return { state: restored, inquiryKey: canonicalInquiryKey };
+    return {
+      state: restored,
+      inquiryKey: canonicalInquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
   }
 
   const versionsResponse = await fetch(
@@ -5585,7 +5621,12 @@ async function restoreCanonicalInquiryState({ inquiryKey, threadId, subject }) {
   if (!lastValid) return fallbackResult;
   const restored = validateInquiryState(lastValid.state, subject);
   restored.version = Math.max(0, Number(lastValid.version) || 0);
-  return { state: restored, inquiryKey: canonicalInquiryKey };
+  return {
+    state: restored,
+    inquiryKey: canonicalInquiryKey,
+    artifactId: lineageArtifact?.artifact_id || null,
+    artifactRevision: lineageArtifact?.artifact_revision || 0,
+  };
 }
 
 async function commitCanonicalInquiryState({
@@ -6166,6 +6207,8 @@ async function runPersistentInquiryFollowUp({
   threadId,
   ownerUserId,
   tier,
+  artifactId,
+  artifactRevision,
   isClientAborted = () => false,
 }) {
   const runtimeStartedAt = Date.now();
@@ -6182,7 +6225,14 @@ async function runPersistentInquiryFollowUp({
   };
 
   let stageStartedAt = emitStage('restore');
-  const restored = await restoreCanonicalInquiryState({ inquiryKey, threadId, subject });
+  const restored = await restoreCanonicalInquiryState({
+    inquiryKey,
+    threadId,
+    subject,
+    artifactId,
+    artifactRevision,
+    ownerUserId,
+  });
   const previousState = restored.state;
   const canonicalInquiryKey = restored.inquiryKey || inquiryKey;
   completeStage('restore', stageStartedAt, { stateVersion: previousState.version });
@@ -6301,7 +6351,7 @@ async function runPersistentInquiryFollowUp({
   }, {
     inquiryId: canonicalInquiryKey,
     inquiryKey: canonicalInquiryKey,
-    revision: previousState.version + 1,
+    revision: Math.max(previousState.version + 1, restored.artifactRevision + 1),
     query: input,
     ownerUserId,
     threadId,
@@ -6835,6 +6885,7 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   let prompt, messages, rawQuery, isFollowUp;
   let inquiryKey, inquiryToken, threadId, inquirySubject, sharedFollowUpId;
+  let artifactId, artifactRevision;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
@@ -6853,6 +6904,14 @@ Do not add any question after the exit offer. The person chooses the next move.
     inquirySubject = typeof body?.inquirySubject === 'string'
       ? body.inquirySubject.slice(0, 2000)
       : '';
+    artifactId = typeof body?.artifactId === 'string'
+      && /^[0-9a-f-]{36}$/i.test(body.artifactId)
+      ? body.artifactId
+      : null;
+    artifactRevision = Number.isInteger(body?.artifactRevision)
+      && body.artifactRevision >= 1
+      ? body.artifactRevision
+      : null;
     sharedFollowUpId = typeof body?.shareId === 'string' ? body.shareId : null;
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
@@ -7040,6 +7099,8 @@ Do not add any question after the exit offer. The person chooses the next move.
                 threadId,
                 ownerUserId: userId,
                 tier,
+                artifactId,
+                artifactRevision,
                 isClientAborted: () => clientAborted,
               });
             } else {
@@ -7370,6 +7431,8 @@ Do not add any question after the exit offer. The person chooses the next move.
             threadId,
             ownerUserId: null,
             tier: 'free',
+            artifactId,
+            artifactRevision,
             isClientAborted: () => clientAborted,
           });
         } else {
