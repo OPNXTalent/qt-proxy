@@ -2081,7 +2081,7 @@
   <!-- Sidebar footer — nav + logout -->
   <div style="padding:16px 20px; border-top:1px solid var(--border); flex-shrink:0; position:relative; display:flex; justify-content:space-between; align-items:center;">
     <a href="/index.html" style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)'">← Home</a>
-    <button onclick="handleLogout()" style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)'">Sign Out →</button>
+    <button id="sidebarSignOut" onclick="handleLogout()" style="display:none;font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)'">Sign Out →</button>
   </div>
 
   <!-- Undo toast -->
@@ -2645,7 +2645,7 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
     // covering Signal Bank / Subscribe purchases — showing the full
     // four-option wall on top of that is redundant, so just the reset
     // message and countdown are shown for them.
-    var registeredEmail = localStorage.getItem('qt_user_email');
+    var registeredEmail = userEmail();
     var optionsGrid = document.getElementById('limitPromptOptions');
     if (registeredEmail) {
       if (optionsGrid) optionsGrid.style.display = 'none';
@@ -2744,8 +2744,8 @@ async function runInterpretation() {
   if (!input) return;
 
   // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
-  const _isAnon = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
-  const _isPaidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
+  const _isAnon = !verifiedAuthState.authenticated;
+  const _isPaidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(getActualTier());
   if (!previewTestAccess && (_isAnon || !_isPaidTier) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
   const requestId = createPrismRequestId();
   markPrismBrowserTiming(requestId, 'submit', {
@@ -2866,7 +2866,7 @@ async function runInterpretation() {
     // page refresh, since it never re-reads purchased_credits.
     loadSidebarCredits();
     // Only lock the UI for free/anonymous users — paid subscribers are gated server-side
-    const _isAnonPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+    const _isAnonPost = !verifiedAuthState.authenticated;
     const _isPaidPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
     if (!previewTestAccess && (_isAnonPost || !_isPaidPost) && sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
@@ -2922,7 +2922,7 @@ async function runFollowUp() {
   if (!input) return;
 
   // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
-  const _isAnonFU = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+  const _isAnonFU = !verifiedAuthState.authenticated;
   const _isPaidTierFU = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
   if (!previewTestAccess && (_isAnonFU || !_isPaidTierFU) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
   const requestId = createPrismRequestId();
@@ -2971,7 +2971,7 @@ async function runFollowUp() {
     // Increment counter and apply lock for non-subscribers after successful follow-up
     sessionQueryCount++;
     loadSidebarCredits();
-    const _isAnonFUPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+    const _isAnonFUPost = !verifiedAuthState.authenticated;
     const _isPaidFUPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
     if (!previewTestAccess && (_isAnonFUPost || !_isPaidFUPost) && sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
@@ -4193,8 +4193,18 @@ document.getElementById('userInput').addEventListener('keydown', function(e) {
 // Tier retention windows in days
 var TIER_RETENTION = { scholar: 90, refraction: 90, theologian: 180, full_spectrum: 180, companion: 365, trial: 30, free: 1 };
 
+// Authentication is established only by a verified Supabase session.
+var verifiedAuthState = {
+  ready: false,
+  authenticated: false,
+  userId: null,
+  email: null,
+  tier: 'free',
+  displayName: null
+};
+
 // Read actual tier — requires a logged-in email to honor a paid tier
-function getActualTier() {
+function getActualTierLegacy() {
   var urlParams = new URLSearchParams(window.location.search);
   var userEmail = localStorage.getItem('qt_user_email');
 
@@ -4228,6 +4238,11 @@ function getActualTier() {
   if (tierParam && TIER_RETENTION[tierParam]) return tierParam;
   if (stored && TIER_RETENTION[stored]) return stored;
   return 'free';
+}
+
+function getActualTier() {
+  if (!verifiedAuthState.authenticated) return 'free';
+  return TIER_RETENTION[verifiedAuthState.tier] ? verifiedAuthState.tier : 'free';
 }
 
 // For R1 new session — store a flag to force free tier WITHOUT clearing S1's localStorage
@@ -4370,7 +4385,7 @@ let sidebarHasAppeared = false;
 const API_BASE = '';
 
 function userEmail() {
-  return localStorage.getItem('qt_user_email') || null;
+  return verifiedAuthState.authenticated ? verifiedAuthState.email : null;
 }
 
 function getThreadTitle(thread) {
@@ -4585,7 +4600,7 @@ function getAnonSessionId() {
 // session id. Returns null if neither applies, so every call site can just
 // bail rather than guessing at a fallback.
 function noteIdentityHeaders() {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (email) return { 'x-user-email': email };
   if (window._sharedViewToken) return { 'x-anon-session': getAnonSessionId() };
   return null;
@@ -4598,7 +4613,7 @@ function noteIdentityHeaders() {
 // followups.js's owner/participant checks would 403 an otherwise-signed-in
 // visitor who hasn't joined, same as they would an anonymous one.
 function canActAsThreadMember() {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (!window._sharedViewToken) return !!email;
   return !!email && window._sharedViewIsParticipant === true;
 }
@@ -4633,7 +4648,7 @@ async function loadSharedThread(token) {
 
     window._sharedViewShareId = share.id;
 
-    var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+    var email = userEmail();
 
     // First-time anonymous visitor — the gateway IS the arrival point.
     // Nothing renders underneath it; entering the thread is what "Explore
@@ -4706,7 +4721,7 @@ function enterSharedThread(share) {
   // explicit, confirmed action rather than something that happens just
   // from opening the link), and separately bring in their own thread
   // history so it's not lost underneath the one shared thread.
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (email) {
     checkCircleParticipant(share.thread_id, email);
     mergeOwnThreadHistory(syntheticThread);
@@ -5156,6 +5171,86 @@ function getSupabaseClient() {
   return _supabaseClient;
 }
 
+function applyVerifiedIdentityPresentation() {
+  CURRENT_TIER = getActualTier();
+  var tierLabels = {
+    refraction: 'Examiner',
+    full_spectrum: 'Full Spectrum',
+    scholar: 'Examiner',
+    theologian: 'Full Spectrum',
+    companion: 'Full Spectrum',
+    free: 'Observer · Free Access'
+  };
+  var labelEl = document.getElementById('sidebarTierLabel');
+  if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || tierLabels.free;
+  var signOut = document.getElementById('sidebarSignOut');
+  if (signOut) signOut.style.display = verifiedAuthState.authenticated ? '' : 'none';
+}
+
+async function hydrateVerifiedAuthState() {
+  // Remove the legacy credential cache even when no session can be recovered.
+  localStorage.removeItem('qt_user_password');
+
+  var session = null;
+  try {
+    var sessionResult = await getSupabaseClient().auth.getSession();
+    session = sessionResult && sessionResult.data ? sessionResult.data.session : null;
+  } catch (e) {
+    session = null;
+  }
+
+  if (!session || !session.user || !session.user.id || !session.user.email) {
+    verifiedAuthState = {
+      ready: true,
+      authenticated: false,
+      userId: null,
+      email: null,
+      tier: 'free',
+      displayName: null
+    };
+    localStorage.removeItem('qt_user_email');
+    localStorage.removeItem('qt_user_tier');
+    localStorage.removeItem('qt_display_name');
+    applyVerifiedIdentityPresentation();
+    return verifiedAuthState;
+  }
+
+  var tier = 'free';
+  var displayName = null;
+  try {
+    var identityResponse = await fetch(API_BASE + '/api/threads', {
+      headers: { Authorization: 'Bearer ' + session.access_token },
+      cache: 'no-store'
+    });
+    if (identityResponse.ok) {
+      var identityPayload = await identityResponse.json();
+      if (identityPayload && TIER_RETENTION[identityPayload.tier]) tier = identityPayload.tier;
+      displayName = identityPayload && identityPayload.display_name
+        ? identityPayload.display_name
+        : null;
+    }
+  } catch (e) {
+    // A verified session remains authoritative even if profile hydration fails.
+  }
+
+  verifiedAuthState = {
+    ready: true,
+    authenticated: true,
+    userId: String(session.user.id).toLowerCase(),
+    email: String(session.user.email).trim().toLowerCase(),
+    tier: tier,
+    displayName: displayName
+  };
+
+  // Compatibility caches are written only after server-verified authentication.
+  localStorage.setItem('qt_user_email', verifiedAuthState.email);
+  localStorage.setItem('qt_user_tier', verifiedAuthState.tier);
+  if (verifiedAuthState.displayName) localStorage.setItem('qt_display_name', verifiedAuthState.displayName);
+  else localStorage.removeItem('qt_display_name');
+  applyVerifiedIdentityPresentation();
+  return verifiedAuthState;
+}
+
 function archiveResponseForRender(serverResponse, localResponse) {
   var responseData = serverResponse || localResponse;
   if (!serverResponse || !responseData || typeof responseData !== 'object') return responseData;
@@ -5585,7 +5680,7 @@ function showSidebarAfterQuery(queryText) {
   if (!sidebarHasAppeared) {
     sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
     sidebarHasAppeared = true;
-    if (localStorage.getItem('qt_user_email')) localStorage.setItem('qt_sidebar_appeared', '1');
+    if (userEmail()) localStorage.setItem('qt_sidebar_appeared', '1');
   }
   // Intentionally not auto-opening the sidebar here — a completed query
   // shouldn't pull focus away onto the Archive. The toggle button (made
@@ -5651,7 +5746,7 @@ function toggleSaveSession() {
 function updateSaveSessionVisibility() {
   var box = document.getElementById('saveSessionBox');
   if (!box) return;
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   var show = !!(window._sharedViewToken && !email);
   box.style.display = show ? 'block' : 'none';
 }
@@ -5672,13 +5767,13 @@ function toggleJoinCircle() {
 function updateJoinCircleVisibility() {
   var box = document.getElementById('joinCircleBox');
   if (!box) return;
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   var show = !!(window._sharedViewToken && email && !window._sharedViewIsParticipant);
   box.style.display = show ? 'block' : 'none';
 }
 
 async function joinCircle() {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (!email || !activeThreadId) return;
   var btn = document.getElementById('joinCircleBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Joining…'; }
@@ -5791,7 +5886,7 @@ async function loadSidebarCreditsAnon() {
 }
 
 async function loadSidebarCredits() {
-  const email = localStorage.getItem('qt_user_email');
+  const email = userEmail();
   if (!email) {
     loadSidebarCreditsAnon();
     return;
@@ -5897,7 +5992,7 @@ function initSidebar() {
     if (toggle)  toggle.classList.add('visible');
     sidebarHasAppeared = true;
     var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
+    if (freePrompt && !userEmail()) freePrompt.style.display = 'block';
     return;
   }
 
@@ -6026,6 +6121,19 @@ function undoDelete() {
 }
 
 async function handleLogout() {
+  try {
+    await getSupabaseClient().auth.signOut();
+  } catch(e) { /* proceed with local clear regardless */ }
+  verifiedAuthState = {
+    ready: true,
+    authenticated: false,
+    userId: null,
+    email: null,
+    tier: 'free',
+    displayName: null
+  };
+  localStorage.removeItem('qt_user_password');
+  if (false) {
   // Sign out of Supabase Auth
   try {
     var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
@@ -6037,7 +6145,8 @@ async function handleLogout() {
   } catch(e) { /* silent — proceed with local clear regardless */ }
 
   // Clear session identity only — preserve thread history for when user logs back in
-  var keysToRemove = ['qt_user_email', 'qt_user_tier', 'qt_sidebar_appeared', 'qt_sidebar_open'];
+  }
+  var keysToRemove = ['qt_user_email', 'qt_user_tier', 'qt_user_password', 'qt_display_name', 'qt_sidebar_appeared', 'qt_sidebar_open'];
   keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
 
   // Clear session storage
@@ -6218,7 +6327,7 @@ async function deactivateShare() {
   try {
     await authenticatedFetch('/api/share', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': localStorage.getItem('qt_user_email') || '' },
+      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() || '' },
       body: JSON.stringify({ shareId: _currentSharedSessionId, status: 'inactive' })
     });
   } catch(e) {}
@@ -6283,9 +6392,15 @@ async function handleShareBtn() {
   var btn = document.getElementById('shareBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Creating share…'; }
 
-  var snapshot    = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
-  var senderEmail = localStorage.getItem('qt_user_email') || null;
+  var senderEmail = userEmail();
   var threadId    = activeThreadId || null;
+  var artifactId = window._lastParsedResult._artifactId || null;
+  var artifactRevision = window._lastParsedResult._artifactRevision || null;
+
+  if (!verifiedAuthState.authenticated) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Share This'; }
+    return;
+  }
 
   // If thread hasn't been saved to Supabase yet (pending-), resolve the real ID first
   if (!threadId || threadId.startsWith('pending-')) {
@@ -6306,7 +6421,14 @@ async function handleShareBtn() {
     var res = await authenticatedFetch('/api/share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-user-email': senderEmail || '' },
-      body: JSON.stringify({ snapshot, subject: currentSubject, senderEmail, threadId, collaborationOpen: false })
+      body: JSON.stringify({
+        subject: currentSubject,
+        senderEmail,
+        threadId,
+        artifactId,
+        artifactRevision,
+        collaborationOpen: false
+      })
     });
     var data = await res.json();
     if (!res.ok || !data.shareId) throw new Error('share failed');
@@ -6571,7 +6693,7 @@ function getChatParticipantName() {
   // display_name fell into the exact same "Participant N" placeholder
   // meant for genuinely anonymous visitors — which is why the sender of a
   // thread, not just recipients, could end up labeled that way.
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (email) {
     var derived = email.split('@')[0].replace(/[._]+/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
     _chatParticipantName = derived;
@@ -6800,7 +6922,7 @@ async function sendChatMessage() {
   var text = input.value.trim();
   if (!text) return;
 
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   // Distinct from just "has an email" — a signed-in visitor who hasn't
   // explicitly joined this thread's Trust Circle yet still sends as an
   // anonymous-style recipient, same as anyone else, until they join.
@@ -7275,7 +7397,7 @@ async function renderDiscussionView() {
       stream.innerHTML = '<div class="chat-empty">No refractions yet.<br>Begin the conversation.</div>';
       return;
     }
-    var myEmail = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+    var myEmail = userEmail();
     var myName  = getChatParticipantName();
     var myAnonId = getAnonSessionId();
     filtered.forEach(function(m) {
@@ -7317,7 +7439,7 @@ async function loadChatMessages() {
 
 // ── Private note edit/delete ─────────────────────────────────────────────
 async function deletePrivateNote(noteId) {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (!email) return;
   if (!confirm('Delete this private note? This can\'t be undone.')) return;
   try {
@@ -7693,9 +7815,20 @@ async function setShareMode(mode) {
 async function proceedToShareDelivery() {
   if (!window._lastParsedResult) return;
   var statusEl = document.getElementById('shareModalStatus');
-  var snapshot = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
-  var senderEmail = localStorage.getItem('qt_user_email') || null;
+  var senderEmail = userEmail();
   var threadId    = activeThreadId || null;
+  var artifactId = window._lastParsedResult._artifactId || null;
+  var artifactRevision = window._lastParsedResult._artifactRevision || null;
+
+  if (!verifiedAuthState.authenticated || !artifactId || !artifactRevision || !threadId) {
+    if (statusEl) {
+      statusEl.textContent = verifiedAuthState.authenticated
+        ? 'This inquiry is not yet ready to share.'
+        : 'Sign in to share this inquiry.';
+      statusEl.style.display = 'block';
+    }
+    return;
+  }
 
   // Show loading state on button
   var continueBtn = document.getElementById('shareContinueBtn');
@@ -7706,10 +7839,11 @@ async function proceedToShareDelivery() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-user-email': senderEmail || '' },
       body: JSON.stringify({
-        snapshot,
         subject:            currentSubject,
         senderEmail,
         threadId,
+        artifactId,
+        artifactRevision,
         collaborationOpen:  _shareMode === 'bidirectional',
         collaborationMode:  _shareMode || 'read_only'
       })
@@ -7785,7 +7919,7 @@ function startLiveSync() {
     selectThread(activeThreadId);
   }
   // Immediate fetch to surface any existing recipient contributions
-  var email = typeof userEmail === 'function' ? userEmail() : localStorage.getItem('qt_user_email');
+  var email = userEmail();
   if (email && activeThreadId) {
     authenticatedFetch((window.API_BASE || '') + '/api/followups?threadId=' + encodeURIComponent(activeThreadId), {
       headers: { 'x-user-email': email }
@@ -7887,7 +8021,7 @@ async function toggleShareOnOff() {
   try {
     var res = await authenticatedFetch('/api/share', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': localStorage.getItem('qt_user_email') || '' },
+      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() || '' },
       body: JSON.stringify({ shareId: _currentSharedSessionId, status: newStatus })
     });
     if (!res.ok) throw new Error('patch failed');
@@ -7922,7 +8056,7 @@ async function toggleCollaboration() {
   try {
     var res = await authenticatedFetch('/api/share', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': localStorage.getItem('qt_user_email') || '' },
+      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() || '' },
       body: JSON.stringify({ shareId: _currentSharedSessionId, collaborationOpen: _collabOpen })
     });
     if (!res.ok) throw new Error('patch failed');
@@ -7972,7 +8106,7 @@ function updateCollabToggleUI() {
 
 function openEmailCapture() {
   // Only show if user is anonymous and has done at least one query
-  if (localStorage.getItem('qt_user_email')) return;
+  if (userEmail()) return;
   var el = document.getElementById('emailCaptureModal');
   if (el) el.style.display = 'flex';
 }
@@ -8301,7 +8435,7 @@ function showFreeAccountModal(context) {
 
 function checkLimitEmailGate() {
   // Applies a known email to the purchase links if one's already on file.
-  var existingEmail = localStorage.getItem('qt_user_email');
+  var existingEmail = userEmail();
   if (existingEmail) applyLimitEmailToOptions(existingEmail);
 }
 
@@ -8405,7 +8539,7 @@ function restoreResumeSnapshot() {
 function handlePurchaseLinkClick(event, anchorEl) {
   saveResumeSnapshot(); // preserve the in-progress conversation either way
 
-  var email = localStorage.getItem('qt_user_email');
+  var email = userEmail();
   if (email) return true; // already registered — proceed to Stripe as normal
 
   event.preventDefault();
@@ -8475,8 +8609,7 @@ async function submitFreeAccount() {
       headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
       body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
     });
-    localStorage.setItem('qt_user_email', email);
-    localStorage.setItem('qt_user_password', btoa(password));
+    await hydrateVerifiedAuthState();
 
     // Send welcome email + credit 3 bonus queries via API
     try {
@@ -8541,7 +8674,7 @@ async function submitFreeAccount() {
 }
 
 async function runPreflightCheck() {
-  var userEmail = localStorage.getItem('qt_user_email');
+  var userEmail = window.userEmail();
   var _anonMode = sessionStorage.getItem('qt_anon_mode') === '1';
   var _paidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
 
@@ -8588,7 +8721,7 @@ async function handleCreditsAdded() {
   const cleanUrl = window.location.pathname;
   window.history.replaceState({}, '', cleanUrl);
 
-  const email = localStorage.getItem('qt_user_email');
+  const email = userEmail();
   if (!email) return;
 
   // Show a brief status message while we verify
@@ -8741,7 +8874,8 @@ async function handleCreditsAdded() {
   }
 })();
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+  await hydrateVerifiedAuthState();
   var _bootParams = new URLSearchParams(window.location.search);
 
   // Share-token entry — qt.html rendering a specific shared thread
@@ -9051,7 +9185,7 @@ function injectSharedThreadEntry() {
   item.addEventListener('click', function() {
     // If R1 has unsaved work, prompt to save before navigating away
     var hasWork = allThreads && allThreads.length > 0;
-    var hasEmail = !!localStorage.getItem('qt_user_email');
+    var hasEmail = !!userEmail();
     if (hasWork && !hasEmail) {
       var go = confirm('Your new query will not be saved when you return to the shared thread. Add your email first to keep it — or press OK to continue without saving.');
       if (!go) return;
