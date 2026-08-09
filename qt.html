@@ -2752,7 +2752,13 @@ async function runInterpretation() {
   conversationHistory.push({ role: 'user', content: input });
 
   try {
-    const apiRawText = await callProxy(conversationHistory, input, requestId);
+    const proxyResult = await callProxy(conversationHistory, input, requestId);
+    const apiRawText = proxyResult.text;
+    const persistedThreadId = proxyResult.threadId;
+
+    if (localStorage.getItem('qt_user_email') && proxyResult.persisted === false) {
+      console.error('[Prism] Interpretation completed, but the thread was not persisted.');
+    }
   
   // Store a condensed version in history to prevent payload bloat on follow-ups
   const condensed = apiRawText.length > 1000 
@@ -2853,11 +2859,13 @@ async function runInterpretation() {
       applyQueryLock();
     }
 
-    // Show sidebar after first successful query
+    // Show sidebar after first successful query. For authenticated users,
+    // the backend now returns the durable Supabase thread ID in the terminal
+    // SSE event, so the UI never has to guess or poll for the new row.
     const queryText = input;
-    showSidebarAfterQuery(queryText);
+    showSidebarAfterQuery(queryText, persistedThreadId);
 
-    // Save full response to localStorage keyed by thread id
+    // Save full response to localStorage keyed by the durable thread id
     // activeThreadId is set by showSidebarAfterQuery/addThreadToSidebar
     if (activeThreadId && parsed) {
         localStorage.setItem('qt_last_thread_id', activeThreadId);
@@ -3303,6 +3311,8 @@ async function callProxy(messages, rawQuery, requestId) {
   let buffer = '';
   let fullText = '';
   let tierFromStream = null;
+  let persistedThreadId = null;
+  let threadPersistenceOk = null;
   let streamTruncated = false;
   let firstDeltaSeen = false;
   let earlyRecognitionShown = false;
@@ -3370,6 +3380,8 @@ async function callProxy(messages, rawQuery, requestId) {
               window._streamTruncated = true;
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
+              persistedThreadId = parsed.threadId || null;
+              threadPersistenceOk = parsed.persisted !== false;
             } else if (parsed.type === 'error') {
               throw new Error('Stream error: ' + parsed.error);
             }
@@ -3396,6 +3408,8 @@ async function callProxy(messages, rawQuery, requestId) {
               considerEarlyRecognition();
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
+              persistedThreadId = parsed.threadId || null;
+              threadPersistenceOk = parsed.persisted !== false;
             }
           } catch(e) { /* ignore malformed final chunk */ }
         }
@@ -3420,7 +3434,11 @@ async function callProxy(messages, rawQuery, requestId) {
     if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
 
-  return fullText;
+  return {
+    text: fullText,
+    threadId: persistedThreadId,
+    persisted: threadPersistenceOk
+  };
 }
 
 function getErrorMessage(err) {
@@ -5053,51 +5071,40 @@ function confirmDelete(id) {
 }
 
 // ADD THREAD TO SIDEBAR
-function addThreadToSidebar(queryText) {
-  var tsNow = Date.now(), tempId = 'pending-' + tsNow;
-  allThreads.unshift({ id: tempId, title: queryText.length > 60 ? queryText.slice(0, 60) + '\u2026' : queryText,
-    query: queryText, lastVisited: formatNow(), createdAt: tsNow,
-    daysLeft: TIER_RETENTION[CURRENT_TIER] || 90, expired: false, response: null });
-  activeThreadId = tempId;
+function addThreadToSidebar(queryText, threadId) {
+  var tsNow = Date.now();
+  var id = threadId || ('pending-' + tsNow);
+
+  allThreads.unshift({
+    id: id,
+    title: queryText.length > 60 ? queryText.slice(0, 60) + '\u2026' : queryText,
+    query: queryText,
+    lastVisited: formatNow(),
+    createdAt: tsNow,
+    daysLeft: TIER_RETENTION[CURRENT_TIER] || 90,
+    expired: false,
+    response: null
+  });
+
+  activeThreadId = id;
   renderThreads(allThreads);
-  if (userEmail()) {
-    setTimeout(function() {
-      fetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() } })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (!data.threads) return;
-        allThreads = data.threads;
-        // Keep the response already on screen. Automatically selecting the
-        // server row here races its response persistence: selectThread()
-        // interprets a not-yet-populated response as an empty thread and
-        // hides resultBlock. Re-key the local snapshot instead, then start
-        // Realtime without rerendering the active conversation.
-        if (activeThreadId === tempId && allThreads.length > 0) {
-          var realThread = allThreads.find(function(thread) {
-            return thread.query === queryText;
-          }) || allThreads[0];
-          var realId = realThread.id;
-          ['qt_response_', 'qt_input_', 'qt_followups_', 'qt_thread_title_'].forEach(function(prefix) {
-            var pendingValue = localStorage.getItem(prefix + tempId);
-            if (pendingValue != null) {
-              localStorage.setItem(prefix + realId, pendingValue);
-              localStorage.removeItem(prefix + tempId);
-            }
-          });
-          activeThreadId = realId;
-          localStorage.setItem('qt_last_thread_id', realId);
-          if (typeof startFollowUpRealtime === 'function') {
-            startFollowUpRealtime(realId);
-          }
-        }
-        renderThreads(allThreads);
-      }).catch(function() {});
-    }, 2500);
+
+  if (threadId) {
+    localStorage.setItem('qt_last_thread_id', threadId);
+    if (typeof startFollowUpRealtime === 'function') {
+      startFollowUpRealtime(threadId);
+    }
+  } else if (userEmail()) {
+    // Authenticated requests should arrive with a durable ID. Do not poll the
+    // archive and replace the optimistic item: that was the race that caused
+    // the Save/archive entry to flash and disappear. Leave the local snapshot
+    // intact and surface the missing ID in diagnostics instead.
+    console.error('[Prism] Authenticated thread completed without a durable threadId.');
   }
 }
 
 // SHOW SIDEBAR AFTER QUERY
-function showSidebarAfterQuery(queryText) {
+function showSidebarAfterQuery(queryText, threadId) {
   var toggle = document.getElementById('sidebarToggle'), sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
   if (!sidebarHasAppeared) {
@@ -5109,7 +5116,7 @@ function showSidebarAfterQuery(queryText) {
   // shouldn't pull focus away onto the Archive. The toggle button (made
   // visible above) is enough for the person to open it themselves if
   // they want to see their session history.
-  addThreadToSidebar(queryText);
+  addThreadToSidebar(queryText, threadId);
 }
 
 // TOGGLE SIDEBAR
