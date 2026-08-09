@@ -5585,17 +5585,31 @@ async function restoreCanonicalInquiryState({
     // The response can proceed from a validated empty state, but no browser state
     // is promoted to canonical authority.
     console.error('Inquiry state restore failed:', response.status, detail.slice(0, 240));
-    return fallbackResult;
+    return {
+      state: fallback,
+      inquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
   }
   let rows = await response.json();
-  if (!rows?.length && /^[0-9a-f-]{36}$/i.test(threadId || '')) {
+  // Thread-level state is recovery-only. Once an artifact has established a
+  // validated lineage, a different root on the same thread cannot replace it.
+  if (!rows?.length && !lineageArtifact && /^[0-9a-f-]{36}$/i.test(threadId || '')) {
     response = await fetch(
       `${SUPABASE_URL}/rest/v1/inquiry_states?thread_id=eq.${encodeURIComponent(threadId)}&order=updated_at.desc&select=inquiry_key,version,state&limit=1`,
       { headers: inquiryServiceHeaders() },
     );
     if (response.ok) rows = await response.json();
   }
-  if (!rows?.length) return fallbackResult;
+  if (!rows?.length) {
+    return {
+      state: fallback,
+      inquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
+  }
   const canonicalInquiryKey = rows[0].inquiry_key || inquiryKey;
   const currentCandidate = rows[0].state;
   if (currentCandidate?.schemaVersion === 1 && typeof currentCandidate.orientation === 'string') {
@@ -5613,12 +5627,26 @@ async function restoreCanonicalInquiryState({
     `${SUPABASE_URL}/rest/v1/inquiry_state_versions?inquiry_key=eq.${encodeURIComponent(canonicalInquiryKey)}&order=version.desc&select=version,state&limit=10`,
     { headers: inquiryServiceHeaders() },
   );
-  if (!versionsResponse.ok) return fallbackResult;
+  if (!versionsResponse.ok) {
+    return {
+      state: fallback,
+      inquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
+  }
   const versions = await versionsResponse.json();
   const lastValid = versions.find(row => (
     row?.state?.schemaVersion === 1 && typeof row.state.orientation === 'string'
   ));
-  if (!lastValid) return fallbackResult;
+  if (!lastValid) {
+    return {
+      state: fallback,
+      inquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
+  }
   const restored = validateInquiryState(lastValid.state, subject);
   restored.version = Math.max(0, Number(lastValid.version) || 0);
   return {

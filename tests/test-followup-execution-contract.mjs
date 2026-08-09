@@ -40,6 +40,16 @@ for (const stage of [
 assert.match(interpret, /followup_total_complete/);
 assert.match(interpret, /FOLLOWUP_ARTIFACT_LINEAGE_INVALID/);
 assert.match(interpret, /artifact_id=eq\.\$\{encodeURIComponent\(artifactId\)\}/);
+assert.match(
+  interpret,
+  /if \(!rows\?\.length && !lineageArtifact && \/\^\[0-9a-f-\]\{36\}\$\/i\.test\(threadId \|\| ''\)\)/,
+  'A validated artifact lineage must bypass thread-level inquiry-state fallback',
+);
+assert.match(
+  interpret,
+  /if \(!rows\?\.length\) \{[\s\S]*?inquiryKey,[\s\S]*?artifactId: lineageArtifact\?\.artifact_id \|\| null,[\s\S]*?artifactRevision: lineageArtifact\?\.artifact_revision \|\| 0/,
+  'Missing inquiry state must preserve the validated artifact lineage',
+);
 assert.match(interpret, /revision: Math\.max\(previousState\.version \+ 1, restored\.artifactRevision \+ 1\)/);
 
 assert.match(frontend, /const followUpPrompt = input;/);
