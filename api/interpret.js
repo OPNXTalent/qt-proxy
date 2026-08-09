@@ -2256,14 +2256,27 @@ async function getAuthUserId(email) {
         }
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.log('[getAuthUserId] auth_lookup_http_error', { status: res.status });
+      return null;
+    }
     const data = await res.json();
     const users = data?.users;
-    if (!Array.isArray(users)) return null;
+    if (!Array.isArray(users)) {
+      console.log('[getAuthUserId] auth_lookup_empty_users', { isArray: false });
+      return null;
+    }
     const match = users.find(u => (u?.email || '').trim().toLowerCase() === normalizedEmail);
-    return match?.id || null;
-  } catch {
+    if (!match?.id) {
+      console.log('[getAuthUserId] auth_lookup_no_match', { userCount: users.length });
+      return null;
+    }
+    console.log('[getAuthUserId] auth_lookup_match', { userCount: users.length });
+    return match.id;
+  } catch (err) {
+    console.log('[getAuthUserId] auth_lookup_exception', { message: err?.message || 'unknown' });
     return null;
+
   }
 }
 
