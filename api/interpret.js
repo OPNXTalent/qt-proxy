@@ -2245,9 +2245,10 @@ async function getSubscriber(email) {
 // and are unaffected by this function.
 async function getAuthUserId(email) {
   if (!email) return null;
+  const normalizedEmail = email.trim().toLowerCase();
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+      `${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`,
       {
         headers: {
           'apikey': SUPABASE_SERVICE_ROLE_KEY,
@@ -2257,11 +2258,15 @@ async function getAuthUserId(email) {
     );
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.users?.[0]?.id || null;
+    const users = data?.users;
+    if (!Array.isArray(users)) return null;
+    const match = users.find(u => (u?.email || '').trim().toLowerCase() === normalizedEmail);
+    return match?.id || null;
   } catch {
     return null;
   }
 }
+
 
 async function getCodeRedemption(email) {
   if (!email) return null;
