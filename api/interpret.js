@@ -2237,6 +2237,50 @@ async function getSubscriber(email) {
   return data?.[0] || null;
 }
 
+// ── AUTH IDENTITY RESOLUTION ──────────────────────────────────────────────────
+// public.subscribers.id and auth.users.id are separate identity namespaces.
+// threads.user_id is foreign-key constrained to auth.users(id) and requires the
+// verified Supabase Auth UID - it must never receive subscriber.id. query_log,
+// getLiveQueryCount, and drawSignalSessionCredit correctly expect subscriber.id
+// and are unaffected by this function.
+async function getAuthUserId(email) {
+  if (!email) return null;
+  const normalizedEmail = email.trim().toLowerCase();
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        }
+      }
+    );
+    if (!res.ok) {
+      console.log('[getAuthUserId] auth_lookup_http_error', { status: res.status });
+      return null;
+    }
+    const data = await res.json();
+    const users = data?.users;
+    if (!Array.isArray(users)) {
+      console.log('[getAuthUserId] auth_lookup_empty_users', { isArray: false });
+      return null;
+    }
+    const match = users.find(u => (u?.email || '').trim().toLowerCase() === normalizedEmail);
+    if (!match?.id) {
+      console.log('[getAuthUserId] auth_lookup_no_match', { userCount: users.length });
+      return null;
+    }
+    console.log('[getAuthUserId] auth_lookup_match', { userCount: users.length });
+    return match.id;
+  } catch (err) {
+    console.log('[getAuthUserId] auth_lookup_exception', { message: err?.message || 'unknown' });
+    return null;
+
+  }
+}
+
+
 async function getCodeRedemption(email) {
   if (!email) return null;
   const res = await fetch(
@@ -5780,7 +5824,8 @@ Do not add any question after the exit offer. The person chooses the next move.
           return res.status(400).json({ error: 'No messages provided' });
         }
         const tier = normalizeTier(subscriber?.tier || 'free');
-        const userId = subscriber?.id || null;
+        const subscriberUserId = subscriber?.id || null;
+        const authUserId = await getAuthUserId(userEmail);
 
         const isFollowUpCheck = isFollowUp || (messages && messages.length > 1);
         if (!isFollowUpCheck && subscriber) {
@@ -5992,20 +6037,20 @@ Do not add any question after the exit offer. The person chooses the next move.
           );
         }
 
-        if (streamDone && userId) {
+        if (streamDone && authUserId) {
           timing('persistence_start', { followUp: Boolean(isFollowUp || (messages && messages.length > 1)) });
           const isFollowUpQuery = isFollowUp || (messages && messages.length > 1);
           if (!isFollowUpQuery) {
             const threadId = await saveThread({
-              userId,
+              userId: authUserId,
               query:     lastUserText,
               queryType,
               response:  fullResponse,
               tier
             });
-            await updateQueryCount({ userId, tier, threadId });
+            await updateQueryCount({ userId: subscriberUserId, tier, threadId });
           } else {
-            await updateQueryCount({ userId, tier, threadId: null });
+            await updateQueryCount({ userId: subscriberUserId, tier, threadId: null });
           }
           timing('persistence_complete');
         }
