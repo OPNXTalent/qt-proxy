@@ -11,9 +11,11 @@ function runNode(file) {
 const repairScripts = [
   'scripts/runtime-archive-repair.mjs',
   'scripts/followup-lineage-repair.mjs',
-  'scripts/print-layout-repair.mjs',
   'scripts/progressive-framework-repair.mjs',
   'scripts/semantic-paragraphing.mjs',
+  // Print normalization runs last because it owns the final artifact-action
+  // markup and print CSS after all other qt.html presentation patches.
+  'scripts/print-layout-repair.mjs',
 ];
 
 for (const script of repairScripts) runNode(script);
