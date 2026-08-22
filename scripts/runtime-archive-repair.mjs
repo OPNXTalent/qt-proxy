@@ -141,30 +141,37 @@ interpret = replaceExact(
       prompt: query,
     });
   } catch (error) {
-    if (error?.message !== 'INQUIRY_MODEL_OUTPUT_TRUNCATED') throw error;
-    timing('artifact_truncation_retry_start', { maxTokens: 3600 });
+    const recoveryCode = error?.message;
+    const isTruncation = recoveryCode === 'INQUIRY_MODEL_OUTPUT_TRUNCATED';
+    const isTimeout = recoveryCode === 'INQUIRY_MODEL_TIMEOUT';
+    if (!isTruncation && !isTimeout) throw error;
+    const recovery = isTimeout ? 'timeout_retry' : 'truncation_retry';
+    const retryStartEvent = isTimeout ? 'artifact_timeout_retry_start' : 'artifact_truncation_retry_start';
+    const retryCompleteEvent = isTimeout ? 'artifact_timeout_retry_complete' : 'artifact_truncation_retry_complete';
+    timing(retryStartEvent, { maxTokens: 3600, timeoutMs: 90000 });
     rawCore = await callInquiryModel({
       model: 'claude-sonnet-4-6',
       maxTokens: 3600,
       temperature: 0.2,
-      timeoutMs: 60000,
+      timeoutMs: 90000,
       system: progressiveSystemPrompt(systemPrompt, PRISM_ARTIFACT_CORE_CONTRACT),
       prompt: query,
       structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
       structuredOutputName: 'emit_interpretation_artifact',
       structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', {
         ...diagnostic,
-        recovery: 'truncation_retry',
+        recovery,
       }),
     });
-    timing('artifact_truncation_retry_complete', {
+    timing(retryCompleteEvent, {
       artifactChars: JSON.stringify(rawCore).length,
       boundary: 'forced_tool_schema',
+      recovery,
     });
   }
   try {
     if (!rawCore) rawCore = parseModelJson(rawCoreText);`,
-  'artifact_truncation_retry_start',
+  'artifact_timeout_retry_start',
 );
 writeFileSync('api/interpret.js', interpret);
 
@@ -178,8 +185,11 @@ for (const marker of requiredQt) {
   if (!qt.includes(marker)) throw new Error(`Missing qt.html regression marker: ${marker}`);
 }
 const requiredInterpret = [
-  "error?.message !== 'INQUIRY_MODEL_OUTPUT_TRUNCATED'",
-  "timing('artifact_truncation_retry_start', { maxTokens: 3600 })",
+  "recoveryCode === 'INQUIRY_MODEL_OUTPUT_TRUNCATED'",
+  "recoveryCode === 'INQUIRY_MODEL_TIMEOUT'",
+  "'artifact_timeout_retry_start'",
+  "'artifact_truncation_retry_start'",
+  'timeoutMs: 90000',
   'structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA',
   "structuredOutputName: 'emit_interpretation_artifact'",
 ];
