@@ -14,6 +14,18 @@
 (function() {
   'use strict';
 
+  // ── Prism UI overrides ────────────────────────────────────────────────────
+  // Keep visual refinements in a stylesheet instead of adding more inline CSS
+  // to the already-large qt.html. Append it after parsing so these scoped
+  // overrides win the cascade without changing any rendering behavior.
+  if (!document.querySelector('link[data-prism-ui]')) {
+    var prismUi = document.createElement('link');
+    prismUi.rel = 'stylesheet';
+    prismUi.href = '/prism-ui.css';
+    prismUi.setAttribute('data-prism-ui', '');
+    document.head.appendChild(prismUi);
+  }
+
   var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
   var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
 
