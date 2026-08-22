@@ -25,11 +25,11 @@ assert.ok(api.includes('completeFollowUpArtifact'));
 assert.ok(api.includes('progressive_analysis_audit_start'));
 assert.ok(api.includes('progressive_analysis_generation_complete'));
 assert.ok(api.includes("throw new Error('ENRICHMENT_EMPTY')"));
-assert.ok(api.includes("error: 'ENRICHMENT_AUDIT_EMPTY'"));
-assert.ok(api.includes('progressive_analysis_audit_retry_start'));
+assert.ok(api.includes("throw new Error('ENRICHMENT_AUDIT_EMPTY')"));
+assert.ok(api.includes('progressive_analysis_audit_degraded'));
+assert.ok(api.includes("fallback: 'validated_generated_enrichment'"));
 assert.ok(api.includes("structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA"));
 assert.ok(api.includes("structuredOutputName: 'emit_audited_enrichment'"));
-assert.ok(api.includes("throw new Error('ENRICHMENT_AUDIT_EMPTY')"));
 
 for (const packetType of [
   'inquiry_orientation',

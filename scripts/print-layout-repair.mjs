@@ -31,5 +31,17 @@ replaceOnce(
   'box-decoration-break: clone;',
 );
 
+// Final normalization: the print action must never regress to a synchronous
+// inline window.print() call, even if another presentation repair rewrites the
+// surrounding button markup before this script runs.
+source = source.replaceAll(
+  'onclick="window.print()"',
+  'onclick="requestAnimationFrame(() => setTimeout(() => window.print(), 0))"',
+);
+
+if (source.includes('onclick="window.print()"')) {
+  throw new Error('Print layout repair left a blocking inline print handler');
+}
+
 writeFileSync(path, source);
 console.log('Print layout repair applied: repeated page gutters, readable Print action, and non-blocking print dispatch.');

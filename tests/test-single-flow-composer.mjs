@@ -50,8 +50,8 @@ assert.match(
 );
 assert.match(
   frontend,
-  /id="queryPrintBtn"[\s\S]*onclick="window\.print\(\)"[\s\S]*>Print<\/button>/,
-  'Print must remain available beneath the composer',
+  /id="queryPrintBtn"[\s\S]*onclick="requestAnimationFrame\(\(\) => setTimeout\(\(\) => window\.print\(\), 0\)\)"[\s\S]*>Print<\/button>/,
+  'Print must remain available beneath the composer without blocking the click handler',
 );
 
 const nodeControlsStart = frontend.indexOf('function buildNodeControls(nodeId, queryText) {');
@@ -73,8 +73,9 @@ assert.match(
   'A completed live query must preserve its reading position',
 );
 
-const addThreadStart = frontend.indexOf('function addThreadToSidebar(queryText, threadId) {');
+const addThreadStart = frontend.indexOf('function addThreadToSidebar(queryText, threadId, responseData) {');
 const addThreadEnd = frontend.indexOf('// SHOW SIDEBAR AFTER QUERY', addThreadStart);
+assert.ok(addThreadStart >= 0 && addThreadEnd > addThreadStart, 'Durable Archive handoff flow must exist');
 const addThreadFlow = frontend.slice(addThreadStart, addThreadEnd);
 assert.doesNotMatch(
   addThreadFlow,
@@ -83,8 +84,8 @@ assert.doesNotMatch(
 );
 assert.match(
   addThreadFlow,
-  /activeThreadId === tempId[\s\S]*qt_response_[\s\S]*startFollowUpRealtime\(realId\)/,
-  'Archive refresh must migrate the local response and start Realtime without rerendering',
+  /responseData[\s\S]*qt_response_[\s\S]*startFollowUpRealtime\(threadId\)/,
+  'Canonical completion must cache the durable response and start Realtime without rerendering',
 );
 
 const initSidebarStart = frontend.indexOf('function initSidebar() {');
