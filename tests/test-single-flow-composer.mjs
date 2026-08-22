@@ -73,7 +73,7 @@ assert.match(
   'A completed live query must preserve its reading position',
 );
 
-const addThreadStart = frontend.indexOf('function addThreadToSidebar(queryText) {');
+const addThreadStart = frontend.indexOf('function addThreadToSidebar(queryText, threadId) {');
 const addThreadEnd = frontend.indexOf('// SHOW SIDEBAR AFTER QUERY', addThreadStart);
 const addThreadFlow = frontend.slice(addThreadStart, addThreadEnd);
 assert.doesNotMatch(
