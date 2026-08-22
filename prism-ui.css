@@ -1,0 +1,19 @@
+/* Prism UI visual refinements
+   Loaded by realtime.js so qt.html can remain behaviorally untouched. */
+
+.qt-interpretive-context {
+  border-left-color: rgba(201,168,76,0.48);
+}
+
+.qt-ic-label {
+  font-size: 10.5px;
+  color: rgba(201,168,76,0.72);
+}
+
+.qt-interpretive-context p {
+  font-family: var(--crimson);
+  font-size: 17.5px;
+  font-style: italic;
+  color: var(--text-dim);
+  line-height: 1.75;
+}
