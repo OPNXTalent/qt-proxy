@@ -101,6 +101,11 @@ assert.doesNotMatch(
   /wasOpen|sidebar\.classList\.add\('open'\)|mainContent\.classList\.add\('sidebar-open'\)/,
   'Archive must not reopen itself from saved or populated state',
 );
+assert.match(
+  initSidebarFlow,
+  /if \(sessionStorage\.getItem\('prism_r1_session'\)\) \{[\s\S]*if \(!verifiedAuthState\.authenticated\) \{[\s\S]*allThreads = \[\];[\s\S]*renderThreads\(allThreads\);[\s\S]*return;[\s\S]*sessionStorage\.removeItem\('prism_r1_active'\);[\s\S]*authenticatedFetch\(API_BASE \+ '\/api\/threads'/,
+  'R1 must isolate an anonymous Archive while allowing a verified account to reach the server-authoritative Archive load',
+);
 
 const applyHighlightStart = frontend.indexOf('function applyHighlight(color) {');
 const applyHighlightEnd = frontend.indexOf('function buildNewSectionButton()', applyHighlightStart);

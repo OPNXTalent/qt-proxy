@@ -5995,18 +5995,22 @@ function initSidebar() {
   if (mainContent) mainContent.classList.remove('sidebar-open');
   if (toggle) toggle.textContent = '☰';
 
-  // R1 new session — start fresh, don't load S1's thread history
+  // R1 isolation applies only to an unauthenticated visit. A verified user
+  // must continue into the server-authoritative Archive load below.
   if (sessionStorage.getItem('prism_r1_session')) {
     sessionStorage.removeItem('prism_r1_session');
-    sessionStorage.setItem('prism_r1_active', '1');
-    allThreads = [];
-    renderThreads(allThreads);
-    if (sidebar) sidebar.classList.add('visible');
-    if (toggle)  toggle.classList.add('visible');
-    sidebarHasAppeared = true;
-    var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt && !userEmail()) freePrompt.style.display = 'block';
-    return;
+    if (!verifiedAuthState.authenticated) {
+      sessionStorage.setItem('prism_r1_active', '1');
+      allThreads = [];
+      renderThreads(allThreads);
+      if (sidebar) sidebar.classList.add('visible');
+      if (toggle)  toggle.classList.add('visible');
+      sidebarHasAppeared = true;
+      var freePrompt = document.getElementById('freeUpgradePrompt');
+      if (freePrompt && !userEmail()) freePrompt.style.display = 'block';
+      return;
+    }
+    sessionStorage.removeItem('prism_r1_active');
   }
 
   // Anonymous — no identity at all — lightweight sidebar, nothing to fetch
