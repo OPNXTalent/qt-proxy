@@ -1,4 +1,5 @@
 {
+  "buildCommand": "node scripts/runtime-archive-repair.mjs && for test in tests/*.mjs; do node \"$test\"; done",
   "functions": {
     "api/interpret.js": {
       "memory": 128,
