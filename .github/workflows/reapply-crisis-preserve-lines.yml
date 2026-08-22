@@ -1,0 +1,203 @@
+name: Reapply crisis repair preserving line endings
+
+on:
+  push:
+    branches:
+      - fix/crisis-continuation-resume
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/crisis-continuation-resume
+          fetch-depth: 0
+
+      - name: Restore source files from main and reapply targeted patch
+        shell: bash
+        run: |
+          git fetch origin main
+          git checkout origin/main -- api/interpret.js qt.html
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def read_exact(path):
+              with open(path, 'r', encoding='utf-8', newline='') as f:
+                  return f.read()
+
+          def write_exact(path, text):
+              with open(path, 'w', encoding='utf-8', newline='') as f:
+                  f.write(text)
+
+          # Server patch, preserving the file's native newline convention.
+          api_path = 'api/interpret.js'
+          api = read_exact(api_path)
+          nl = '\r\n' if api.count('\r\n') > api.count('\n') / 2 else '\n'
+          old = nl.join([
+              "  if (detectCrisis(lastUserText)) {",
+              "    timing('safety_complete', { outcome: 'crisis_intercept' });",
+              "    return res.status(200).json({ crisis: true });",
+              "  }",
+              "  timing('safety_complete', { outcome: 'clear' });",
+          ])
+          new = nl.join([
+              "  const crisisAcknowledged = req.body?.crisisAcknowledged === true;",
+              "  if (!crisisAcknowledged && detectCrisis(lastUserText)) {",
+              "    timing('safety_complete', { outcome: 'crisis_intercept' });",
+              "    return res.status(200).json({ crisis: true });",
+              "  }",
+              "  timing('safety_complete', { outcome: crisisAcknowledged ? 'crisis_acknowledged' : 'clear' });",
+          ])
+          if old not in api:
+              raise SystemExit('interpret.js crisis block not found after reset to main')
+          api = api.replace(old, new, 1)
+          write_exact(api_path, api)
+
+          # Client patch, also preserving native newlines.
+          qt_path = 'qt.html'
+          qt = read_exact(qt_path)
+          qnl = '\r\n' if qt.count('\r\n') > qt.count('\n') / 2 else '\n'
+
+          old_sig = 'async function callProxy(messages, rawQuery, requestId) {'
+          new_sig = 'async function callProxy(messages, rawQuery, requestId, options) {' + qnl + '  options = options || {};'
+          if old_sig not in qt:
+              raise SystemExit('callProxy signature not found after reset to main')
+          qt = qt.replace(old_sig, new_sig, 1)
+
+          old_payload = qnl.join([
+              "        rawQuery: rawQuery || '',",
+              "        debugMode: getTheodicyDebugMode(),",
+              "        requestId",
+          ])
+          new_payload = qnl.join([
+              "        rawQuery: rawQuery || '',",
+              "        crisisAcknowledged: options.crisisAcknowledged === true,",
+              "        debugMode: getTheodicyDebugMode(),",
+              "        requestId",
+          ])
+          if old_payload not in qt:
+              raise SystemExit('callProxy payload not found after reset to main')
+          qt = qt.replace(old_payload, new_payload, 1)
+
+          crisis_branch = re.compile(
+              r"if \(bodyData\.crisis\) \{\s*showCrisisPanel\(\);\s*throw new Error\('CRISIS_DETECTED'\);\s*\}",
+              re.M,
+          )
+          replacement = qnl.join([
+              'if (bodyData.crisis) {',
+              '      await showCrisisPanel();',
+              '      return callProxy(messages, rawQuery, requestId, { crisisAcknowledged: true });',
+              '    }',
+          ])
+          qt, count = crisis_branch.subn(replacement, qt, count=1)
+          if count != 1:
+              raise SystemExit(f'expected one crisis response branch, found {count}')
+
+          start_marker = '// ── CRISIS PANEL'
+          end_marker = '// ── CHILD ABUSE PANEL'
+          start = qt.find(start_marker)
+          end = qt.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('crisis panel section markers not found')
+          section = qt[start:end]
+
+          section = section.replace(
+              'function showCrisisPanel() {',
+              'var _crisisContinueResolver = null;' + qnl + qnl + 'function showCrisisPanel() {',
+              1,
+          )
+
+          scroll_line = "  document.getElementById('resultContent').scrollIntoView({ behavior: 'smooth', block: 'start' });" + qnl + '}'
+          if scroll_line not in section:
+              raise SystemExit('showCrisisPanel closing sequence not found')
+          section = section.replace(
+              scroll_line,
+              qnl.join([
+                  "  document.getElementById('resultContent').scrollIntoView({ behavior: 'smooth', block: 'start' });",
+                  '',
+                  '  return new Promise(function(resolve) {',
+                  '    _crisisContinueResolver = resolve;',
+                  '  });',
+                  '}',
+              ]),
+              1,
+          )
+
+          dismiss_pattern = re.compile(r"function dismissCrisisPanel\(\) \{.*?" + re.escape(qnl) + r"\}", re.S)
+          match = dismiss_pattern.search(section)
+          if not match:
+              raise SystemExit('dismissCrisisPanel function not found')
+          new_dismiss = qnl.join([
+              'function dismissCrisisPanel() {',
+              '  var continueInquiry = _crisisContinueResolver;',
+              '  _crisisContinueResolver = null;',
+              "  var panel = document.getElementById('crisisPanel');",
+              '',
+              '  var resume = function() {',
+              '    if (!continueInquiry) {',
+              "      document.getElementById('resultBlock').classList.remove('visible');",
+              "      document.getElementById('userInput').focus();",
+              "      window.scrollTo({ top: 0, behavior: 'smooth' });",
+              '      return;',
+              '    }',
+              '',
+              '    // The person explicitly chose to continue. Restore the ordinary in-flight',
+              '    // query state before resolving the paused callProxy() promise.',
+              "    document.getElementById('resultBlock').classList.remove('visible');",
+              "    document.getElementById('loadingBlock').classList.add('visible');",
+              "    document.getElementById('inputSection').style.opacity = '0.45';",
+              "    document.getElementById('inputSection').style.pointerEvents = 'none';",
+              "    document.getElementById('submitBtn').disabled = true;",
+              '    continueInquiry();',
+              '  };',
+              '',
+              '  if (panel) {',
+              "    panel.style.transition = 'opacity 0.4s ease';",
+              "    panel.style.opacity = '0';",
+              '    setTimeout(function() {',
+              '      if (panel.parentNode) panel.parentNode.removeChild(panel);',
+              '      resume();',
+              '    }, 400);',
+              '  } else {',
+              '    resume();',
+              '  }',
+              '}',
+          ])
+          section = section[:match.start()] + new_dismiss + section[match.end():]
+          qt = qt[:start] + section + qt[end:]
+          write_exact(qt_path, qt)
+
+          Path('.github/workflows/reapply-crisis-preserve-lines.yml').unlink()
+          PY
+
+      - name: Verify diff is targeted
+        shell: bash
+        run: |
+          echo "Diff stat against main:"
+          git diff --stat origin/main -- api/interpret.js qt.html tests/test-crisis-continuation-contract.mjs
+          changed=$(git diff --numstat origin/main -- api/interpret.js qt.html | awk '{a+=$1; d+=$2} END {print a+d+0}')
+          if [ "$changed" -gt 120 ]; then
+            echo "Source diff unexpectedly large: $changed changed lines"
+            exit 1
+          fi
+
+      - name: Run focused regression
+        run: node --test tests/test-crisis-continuation-contract.mjs
+
+      - name: Run full regression suite
+        run: node --test tests/*.mjs
+
+      - name: Commit clean repair
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/interpret.js qt.html tests/test-crisis-continuation-contract.mjs .github/workflows/reapply-crisis-preserve-lines.yml
+          git commit -m "fix(safety): preserve source format in crisis continuation"
+          git push origin HEAD:fix/crisis-continuation-resume
