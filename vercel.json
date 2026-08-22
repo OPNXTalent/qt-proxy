@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/runtime-archive-repair.mjs && node scripts/followup-lineage-repair.mjs && node scripts/print-layout-repair.mjs && for test in tests/*.mjs; do node \"$test\"; done",
+  "buildCommand": "node scripts/runtime-archive-repair.mjs && node scripts/followup-lineage-repair.mjs && node scripts/print-layout-repair.mjs && node scripts/progressive-framework-repair.mjs && for test in tests/*.mjs; do node \"$test\"; done",
   "outputDirectory": ".",
   "functions": {
     "api/interpret.js": {
