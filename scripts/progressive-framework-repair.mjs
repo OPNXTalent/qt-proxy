@@ -97,6 +97,28 @@ qt = replaceExact(
   'd._analysisIncomplete && !hasFramework',
 );
 
+qt = replaceExact(
+  qt,
+  String.raw`  .qt-framework-body.open {
+    display: block;
+  }`,
+  String.raw`  .qt-framework-body.open {
+    display: block;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
+  }`,
+  'Keep Prism Analysis bullets clear of the left accent rail',
+);
+
 writeFileSync('qt.html', qt);
 
 const requiredInterpret = [
@@ -116,6 +138,8 @@ const requiredQt = [
   'd._analysisPending || d._analysisIncomplete',
   'Prism Analysis paused.',
   'd._analysisIncomplete && !hasFramework',
+  'Keep Prism Analysis bullets clear of the left accent rail',
+  'padding-left: 24px;',
 ];
 for (const marker of requiredQt) {
   if (!qt.includes(marker)) throw new Error(`Missing progressive Framework client marker: ${marker}`);
