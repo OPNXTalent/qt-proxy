@@ -3441,7 +3441,8 @@ async function retryFollowUpAnalysis(button) {
   }
 }
 
-async function callProxy(messages, rawQuery, requestId) {
+async function callProxy(messages, rawQuery, requestId, options) {
+  options = options || {};
   let response;
 
   try {
@@ -3451,6 +3452,7 @@ async function callProxy(messages, rawQuery, requestId) {
       body: JSON.stringify({
         messages,
         rawQuery: rawQuery || '',
+        crisisAcknowledged: options.crisisAcknowledged === true,
         debugMode: getTheodicyDebugMode(),
         requestId
       })
@@ -3510,8 +3512,8 @@ async function callProxy(messages, rawQuery, requestId) {
     }
 
     if (bodyData.crisis) {
-      showCrisisPanel();
-      throw new Error('CRISIS_DETECTED');
+      await showCrisisPanel();
+      return callProxy(messages, rawQuery, requestId, { crisisAcknowledged: true });
     }
     if (bodyData.survey) {
       showSurveyPanel(bodyData.redirect);
@@ -8165,6 +8167,8 @@ async function submitEmailCapture() {
 }
 
 // ── CRISIS PANEL ─────────────────────────────────────────────────────────────
+var _crisisContinueResolver = null;
+
 function showCrisisPanel() {
   // Hide loading, show result area
   document.getElementById('loadingBlock').classList.remove('visible');
@@ -8216,19 +8220,44 @@ function showCrisisPanel() {
   `;
 
   document.getElementById('resultContent').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  return new Promise(function(resolve) {
+    _crisisContinueResolver = resolve;
+  });
 }
 
 function dismissCrisisPanel() {
+  var continueInquiry = _crisisContinueResolver;
+  _crisisContinueResolver = null;
   var panel = document.getElementById('crisisPanel');
+
+  var resume = function() {
+    if (!continueInquiry) {
+      document.getElementById('resultBlock').classList.remove('visible');
+      document.getElementById('userInput').focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // The person explicitly chose to continue. Restore the ordinary in-flight
+    // query state before resolving the paused callProxy() promise.
+    document.getElementById('resultBlock').classList.remove('visible');
+    document.getElementById('loadingBlock').classList.add('visible');
+    document.getElementById('inputSection').style.opacity = '0.45';
+    document.getElementById('inputSection').style.pointerEvents = 'none';
+    document.getElementById('submitBtn').disabled = true;
+    continueInquiry();
+  };
+
   if (panel) {
     panel.style.transition = 'opacity 0.4s ease';
     panel.style.opacity = '0';
     setTimeout(function() {
       if (panel.parentNode) panel.parentNode.removeChild(panel);
-      document.getElementById('resultBlock').classList.remove('visible');
-      document.getElementById('userInput').focus();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      resume();
     }, 400);
+  } else {
+    resume();
   }
 }
 

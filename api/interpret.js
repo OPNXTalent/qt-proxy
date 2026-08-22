@@ -6994,11 +6994,12 @@ Do not add any question after the exit offer. The person chooses the next move.
     return res.status(200).json({ child_abuse: true });
   }
 
-  if (detectCrisis(lastUserText)) {
+  const crisisAcknowledged = req.body?.crisisAcknowledged === true;
+  if (!crisisAcknowledged && detectCrisis(lastUserText)) {
     timing('safety_complete', { outcome: 'crisis_intercept' });
     return res.status(200).json({ crisis: true });
   }
-  timing('safety_complete', { outcome: 'clear' });
+  timing('safety_complete', { outcome: crisisAcknowledged ? 'crisis_acknowledged' : 'clear' });
 
   // ── SUBSCRIBER PATH ───────────────────────────────────────────────────────
   try {
