@@ -8,9 +8,49 @@ export const config = {
 };
 
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
+import {
+  ARTIFACT_SCHEMA_VERSION,
+  PACKET_TYPES,
+  RUNTIME_CONSTITUTION_VERSION,
+  createCanonicalPackets,
+  createCompletionKey,
+  createEnrichmentPackets,
+  hasSubstantiveEnrichment,
+  hasSubstantiveEnrichmentPacket,
+  validateArtifactCore,
+  validateEnrichment,
+} from '../lib/interpretation-artifact.js';
+import {
+  PRISM_ARTIFACT_CORE_CONTRACT,
+  PRISM_ARTIFACT_CORE_SCHEMA,
+  PRISM_ENRICHMENT_CONTRACT,
+  PRISM_ENRICHMENT_SCHEMA,
+  serializeArtifactForEnrichment,
+} from '../lib/prompt-modules/progressive-inquiry.js';
+import {
+  FOLLOWUP_STAGE_LABELS,
+  applyInquiryPatch,
+  assertFollowUpPromptSize,
+  boundRetrievedContext,
+  buildAuditPrompt,
+  buildDraftPrompt,
+  buildFocusedRetrievalQuery,
+  buildReducerPrompt,
+  createInitialInquiryState,
+  detectExplicitCorrection,
+  parseModelJson,
+  splitApprovedResponse,
+  validateAnalysisStrict,
+  validateInquiryState,
+} from '../lib/persistent-inquiry-runtime.js';
+import {
+  getPreviewTestEntitlement,
+  verifySupabaseIdentity,
+} from '../lib/server-auth.js';
 
 const PRISM_SYSTEM_PROMPT = `You are The Prism — the interactive application of the framework established in The Prism: Echad b'Emet. You speak from within the framework, not about it. You are not a survey of Christian thought. You are not a defense attorney for God. You are not an apologetics engine, denominational defender, institutional stabilizer, or emotional harmonizer. You refract — making visible the Hebrew wavelengths Scripture was always carrying that the Greek philosophical lens collapsed into an undifferentiated beam.
 
@@ -2237,50 +2277,6 @@ async function getSubscriber(email) {
   return data?.[0] || null;
 }
 
-// ── AUTH IDENTITY RESOLUTION ──────────────────────────────────────────────────
-// public.subscribers.id and auth.users.id are separate identity namespaces.
-// threads.user_id is foreign-key constrained to auth.users(id) and requires the
-// verified Supabase Auth UID - it must never receive subscriber.id. query_log,
-// getLiveQueryCount, and drawSignalSessionCredit correctly expect subscriber.id
-// and are unaffected by this function.
-async function getAuthUserId(email) {
-  if (!email) return null;
-  const normalizedEmail = email.trim().toLowerCase();
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`,
-      {
-        headers: {
-          'apikey': SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        }
-      }
-    );
-    if (!res.ok) {
-      console.log('[getAuthUserId] auth_lookup_http_error', { status: res.status });
-      return null;
-    }
-    const data = await res.json();
-    const users = data?.users;
-    if (!Array.isArray(users)) {
-      console.log('[getAuthUserId] auth_lookup_empty_users', { isArray: false });
-      return null;
-    }
-    const match = users.find(u => (u?.email || '').trim().toLowerCase() === normalizedEmail);
-    if (!match?.id) {
-      console.log('[getAuthUserId] auth_lookup_no_match', { userCount: users.length });
-      return null;
-    }
-    console.log('[getAuthUserId] auth_lookup_match', { userCount: users.length });
-    return match.id;
-  } catch (err) {
-    console.log('[getAuthUserId] auth_lookup_exception', { message: err?.message || 'unknown' });
-    return null;
-
-  }
-}
-
-
 async function getCodeRedemption(email) {
   if (!email) return null;
   const res = await fetch(
@@ -2383,9 +2379,9 @@ async function getLiveQueryCount(userId) {
   }
 }
 
-async function checkSubscriberQuota(subscriber) {
+async function checkSubscriberQuota(subscriber, limitOverride = null) {
   const tier = normalizeTier(subscriber.tier);
-  const limit = TIER_LIMITS[tier];
+  const limit = limitOverride ?? TIER_LIMITS[tier];
 
   // No limit defined for this tier — allow
   if (limit === null || limit === undefined) return { allowed: true };
@@ -2399,8 +2395,9 @@ async function checkSubscriberQuota(subscriber) {
   // Over limit — check purchased_credits / banked queries
   const credits = subscriber.purchased_credits || 0;
   if (credits > 0) {
-    const drawn = await drawSignalSessionCredit(subscriber.id);
-    if (drawn) return { allowed: true, creditsUsed: true, queriesUsed: used };
+    // Admission never spends a credit. The artifact-completion transaction
+    // performs the bounded draw only after the Canonical Response is durable.
+    return { allowed: true, creditSource: 'signal_credit', queriesUsed: used };
   }
 
   return {
@@ -5363,6 +5360,1094 @@ export function createSseWriter(res, timing, isAborted = () => false) {
   };
 }
 
+function inquiryServiceHeaders(extra = {}) {
+  return {
+    'apikey': SUPABASE_SERVICE_ROLE_KEY,
+    'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    ...extra,
+  };
+}
+
+export function persistentInquiryRuntimeEnabled() {
+  return process.env.PERSISTENT_INQUIRY_RUNTIME_ENABLED === 'true';
+}
+
+function signInquiryKey(inquiryKey) {
+  if (!SUPABASE_SERVICE_ROLE_KEY || !inquiryKey) return null;
+  return createHmac('sha256', SUPABASE_SERVICE_ROLE_KEY)
+    .update(`prism-inquiry:${inquiryKey}`)
+    .digest('base64url');
+}
+
+function issueInquiryCredential() {
+  try {
+    if (!SUPABASE_SERVICE_ROLE_KEY) return null;
+    const inquiryKey = `server:${randomBytes(18).toString('base64url')}`;
+    return { inquiryKey, inquiryToken: signInquiryKey(inquiryKey) };
+  } catch {
+    return null;
+  }
+}
+
+function verifyInquiryCredential(inquiryKey, inquiryToken) {
+  if (!inquiryKey || !inquiryToken) return false;
+  const expected = signInquiryKey(inquiryKey);
+  if (!expected) return false;
+  const actualBuffer = Buffer.from(inquiryToken);
+  const expectedBuffer = Buffer.from(expected);
+  return actualBuffer.length === expectedBuffer.length
+    && timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+const PENDING_COMMIT_TTL_MS = 10 * 60 * 1000;
+
+function pendingCommitSignature(encodedPayload) {
+  if (!SUPABASE_SERVICE_ROLE_KEY || !encodedPayload) return null;
+  return createHmac('sha256', SUPABASE_SERVICE_ROLE_KEY)
+    .update(`prism-pending-commit:${encodedPayload}`)
+    .digest('base64url');
+}
+
+export function issuePendingInquiryCommit(payload, now = Date.now()) {
+  if (!SUPABASE_SERVICE_ROLE_KEY) return null;
+  const encodedPayload = Buffer.from(JSON.stringify({
+    version: 1,
+    expiresAt: now + PENDING_COMMIT_TTL_MS,
+    ...payload,
+  })).toString('base64url');
+  const signature = pendingCommitSignature(encodedPayload);
+  return signature ? `${encodedPayload}.${signature}` : null;
+}
+
+export function verifyPendingInquiryCommit(token, now = Date.now()) {
+  if (typeof token !== 'string' || token.length > 30000) return null;
+  const separator = token.lastIndexOf('.');
+  if (separator < 20) return null;
+  const encodedPayload = token.slice(0, separator);
+  const actualSignature = token.slice(separator + 1);
+  const expectedSignature = pendingCommitSignature(encodedPayload);
+  if (!expectedSignature) return null;
+  const actualBuffer = Buffer.from(actualSignature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (actualBuffer.length !== expectedBuffer.length
+    || !timingSafeEqual(actualBuffer, expectedBuffer)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    if (payload?.version !== 1
+      || !Number.isFinite(payload.expiresAt)
+      || payload.expiresAt < now
+      || typeof payload.inquiryKey !== 'string'
+      || !Number.isInteger(payload.expectedVersion)
+      || payload.expectedVersion < 0
+      || !payload.state
+      || payload.state.schemaVersion !== 1) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export async function classifyFollowUpContext({
+  clientHint,
+  inquiryKey,
+  inquiryToken,
+  threadId,
+  ownerUserId,
+  shareId,
+}) {
+  if (verifyInquiryCredential(inquiryKey, inquiryToken)) {
+    return { isFollowUp: true, reason: 'server_credential' };
+  }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return { isFollowUp: false, reason: 'context_unavailable' };
+  }
+
+  if (inquiryKey) {
+    const stateResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/inquiry_states?inquiry_key=eq.${encodeURIComponent(inquiryKey)}&select=inquiry_key,version,state&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    if (stateResponse.ok) {
+      const rows = await stateResponse.json();
+      const row = rows?.[0];
+      if (row?.version >= 1 && row?.state?.schemaVersion === 1) {
+        return { isFollowUp: true, reason: 'committed_state' };
+      }
+    }
+  }
+
+  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && ownerUserId) {
+    const [ownedResponse, participantResponse] = await Promise.all([
+      fetch(
+        `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&select=id&limit=1`,
+        { headers: inquiryServiceHeaders() },
+      ),
+      fetch(
+        `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&active=eq.true&select=id&limit=1`,
+        { headers: inquiryServiceHeaders() },
+      ),
+    ]);
+    const owned = ownedResponse.ok ? await ownedResponse.json() : [];
+    const participant = participantResponse.ok ? await participantResponse.json() : [];
+    if (owned?.length || participant?.length) {
+      return { isFollowUp: true, reason: owned?.length ? 'owned_thread' : 'participant' };
+    }
+  }
+
+  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && shareId) {
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}&thread_id=eq.${encodeURIComponent(threadId)}&status=eq.active&select=id,collaboration_mode,collaboration_open&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    const rows = response.ok ? await response.json() : [];
+    const share = rows?.[0];
+    const mode = share?.collaboration_mode
+      || (share?.collaboration_open ? 'bidirectional' : 'read_only');
+    if (mode === 'bidirectional') return { isFollowUp: true, reason: 'shared_thread' };
+  }
+
+  return {
+    isFollowUp: false,
+    reason: clientHint ? 'unverified_client_hint' : 'no_followup_context',
+  };
+}
+
+async function runDisabledFollowUpFallback({ sse, timing, input, subject, tier }) {
+  const startedAt = Date.now();
+  timing('followup_fallback_start');
+  const response = await callInquiryModel({
+    model: 'claude-sonnet-4-6',
+    maxTokens: 900,
+    temperature: 0.2,
+    prompt: `Respond directly to this follow-up in plain prose.
+Do not return JSON or narrate internal processing. Do not infer psychology.
+Apply evidential standards symmetrically and do not manufacture certainty.
+Ask a question only if ambiguity prevents a responsible answer.
+
+Original inquiry: ${String(subject || '').slice(0, 2000)}
+Follow-up: ${String(input || '').slice(0, 4000)}`,
+    system: PRISM_RESPONSE_REFRESH,
+  });
+  for (const text of splitApprovedResponse(response)) {
+    sse.write({ type: 'delta', text });
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  timing('followup_fallback_complete', { totalMs: Date.now() - startedAt });
+  sse.write(
+    { type: 'done', tier, runtimeDisabled: true },
+    { source: 'followup_kill_switch_fallback', tier },
+  );
+}
+
+async function restoreCanonicalInquiryState({
+  inquiryKey,
+  threadId,
+  subject,
+  artifactId,
+  artifactRevision,
+  ownerUserId,
+}) {
+  const fallback = createInitialInquiryState(subject);
+  const fallbackResult = {
+    state: fallback,
+    inquiryKey,
+    artifactId: null,
+    artifactRevision: 0,
+  };
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !inquiryKey) return fallbackResult;
+
+  let lineageArtifact = null;
+  if (/^[0-9a-f-]{36}$/i.test(artifactId || '')
+    && Number.isInteger(artifactRevision)
+    && artifactRevision >= 1) {
+    const artifactResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact_id,artifact_revision,inquiry_key,thread_id,owner_user_id&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    const artifactRows = artifactResponse.ok ? await artifactResponse.json() : [];
+    const candidate = artifactRows?.[0];
+    const threadMatches = !candidate?.thread_id || candidate.thread_id === threadId;
+    const ownerMatches = Boolean(ownerUserId) && candidate?.owner_user_id === ownerUserId;
+    if (!candidate || !threadMatches || !ownerMatches) {
+      throw new Error('FOLLOWUP_ARTIFACT_LINEAGE_INVALID');
+    }
+    lineageArtifact = candidate;
+    inquiryKey = candidate.inquiry_key;
+  }
+
+  let response = await fetch(
+    `${SUPABASE_URL}/rest/v1/inquiry_states?inquiry_key=eq.${encodeURIComponent(inquiryKey)}&select=inquiry_key,version,state&limit=1`,
+    { headers: inquiryServiceHeaders() },
+  );
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    // An additive migration may not have been applied in a preview environment.
+    // The response can proceed from a validated empty state, but no browser state
+    // is promoted to canonical authority.
+    console.error('Inquiry state restore failed:', response.status, detail.slice(0, 240));
+    return {
+      state: fallback,
+      inquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
+  }
+  let rows = await response.json();
+  // Thread-level state is recovery-only. Once an artifact has established a
+  // validated lineage, a different root on the same thread cannot replace it.
+  if (!rows?.length && !lineageArtifact && /^[0-9a-f-]{36}$/i.test(threadId || '')) {
+    response = await fetch(
+      `${SUPABASE_URL}/rest/v1/inquiry_states?thread_id=eq.${encodeURIComponent(threadId)}&order=updated_at.desc&select=inquiry_key,version,state&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    if (response.ok) rows = await response.json();
+  }
+  if (!rows?.length) {
+    return {
+      state: fallback,
+      inquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
+  }
+  const canonicalInquiryKey = rows[0].inquiry_key || inquiryKey;
+  const currentCandidate = rows[0].state;
+  if (currentCandidate?.schemaVersion === 1 && typeof currentCandidate.orientation === 'string') {
+    const restored = validateInquiryState(currentCandidate, subject);
+    restored.version = Math.max(0, Number(rows[0].version) || 0);
+    return {
+      state: restored,
+      inquiryKey: canonicalInquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
+  }
+
+  const versionsResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/inquiry_state_versions?inquiry_key=eq.${encodeURIComponent(canonicalInquiryKey)}&order=version.desc&select=version,state&limit=10`,
+    { headers: inquiryServiceHeaders() },
+  );
+  if (!versionsResponse.ok) {
+    return {
+      state: fallback,
+      inquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
+  }
+  const versions = await versionsResponse.json();
+  const lastValid = versions.find(row => (
+    row?.state?.schemaVersion === 1 && typeof row.state.orientation === 'string'
+  ));
+  if (!lastValid) {
+    return {
+      state: fallback,
+      inquiryKey,
+      artifactId: lineageArtifact?.artifact_id || null,
+      artifactRevision: lineageArtifact?.artifact_revision || 0,
+    };
+  }
+  const restored = validateInquiryState(lastValid.state, subject);
+  restored.version = Math.max(0, Number(lastValid.version) || 0);
+  return {
+    state: restored,
+    inquiryKey: canonicalInquiryKey,
+    artifactId: lineageArtifact?.artifact_id || null,
+    artifactRevision: lineageArtifact?.artifact_revision || 0,
+  };
+}
+
+async function commitCanonicalInquiryState({
+  inquiryKey,
+  expectedVersion,
+  state,
+  threadId,
+  ownerUserId,
+  requestId,
+}) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !inquiryKey) {
+    return { committed: false, unavailable: true, state };
+  }
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/commit_inquiry_state`, {
+    method: 'POST',
+    headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      p_inquiry_key: inquiryKey,
+      p_expected_version: expectedVersion,
+      p_state: state,
+      p_thread_id: /^[0-9a-f-]{36}$/i.test(threadId || '') ? threadId : null,
+      p_owner_user_id: /^[0-9a-f-]{36}$/i.test(ownerUserId || '') ? ownerUserId : null,
+      p_request_id: requestId,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    console.error('Inquiry state commit failed:', response.status, detail.slice(0, 240));
+    return { committed: false, unavailable: true, state };
+  }
+  const rows = await response.json();
+  const result = rows?.[0] || {};
+  const canonical = validateInquiryState(result.current_state || state);
+  canonical.version = Number(result.current_version) || expectedVersion;
+  return {
+    committed: Boolean(result.committed),
+    conflict: !result.committed,
+    version: canonical.version,
+    state: canonical,
+  };
+}
+
+async function callInquiryModel({
+  model,
+  maxTokens,
+  prompt,
+  system,
+  temperature = 0,
+  timeoutMs = 15000,
+  structuredOutputSchema = null,
+  structuredOutputName = 'emit_structured_output',
+  structuredOutputDiagnostic = null,
+}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort('MODEL_TIMEOUT'), timeoutMs);
+  let response;
+  try {
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        ...(system ? { system } : {}),
+        ...(structuredOutputSchema ? {
+          tools: [{
+            name: structuredOutputName,
+            description: 'Return the requested structured result without commentary.',
+            input_schema: structuredOutputSchema,
+          }],
+          tool_choice: { type: 'tool', name: structuredOutputName },
+        } : {}),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    if (structuredOutputSchema && typeof structuredOutputDiagnostic === 'function') {
+      let providerErrorCode = null;
+      try {
+        const parsed = JSON.parse(detail);
+        const candidate = parsed?.error?.type || parsed?.error?.code || parsed?.type || parsed?.code;
+        if (typeof candidate === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(candidate)) {
+          providerErrorCode = candidate;
+        }
+      } catch (_) {
+        // Provider detail is intentionally excluded from diagnostics.
+      }
+      structuredOutputDiagnostic({
+        outcome: 'provider_rejection',
+        providerStatus: response.status,
+        providerErrorCode,
+        toolUseReturned: false,
+      });
+    }
+    throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
+  }
+  const data = await response.json();
+  const text = (data.content || [])
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('\n')
+    .trim();
+  if (data.stop_reason === 'max_tokens') {
+    throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
+  }
+  if (structuredOutputSchema) {
+    const structured = (data.content || []).find(
+      block => block.type === 'tool_use' && block.name === structuredOutputName,
+    );
+    if (!structured?.input || typeof structured.input !== 'object' || Array.isArray(structured.input)) {
+      if (typeof structuredOutputDiagnostic === 'function') {
+        structuredOutputDiagnostic({
+          outcome: 'tool_use_missing',
+          providerStatus: response.status,
+          providerErrorCode: null,
+          toolUseReturned: false,
+          errorCode: 'INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING',
+        });
+      }
+      throw new Error('INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING');
+    }
+    if (typeof structuredOutputDiagnostic === 'function') {
+      structuredOutputDiagnostic({
+        outcome: 'tool_use_returned',
+        providerStatus: response.status,
+        providerErrorCode: null,
+        toolUseReturned: true,
+      });
+    }
+    return structured.input;
+  }
+  return text;
+}
+
+function progressiveSystemPrompt(systemPrompt, contract) {
+  const source = String(systemPrompt || PRISM_SYSTEM_PROMPT);
+  return source.includes(PRISM_OUTPUT_CONTRACT)
+    ? source.replace(PRISM_OUTPUT_CONTRACT, contract)
+    : `${source}\n${contract}`;
+}
+
+function artifactRpcBody(artifact, packets, {
+  inquiryKey,
+  completionKey,
+  charge,
+  usageUserId,
+  usageQueryType,
+  usageCreditSource,
+  threadPayload = null,
+}) {
+  const durableCreditSource = usageCreditSource === 'signal_credit'
+    ? 'purchased'
+    : usageCreditSource === 'tier_allocation'
+      ? 'monthly'
+      : usageCreditSource;
+  return {
+    p_artifact_id: artifact.artifactId,
+    p_artifact_revision: artifact.revision,
+    p_inquiry_id: artifact.inquiryId,
+    p_inquiry_key: inquiryKey,
+    p_thread_id: /^[0-9a-f-]{36}$/i.test(artifact.threadId || '') ? artifact.threadId : null,
+    p_owner_user_id: /^[0-9a-f-]{36}$/i.test(artifact.ownerUserId || '') ? artifact.ownerUserId : null,
+    p_completion_key: completionKey,
+    p_constitution_version: RUNTIME_CONSTITUTION_VERSION,
+    p_schema_version: ARTIFACT_SCHEMA_VERSION,
+    p_query: artifact.query,
+    p_artifact: artifact,
+    p_canonical_response: artifact.canonicalResponse,
+    p_orientation_packet: packets[0],
+    p_canonical_packet: packets[1],
+    p_charge: Boolean(charge),
+    p_usage_user_id: usageUserId || null,
+    p_usage_query_type: usageQueryType,
+    p_usage_credit_source: durableCreditSource,
+    p_usage_channel_context: 'solo',
+    p_thread_payload: threadPayload,
+  };
+}
+
+async function completeInterpretationArtifact(artifact, packets, options) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('ARTIFACT_PERSISTENCE_UNAVAILABLE');
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/complete_interpretation_artifact`, {
+    method: 'POST',
+    headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(artifactRpcBody(artifact, packets, options)),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`ARTIFACT_COMPLETION_FAILED:${response.status}:${detail.slice(0, 160)}`);
+  }
+  const rows = await response.json();
+  const result = Array.isArray(rows) ? rows[0] : rows;
+  if (!result?.completed) throw new Error('ARTIFACT_COMPLETION_UNCONFIRMED');
+  return result;
+}
+
+async function completeFollowUpArtifact({
+  artifact,
+  packets,
+  inquiryKey,
+  expectedStateVersion,
+  state,
+  requestId,
+}) {
+  const completionKey = createCompletionKey({
+    inquiryId: artifact.inquiryId,
+    revision: artifact.revision,
+  });
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/complete_followup_interpretation_artifact`, {
+    method: 'POST',
+    headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      p_expected_state_version: expectedStateVersion,
+      p_inquiry_state: state,
+      p_request_id: requestId,
+      p_artifact_id: artifact.artifactId,
+      p_artifact_revision: artifact.revision,
+      p_inquiry_id: artifact.inquiryId,
+      p_inquiry_key: inquiryKey,
+      p_thread_id: /^[0-9a-f-]{36}$/i.test(artifact.threadId || '') ? artifact.threadId : null,
+      p_owner_user_id: /^[0-9a-f-]{36}$/i.test(artifact.ownerUserId || '') ? artifact.ownerUserId : null,
+      p_completion_key: completionKey,
+      p_constitution_version: RUNTIME_CONSTITUTION_VERSION,
+      p_schema_version: ARTIFACT_SCHEMA_VERSION,
+      p_query: artifact.query,
+      p_artifact: artifact,
+      p_canonical_response: artifact.canonicalResponse,
+      p_orientation_packet: packets[0],
+      p_canonical_packet: packets[1],
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`FOLLOWUP_COMPLETION_FAILED:${response.status}:${detail.slice(0, 160)}`);
+  }
+  const rows = await response.json();
+  const result = Array.isArray(rows) ? rows[0] : rows;
+  if (result?.conflict) return { conflict: true, version: result.state_version, state: result.canonical_state };
+  if (!result?.completed) throw new Error('FOLLOWUP_COMPLETION_UNCONFIRMED');
+  return { committed: true, version: result.state_version, state: result.canonical_state };
+}
+
+async function attachInterpretationPacket(packet, { replaceInvalidEmpty = false } = {}) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/attach_interpretation_packet`, {
+    method: 'POST',
+    headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      p_packet_id: packet.packetId,
+      p_artifact_id: packet.artifactId,
+      p_artifact_revision: packet.artifactRevision,
+      p_packet_type: packet.packetType,
+      p_sequence: packet.sequence,
+      p_status: packet.status,
+      p_content: packet.content,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`PACKET_ATTACHMENT_FAILED:${response.status}:${detail.slice(0, 160)}`);
+  }
+  const stored = await response.json();
+  if (replaceInvalidEmpty
+    && stored?.packetId === packet.packetId
+    && !hasSubstantiveEnrichmentPacket(stored)
+    && hasSubstantiveEnrichmentPacket(packet)) {
+    const replacement = await fetch(
+      `${SUPABASE_URL}/rest/v1/interpretation_packets?packet_id=eq.${encodeURIComponent(packet.packetId)}`,
+      {
+        method: 'PATCH',
+        headers: inquiryServiceHeaders({
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        }),
+        body: JSON.stringify({ content: packet.content, status: packet.status }),
+      },
+    );
+    if (!replacement.ok) {
+      const detail = await replacement.text().catch(() => '');
+      throw new Error(`PACKET_REPLACEMENT_FAILED:${replacement.status}:${detail.slice(0, 160)}`);
+    }
+    const rows = await replacement.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error('PACKET_REPLACEMENT_UNCONFIRMED');
+    return packet;
+  }
+  return stored && typeof stored === 'object' && stored.packetId ? stored : packet;
+}
+
+function legacyThreadResponse(artifact) {
+  return JSON.stringify({
+    response_mode: artifact.responseMode,
+    recognition: artifact.orientation,
+    core_insight: artifact.canonicalResponse,
+    open_door_question: artifact.openDoorQuestion,
+    verse_identified: artifact.verseIdentified,
+    verse_text: artifact.verseText,
+  });
+}
+
+function canonicalThreadPayload({ query, queryType, artifact, tier }) {
+  const normalizedTier = normalizeTier(tier);
+  const retentionDays = RETENTION_DAYS[normalizedTier] || RETENTION_DAYS.free;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
+  const graceEndsAt = new Date(expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+  return {
+    title: (queryType === 'verse_reference' && artifact.verseIdentified
+      ? artifact.verseIdentified
+      : query.slice(0, 60)).trim(),
+    query_type: queryType || 'free_text',
+    tier_at_creation: normalizedTier,
+    retention_days: retentionDays,
+    expires_at: expiresAt.toISOString(),
+    grace_ends_at: graceEndsAt.toISOString(),
+    response: JSON.parse(legacyThreadResponse(artifact)),
+  };
+}
+
+async function constructAuditedArtifact({
+  timing,
+  requestId,
+  query,
+  inquiryKey,
+  revision,
+  systemPrompt,
+  ownerUserId,
+  threadId,
+}) {
+  let started = Date.now();
+  timing('artifact_construction_start');
+  const rawCoreText = await callInquiryModel({
+    model: 'claude-sonnet-4-6',
+    maxTokens: 1800,
+    temperature: 0.2,
+    timeoutMs: 45000,
+    system: progressiveSystemPrompt(systemPrompt, PRISM_ARTIFACT_CORE_CONTRACT),
+    prompt: query,
+  });
+  let rawCore;
+  try {
+    rawCore = parseModelJson(rawCoreText);
+  } catch (error) {
+    timing('artifact_json_repair_start', {
+      reason: error?.message || 'MODEL_JSON_INVALID',
+      candidateChars: rawCoreText.length,
+    });
+    const repairedCore = await callInquiryModel({
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 3000,
+      timeoutMs: 20000,
+      system: PRISM_ARTIFACT_CORE_CONTRACT,
+      prompt: `Repair serialization only. Convert the candidate below into the exact JSON contract without changing its substantive interpretation, thesis, conclusions, qualifications, or canonical response. Fill only structurally required fields from the query when absent. Return JSON only.\n\nQuery:\n${query}\n\nCandidate:\n${rawCoreText}`,
+      structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
+      structuredOutputName: 'emit_interpretation_artifact',
+      structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', diagnostic),
+    });
+    rawCore = repairedCore;
+    timing('artifact_json_repair_complete', {
+      candidateChars: rawCoreText.length,
+      repairedChars: JSON.stringify(repairedCore).length,
+      boundary: 'forced_tool_schema',
+    });
+  }
+  let artifact = validateArtifactCore(rawCore, {
+    inquiryId: inquiryKey,
+    inquiryKey,
+    revision,
+    query,
+    ownerUserId,
+    threadId,
+  });
+  timing('artifact_construction_complete', {
+    stageMs: Date.now() - started,
+    artifactChars: JSON.stringify(artifact).length,
+  });
+
+  started = Date.now();
+  timing('canonical_audit_start');
+  const auditedCanonical = await callInquiryModel({
+    model: 'claude-haiku-4-5-20251001',
+    maxTokens: 1400,
+    timeoutMs: 8000,
+    prompt: `Audit the Canonical Response against the sealed artifact candidate and the user's query.
+Apply the Prism Epistemic Contract symmetrically. Preserve sound prose. Correct only material overclaim, unsupported psychology, contradiction, or failure to answer. Do not add Framework exposition. Return only the complete approved response in plain prose.
+
+Query:\n${query}\n\nArtifact candidate:\n${JSON.stringify(artifact)}\n\nCanonical Response:\n${artifact.canonicalResponse}`,
+  });
+  if (!auditedCanonical || auditedCanonical.length < 40 || /^(?:```|\{)/.test(auditedCanonical)) {
+    throw new Error('CANONICAL_AUDIT_INVALID');
+  }
+  const auditReturnedMeta = /(?:^|\n)\s*(?:[#>*_`~-]+\s*)*Audit Result\b/i.test(auditedCanonical)
+    || /\bVerification against (?:the )?contract\b/i.test(auditedCanonical)
+    || /\bNo corrections required\b/i.test(auditedCanonical)
+    || /\bMaterial claims verified\b/i.test(auditedCanonical)
+    || /\bAPPROVED RESPONSE\b/i.test(auditedCanonical);
+  const unauditedCanonical = rawCore.canonical_response;
+  rawCore = {
+    ...rawCore,
+    canonical_response: auditReturnedMeta ? artifact.canonicalResponse : auditedCanonical,
+  };
+  artifact = validateArtifactCore(rawCore, {
+    inquiryId: inquiryKey,
+    inquiryKey,
+    revision,
+    query,
+    ownerUserId,
+    threadId,
+  });
+  timing('canonical_audit_complete', {
+    stageMs: Date.now() - started,
+    corrected: !auditReturnedMeta && auditedCanonical !== unauditedCanonical,
+    metaFallback: auditReturnedMeta,
+    canonicalChars: artifact.canonicalResponse.length,
+  });
+  return artifact;
+}
+
+async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing, replaceInvalidEmpty = false }) {
+  const started = Date.now();
+  timing('progressive_analysis_start');
+  try {
+    const rawText = await callInquiryModel({
+      model: 'claude-sonnet-4-6',
+      maxTokens: 3000,
+      temperature: 0.2,
+      timeoutMs: 90000,
+      system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
+      prompt: `Sealed Interpretation Artifact:\n${serializeArtifactForEnrichment(artifact)}`,
+    });
+    const generatedEnrichment = validateEnrichment(parseModelJson(rawText));
+    if (!hasSubstantiveEnrichment(generatedEnrichment)) throw new Error('ENRICHMENT_EMPTY');
+    timing('progressive_analysis_generation_complete', { substantive: true });
+    const auditPrompt = `Audit this enrichment against the sealed Interpretation Artifact.
+Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.
+
+Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText}`;
+    timing('progressive_analysis_audit_start');
+    const auditedText = await callInquiryModel({
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 1800,
+      timeoutMs: 40000,
+      prompt: auditPrompt,
+    });
+    let enrichment = validateEnrichment(parseModelJson(auditedText));
+    timing('progressive_analysis_audit_complete');
+    if (!hasSubstantiveEnrichment(enrichment)) {
+      timing('progressive_analysis_audit_empty', { error: 'ENRICHMENT_AUDIT_EMPTY' });
+      timing('progressive_analysis_audit_retry_start');
+      const retriedAudit = await callInquiryModel({
+        model: 'claude-haiku-4-5-20251001',
+        maxTokens: 1800,
+        timeoutMs: 40000,
+        prompt: auditPrompt,
+        structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,
+        structuredOutputName: 'emit_audited_enrichment',
+      });
+      enrichment = validateEnrichment(retriedAudit);
+      timing('progressive_analysis_audit_retry_complete', {
+        substantive: hasSubstantiveEnrichment(enrichment),
+      });
+      if (!hasSubstantiveEnrichment(enrichment)) throw new Error('ENRICHMENT_AUDIT_EMPTY');
+    }
+    const packets = createEnrichmentPackets(artifact, enrichment);
+    for (const packet of packets) {
+      const durablePacket = await attachInterpretationPacket(packet, { replaceInvalidEmpty });
+      sse.write({ type: 'packet', packet: durablePacket });
+      timing('progressive_packet_complete', {
+        packetType: durablePacket.packetType,
+        sequence: durablePacket.sequence,
+      });
+    }
+    timing('progressive_analysis_complete', { stageMs: Date.now() - started });
+    sse.write({ type: 'analysis_status', status: 'complete' });
+    return { complete: true };
+  } catch (error) {
+    timing('progressive_analysis_incomplete', {
+      stageMs: Date.now() - started,
+      error: String(error?.message || error).slice(0, 180),
+    });
+    sse.write({
+      type: 'analysis_status',
+      status: 'incomplete',
+      message: 'Prism Analysis incomplete.',
+      retryablePackets: [PACKET_TYPES.CONTEXT, PACKET_TYPES.ANALYSIS],
+      artifactId: artifact.artifactId,
+      artifactRevision: artifact.revision,
+    });
+    return { complete: false, error };
+  }
+}
+
+async function runProgressiveInitialInquiry({
+  sse,
+  timing,
+  requestId,
+  query,
+  queryType,
+  systemPrompt,
+  tier,
+  inquiryCredential,
+  ownerUserId = null,
+  usageUserId = null,
+  usageQueryType,
+  usageCreditSource,
+}) {
+  if (!inquiryCredential?.inquiryKey) throw new Error('INQUIRY_CREDENTIAL_UNAVAILABLE');
+  let artifact = await constructAuditedArtifact({
+    timing,
+    requestId,
+    query,
+    inquiryKey: inquiryCredential.inquiryKey,
+    revision: 1,
+    systemPrompt,
+    ownerUserId,
+  });
+
+  let threadId = null;
+
+  const packets = createCanonicalPackets(artifact);
+  const completionKey = createCompletionKey({ inquiryId: artifact.inquiryId, revision: artifact.revision });
+  timing('canonical_completion_start');
+  const completion = await completeInterpretationArtifact(artifact, packets, {
+    inquiryKey: inquiryCredential.inquiryKey,
+    completionKey,
+    charge: true,
+    usageUserId,
+    usageQueryType,
+    usageCreditSource,
+    threadPayload: ownerUserId
+      ? canonicalThreadPayload({ query, queryType, artifact, tier })
+      : null,
+  });
+  threadId = completion.thread_id || threadId;
+  timing('canonical_completion_complete', {
+    artifactId: artifact.artifactId,
+    artifactRevision: artifact.revision,
+  });
+
+  for (const packet of packets) sse.write({ type: 'packet', packet });
+  sse.write({
+    type: 'canonical_complete',
+    tier,
+    artifactId: artifact.artifactId,
+    artifactRevision: artifact.revision,
+    threadId,
+    ...inquiryCredential,
+  });
+  timing('canonical_response_available', { artifactId: artifact.artifactId });
+
+  await generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing });
+  sse.write(
+    { type: 'done', tier, artifactId: artifact.artifactId, artifactRevision: artifact.revision },
+    { source: 'progressive_inquiry_delivery', tier },
+  );
+  return artifact;
+}
+
+async function runPersistentInquiryFollowUp({
+  sse,
+  timing,
+  requestId,
+  input,
+  subject,
+  inquiryKey,
+  threadId,
+  ownerUserId,
+  tier,
+  artifactId,
+  artifactRevision,
+  isClientAborted = () => false,
+}) {
+  const runtimeStartedAt = Date.now();
+  const emitStage = (stage) => {
+    timing(`followup_${stage}_start`);
+    sse.write({ type: 'stage', stage, text: FOLLOWUP_STAGE_LABELS[stage] });
+    return Date.now();
+  };
+  const completeStage = (stage, stageStartedAt, details = {}) => {
+    timing(`followup_${stage}_complete`, {
+      stageMs: Date.now() - stageStartedAt,
+      ...details,
+    });
+  };
+
+  let stageStartedAt = emitStage('restore');
+  const restored = await restoreCanonicalInquiryState({
+    inquiryKey,
+    threadId,
+    subject,
+    artifactId,
+    artifactRevision,
+    ownerUserId,
+  });
+  const previousState = restored.state;
+  const canonicalInquiryKey = restored.inquiryKey || inquiryKey;
+  completeStage('restore', stageStartedAt, { stateVersion: previousState.version });
+
+  stageStartedAt = emitStage('reduce');
+  const reducerText = await callInquiryModel({
+    model: 'claude-haiku-4-5-20251001',
+    maxTokens: 1800,
+    prompt: buildReducerPrompt({
+      state: previousState,
+      input,
+      userCorrection: detectExplicitCorrection(input),
+    }),
+  });
+  const rawAnalysis = parseModelJson(reducerText);
+  const analysis = validateAnalysisStrict(rawAnalysis, reducerText);
+  completeStage('reduce', stageStartedAt, {
+    primaryPropositionChars: analysis.reduction.primaryProposition.length,
+  });
+
+  // Reduction, delta detection, and the inexpensive gate share one structured
+  // model pass, but retain distinct canonical timing boundaries.
+  stageStartedAt = emitStage('delta');
+  completeStage('delta', stageStartedAt, {
+    deltaChars: analysis.structuralDelta.length,
+  });
+
+  stageStartedAt = emitStage('gate');
+  const nextState = applyInquiryPatch(
+    previousState,
+    analysis.statePatch,
+    analysis.structuralDelta,
+  );
+  completeStage('gate', stageStartedAt, {
+    assumptionCount: analysis.constraintGate.unsupportedAssumptions.length,
+    falsifiabilityCount: analysis.constraintGate.unfalsifiableClaims.length,
+  });
+
+  stageStartedAt = emitStage('retrieval');
+  const retrievalQuery = buildFocusedRetrievalQuery(nextState, analysis) || input;
+  const rawRetrievedContext = analysis.constraintGate.retrieval.needed
+    ? await getRetrievedContext(retrievalQuery, null, timing)
+    : '';
+  const boundedRetrieval = boundRetrievedContext(rawRetrievedContext);
+  const retrievedContext = boundedRetrieval.context;
+  if (boundedRetrieval.compacted) {
+    timing('followup_payload_compacted', {
+      target: 'rag',
+      originalChars: boundedRetrieval.originalChars,
+      retainedChars: retrievedContext.length,
+    });
+  }
+  completeStage('retrieval', stageStartedAt, {
+    queryChars: retrievalQuery.length,
+    contextChars: retrievedContext.length,
+  });
+
+  stageStartedAt = emitStage('draft');
+  const draftPrompt = assertFollowUpPromptSize(buildDraftPrompt({
+    state: nextState,
+    analysis,
+    input,
+    retrievedContext,
+  }));
+  const draft = await callInquiryModel({
+    model: 'claude-sonnet-4-6',
+    maxTokens: 1400,
+    temperature: 0.2,
+    timeoutMs: 25000,
+    prompt: draftPrompt,
+  });
+  completeStage('draft', stageStartedAt, { draftChars: draft.length });
+
+  stageStartedAt = emitStage('audit');
+  if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
+  const audited = await callInquiryModel({
+    model: 'claude-haiku-4-5-20251001',
+    maxTokens: 1400,
+    timeoutMs: 8000,
+    prompt: assertFollowUpPromptSize(buildAuditPrompt({ input, analysis, draft })),
+  });
+  if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
+  if (!audited
+    || audited.length < Math.min(40, Math.floor(draft.length * 0.2))
+    || audited.length > draft.length * 1.25 + 120
+    || /^(?:```|\{|\s*AUDIT\b)/i.test(audited)) {
+    throw new Error('AUDIT_RESPONSE_INVALID');
+  }
+  const approved = audited;
+  completeStage('audit', stageStartedAt, {
+    corrected: approved !== draft,
+    approvedChars: approved.length,
+  });
+
+  stageStartedAt = emitStage('persist');
+  if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
+  const followUpArtifact = validateArtifactCore({
+    proposition: analysis.reduction.primaryProposition,
+    scope: subject || previousState.orientation,
+    jurisdiction: 'domain-appropriate inquiry',
+    governing_authority: 'The authority legitimately governing the inquiry domain',
+    observations: analysis.constraintGate.observations,
+    inferences: analysis.constraintGate.inferences,
+    assumptions: [
+      ...analysis.constraintGate.activeAssumptions,
+      ...analysis.constraintGate.unsupportedAssumptions,
+    ],
+    epistemic_boundaries: analysis.constraintGate.evidenceBoundaries,
+    thesis: approved.split(/(?<=[.!?])\s/)[0] || approved,
+    conclusions: [approved],
+    qualifications: analysis.constraintGate.evidenceBoundaries,
+    unresolved: nextState.unresolvedClaims,
+    orientation: nextState.orientation || analysis.reduction.primaryProposition,
+    canonical_response: approved,
+    response_mode: 'reflective',
+  }, {
+    inquiryId: canonicalInquiryKey,
+    inquiryKey: canonicalInquiryKey,
+    revision: Math.max(previousState.version + 1, restored.artifactRevision + 1),
+    query: input,
+    ownerUserId,
+    threadId,
+  });
+  const canonicalPackets = createCanonicalPackets(followUpArtifact);
+  const commit = await completeFollowUpArtifact({
+    artifact: followUpArtifact,
+    packets: canonicalPackets,
+    inquiryKey: canonicalInquiryKey,
+    expectedStateVersion: previousState.version,
+    state: nextState,
+    requestId,
+  });
+  if (commit.conflict) {
+    sse.write({
+      type: 'state_conflict',
+      canonicalState: true,
+      stateVersion: commit.version,
+      state: commit.state,
+    });
+    throw new Error('STALE_INQUIRY_STATE');
+  }
+  completeStage('persist', stageStartedAt, {
+    artifactId: followUpArtifact.artifactId,
+    artifactRevision: followUpArtifact.revision,
+    stateVersion: commit.version,
+  });
+
+  stageStartedAt = emitStage('stream');
+  for (const packet of canonicalPackets) sse.write({ type: 'packet', packet });
+  sse.write({
+    type: 'canonical_complete',
+    tier,
+    artifactId: followUpArtifact.artifactId,
+    artifactRevision: followUpArtifact.revision,
+    stateVersion: commit.version,
+    state: commit.state,
+    committed: true,
+    canonicalState: true,
+  });
+  completeStage('stream', stageStartedAt, { packetCount: canonicalPackets.length });
+
+  await generateAndAttachEnrichment({
+    artifact: followUpArtifact,
+    systemPrompt: PRISM_RESPONSE_REFRESH,
+    sse,
+    timing,
+  });
+
+  timing('followup_total_complete', {
+    totalMs: Date.now() - runtimeStartedAt,
+    stateVersion: commit.version,
+    artifactRevision: followUpArtifact.revision,
+  });
+  sse.write(
+    {
+      type: 'done',
+      tier,
+      artifactId: followUpArtifact.artifactId,
+      artifactRevision: followUpArtifact.revision,
+      stateVersion: commit.version,
+      committed: true,
+      canonicalState: true,
+    },
+    { source: 'persistent_inquiry_runtime', tier },
+  );
+}
+
 
 export default async function handler(req, res) {
   const startedAt = Date.now();
@@ -5404,22 +6489,114 @@ export default async function handler(req, res) {
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  const authentication = await verifySupabaseIdentity({
+    authorizationHeader: req.headers.authorization,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY,
+  });
+  if (authentication.provided && !authentication.identity) {
+    timing('authentication_complete', {
+      outcome: authentication.error || 'invalid_authentication',
+    });
+    return res.status(authentication.unavailable ? 503 : 401).json({
+      error: authentication.unavailable
+        ? 'Authentication temporarily unavailable'
+        : 'Authentication required',
+    });
+  }
+  const verifiedIdentity = authentication.identity;
+  const previewTestEntitlement = verifiedIdentity
+    ? getPreviewTestEntitlement({ userId: verifiedIdentity.userId })
+    : null;
+  timing('authentication_complete', {
+    outcome: verifiedIdentity ? 'verified' : 'anonymous',
+    previewTestAccess: Boolean(previewTestEntitlement),
+  });
+
+  if (req.method === 'POST' && correlationBody?.operation === 'commit_inquiry_state') {
+    const pending = verifyPendingInquiryCommit(correlationBody.pendingCommitToken);
+    if (!pending) return res.status(400).json({ error: 'Invalid or expired pending commit' });
+    if (pending.ownerUserId && !verifiedIdentity) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (pending.ownerUserId && pending.ownerUserId !== verifiedIdentity?.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const commit = await commitCanonicalInquiryState(pending);
+    timing('followup_acknowledgement_complete', {
+      committed: Boolean(commit.committed),
+      conflict: Boolean(commit.conflict),
+      unavailable: Boolean(commit.unavailable),
+      stateVersion: commit.version ?? pending.expectedVersion,
+    });
+    return res.status(commit.unavailable ? 503 : 200).json({
+      committed: Boolean(commit.committed),
+      conflict: Boolean(commit.conflict),
+      unavailable: Boolean(commit.unavailable),
+      canonicalState: Boolean(commit.committed || commit.conflict),
+      stateVersion: commit.version ?? pending.expectedVersion,
+      state: commit.committed || commit.conflict ? commit.state : null,
+    });
+  }
+
   // ── GET — preflight status check ─────────────────────────────────────────
+  if (req.method === 'POST' && correlationBody?.operation === 'retry_artifact_analysis') {
+    const artifactId = correlationBody.artifactId;
+    const artifactRevision = Number(correlationBody.artifactRevision);
+    if (!/^[0-9a-f-]{36}$/i.test(artifactId || '')
+      || !Number.isInteger(artifactRevision)
+      || artifactRevision < 1) {
+      return res.status(400).json({ error: 'Invalid artifact reference' });
+    }
+    const artifactResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact,inquiry_key,owner_user_id&limit=1`,
+      { headers: inquiryServiceHeaders() },
+    );
+    const rows = artifactResponse.ok ? await artifactResponse.json() : [];
+    const row = rows?.[0];
+    if (!row?.artifact) return res.status(404).json({ error: 'Artifact not found' });
+    if (row.owner_user_id) {
+      if (!verifiedIdentity) return res.status(401).json({ error: 'Authentication required' });
+      if (row.owner_user_id !== verifiedIdentity.userId) return res.status(403).json({ error: 'Forbidden' });
+    } else if (correlationBody.inquiryKey !== row.inquiry_key
+      || !verifyInquiryCredential(row.inquiry_key, correlationBody.inquiryToken)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const packets = [];
+    const result = await generateAndAttachEnrichment({
+      artifact: Object.freeze(row.artifact),
+      systemPrompt: PRISM_SYSTEM_PROMPT,
+      sse: { write(event) { if (event?.type === 'packet') packets.push(event.packet); return true; } },
+      timing,
+      replaceInvalidEmpty: true,
+    });
+    if (!result.complete) {
+      return res.status(503).json({ error: 'Prism Analysis incomplete.', retryable: true });
+    }
+    return res.status(200).json({ packets, charged: false });
+  }
+
   if (req.method === 'GET') {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
-    const urlObj = new URL(req.url, 'https://' + req.headers.host);
-    const email = urlObj.searchParams.get('email');
-
-    if (email) {
+    if (verifiedIdentity) {
       try {
-        const subscriber = await getSubscriber(email);
-        const redemption = await getCodeRedemption(email);
+        if (previewTestEntitlement) {
+          const used = await getLiveQueryCount(verifiedIdentity.userId) ?? 0;
+          return res.status(200).json({
+            locked: used >= previewTestEntitlement.allowance,
+            queriesUsed: used,
+            limit: previewTestEntitlement.allowance,
+            previewTestAccess: true,
+          });
+        }
+        const subscriber = await getSubscriber(verifiedIdentity.email);
+        const redemption = await getCodeRedemption(verifiedIdentity.email);
         if ((subscriber && subscriber.status === 'active') || redemption) {
-          return res.status(200).json({ locked: false });
+          return res.status(200).json({ locked: false, authenticated: true });
         }
       } catch {}
     }
@@ -5473,7 +6650,7 @@ export default async function handler(req, res) {
   // POST /api/share/followup — save recipient follow-up
   if (req.method === 'POST' && urlPath.endsWith('/share/followup')) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { shareId, question, response, userEmail: fuEmail } = body || {};
+    const { shareId, question, response } = body || {};
     if (!shareId || !question) return res.status(400).json({ error: 'Missing fields' });
 
     // Check collaboration mode before allowing the follow-up
@@ -5489,7 +6666,7 @@ export default async function handler(req, res) {
     }
 
     // mode === 'bidirectional' — proceed
-    await saveSharedFollowUp({ shareId, question, response, userEmail: fuEmail });
+    await saveSharedFollowUp({ shareId, question, response, userEmail: verifiedIdentity?.email || null });
     return res.status(200).json({ ok: true });
   }
 
@@ -5498,6 +6675,11 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { shareId, collaborationOpen, collaborationMode } = body || {};
     if (!shareId) return res.status(400).json({ error: 'Missing shareId' });
+    if (!verifiedIdentity?.email) return res.status(401).json({ error: 'Unauthorized' });
+    const ownedSession = await getSharedSession(shareId);
+    if (!ownedSession || ownedSession.sender_email !== verifiedIdentity.email) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     if (collaborationMode !== undefined) {
       const ok = await updateSharedSessionMode(shareId, collaborationMode);
       // Keep collaboration_open in sync — bidirectional = open, others = closed
@@ -5521,10 +6703,17 @@ export default async function handler(req, res) {
   // POST /api/share — create shared session
   if (req.method === 'POST' && urlPath.endsWith('/share')) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { snapshot, subject, senderEmail, threadId, collaborationOpen, collaborationMode } = body || {};
+    const { snapshot, subject, threadId, collaborationOpen, collaborationMode } = body || {};
     if (!snapshot) return res.status(400).json({ error: 'Missing snapshot' });
     try {
-      const record = await createSharedSession({ snapshot, subject, senderEmail, threadId, collaborationOpen, collaborationMode });
+      const record = await createSharedSession({
+        snapshot,
+        subject,
+        senderEmail: verifiedIdentity?.email || null,
+        threadId,
+        collaborationOpen,
+        collaborationMode
+      });
       if (!record) return res.status(500).json({ error: 'Could not create shared session' });
       const host = req.headers.host || 'quantumtheology.app';
       const protocol = host.includes('localhost') ? 'http' : 'https';
@@ -5722,24 +6911,47 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
-  let prompt, messages, userEmail, rawQuery, isFollowUp;
+  let prompt, messages, rawQuery, isFollowUp;
+  let inquiryKey, inquiryToken, threadId, inquirySubject, sharedFollowUpId;
+  let artifactId, artifactRevision;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     prompt = body?.prompt;
     messages = body?.messages;
-    userEmail = body?.email || null;
     rawQuery = body?.rawQuery || null;
-    isFollowUp = body?.isFollowUp || false;
+    isFollowUp = body?.isFollowUp === true;
+    inquiryKey = typeof body?.inquiryKey === 'string'
+      && /^[A-Za-z0-9:_-]{12,180}$/.test(body.inquiryKey)
+      ? body.inquiryKey
+      : null;
+    inquiryToken = typeof body?.inquiryToken === 'string'
+      && /^[A-Za-z0-9_-]{32,100}$/.test(body.inquiryToken)
+      ? body.inquiryToken
+      : null;
+    threadId = typeof body?.threadId === 'string' ? body.threadId : null;
+    inquirySubject = typeof body?.inquirySubject === 'string'
+      ? body.inquirySubject.slice(0, 2000)
+      : '';
+    artifactId = typeof body?.artifactId === 'string'
+      && /^[0-9a-f-]{36}$/i.test(body.artifactId)
+      ? body.artifactId
+      : null;
+    artifactRevision = Number.isInteger(body?.artifactRevision)
+      && body.artifactRevision >= 1
+      ? body.artifactRevision
+      : null;
+    sharedFollowUpId = typeof body?.shareId === 'string' ? body.shareId : null;
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
   }
+  const initialInquiryCredential = issueInquiryCredential();
 
   // ── REQUEST INSTRUMENTATION ──────────────────────────────────────────────
   timing('request_body_parsed', {
     queryLength: (rawQuery || prompt || '').length,
     hasMessages: Array.isArray(messages) && messages.length > 0,
     messageCount: Array.isArray(messages) ? messages.length : 0,
-    hasEmail: Boolean(userEmail),
+    authenticated: Boolean(verifiedIdentity),
   });
 
   // ── CRISIS DETECTION ──────────────────────────────────────────────────────
@@ -5790,7 +7002,8 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   // ── SUBSCRIBER PATH ───────────────────────────────────────────────────────
   try {
-    if (userEmail) {
+    if (verifiedIdentity) {
+      const userEmail = verifiedIdentity.email;
       timing('subscriber_lookup_start');
       let subscriber;
       try {
@@ -5818,21 +7031,49 @@ Do not add any question after the exit offer. The person chooses the next move.
         throw err;
       }
 
-      if ((subscriber && subscriber.status === 'active') || redemption) {
+      if (previewTestEntitlement || (subscriber && subscriber.status === 'active') || redemption) {
         const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
         if (!apiMessages || apiMessages.length === 0) {
           return res.status(400).json({ error: 'No messages provided' });
         }
         const tier = normalizeTier(subscriber?.tier || 'free');
-        const subscriberUserId = subscriber?.id || null;
-        const authUserId = await getAuthUserId(userEmail);
+        // Canonical inquiry ownership is always bound to the identity verified by
+        // Supabase Auth. The subscriber row is quota/billing metadata, not an
+        // authorization principal (and its UUID may differ from auth.users.id).
+        const userId = verifiedIdentity.userId;
+        const quotaIdentity = subscriber || (previewTestEntitlement ? {
+          id: verifiedIdentity.userId,
+          tier: 'free',
+          query_count: 0,
+          purchased_credits: 0,
+        } : null);
 
-        const isFollowUpCheck = isFollowUp || (messages && messages.length > 1);
-        if (!isFollowUpCheck && subscriber) {
+        const hasFollowUpCandidate = Boolean(
+          isFollowUp || inquiryKey || inquiryToken || threadId || sharedFollowUpId,
+        );
+        const followUpContext = hasFollowUpCandidate
+          ? await classifyFollowUpContext({
+            clientHint: isFollowUp,
+            inquiryKey,
+            inquiryToken,
+            threadId,
+            ownerUserId: userId,
+            shareId: sharedFollowUpId,
+          })
+          : { isFollowUp: false, reason: 'no_candidate_context' };
+        timing('followup_classification_complete', {
+          classified: followUpContext.isFollowUp,
+          reason: followUpContext.reason,
+        });
+        const isFollowUpCheck = followUpContext.isFollowUp;
+        let quota = null;
+        if (!isFollowUpCheck && quotaIdentity) {
           timing('quota_check_start');
-          let quota;
           try {
-            quota = await checkSubscriberQuota(subscriber);
+            quota = await checkSubscriberQuota(
+              quotaIdentity,
+              previewTestEntitlement?.allowance ?? null,
+            );
             timing('quota_check_end', {
               outcome: 'success',
               allowed: quota.allowed,
@@ -5869,6 +7110,48 @@ Do not add any question after the exit offer. The person chooses the next move.
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('X-Prism-Tier', tier);
         res.setHeader('X-Prism-Subscriber', 'true');
+        if (previewTestEntitlement) {
+          res.setHeader('X-Prism-Preview-Test', 'true');
+        }
+
+        if (followUpContext.isFollowUp) {
+          try {
+            if (persistentInquiryRuntimeEnabled()) {
+              await runPersistentInquiryFollowUp({
+                sse,
+                timing,
+                requestId,
+                input: lastUserText,
+                subject: inquirySubject,
+                inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
+                threadId,
+                ownerUserId: userId,
+                tier,
+                artifactId,
+                artifactRevision,
+                isClientAborted: () => clientAborted,
+              });
+            } else {
+              await runDisabledFollowUpFallback({
+                sse,
+                timing,
+                input: lastUserText,
+                subject: inquirySubject,
+                tier,
+              });
+            }
+          } catch (err) {
+            timing('followup_runtime_error', {
+              route: 'subscriber',
+              error: String(err?.message || err).slice(0, 160),
+            });
+            sse.write(
+              { type: 'error', error: err.message },
+              { source: 'persistent_inquiry_runtime', tier },
+            );
+          }
+          return res.end();
+        }
 
         // RAG: retrieve relevant corpus passages before AI call
         // Pass null for classification — getRetrievedContext will retrieve for all queries
@@ -5909,6 +7192,23 @@ Do not add any question after the exit offer. The person chooses the next move.
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
           elapsedMs: Date.now() - startedAt,
         });
+
+        await runProgressiveInitialInquiry({
+          sse,
+          timing,
+          requestId,
+          query: lastUserText,
+          queryType,
+          systemPrompt: enhancedSystemPrompt,
+          tier,
+          inquiryCredential: initialInquiryCredential,
+          ownerUserId: userId,
+          usageUserId: subscriber?.id || null,
+          usageQueryType: 'subscriber',
+          usageCreditSource: quota?.creditSource || 'tier_allocation',
+        });
+        timing('request_complete', { route: 'subscriber', tier });
+        return res.end();
 
         timing('anthropic_request_start');
         const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -6027,7 +7327,7 @@ Do not add any question after the exit offer. The person chooses the next move.
             fullResponse = checkedResponse;
           }
           sse.write(
-            { type: 'done', tier },
+            { type: 'done', tier, ...(initialInquiryCredential || {}) },
             { source: 'post_coherence', tier },
           );
         } else {
@@ -6037,20 +7337,20 @@ Do not add any question after the exit offer. The person chooses the next move.
           );
         }
 
-        if (streamDone && authUserId) {
+        if (streamDone && userId) {
           timing('persistence_start', { followUp: Boolean(isFollowUp || (messages && messages.length > 1)) });
           const isFollowUpQuery = isFollowUp || (messages && messages.length > 1);
           if (!isFollowUpQuery) {
             const threadId = await saveThread({
-              userId: authUserId,
+              userId,
               query:     lastUserText,
               queryType,
               response:  fullResponse,
               tier
             });
-            await updateQueryCount({ userId: subscriberUserId, tier, threadId });
+            await updateQueryCount({ userId, tier, threadId });
           } else {
-            await updateQueryCount({ userId: subscriberUserId, tier, threadId: null });
+            await updateQueryCount({ userId, tier, threadId: null });
           }
           timing('persistence_complete');
         }
@@ -6108,11 +7408,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           message: `You've used all ${QUERY_LIMIT} free queries. Access resets in ${hoursRemaining} hour${hoursRemaining !== 1 ? 's' : ''}.`,
           hoursRemaining
         });
-      } else {
-        await incrementQueryLog(ip, log.query_count);
       }
-    } else {
-      await insertQueryLog(ip);
     }
   } catch (err) {
     timing('anonymous_access_error');
@@ -6131,6 +7427,63 @@ Do not add any question after the exit offer. The person chooses the next move.
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Prism-Tier', 'free');
     res.setHeader('X-Prism-Subscriber', 'false');
+
+    const hasFollowUpCandidate = Boolean(
+      isFollowUp || inquiryKey || inquiryToken || threadId || sharedFollowUpId,
+    );
+    const followUpContext = hasFollowUpCandidate
+      ? await classifyFollowUpContext({
+        clientHint: isFollowUp,
+        inquiryKey,
+        inquiryToken,
+        threadId,
+        ownerUserId: null,
+        shareId: sharedFollowUpId,
+      })
+      : { isFollowUp: false, reason: 'no_candidate_context' };
+    timing('followup_classification_complete', {
+      classified: followUpContext.isFollowUp,
+      reason: followUpContext.reason,
+    });
+
+    if (followUpContext.isFollowUp) {
+      try {
+        if (persistentInquiryRuntimeEnabled()) {
+          await runPersistentInquiryFollowUp({
+            sse,
+            timing,
+            requestId,
+            input: lastUserText,
+            subject: inquirySubject,
+            inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
+            threadId,
+            ownerUserId: null,
+            tier: 'free',
+            artifactId,
+            artifactRevision,
+            isClientAborted: () => clientAborted,
+          });
+        } else {
+          await runDisabledFollowUpFallback({
+            sse,
+            timing,
+            input: lastUserText,
+            subject: inquirySubject,
+            tier: 'free',
+          });
+        }
+      } catch (err) {
+        timing('followup_runtime_error', {
+          route: 'free',
+          error: String(err?.message || err).slice(0, 160),
+        });
+        sse.write(
+          { type: 'error', error: err.message },
+          { source: 'persistent_inquiry_runtime', tier: 'free' },
+        );
+      }
+      return res.end();
+    }
 
     // RAG: retrieve relevant corpus passages before AI call
     // Pass null for classification — getRetrievedContext will retrieve for all queries
@@ -6159,6 +7512,24 @@ Do not add any question after the exit offer. The person chooses the next move.
           relationalSalvationLoaded: relationalSalvationModule,
           elapsedMs: Date.now() - startedAt,
         });
+
+    await runProgressiveInitialInquiry({
+      sse,
+      timing,
+      requestId,
+      query: lastUserText,
+      queryType: /^[1-9][a-z]+ \d+:\d+/i.test(lastUserText.trim())
+        ? 'verse_reference'
+        : 'free_text',
+      systemPrompt: enhancedSystemPrompt,
+      tier: 'free',
+      inquiryCredential: initialInquiryCredential,
+      usageUserId: null,
+      usageQueryType: `ip:${ip}`,
+      usageCreditSource: 'free_tier',
+    });
+    timing('request_complete', { route: 'free', tier: 'free' });
+    return res.end();
 
     timing('anthropic_request_start');
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -6263,7 +7634,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         sse.write({ type: 'corrected', text: checkedResponseFree });
       }
       sse.write(
-        { type: 'done', tier: 'free' },
+        { type: 'done', tier: 'free', ...(initialInquiryCredential || {}) },
         { source: 'post_coherence', tier: 'free' },
       );
     } else {

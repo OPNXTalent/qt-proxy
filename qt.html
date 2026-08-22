@@ -2081,7 +2081,7 @@
   <!-- Sidebar footer — nav + logout -->
   <div style="padding:16px 20px; border-top:1px solid var(--border); flex-shrink:0; position:relative; display:flex; justify-content:space-between; align-items:center;">
     <a href="/index.html" style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)'">← Home</a>
-    <button onclick="handleLogout()" style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)'">Sign Out →</button>
+    <button id="sidebarSignOut" onclick="handleLogout()" style="display:none;font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); background:transparent; border:none; cursor:pointer; padding:0; transition:color 0.2s;" onmouseover="this.style.color='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)'">Sign Out →</button>
   </div>
 
   <!-- Undo toast -->
@@ -2573,6 +2573,7 @@ function updateCharCount() {
 // --- Query limit state ---
 let sessionQueryCount = 0;
 const QUERY_LIMIT = 3;
+let previewTestAccess = false;
 
 // Live ticker state
 let _tickerInterval = null;
@@ -2644,7 +2645,7 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
     // covering Signal Bank / Subscribe purchases — showing the full
     // four-option wall on top of that is redundant, so just the reset
     // message and countdown are shown for them.
-    var registeredEmail = localStorage.getItem('qt_user_email');
+    var registeredEmail = userEmail();
     var optionsGrid = document.getElementById('limitPromptOptions');
     if (registeredEmail) {
       if (optionsGrid) optionsGrid.style.display = 'none';
@@ -2653,6 +2654,23 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
       checkLimitEmailGate();
     }
   }
+
+function releaseServerAuthorizedPreviewLock() {
+    // This only restores the controls. The API remains the authority that
+    // grants or denies allowance on every request.
+    if (!previewTestAccess) return;
+    if (_tickerInterval) {
+      clearInterval(_tickerInterval);
+      _tickerInterval = null;
+    }
+    const prompt = document.getElementById('limitPrompt');
+    if (prompt) prompt.style.display = 'none';
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) submitBtn.style.display = '';
+    const newSubjectBtn = document.getElementById('newSubjectTopBtn');
+    if (newSubjectBtn) newSubjectBtn.style.display = '';
+}
+
 function applyQuotaLock(message) {
     document.getElementById('submitBtn').style.display = 'none';
     document.getElementById('newSubjectTopBtn').style.display = 'none';
@@ -2726,9 +2744,9 @@ async function runInterpretation() {
   if (!input) return;
 
   // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
-  const _isAnon = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
-  const _isPaidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
-  if ((_isAnon || !_isPaidTier) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  const _isAnon = !verifiedAuthState.authenticated;
+  const _isPaidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(getActualTier());
+  if (!previewTestAccess && (_isAnon || !_isPaidTier) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
   const requestId = createPrismRequestId();
   markPrismBrowserTiming(requestId, 'submit', {
     queryLength: input.length,
@@ -2738,6 +2756,10 @@ async function runInterpretation() {
   // Reset conversation for new subject
   conversationHistory = [];
   currentSubject = input;
+  beginNewPersistentInquiry();
+  // A brand-new subject has no durable thread yet. Clear any ID left over
+  // from the previous thread so it cannot be mistaken for this one below.
+  activeThreadId = null;
 
   document.getElementById('submitBtn').disabled = true;
   document.getElementById('inputSection').style.opacity = '0.4';
@@ -2752,13 +2774,7 @@ async function runInterpretation() {
   conversationHistory.push({ role: 'user', content: input });
 
   try {
-    const proxyResult = await callProxy(conversationHistory, input, requestId);
-    const apiRawText = proxyResult.text;
-    const persistedThreadId = proxyResult.threadId;
-
-    if (localStorage.getItem('qt_user_email') && proxyResult.persisted === false) {
-      console.error('[Prism] Interpretation completed, but the thread was not persisted.');
-    }
+    const apiRawText = await callProxy(conversationHistory, input, requestId);
   
   // Store a condensed version in history to prevent payload bloat on follow-ups
   const condensed = apiRawText.length > 1000 
@@ -2853,19 +2869,17 @@ async function runInterpretation() {
     // page refresh, since it never re-reads purchased_credits.
     loadSidebarCredits();
     // Only lock the UI for free/anonymous users — paid subscribers are gated server-side
-    const _isAnonPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+    const _isAnonPost = !verifiedAuthState.authenticated;
     const _isPaidPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
-    if ((_isAnonPost || !_isPaidPost) && sessionQueryCount >= QUERY_LIMIT) {
+    if (!previewTestAccess && (_isAnonPost || !_isPaidPost) && sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
     }
 
-    // Show sidebar after first successful query. For authenticated users,
-    // the backend now returns the durable Supabase thread ID in the terminal
-    // SSE event, so the UI never has to guess or poll for the new row.
+    // Show sidebar after first successful query
     const queryText = input;
-    showSidebarAfterQuery(queryText, persistedThreadId);
+    showSidebarAfterQuery(queryText, activeThreadId);
 
-    // Save full response to localStorage keyed by the durable thread id
+    // Save full response to localStorage keyed by thread id
     // activeThreadId is set by showSidebarAfterQuery/addThreadToSidebar
     if (activeThreadId && parsed) {
         localStorage.setItem('qt_last_thread_id', activeThreadId);
@@ -2911,9 +2925,9 @@ async function runFollowUp() {
   if (!input) return;
 
   // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
-  const _isAnonFU = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+  const _isAnonFU = !verifiedAuthState.authenticated;
   const _isPaidTierFU = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
-  if ((_isAnonFU || !_isPaidTierFU) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  if (!previewTestAccess && (_isAnonFU || !_isPaidTierFU) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
   const requestId = createPrismRequestId();
   markPrismBrowserTiming(requestId, 'submit', {
     queryLength: input.length,
@@ -2927,117 +2941,8 @@ async function runFollowUp() {
   document.getElementById('followUpLoading').scrollIntoView({ behavior: 'smooth', block: 'center' });
   markPrismBrowserTiming(requestId, 'wait_indicator_visible');
 
-  // Build follow-up prompt that stays within Prism framework
-  const followUpPrompt = `RESPONSE BEHAVIOR — CONSTITUTIONAL LAYER
-These instructions govern sequencing and delivery. The framework architecture remains intact beneath them.
-
-First Movement: Recognition Before Terminology
-Every response begins by locating the human tension inside the question. Name what the visitor is actually carrying before introducing any framework category. If they feel seen first, the architecture lands as revelation rather than lecture.
-
-Second Movement: Ordinary Language Before Framework Language
-Articulate the underlying tension in plain language before introducing Prism terminology. The category earns its name by explaining something the visitor already felt but couldn't articulate. Terminology introduced before recognition feels imposed. Terminology introduced after recognition feels inevitable.
-
-Third Movement: One Door At A Time
-Resist the impulse toward categorical completeness in a single response. Open one door fully rather than gesturing at six doors simultaneously. The visitor should leave each response with one thing newly visible — and a question forming naturally in their mind.
-
-Pacing Principle: Spiral Staircase, Not Elevator Shaft
-The descent into Prism architecture should feel gradual and earned. Recognition → Curiosity → Resonance → Interpretation → Architecture → Ontology. Never begin at ontology.
-
-Compression Over Explanation
-When a formulation captures the insight completely, stop. Do not explain what the compression already accomplished. Trust the language.
-
-End Open, Not Closed
-Every response should leave one thread slightly unresolved — not as manipulation, but as honest invitation. Reality is not fully legible yet. The response should reflect that.
-
-The Governing Principle
-The goal is not to make the visitor feel informed. The goal is to make reality feel newly legible to them. Every response is measured against that standard — not against categorical completeness.
-
-
-
-HUMAN CARE PROTOCOL — SILENT MODE
-This instruction operates beneath all framework activity. It never announces itself.
-
-As you read each message, remain attentive to signals that suggest the person may be in genuine personal distress — not theological distress, but human distress. Lament psalms, Job, Ecclesiastes, and suffering theology are not signals. Personal statements of hopelessness, worthlessness, desire to disappear, or references to self-harm or ending one's life are signals.
-
-When you detect a potential signal:
-- Do not deliver a framework interpretation.
-- Shift seamlessly into warm, plainspoken presence. No Prism terminology. No lenses.
-- Begin with acknowledgment. Let them know they have been heard.
-- Ask one gentle qualifying question at a time to understand what they are carrying. Do not interrogate. Do not rush.
-- Weave in naturally, without preaching: they matter, they are seen, they are loved by the One who knows them completely.
-
-As the exchange clarifies:
-- If it resolves as theological or academic engagement — return to normal interpretation without comment.
-- If genuine distress is confirmed but not imminent — offer warmly: "You don't have to carry this alone. Please reach out to the 988 Suicide and Crisis Lifeline (call or text 988) or the Crisis Text Line (text HOME to 741741). Someone is ready to listen right now."
-- If there is any indication of imminent risk or active attempt — respond with urgency and care: "Please call 911 now. You matter, and help can reach you. After you call, 988 and the Crisis Text Line (text HOME to 741741) are also there for you."
-
-CHILD ABUSE DISCLOSURE — MANDATORY PROTOCOL:
-If at any point a person describes being touched inappropriately, sexually abused, physically harmed by an adult in their home, or uses language suggesting ongoing abuse — this is not a theological question. Stop the framework entirely. Do not ask another question. Do not continue the interpretive exchange. Respond with these three things only:
-
-1. Name what they described plainly and without minimizing: "What you just described is not okay. It is not your fault. What is happening to you is abuse."
-2. Deliver the resource directly: "Please call or text the Childhelp National Child Abuse Hotline right now: 1-800-422-4453. It is free, confidential, and available 24/7. If you are in immediate danger, call 911 or get to a trusted adult, teacher, or neighbor."
-3. One sentence of witness: "You are seen. You matter. There are adults whose entire job is to help you — please reach out to them."
-
-Do not ask follow-up questions. Do not return to the framework. Do not continue the theological exchange. The resource is the response.
-
-The thread memorializes this exchange. Hold it with care.
-
-${(function() {
-  var _seed = sessionStorage.getItem('qt_thread_seed');
-  if (_seed) {
-    sessionStorage.removeItem('qt_thread_seed');
-    var _b = document.getElementById('qt-seed-banner');
-    if (_b) _b.style.display = 'none';
-    return 'CONTINUING FROM PRIOR THREAD — the following is a summary of where the previous conversation arrived. Use it as orientation context for this new exchange. Do not restate or summarize it. Simply begin from this ground.\n\n' + _seed + '\n\nThe user has now opened a new thread. Receive their first question with fresh eyes, oriented by the above.\n\n';
-  }
-  return '';
-})()}You are The Prism framework interpreter. The user previously received a full Prism interpretation of: "${currentSubject}"
-
-Their follow-up question is: "${input}"
-
-CRITICAL — DO NOT REPEAT OR RE-ENTER PRIOR EXCHANGES. The conversation history above is already established ground. You are continuing forward from the last message — not reviewing, re-processing, or restarting the exchange. If the last assistant response asked a question, do not ask that question again. If the last user message was answered, do not re-answer it. Continue from exactly where the exchange left off.
-
-Respond within the Prism framework — grounded in Echad b'Emet, relational ontology, entanglement/coherence/decoherence, telos, and Hebrew two-world cosmology where relevant. Be direct and precise. Plain prose, no JSON, no markdown headers.
-
-CRITICAL — ALL INTERNAL PROCESSING IS SILENT. The following are strictly prohibited from appearing anywhere in the response:
-- Any narration of the session audit: "Running session audit," "Path A confirmed," "Path B confirmed," "No cycling detected"
-- Any narration of calibration: "Early calibration," "Reader level," "Profile A/B/C," "Profile B — reflective"
-- Any tier vocabulary: "Tier 1," "Tier 2," "Tier 3," "Tier 4," "Tier 5," "Tier 404," "Tier 5 institutional overlay"
-- Any separator lines used to divide internal reasoning from output (e.g. "---")
-- Any meta-commentary about what the interpreter is doing before it does it
-
-The response begins directly. No preamble. No audit narration. No calibration announcement. The internal work happens invisibly. The person receives only what follows from it.
-
-DELIVERY — SOCRATIC CHUNKING: Before responding, construct the complete answer mentally. Then deliver only the first meaningful layer — 2-4 sentences of real substance. End with a single question that is the natural next step in the full answer you are holding. The question must arise from what was just said, feel like genuine curiosity, and open the next door without telegraphing what is behind it. Never deliver the full answer in one response. The exchange is the architecture.
-
-SOCRATIC CEILING — THE STEWARDSHIP OBLIGATION
-
-The Socratic mode exists to find the ground. Once the ground is found, continuing is not illumination. It is motion without light.
-
-After each exchange, before formulating a response, the interpreter asks one internal question: has this conversation produced something the person can stand on?
-
-This is a presence obligation, not a distress detector. The interpreter does not wait for the person to signal frustration or exhaustion. Engaged users will keep answering questions long after the ground has been found — not because they need more, but because the conversation has been good and they trust it is going somewhere. The interpreter is the one who knows when the light is dimming. The person cannot see it from inside the exchange.
-
-THE GROUND HAS BEEN FOUND WHEN:
-
-- The person names a conclusion as their own — "I now feel," "I've decided," "I think I need to," "that makes sense to me"
-- The person's last answer contains the thing the whole conversation was moving toward — whether they name it or not
-- The exchange has produced a distinction, a reframe, or a recognition that changes where the person is standing
-- Continuing would generate motion without new light
-
-WHEN THE GROUND IS FOUND, THE INTERPRETER DOES NOT ASK ANOTHER QUESTION. Instead it delivers three things in sequence:
-
-1. RECOGNITION — one sentence that names what just happened. Not praise. Not "that's a great point." A precise statement of what arrived: "What you just named is the thing this whole conversation was moving toward."
-
-2. SUMMARY — 2-3 sentences that distill what the conversation actually produced. Plain language. No framework vocabulary. This is what the person found — stated clearly enough that they could carry it out of the conversation and set it down somewhere solid. It is not a recap of the exchange. It is the net of it.
-
-3. CONFIRMATION — a single closing question, not Socratic but custodial: "Does this answer what you came here with?"
-
-   This question does one thing: it hands the conversation back to the person. If it does — they leave with something solid. If it doesn't — they name what's still open, and the interpreter has a precise target for what remains.
-
-The closing does not reopen the question. It does not introduce new pressure. It does not perform pastoral warmth. It names what was found, confirms the person received it, and stops.
-
-The husband who says "uh huh" for fifteen years is present but not receiving. The interpreter's failure mode is the same: beautifully constructed responses that stopped receiving somewhere along the way. Presence means knowing when something has landed. When it lands — name it, summarize it, hand it back.`;
+  // The server-side persistent runtime owns follow-up reasoning.
+  const followUpPrompt = input;
 
   // Create follow-up element immediately so we can stream into it
   const followUpEl = document.createElement('div');
@@ -3069,9 +2974,9 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
     // Increment counter and apply lock for non-subscribers after successful follow-up
     sessionQueryCount++;
     loadSidebarCredits();
-    const _isAnonFUPost = sessionStorage.getItem('qt_anon_mode') === '1' || !localStorage.getItem('qt_user_email');
+    const _isAnonFUPost = !verifiedAuthState.authenticated;
     const _isPaidFUPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
-    if ((_isAnonFUPost || !_isPaidFUPost) && sessionQueryCount >= QUERY_LIMIT) {
+    if (!previewTestAccess && (_isAnonFUPost || !_isPaidFUPost) && sessionQueryCount >= QUERY_LIMIT) {
       applyQueryLock();
     }
 
@@ -3100,6 +3005,9 @@ The husband who says "uh huh" for fifteen years is present but not receiving. Th
     prismBrowserTimelines.delete(requestId);
     if (err.message === 'RATE_LIMITED') return;
     if (err.message === 'QUOTA_EXCEEDED') return;
+    if (err.message === 'STALE_INQUIRY_STATE') return;
+    if (err.message === 'INQUIRY_STATE_UNAVAILABLE') return;
+    const errEl = document.createElement('div');
     errEl.style.marginTop = '20px';
     errEl.innerHTML = getErrorMessage(err);
     document.getElementById('resultContent').appendChild(errEl);
@@ -3123,18 +3031,29 @@ function getTheodicyDebugMode() {
 
 async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, requestId) {
   // Streams plain text response directly into targetEl
-  const userEmail = localStorage.getItem('qt_user_email') || null;
   let response;
 
   try {
     response = await fetch('/api/interpret', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getInterpretRequestHeaders(),
       body: JSON.stringify({
         messages,
-        email: userEmail,
         rawQuery: rawQuery || '',
         isFollowUp: isFollowUp || false,
+        inquiryKey: isFollowUp ? getPersistentInquiryKey() : undefined,
+        inquiryToken: isFollowUp && activeInquiryCredential
+          ? activeInquiryCredential.inquiryToken
+          : undefined,
+        threadId: isFollowUp ? activeThreadId : undefined,
+        inquirySubject: isFollowUp ? currentSubject : undefined,
+        artifactId: isFollowUp && window._lastParsedResult
+          ? window._lastParsedResult._artifactId
+          : undefined,
+        artifactRevision: isFollowUp && window._lastParsedResult
+          ? window._lastParsedResult._artifactRevision
+          : undefined,
+        shareId: isFollowUp ? (window._sharedViewShareId || undefined) : undefined,
         debugMode: getTheodicyDebugMode(),
         requestId
       })
@@ -3144,6 +3063,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
     err.type = 'network';
     throw err;
   }
+  previewTestAccess = response.headers.get('x-prism-preview-test') === 'true';
   const echoedRequestId = response.headers.get('x-prism-request-id');
   markPrismBrowserTiming(requestId, 'response_headers_received', {
     status: response.status,
@@ -3179,6 +3099,54 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
   let buffer = '';
   let fullText = '';
   let firstVisibleDeltaSeen = false;
+  let latestInquiryState = null;
+  let latestStateVersion = null;
+  let latestStateCanonical = false;
+  let stateConflict = null;
+  let stateUnavailable = null;
+  let terminalStreamError = null;
+  let pendingCommitToken = null;
+  let followUpOrientation = '';
+  let progressiveFollowUp = false;
+
+  function renderFollowUpPacket(packet) {
+    if (packet && packet.artifactId && packet.artifactRevision && window._lastParsedResult) {
+      window._lastParsedResult._artifactId = packet.artifactId;
+      window._lastParsedResult._artifactRevision = packet.artifactRevision;
+    }
+    progressiveFollowUp = true;
+    var content = packet.content || {};
+    if (packet.packetType === 'inquiry_orientation') {
+      followUpOrientation = content.text || '';
+      if (targetEl) targetEl.innerHTML = '<div class="orientation-block"><p>' + escHtml(followUpOrientation) + '</p></div>' +
+        '<div class="early-recognition-progress">Preparing the response…</div>';
+      markPrismBrowserTiming(requestId, 'inquiry_orientation_visible');
+    } else if (packet.packetType === 'canonical_response') {
+      fullText = content.text || '';
+      if (targetEl) targetEl.innerHTML =
+        (followUpOrientation ? '<div class="orientation-block"><p>' + escHtml(followUpOrientation) + '</p></div>' : '') +
+        fullText.split(/\n\n/).map(function(p) { return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>'; }).join('') +
+        '<div class="early-recognition-progress" data-progressive-analysis>Prism Analysis continuing…</div>';
+      markPrismBrowserTiming(requestId, 'canonical_response_visible');
+    } else if (packet.packetType === 'interpretive_context' && targetEl) {
+      var progress = targetEl.querySelector('[data-progressive-analysis]');
+      var context = document.createElement('div');
+      context.className = 'qt-interpretive-context';
+      context.innerHTML = '<div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(content.text || '') + '</p>';
+      targetEl.insertBefore(context, progress || null);
+      markPrismBrowserTiming(requestId, 'interpretive_context_visible');
+    } else if (packet.packetType === 'prism_analysis' && targetEl) {
+      var analysis = document.createElement('details');
+      analysis.className = 'qt-framework-body open';
+      var findings = (content.constraintFindings || []).map(function(item) {
+        return '<li>' + escHtml(item) + '</li>';
+      }).join('');
+      analysis.innerHTML = '<summary>Prism Analysis</summary>' + (findings ? '<ul>' + findings + '</ul>' : '');
+      var loading = targetEl.querySelector('[data-progressive-analysis]');
+      if (loading) loading.replaceWith(analysis); else targetEl.appendChild(analysis);
+      markPrismBrowserTiming(requestId, 'prism_analysis_visible');
+    }
+  }
 
   // Show streaming cursor in target element
   if (targetEl) targetEl.innerHTML = '<span style="opacity:0.4; font-family:var(--mono); font-size:14px; letter-spacing:0.12em;">interpreting…</span>';
@@ -3194,7 +3162,33 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
         const data = line.slice(6).trim();
         try {
           const parsed = JSON.parse(data);
-          if (parsed.type === 'delta' && parsed.text) {
+          if (parsed.type === 'packet' && parsed.packet) {
+            renderFollowUpPacket(parsed.packet);
+          } else if (parsed.type === 'canonical_complete') {
+            latestInquiryState = parsed.canonicalState === true ? (parsed.state || null) : null;
+            latestStateVersion = parsed.stateVersion ?? null;
+            latestStateCanonical = parsed.canonicalState === true;
+            document.getElementById('inputSection').style.opacity = '';
+            document.getElementById('inputSection').style.pointerEvents = '';
+            document.getElementById('submitBtn').disabled = false;
+            markPrismBrowserTiming(requestId, 'canonical_completion_available');
+          } else if (parsed.type === 'analysis_status' && parsed.status === 'incomplete') {
+            if (targetEl) {
+              var progress = targetEl.querySelector('[data-progressive-analysis]');
+              if (progress) progress.innerHTML = 'Prism Analysis incomplete. ' +
+                '<button type="button" class="query-secondary-btn" data-artifact-id="' + escHtml(parsed.artifactId || '') +
+                '" data-artifact-revision="' + escHtml(String(parsed.artifactRevision || '')) +
+                '" onclick="retryFollowUpAnalysis(this)">Retry Analysis</button>';
+            }
+          } else if (parsed.type === 'stage' && parsed.text) {
+            markPrismBrowserTiming(requestId, 'followup_stage_visible', {
+              stage: parsed.stage || 'unknown'
+            });
+            if (targetEl && !firstVisibleDeltaSeen) {
+              targetEl.innerHTML = '<span class="prism-runtime-stage" style="opacity:0.55; font-family:var(--mono); font-size:13px; letter-spacing:0.1em;">' +
+                escHtml(parsed.text) + '</span>';
+            }
+          } else if (parsed.type === 'delta' && parsed.text) {
             fullText += parsed.text;
             if (!firstVisibleDeltaSeen) {
               firstVisibleDeltaSeen = true;
@@ -3209,26 +3203,253 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
                   : '<p>' + escHtml(p.replace(/\n/g, ' ')) + (fullText.endsWith('\n\n') ? '</p>' : '')
               ).join('');
             }
+          } else if (parsed.type === 'done') {
+            latestInquiryState = parsed.canonicalState === true ? (parsed.state || null) : null;
+            latestStateVersion = parsed.stateVersion ?? null;
+            latestStateCanonical = parsed.canonicalState === true;
+            pendingCommitToken = typeof parsed.pendingCommitToken === 'string'
+              ? parsed.pendingCommitToken
+              : null;
+          } else if (parsed.type === 'state_conflict') {
+            stateConflict = parsed;
+            if (parsed.state && parsed.canonicalState === true) {
+              latestInquiryState = parsed.state;
+              latestStateVersion = parsed.stateVersion ?? null;
+              latestStateCanonical = true;
+            }
+            markPrismBrowserTiming(requestId, 'followup_state_conflict', {
+              stateVersion: parsed.stateVersion ?? null
+            });
+          } else if (parsed.type === 'state_unavailable') {
+            stateUnavailable = parsed;
+          } else if (parsed.type === 'error') {
+            terminalStreamError = parsed.error || 'FOLLOWUP_RUNTIME_ERROR';
           }
         } catch {}
       }
     }
   }
+  previewTestAccess = response.headers.get('x-prism-preview-test') === 'true';
 
+  if (terminalStreamError) {
+    const streamError = new Error(terminalStreamError);
+    streamError.type = 'server';
+    throw streamError;
+  }
+  if (pendingCommitToken && !progressiveFollowUp) {
+    let acknowledgement;
+    try {
+      const acknowledgementResponse = await fetch('/api/interpret', {
+        method: 'POST',
+        headers: await getInterpretRequestHeaders(),
+        body: JSON.stringify({
+          operation: 'commit_inquiry_state',
+          pendingCommitToken,
+          requestId: createPrismRequestId()
+        })
+      });
+      if (!acknowledgementResponse.ok) throw new Error('ACKNOWLEDGEMENT_FAILED');
+      acknowledgement = await acknowledgementResponse.json();
+    } catch {
+      stateUnavailable = { type: 'state_unavailable' };
+    }
+    if (acknowledgement?.conflict) {
+      stateConflict = acknowledgement;
+    } else if (acknowledgement?.committed && acknowledgement.canonicalState === true) {
+      latestInquiryState = acknowledgement.state || null;
+      latestStateVersion = acknowledgement.stateVersion ?? null;
+      latestStateCanonical = true;
+      markPrismBrowserTiming(requestId, 'followup_state_committed', {
+        stateVersion: latestStateVersion
+      });
+    } else if (acknowledgement && !acknowledgement.committed) {
+      stateUnavailable = { type: 'state_unavailable' };
+    }
+  }
+  if (latestInquiryState && latestStateCanonical) {
+    cachePersistentInquiryState(latestInquiryState, latestStateVersion);
+  }
+  if (stateConflict) {
+    if (targetEl) {
+      targetEl.innerHTML = '<p>This inquiry changed in another session. The latest confirmed state has been restored; please submit your response again.</p>';
+    }
+    const conflictError = new Error('STALE_INQUIRY_STATE');
+    conflictError.type = 'conflict';
+    throw conflictError;
+  }
+  if (stateUnavailable) {
+    if (targetEl) {
+      targetEl.innerHTML = '<p>The response could not be committed to this inquiry. Nothing was saved; please try again.</p>';
+    }
+    const unavailableError = new Error('INQUIRY_STATE_UNAVAILABLE');
+    unavailableError.type = 'retryable';
+    throw unavailableError;
+  }
   return fullText;
 }
 
+function progressiveAnalysisHasSubstance(content) {
+  content = content && typeof content === 'object' ? content : {};
+  var framework = content.framework && typeof content.framework === 'object' ? content.framework : {};
+  var frameworkFields = [
+    framework.prismSummary,
+    framework.entanglement,
+    framework.coherenceAlignment,
+    framework.noiseDecoherence,
+    framework.telosInsight,
+    framework.olamHaba
+  ];
+  var hasFramework = frameworkFields.some(function(value) {
+    return typeof value === 'string' && value.trim().length > 0;
+  });
+  var hasKeyTerms = Array.isArray(content.keyTerms) && content.keyTerms.some(function(term) {
+    return term && [term.term, term.original, term.meaning].some(function(value) {
+      return typeof value === 'string' && value.trim().length > 0;
+    });
+  });
+  var hasFindings = Array.isArray(content.constraintFindings) && content.constraintFindings.some(function(value) {
+    return typeof value === 'string' ? value.trim().length > 0 : !!value;
+  });
+  var hasProjections = Array.isArray(content.futureAnalysisProjections) && content.futureAnalysisProjections.some(function(value) {
+    return typeof value === 'string' ? value.trim().length > 0 : !!value;
+  });
+  return hasFramework || hasKeyTerms || hasFindings || hasProjections;
+}
+
+function applyProgressivePacket(result, packet) {
+  result = result || { response_mode: 'reflective', key_terms: [] };
+  var content = packet && packet.content ? packet.content : {};
+  if (packet.packetType === 'inquiry_orientation') {
+    result.recognition = content.text || '';
+  } else if (packet.packetType === 'canonical_response') {
+    result.core_insight = content.text || '';
+    result.open_door_question = content.openDoorQuestion || '';
+    result.verse_identified = content.verseIdentified || '';
+    result.verse_text = content.verseText || '';
+    result.response_mode = content.responseMode || result.response_mode;
+    result._analysisPending = true;
+  } else if (packet.packetType === 'interpretive_context') {
+    result.interpretive_context = content.text || '';
+  } else if (packet.packetType === 'prism_analysis') {
+    var framework = content.framework || {};
+    var hasSubstantiveAnalysis = progressiveAnalysisHasSubstance(content);
+    result.prism_summary = framework.prismSummary || '';
+    result.entanglement = framework.entanglement || '';
+    result.coherence_alignment = framework.coherenceAlignment || '';
+    result.noise_decoherence = framework.noiseDecoherence || '';
+    result.telos_insight = framework.telosInsight || '';
+    result.olam_haba = framework.olamHaba || '';
+    result.key_terms = (content.keyTerms || []).map(function(term) {
+      return {
+        term: term.term || '',
+        hebrew: term.original || '',
+        prism_meaning: term.meaning || ''
+      };
+    });
+    result.constraint_findings = content.constraintFindings || [];
+    result.future_analysis_projections = content.futureAnalysisProjections || [];
+    result._analysisPending = false;
+    if (hasSubstantiveAnalysis) result._analysisIncomplete = false;
+  }
+  result._artifactId = packet.artifactId;
+  result._artifactRevision = packet.artifactRevision;
+  return result;
+}
+
+function showProgressiveAnalysisIncomplete(status) {
+  var content = document.getElementById('resultContent');
+  if (!content || document.getElementById('prismAnalysisIncomplete')) return;
+  var notice = document.createElement('div');
+  notice.id = 'prismAnalysisIncomplete';
+  notice.className = 'qt-framework-callout';
+  notice.innerHTML = '<span>Prism Analysis incomplete.</span> ' +
+    '<button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button>';
+  notice.dataset.artifactId = status.artifactId || '';
+  notice.dataset.artifactRevision = String(status.artifactRevision || '');
+  content.appendChild(notice);
+}
+
+async function retryProgressiveAnalysis(button) {
+  var notice = button && button.closest ? button.closest('#prismAnalysisIncomplete') : null;
+  if (!notice) return;
+  button.disabled = true;
+  button.textContent = 'Retrying…';
+  try {
+    var response = await fetch('/api/interpret', {
+      method: 'POST',
+      headers: await getInterpretRequestHeaders(),
+      body: JSON.stringify({
+        operation: 'retry_artifact_analysis',
+        artifactId: notice.dataset.artifactId,
+        artifactRevision: Number(notice.dataset.artifactRevision),
+        inquiryKey: getPersistentInquiryKey(),
+        inquiryToken: activeInquiryCredential ? activeInquiryCredential.inquiryToken : undefined,
+        requestId: createPrismRequestId()
+      })
+    });
+    if (!response.ok) throw new Error('ANALYSIS_RETRY_FAILED');
+    var payload = await response.json();
+    (payload.packets || []).forEach(function(packet) {
+      window._lastParsedResult = applyProgressivePacket(window._lastParsedResult || {}, packet);
+    });
+    renderResult(window._lastParsedResult || {});
+  } catch {
+    button.disabled = false;
+    button.textContent = 'Retry Analysis';
+  }
+}
+
+async function retryFollowUpAnalysis(button) {
+  var target = button && button.closest ? button.closest('.assistant-msg, .followup-assistant, [data-followup-response]') : null;
+  if (!target) target = button.parentElement && button.parentElement.parentElement;
+  button.disabled = true;
+  button.textContent = 'Retryingâ€¦';
+  try {
+    var response = await fetch('/api/interpret', {
+      method: 'POST',
+      headers: await getInterpretRequestHeaders(),
+      body: JSON.stringify({
+        operation: 'retry_artifact_analysis',
+        artifactId: button.dataset.artifactId,
+        artifactRevision: Number(button.dataset.artifactRevision),
+        inquiryKey: getPersistentInquiryKey(),
+        inquiryToken: activeInquiryCredential ? activeInquiryCredential.inquiryToken : undefined,
+        requestId: createPrismRequestId()
+      })
+    });
+    if (!response.ok) throw new Error('ANALYSIS_RETRY_FAILED');
+    var payload = await response.json();
+    (payload.packets || []).forEach(function(packet) {
+      var content = packet.content || {};
+      if (packet.packetType === 'interpretive_context') {
+        var context = document.createElement('div');
+        context.className = 'qt-interpretive-context';
+        context.innerHTML = '<div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(content.text || '') + '</p>';
+        target.insertBefore(context, button.parentElement);
+      } else if (packet.packetType === 'prism_analysis') {
+        var analysis = document.createElement('details');
+        analysis.className = 'qt-framework-body open';
+        analysis.innerHTML = '<summary>Prism Analysis</summary><ul>' +
+          (content.constraintFindings || []).map(function(item) { return '<li>' + escHtml(item) + '</li>'; }).join('') + '</ul>';
+        target.insertBefore(analysis, button.parentElement);
+      }
+    });
+    button.parentElement.remove();
+  } catch (_) {
+    button.disabled = false;
+    button.textContent = 'Retry Analysis';
+  }
+}
+
 async function callProxy(messages, rawQuery, requestId) {
-  const userEmail = localStorage.getItem('qt_user_email') || null;
   let response;
 
   try {
     response = await fetch('/api/interpret', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getInterpretRequestHeaders(),
       body: JSON.stringify({
         messages,
-        email: userEmail,
         rawQuery: rawQuery || '',
         debugMode: getTheodicyDebugMode(),
         requestId
@@ -3239,6 +3460,7 @@ async function callProxy(messages, rawQuery, requestId) {
     err.type = 'network';
     throw err;
   }
+  previewTestAccess = response.headers.get('x-prism-preview-test') === 'true';
   const echoedRequestId = response.headers.get('x-prism-request-id');
   markPrismBrowserTiming(requestId, 'response_headers_received', {
     status: response.status,
@@ -3311,12 +3533,12 @@ async function callProxy(messages, rawQuery, requestId) {
   let buffer = '';
   let fullText = '';
   let tierFromStream = null;
-  let persistedThreadId = null;
-  let threadPersistenceOk = null;
   let streamTruncated = false;
   let firstDeltaSeen = false;
   let earlyRecognitionShown = false;
   let earlyRecognitionDisabled = false;
+  let progressiveResult = null;
+  let canonicalAvailable = false;
   window._streamTruncated = false;
 
   function considerEarlyRecognition() {
@@ -3365,7 +3587,41 @@ async function callProxy(messages, rawQuery, requestId) {
           const data = line.slice(6).trim();
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type === 'delta' && parsed.text) {
+            if (parsed.type === 'packet' && parsed.packet) {
+              progressiveResult = applyProgressivePacket(progressiveResult, parsed.packet);
+              window._lastParsedResult = progressiveResult;
+              renderResult(progressiveResult);
+              showResult(true);
+              if (parsed.packet.packetType === 'inquiry_orientation') {
+                markPrismBrowserTiming(requestId, 'inquiry_orientation_visible');
+              } else if (parsed.packet.packetType === 'canonical_response') {
+                markPrismBrowserTiming(requestId, 'canonical_response_visible');
+              } else if (parsed.packet.packetType === 'interpretive_context') {
+                markPrismBrowserTiming(requestId, 'interpretive_context_visible');
+              } else if (parsed.packet.packetType === 'prism_analysis') {
+                markPrismBrowserTiming(requestId, 'prism_analysis_visible');
+              }
+            } else if (parsed.type === 'canonical_complete') {
+              canonicalAvailable = true;
+              tierFromStream = parsed.tier || tierFromStream;
+              acceptInquiryCredential(parsed);
+              if (parsed.threadId) activeThreadId = parsed.threadId;
+              document.getElementById('subjectText').textContent = rawQuery || currentSubject || '';
+              document.getElementById('subjectBanner').style.display = 'block';
+              showFollowUpComposer();
+              document.getElementById('inputSection').style.opacity = '';
+              document.getElementById('inputSection').style.pointerEvents = '';
+              document.getElementById('submitBtn').disabled = false;
+              markPrismBrowserTiming(requestId, 'canonical_completion_available');
+            } else if (parsed.type === 'analysis_status' && parsed.status === 'incomplete') {
+              progressiveResult._analysisIncomplete = true;
+              progressiveResult._analysisPending = false;
+              progressiveResult._artifactId = parsed.artifactId || progressiveResult._artifactId;
+              progressiveResult._artifactRevision = parsed.artifactRevision || progressiveResult._artifactRevision;
+              window._lastParsedResult = progressiveResult;
+              renderResult(progressiveResult);
+              showProgressiveAnalysisIncomplete(parsed);
+            } else if (parsed.type === 'delta' && parsed.text) {
               if (!firstDeltaSeen) {
                 firstDeltaSeen = true;
                 markPrismBrowserTiming(requestId, 'first_delta_received');
@@ -3380,8 +3636,7 @@ async function callProxy(messages, rawQuery, requestId) {
               window._streamTruncated = true;
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
-              persistedThreadId = parsed.threadId || null;
-              threadPersistenceOk = parsed.persisted !== false;
+              acceptInquiryCredential(parsed);
             } else if (parsed.type === 'error') {
               throw new Error('Stream error: ' + parsed.error);
             }
@@ -3399,7 +3654,14 @@ async function callProxy(messages, rawQuery, requestId) {
           const data = line.slice(6).trim();
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type === 'delta' && parsed.text) {
+            if (parsed.type === 'packet' && parsed.packet) {
+              progressiveResult = applyProgressivePacket(progressiveResult, parsed.packet);
+              renderResult(progressiveResult);
+            } else if (parsed.type === 'canonical_complete') {
+              canonicalAvailable = true;
+              tierFromStream = parsed.tier || tierFromStream;
+              acceptInquiryCredential(parsed);
+            } else if (parsed.type === 'delta' && parsed.text) {
               if (!firstDeltaSeen) {
                 firstDeltaSeen = true;
                 markPrismBrowserTiming(requestId, 'first_delta_received');
@@ -3408,8 +3670,7 @@ async function callProxy(messages, rawQuery, requestId) {
               considerEarlyRecognition();
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
-              persistedThreadId = parsed.threadId || null;
-              threadPersistenceOk = parsed.persisted !== false;
+              acceptInquiryCredential(parsed);
             }
           } catch(e) { /* ignore malformed final chunk */ }
         }
@@ -3419,7 +3680,7 @@ async function callProxy(messages, rawQuery, requestId) {
     clearInterval(dotInterval);
   }
 
-  if (!fullText) {
+  if (!fullText && !progressiveResult) {
     const err = new Error('Empty stream response.');
     err.type = 'empty';
     throw err;
@@ -3434,11 +3695,12 @@ async function callProxy(messages, rawQuery, requestId) {
     if (labelEl) labelEl.textContent = tierLabelsMap[tierFromStream] || tierLabelsMap['free'];
   }
 
-  return {
-    text: fullText,
-    threadId: persistedThreadId,
-    persisted: threadPersistenceOk
-  };
+  if (progressiveResult) {
+    progressiveResult._canonicalAvailable = canonicalAvailable;
+    window._lastParsedResult = progressiveResult;
+    return JSON.stringify(progressiveResult);
+  }
+  return fullText;
 }
 
 function getErrorMessage(err) {
@@ -3520,9 +3782,13 @@ function renderResult(d) {
   }
 
   // ── 1. FRAMEWORK FOR INTERPRETATION (collapsed, top of response) ─────────────
-  const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0);
+  const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0) || d._analysisPending;
   if (hasFramework) {
     let frameworkHtml = '';
+
+    if (d._analysisPending) {
+      frameworkHtml += '<div class="early-recognition-progress">Prism Analysis continuing… Completed packets will appear here.</div>';
+    }
 
     sections.forEach(function(s) {
       if (!s.content) return;
@@ -3587,6 +3853,12 @@ function renderResult(d) {
       });
       html += '</div></div>';
     }
+  }
+
+  if (d._analysisIncomplete) {
+    html += '<div id="prismAnalysisIncomplete" class="qt-framework-callout" data-artifact-id="' +
+      escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+      '<span>Prism Analysis incomplete.</span> <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
   }
 
   document.getElementById('resultContent').innerHTML = html;
@@ -3924,8 +4196,18 @@ document.getElementById('userInput').addEventListener('keydown', function(e) {
 // Tier retention windows in days
 var TIER_RETENTION = { scholar: 90, refraction: 90, theologian: 180, full_spectrum: 180, companion: 365, trial: 30, free: 1 };
 
+// Authentication is established only by a verified Supabase session.
+var verifiedAuthState = {
+  ready: false,
+  authenticated: false,
+  userId: null,
+  email: null,
+  tier: 'free',
+  displayName: null
+};
+
 // Read actual tier — requires a logged-in email to honor a paid tier
-function getActualTier() {
+function getActualTierLegacy() {
   var urlParams = new URLSearchParams(window.location.search);
   var userEmail = localStorage.getItem('qt_user_email');
 
@@ -3959,6 +4241,11 @@ function getActualTier() {
   if (tierParam && TIER_RETENTION[tierParam]) return tierParam;
   if (stored && TIER_RETENTION[stored]) return stored;
   return 'free';
+}
+
+function getActualTier() {
+  if (!verifiedAuthState.authenticated) return 'free';
+  return TIER_RETENTION[verifiedAuthState.tier] ? verifiedAuthState.tier : 'free';
 }
 
 // For R1 new session — store a flag to force free tier WITHOUT clearing S1's localStorage
@@ -4034,17 +4321,74 @@ function submitTierEmail() {
 }
 
 let activeThreadId = null;
+let activeInquiryCredential = null;
+let activeInquiryKey = null;
+try {
+  var restoredInquiryCredential = JSON.parse(sessionStorage.getItem('prism_active_inquiry_credential') || 'null');
+  if (restoredInquiryCredential && restoredInquiryCredential.inquiryKey && restoredInquiryCredential.inquiryToken) {
+    activeInquiryCredential = restoredInquiryCredential;
+    activeInquiryKey = restoredInquiryCredential.inquiryKey;
+  }
+} catch (_) {}
+
+function acceptInquiryCredential(event) {
+  if (!event || typeof event.inquiryKey !== 'string' || typeof event.inquiryToken !== 'string') return;
+  activeInquiryCredential = {
+    inquiryKey: event.inquiryKey,
+    inquiryToken: event.inquiryToken
+  };
+  activeInquiryKey = event.inquiryKey;
+  try {
+    sessionStorage.setItem('prism_active_inquiry_credential', JSON.stringify(activeInquiryCredential));
+  } catch (_) {}
+}
+
+function getPersistentInquiryKey() {
+  if (activeInquiryCredential && activeInquiryCredential.inquiryKey) {
+    return activeInquiryCredential.inquiryKey;
+  }
+  if (activeInquiryKey) return activeInquiryKey;
+  if (activeThreadId && /^[0-9a-f-]{36}$/i.test(activeThreadId)) {
+    activeInquiryKey = 'thread:' + activeThreadId;
+    return activeInquiryKey;
+  }
+  var entropy = window.crypto && typeof window.crypto.randomUUID === 'function'
+    ? window.crypto.randomUUID()
+    : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  activeInquiryKey = 'anon:' + entropy;
+  return activeInquiryKey;
+}
+
+function beginNewPersistentInquiry() {
+  // Begin with isolated in-memory identity. Do not delete browser storage:
+  // another tab may still own a committed inquiry under the former key.
+  activeInquiryCredential = null;
+  activeInquiryKey = null;
+  try { sessionStorage.removeItem('prism_active_inquiry_credential'); } catch (_) {}
+}
+
+function cachePersistentInquiryState(state, version) {
+  try {
+    localStorage.setItem(
+      'qt_inquiry_cache:' + getPersistentInquiryKey(),
+      JSON.stringify({ version: version, state: state, cachedAt: Date.now() })
+    );
+  } catch (_) {
+    // Cache failure never affects canonical server state.
+  }
+}
 
 // SIDEBAR STATE
 let renameOpenId  = null;
 let allThreads    = [];
+var _archiveRawResponseDiagnostics = new Map();
 let sidebarOpen   = false;
 let sidebarHasAppeared = false;
 
 const API_BASE = '';
 
 function userEmail() {
-  return localStorage.getItem('qt_user_email') || null;
+  return verifiedAuthState.authenticated ? verifiedAuthState.email : null;
 }
 
 function getThreadTitle(thread) {
@@ -4259,7 +4603,7 @@ function getAnonSessionId() {
 // session id. Returns null if neither applies, so every call site can just
 // bail rather than guessing at a fallback.
 function noteIdentityHeaders() {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (email) return { 'x-user-email': email };
   if (window._sharedViewToken) return { 'x-anon-session': getAnonSessionId() };
   return null;
@@ -4272,7 +4616,7 @@ function noteIdentityHeaders() {
 // followups.js's owner/participant checks would 403 an otherwise-signed-in
 // visitor who hasn't joined, same as they would an anonymous one.
 function canActAsThreadMember() {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (!window._sharedViewToken) return !!email;
   return !!email && window._sharedViewIsParticipant === true;
 }
@@ -4292,7 +4636,7 @@ window._sharedViewIsParticipant = false;
 async function loadSharedThread(token) {
   window._sharedViewToken = token;
   try {
-    var res = await fetch((window.API_BASE || '') + '/api/share?t=' + encodeURIComponent(token));
+    var res = await authenticatedFetch((window.API_BASE || '') + '/api/share?t=' + encodeURIComponent(token));
 
     if (res.status === 410) { showSharedThreadError('This share has been closed by the sender.'); return; }
     if (res.status === 404) { showSharedThreadError('This interpretation could not be found or has expired.'); return; }
@@ -4307,7 +4651,7 @@ async function loadSharedThread(token) {
 
     window._sharedViewShareId = share.id;
 
-    var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+    var email = userEmail();
 
     // First-time anonymous visitor — the gateway IS the arrival point.
     // Nothing renders underneath it; entering the thread is what "Explore
@@ -4380,7 +4724,7 @@ function enterSharedThread(share) {
   // explicit, confirmed action rather than something that happens just
   // from opening the link), and separately bring in their own thread
   // history so it's not lost underneath the one shared thread.
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (email) {
     checkCircleParticipant(share.thread_id, email);
     mergeOwnThreadHistory(syntheticThread);
@@ -4417,7 +4761,7 @@ async function checkCircleParticipant(threadId, email) {
 // they arrived via someone else's share link — pulled in separately from
 // the synthetic single-thread array loadSharedThread() otherwise builds.
 function mergeOwnThreadHistory(syntheticThread) {
-  fetch((window.API_BASE || '') + '/api/threads', { headers: { 'x-user-email': userEmail() } })
+  authenticatedFetch((window.API_BASE || '') + '/api/threads', { headers: { 'x-user-email': userEmail() } })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.threads) return;
@@ -4517,6 +4861,8 @@ function selectThread(id) {
     openThreadIds: Array.from(_openThreadIds)
   });
   activeThreadId = id;
+  activeInquiryCredential = null;
+  activeInquiryKey = /^[0-9a-f-]{36}$/i.test(id) ? 'thread:' + id : null;
   localStorage.setItem('qt_last_thread_id', id);
   // Pre-stamp collaboration_open if we already know this thread is open
   if (_openThreadIds.has(id)) {
@@ -4535,12 +4881,20 @@ function selectThread(id) {
   var localParsed = null;
   if (localRaw) { try { localParsed = JSON.parse(localRaw); } catch(e) {} }
   var supaResp = (thread.response && typeof thread.response === 'object' && Object.keys(thread.response).length > 0) ? thread.response : null;
-  var responseData = localParsed || supaResp;
+  // Archive hydration is server-authoritative. A local response snapshot may
+  // have been written at canonical completion, before progressive packets
+  // attached, so it must not mask the complete persisted artifact revision.
+  var responseData = archiveResponseForRender(supaResp, localParsed);
 
   if (responseData) {
     // Set _lastParsedResult so Share button works on sidebar-loaded threads
     window._lastParsedResult = responseData;
     currentSubject = savedInput;
+    console.info('[prism:archive-client-boundary] ' + JSON.stringify({
+      threadId: id,
+      rawApiThreads: _archiveRawResponseDiagnostics.get(id) || archiveDiagnosticShape(supaResp),
+      beforeRenderResult: archiveDiagnosticShape(responseData)
+    }));
     renderResult(responseData);
     showResult();
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
@@ -4767,7 +5121,7 @@ function restoreFollowUps(id) {
   if (id.startsWith('pending-')) return;
 
   if (canActAsThreadMember()) {
-    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-user-email': userEmail() } })
+    authenticatedFetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-user-email': userEmail() } })
     .then(function(r) { return r.json(); })
     .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false); })
     .catch(function() {});
@@ -4780,7 +5134,7 @@ function restoreFollowUps(id) {
   // follow-up (R1/R2/R3) history, only the root interpretation — even
   // though the backend already supports this exact read via x-share-id.
   if (window._sharedViewToken && window._sharedViewShareId) {
-    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-share-id': window._sharedViewShareId } })
+    authenticatedFetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-share-id': window._sharedViewShareId } })
     .then(function(r) { return r.json(); })
     .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false); })
     .catch(function() {});
@@ -4803,7 +5157,7 @@ function startFollowUpPolling(threadId) {
       ? { 'x-user-email': userEmail() }
       : (window._sharedViewToken && window._sharedViewShareId ? { 'x-share-id': window._sharedViewShareId } : null);
     if (!headers) return;
-    fetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), { headers: headers })
+    authenticatedFetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), { headers: headers })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false);
@@ -4818,6 +5172,214 @@ function getSupabaseClient() {
   var anon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
   _supabaseClient = window.supabase.createClient(url, anon);
   return _supabaseClient;
+}
+
+function applyVerifiedIdentityPresentation() {
+  CURRENT_TIER = getActualTier();
+  var tierLabels = {
+    refraction: 'Examiner',
+    full_spectrum: 'Full Spectrum',
+    scholar: 'Examiner',
+    theologian: 'Full Spectrum',
+    companion: 'Full Spectrum',
+    free: 'Observer · Free Access'
+  };
+  var labelEl = document.getElementById('sidebarTierLabel');
+  if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || tierLabels.free;
+  var signOut = document.getElementById('sidebarSignOut');
+  if (signOut) signOut.style.display = verifiedAuthState.authenticated ? '' : 'none';
+}
+
+async function hydrateVerifiedAuthState() {
+  // Remove the legacy credential cache even when no session can be recovered.
+  localStorage.removeItem('qt_user_password');
+
+  var session = null;
+  try {
+    var sessionResult = await getSupabaseClient().auth.getSession();
+    session = sessionResult && sessionResult.data ? sessionResult.data.session : null;
+  } catch (e) {
+    session = null;
+  }
+
+  if (!session || !session.user || !session.user.id || !session.user.email) {
+    verifiedAuthState = {
+      ready: true,
+      authenticated: false,
+      userId: null,
+      email: null,
+      tier: 'free',
+      displayName: null
+    };
+    localStorage.removeItem('qt_user_email');
+    localStorage.removeItem('qt_user_tier');
+    localStorage.removeItem('qt_display_name');
+    applyVerifiedIdentityPresentation();
+    return verifiedAuthState;
+  }
+
+  var tier = 'free';
+  var displayName = null;
+  try {
+    var identityResponse = await fetch(API_BASE + '/api/threads', {
+      headers: { Authorization: 'Bearer ' + session.access_token },
+      cache: 'no-store'
+    });
+    if (identityResponse.ok) {
+      var identityPayload = await identityResponse.json();
+      if (identityPayload && TIER_RETENTION[identityPayload.tier]) tier = identityPayload.tier;
+      displayName = identityPayload && identityPayload.display_name
+        ? identityPayload.display_name
+        : null;
+    }
+  } catch (e) {
+    // A verified session remains authoritative even if profile hydration fails.
+  }
+
+  verifiedAuthState = {
+    ready: true,
+    authenticated: true,
+    userId: String(session.user.id).toLowerCase(),
+    email: String(session.user.email).trim().toLowerCase(),
+    tier: tier,
+    displayName: displayName
+  };
+
+  // Compatibility caches are written only after server-verified authentication.
+  localStorage.setItem('qt_user_email', verifiedAuthState.email);
+  localStorage.setItem('qt_user_tier', verifiedAuthState.tier);
+  if (verifiedAuthState.displayName) localStorage.setItem('qt_display_name', verifiedAuthState.displayName);
+  else localStorage.removeItem('qt_display_name');
+  applyVerifiedIdentityPresentation();
+  return verifiedAuthState;
+}
+
+function archiveResponseForRender(serverResponse, localResponse) {
+  var responseData = serverResponse || localResponse;
+  if (!serverResponse || !responseData || typeof responseData !== 'object') return responseData;
+
+  // Preserve the persisted packet as the authoritative Archive state while
+  // retaining the flattened fields consumed by the existing Framework UI.
+  if (responseData.prism_analysis && typeof responseData.prism_analysis === 'object') {
+    applyProgressivePacket(responseData, {
+      packetType: 'prism_analysis',
+      content: responseData.prism_analysis,
+      artifactId: responseData._artifactId,
+      artifactRevision: responseData._artifactRevision
+    });
+  }
+  return responseData;
+}
+
+function archiveDiagnosticShape(response) {
+  var value = response && typeof response === 'object' ? response : null;
+  var keys = value ? Object.keys(value).sort() : [];
+  var flattenedFields = [
+    'prism_summary',
+    'entanglement',
+    'coherence_alignment',
+    'noise_decoherence',
+    'telos_insight',
+    'olam_haba',
+    'key_terms'
+  ];
+  var frameworkFields = [
+    'prism_summary',
+    'entanglement',
+    'coherence_alignment',
+    'noise_decoherence',
+    'telos_insight',
+    'olam_haba'
+  ];
+  var prismAnalysis = value ? value.prism_analysis : null;
+  var prismFramework = prismAnalysis && typeof prismAnalysis === 'object'
+    ? prismAnalysis.framework
+    : null;
+  var expectedNestedKeys = [
+    'prismSummary',
+    'entanglement',
+    'coherenceAlignment',
+    'noiseDecoherence',
+    'telosInsight',
+    'olamHaba'
+  ];
+  var flattenedValueShape = {};
+  frameworkFields.forEach(function(field) {
+    flattenedValueShape[field] = archiveDiagnosticValueShape(value ? value[field] : null);
+  });
+  var keyTerms = value ? value.key_terms : null;
+  var computedHasFramework = !!(value && (
+    frameworkFields.some(function(field) { return !!value[field]; }) ||
+    (Array.isArray(keyTerms) && keyTerms.length > 0) ||
+    value._analysisPending
+  ));
+  return {
+    artifactId: value && value._artifactId ? value._artifactId : null,
+    artifactRevision: value && value._artifactRevision != null ? value._artifactRevision : null,
+    topLevelKeys: keys,
+    hasArtifactId: keys.indexOf('_artifactId') !== -1,
+    hasArtifactRevision: keys.indexOf('_artifactRevision') !== -1,
+    hasInterpretiveContext: keys.indexOf('interpretive_context') !== -1,
+    hasPrismAnalysis: keys.indexOf('prism_analysis') !== -1,
+    hasFlattenedCompatibilityFields: flattenedFields.some(function(field) {
+      return keys.indexOf(field) !== -1;
+    }),
+    interpretiveContextShape: archiveDiagnosticValueShape(value ? value.interpretive_context : null),
+    prismAnalysisShape: archiveDiagnosticValueShape(prismAnalysis),
+    prismAnalysisFrameworkExists: !!prismFramework,
+    prismAnalysisFrameworkShape: archiveDiagnosticValueShape(prismFramework),
+    prismAnalysisFrameworkKeys: expectedNestedKeys.reduce(function(result, key) {
+      result[key] = !!(prismFramework && Object.prototype.hasOwnProperty.call(prismFramework, key));
+      return result;
+    }, {}),
+    flattenedValueShape: flattenedValueShape,
+    keyTermsType: Array.isArray(keyTerms) ? 'array' : archiveDiagnosticRuntimeType(keyTerms),
+    keyTermsCardinality: Array.isArray(keyTerms) ? keyTerms.length : 0,
+    computedHasFramework: computedHasFramework,
+    computedHasInterpretiveContext: !!(value && value.interpretive_context),
+    analysisPending: !!(value && value._analysisPending),
+    analysisIncomplete: !!(value && value._analysisIncomplete)
+  };
+}
+
+function archiveDiagnosticRuntimeType(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+function archiveDiagnosticValueShape(value) {
+  var type = archiveDiagnosticRuntimeType(value);
+  var nonEmpty = false;
+  if (type === 'string') nonEmpty = value.trim().length > 0;
+  else if (type === 'array') nonEmpty = value.length > 0;
+  else if (type === 'object') nonEmpty = Object.keys(value).length > 0;
+  else nonEmpty = !!value;
+  return { type: type, nonEmpty: nonEmpty };
+}
+
+async function getInterpretRequestHeaders() {
+  var headers = { 'Content-Type': 'application/json' };
+  try {
+    var client = getSupabaseClient();
+    var result = await client.auth.getSession();
+    var token = result && result.data && result.data.session
+      ? result.data.session.access_token
+      : null;
+    if (token) headers.Authorization = 'Bearer ' + token;
+  } catch (e) {
+    // No active session is the explicit Observer/free-access contract.
+  }
+  return headers;
+}
+
+async function authenticatedFetch(url, options) {
+  options = options || {};
+  var authHeaders = await getInterpretRequestHeaders();
+  return fetch(url, {
+    ...options,
+    headers: { ...authHeaders, ...(options.headers || {}) }
+  });
 }
 
 function startFollowUpRealtime(threadId) {
@@ -4949,7 +5511,7 @@ function saveFollowUp(threadId, question, response) {
   if (threadId.startsWith('pending-')) return;
 
   if (canActAsThreadMember()) {
-    fetch(API_BASE + '/api/followups', {
+    authenticatedFetch(API_BASE + '/api/followups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
       body: JSON.stringify({ threadId: threadId, question: question, response: response })
@@ -4962,7 +5524,7 @@ function saveFollowUp(threadId, question, response) {
   // x-share-id/source=recipient path followups.js already supports and
   // share.html already relied on.
   if (window._sharedViewToken && window._sharedViewShareId) {
-    fetch(API_BASE + '/api/followups', {
+    authenticatedFetch(API_BASE + '/api/followups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-share-id': window._sharedViewShareId },
       body: JSON.stringify({ threadId: threadId, question: question, response: response, source: 'recipient', shareId: window._sharedViewShareId, anonSessionId: getAnonSessionId() })
@@ -4984,7 +5546,7 @@ function saveRename(id) {
     localStorage.setItem('qt_thread_title_' + id, val);
     allThreads = allThreads.map(function(t) { return t.id === id ? Object.assign({}, t, { title: val }) : t; });
     if (!id.startsWith('pending-') && userEmail()) {
-      fetch(API_BASE + '/api/threads', {
+      authenticatedFetch(API_BASE + '/api/threads', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
         body: JSON.stringify({ threadId: id, title: val })
       }).catch(function() {});
@@ -5020,7 +5582,7 @@ function resetThreadExpiry(id) {
   renderThreads(allThreads);
 
   // Call server to reset expiry and draw 1 query
-  fetch(API_BASE + '/api/threads', {
+  authenticatedFetch(API_BASE + '/api/threads', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'x-user-email': email },
     body: JSON.stringify({ threadId: id, action: 'reset_expiry' })
@@ -5058,7 +5620,7 @@ function deleteThread(id) {
 function confirmDelete(id) {
   if (!_deletedThread || _deletedThread.thread.id !== id) return;
   if (!id.startsWith('pending-') && userEmail()) {
-    fetch(API_BASE + '/api/threads', {
+    authenticatedFetch(API_BASE + '/api/threads', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
       body: JSON.stringify({ threadId: id })
     }).catch(function() {});
@@ -5072,20 +5634,11 @@ function confirmDelete(id) {
 
 // ADD THREAD TO SIDEBAR
 function addThreadToSidebar(queryText, threadId) {
-  var tsNow = Date.now();
-  var id = threadId || ('pending-' + tsNow);
-
-  allThreads.unshift({
-    id: id,
-    title: queryText.length > 60 ? queryText.slice(0, 60) + '\u2026' : queryText,
-    query: queryText,
-    lastVisited: formatNow(),
-    createdAt: tsNow,
-    daysLeft: TIER_RETENTION[CURRENT_TIER] || 90,
-    expired: false,
-    response: null
-  });
-
+  var tsNow = Date.now(), tempId = 'pending-' + tsNow;
+  var id = threadId || tempId;
+  allThreads.unshift({ id: id, title: queryText.length > 60 ? queryText.slice(0, 60) + '\u2026' : queryText,
+    query: queryText, lastVisited: formatNow(), createdAt: tsNow,
+    daysLeft: TIER_RETENTION[CURRENT_TIER] || 90, expired: false, response: null });
   activeThreadId = id;
   renderThreads(allThreads);
 
@@ -5094,12 +5647,42 @@ function addThreadToSidebar(queryText, threadId) {
     if (typeof startFollowUpRealtime === 'function') {
       startFollowUpRealtime(threadId);
     }
-  } else if (userEmail()) {
-    // Authenticated requests should arrive with a durable ID. Do not poll the
-    // archive and replace the optimistic item: that was the race that caused
-    // the Save/archive entry to flash and disappear. Leave the local snapshot
-    // intact and surface the missing ID in diagnostics instead.
-    console.error('[Prism] Authenticated thread completed without a durable threadId.');
+    return;
+  }
+
+  if (userEmail()) {
+    setTimeout(function() {
+      authenticatedFetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.threads) return;
+        allThreads = data.threads;
+        // Keep the response already on screen. Automatically selecting the
+        // server row here races its response persistence: selectThread()
+        // interprets a not-yet-populated response as an empty thread and
+        // hides resultBlock. Re-key the local snapshot instead, then start
+        // Realtime without rerendering the active conversation.
+        if (activeThreadId === tempId && allThreads.length > 0) {
+          var realThread = allThreads.find(function(thread) {
+            return thread.query === queryText;
+          }) || allThreads[0];
+          var realId = realThread.id;
+          ['qt_response_', 'qt_input_', 'qt_followups_', 'qt_thread_title_'].forEach(function(prefix) {
+            var pendingValue = localStorage.getItem(prefix + tempId);
+            if (pendingValue != null) {
+              localStorage.setItem(prefix + realId, pendingValue);
+              localStorage.removeItem(prefix + tempId);
+            }
+          });
+          activeThreadId = realId;
+          localStorage.setItem('qt_last_thread_id', realId);
+          if (typeof startFollowUpRealtime === 'function') {
+            startFollowUpRealtime(realId);
+          }
+        }
+        renderThreads(allThreads);
+      }).catch(function() {});
+    }, 2500);
   }
 }
 
@@ -5110,7 +5693,7 @@ function showSidebarAfterQuery(queryText, threadId) {
   if (!sidebarHasAppeared) {
     sidebar.classList.add('visible'); if (toggle) toggle.classList.add('visible');
     sidebarHasAppeared = true;
-    if (localStorage.getItem('qt_user_email')) localStorage.setItem('qt_sidebar_appeared', '1');
+    if (userEmail()) localStorage.setItem('qt_sidebar_appeared', '1');
   }
   // Intentionally not auto-opening the sidebar here — a completed query
   // shouldn't pull focus away onto the Archive. The toggle button (made
@@ -5176,7 +5759,7 @@ function toggleSaveSession() {
 function updateSaveSessionVisibility() {
   var box = document.getElementById('saveSessionBox');
   if (!box) return;
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   var show = !!(window._sharedViewToken && !email);
   box.style.display = show ? 'block' : 'none';
 }
@@ -5197,18 +5780,18 @@ function toggleJoinCircle() {
 function updateJoinCircleVisibility() {
   var box = document.getElementById('joinCircleBox');
   if (!box) return;
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   var show = !!(window._sharedViewToken && email && !window._sharedViewIsParticipant);
   box.style.display = show ? 'block' : 'none';
 }
 
 async function joinCircle() {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (!email || !activeThreadId) return;
   var btn = document.getElementById('joinCircleBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Joining…'; }
   try {
-    var res = await fetch((window.API_BASE || '') + '/api/followups?action=join-circle', {
+    var res = await authenticatedFetch((window.API_BASE || '') + '/api/followups?action=join-circle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-user-email': email },
       body: JSON.stringify({ threadId: activeThreadId })
@@ -5288,10 +5871,15 @@ async function loadSidebarCreditsAnon() {
   // is on file, pass it along so the server can factor in Signal Bank
   // credits rather than just the raw anonymous visitor count.
   try {
-    var email = localStorage.getItem('qt_user_email');
-    var url = API_BASE + '/api/interpret' + (email ? '?email=' + encodeURIComponent(email) + '&_ts=' : '?_ts=') + Date.now();
-    const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+    var url = API_BASE + '/api/interpret?_ts=' + Date.now();
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: await getInterpretRequestHeaders(),
+      cache: 'no-store'
+    });
     const data = await res.json();
+    previewTestAccess = data.previewTestAccess === true;
+    releaseServerAuthorizedPreviewLock();
     const countEl = document.getElementById('sidebarQueryCountText');
     const wrapEl  = document.getElementById('sidebarCredits');
     if (!countEl || !wrapEl) return;
@@ -5299,8 +5887,9 @@ async function loadSidebarCreditsAnon() {
       setQueryCount(countEl, 0, 3);
     } else {
       const used = data.queriesUsed || 0;
-      const remaining = Math.max(0, 3 - used);
-      setQueryCount(countEl, remaining, 3);
+      const limit = data.limit || 3;
+      const remaining = Math.max(0, limit - used);
+      setQueryCount(countEl, remaining, limit);
     }
     // No refill date for anonymous/free users
     var refillEl = document.getElementById('sidebarRefillDate');
@@ -5310,7 +5899,7 @@ async function loadSidebarCreditsAnon() {
 }
 
 async function loadSidebarCredits() {
-  const email = localStorage.getItem('qt_user_email');
+  const email = userEmail();
   if (!email) {
     loadSidebarCreditsAnon();
     return;
@@ -5406,18 +5995,22 @@ function initSidebar() {
   if (mainContent) mainContent.classList.remove('sidebar-open');
   if (toggle) toggle.textContent = '☰';
 
-  // R1 new session — start fresh, don't load S1's thread history
+  // R1 isolation applies only to an unauthenticated visit. A verified user
+  // must continue into the server-authoritative Archive load below.
   if (sessionStorage.getItem('prism_r1_session')) {
     sessionStorage.removeItem('prism_r1_session');
-    sessionStorage.setItem('prism_r1_active', '1');
-    allThreads = [];
-    renderThreads(allThreads);
-    if (sidebar) sidebar.classList.add('visible');
-    if (toggle)  toggle.classList.add('visible');
-    sidebarHasAppeared = true;
-    var freePrompt = document.getElementById('freeUpgradePrompt');
-    if (freePrompt && !localStorage.getItem('qt_user_email')) freePrompt.style.display = 'block';
-    return;
+    if (!verifiedAuthState.authenticated) {
+      sessionStorage.setItem('prism_r1_active', '1');
+      allThreads = [];
+      renderThreads(allThreads);
+      if (sidebar) sidebar.classList.add('visible');
+      if (toggle)  toggle.classList.add('visible');
+      sidebarHasAppeared = true;
+      var freePrompt = document.getElementById('freeUpgradePrompt');
+      if (freePrompt && !userEmail()) freePrompt.style.display = 'block';
+      return;
+    }
+    sessionStorage.removeItem('prism_r1_active');
   }
 
   // Anonymous — no identity at all — lightweight sidebar, nothing to fetch
@@ -5446,10 +6039,17 @@ function initSidebar() {
     sidebarHasAppeared = true;
   }
 
-  fetch(API_BASE + '/api/threads', { headers: { 'Content-Type': 'application/json', 'x-user-email': email } })
+  authenticatedFetch(API_BASE + '/api/threads', {
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'x-user-email': email }
+  })
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (!data.threads) return;
+    _archiveRawResponseDiagnostics.clear();
+    data.threads.forEach(function(thread) {
+      _archiveRawResponseDiagnostics.set(thread.id, archiveDiagnosticShape(thread.response));
+    });
     allThreads = data.threads;
     // Cache display_name for chat attribution
     if (data.display_name) {
@@ -5460,7 +6060,7 @@ function initSidebar() {
       var local = [];
       try { if (raw) local = JSON.parse(raw); } catch(e) {}
       if (local.length > 0) {
-        fetch(API_BASE + '/api/migrate', {
+        authenticatedFetch(API_BASE + '/api/migrate', {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-email': email },
           body: JSON.stringify({ threads: local })
         }).catch(function() {});
@@ -5538,6 +6138,19 @@ function undoDelete() {
 }
 
 async function handleLogout() {
+  try {
+    await getSupabaseClient().auth.signOut();
+  } catch(e) { /* proceed with local clear regardless */ }
+  verifiedAuthState = {
+    ready: true,
+    authenticated: false,
+    userId: null,
+    email: null,
+    tier: 'free',
+    displayName: null
+  };
+  localStorage.removeItem('qt_user_password');
+  if (false) {
   // Sign out of Supabase Auth
   try {
     var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
@@ -5549,7 +6162,8 @@ async function handleLogout() {
   } catch(e) { /* silent — proceed with local clear regardless */ }
 
   // Clear session identity only — preserve thread history for when user logs back in
-  var keysToRemove = ['qt_user_email', 'qt_user_tier', 'qt_sidebar_appeared', 'qt_sidebar_open'];
+  }
+  var keysToRemove = ['qt_user_email', 'qt_user_tier', 'qt_user_password', 'qt_display_name', 'qt_sidebar_appeared', 'qt_sidebar_open'];
   keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
 
   // Clear session storage
@@ -5728,9 +6342,9 @@ function updateSidebarSharedDot(threadId, isShared) {
 async function deactivateShare() {
   if (!_currentSharedSessionId) return;
   try {
-    await fetch('/api/share', {
+    await authenticatedFetch('/api/share', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': localStorage.getItem('qt_user_email') || '' },
+      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() || '' },
       body: JSON.stringify({ shareId: _currentSharedSessionId, status: 'inactive' })
     });
   } catch(e) {}
@@ -5795,15 +6409,21 @@ async function handleShareBtn() {
   var btn = document.getElementById('shareBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Creating share…'; }
 
-  var snapshot    = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
-  var senderEmail = localStorage.getItem('qt_user_email') || null;
+  var senderEmail = userEmail();
   var threadId    = activeThreadId || null;
+  var artifactId = window._lastParsedResult._artifactId || null;
+  var artifactRevision = window._lastParsedResult._artifactRevision || null;
+
+  if (!verifiedAuthState.authenticated) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Share This'; }
+    return;
+  }
 
   // If thread hasn't been saved to Supabase yet (pending-), resolve the real ID first
   if (!threadId || threadId.startsWith('pending-')) {
     if (userEmail()) {
       try {
-        var tRes = await fetch(API_BASE + '/api/threads', { headers: { 'x-user-email': userEmail() } });
+        var tRes = await authenticatedFetch(API_BASE + '/api/threads', { headers: { 'x-user-email': userEmail() } });
         var tData = await tRes.json();
         if (tData.threads && tData.threads.length > 0) {
           threadId = tData.threads[0].id;
@@ -5815,10 +6435,17 @@ async function handleShareBtn() {
   }
 
   try {
-    var res = await fetch('/api/share', {
+    var res = await authenticatedFetch('/api/share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-user-email': senderEmail || '' },
-      body: JSON.stringify({ snapshot, subject: currentSubject, senderEmail, threadId, collaborationOpen: false })
+      body: JSON.stringify({
+        subject: currentSubject,
+        senderEmail,
+        threadId,
+        artifactId,
+        artifactRevision,
+        collaborationOpen: false
+      })
     });
     var data = await res.json();
     if (!res.ok || !data.shareId) throw new Error('share failed');
@@ -5911,7 +6538,7 @@ function startPresencePolling(token) {
 async function pollPresence() {
   if (!_presenceToken) return;
   try {
-    var res = await fetch('/api/share-presence?token=' + encodeURIComponent(_presenceToken));
+    var res = await authenticatedFetch('/api/share-presence?token=' + encodeURIComponent(_presenceToken));
     if (!res.ok) return;
     var data = await res.json();
 
@@ -6083,7 +6710,7 @@ function getChatParticipantName() {
   // display_name fell into the exact same "Participant N" placeholder
   // meant for genuinely anonymous visitors — which is why the sender of a
   // thread, not just recipients, could end up labeled that way.
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (email) {
     var derived = email.split('@')[0].replace(/[._]+/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
     _chatParticipantName = derived;
@@ -6312,7 +6939,7 @@ async function sendChatMessage() {
   var text = input.value.trim();
   if (!text) return;
 
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   // Distinct from just "has an email" — a signed-in visitor who hasn't
   // explicitly joined this thread's Trust Circle yet still sends as an
   // anonymous-style recipient, same as anyone else, until they join.
@@ -6678,7 +7305,7 @@ function startNewSection(wrap) {
     if (created) return;
     created = true;
     try {
-      var res = await fetch('/api/followups?kind=note', {
+      var res = await authenticatedFetch('/api/followups?kind=note', {
         method: 'POST',
         headers: Object.assign({ 'Content-Type': 'application/json' }, identityHeaders),
         body: JSON.stringify({
@@ -6726,7 +7353,7 @@ async function flushNoteAutosave(noteId) {
   var identityHeaders = noteIdentityHeaders();
   if (!identityHeaders) return;
   try {
-    await fetch('/api/followups?kind=note', {
+    await authenticatedFetch('/api/followups?kind=note', {
       method: 'PATCH',
       headers: Object.assign({ 'Content-Type': 'application/json' }, identityHeaders),
       body: JSON.stringify(Object.assign({ noteId: noteId }, pending.fields))
@@ -6739,7 +7366,7 @@ async function deletePrivateNote(noteId) {
   if (!identityHeaders) return;
   if (!confirm('Delete this section? This can\'t be undone.')) return;
   try {
-    await fetch('/api/followups?kind=note', {
+    await authenticatedFetch('/api/followups?kind=note', {
       method: 'DELETE',
       headers: Object.assign({ 'Content-Type': 'application/json' }, identityHeaders),
       body: JSON.stringify({ noteId: noteId })
@@ -6787,7 +7414,7 @@ async function renderDiscussionView() {
       stream.innerHTML = '<div class="chat-empty">No refractions yet.<br>Begin the conversation.</div>';
       return;
     }
-    var myEmail = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+    var myEmail = userEmail();
     var myName  = getChatParticipantName();
     var myAnonId = getAnonSessionId();
     filtered.forEach(function(m) {
@@ -6829,11 +7456,11 @@ async function loadChatMessages() {
 
 // ── Private note edit/delete ─────────────────────────────────────────────
 async function deletePrivateNote(noteId) {
-  var email = typeof userEmail === 'function' ? userEmail() : (localStorage.getItem('qt_user_email') || null);
+  var email = userEmail();
   if (!email) return;
   if (!confirm('Delete this private note? This can\'t be undone.')) return;
   try {
-    await fetch('/api/followups?kind=note', {
+    await authenticatedFetch('/api/followups?kind=note', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'x-user-email': email },
       body: JSON.stringify({ noteId: noteId })
@@ -7169,7 +7796,7 @@ async function setShareMode(mode) {
   var statusEl = document.getElementById('shareModeStatus');
   if (statusEl) statusEl.textContent = 'Updating…';
   try {
-    var res = await fetch('/api/share', {
+    var res = await authenticatedFetch('/api/share', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ shareId: _currentSharedSessionId, collaborationMode: mode })
@@ -7205,23 +7832,35 @@ async function setShareMode(mode) {
 async function proceedToShareDelivery() {
   if (!window._lastParsedResult) return;
   var statusEl = document.getElementById('shareModalStatus');
-  var snapshot = Object.assign({}, window._lastParsedResult, { _subject: currentSubject });
-  var senderEmail = localStorage.getItem('qt_user_email') || null;
+  var senderEmail = userEmail();
   var threadId    = activeThreadId || null;
+  var artifactId = window._lastParsedResult._artifactId || null;
+  var artifactRevision = window._lastParsedResult._artifactRevision || null;
+
+  if (!verifiedAuthState.authenticated || !artifactId || !artifactRevision || !threadId) {
+    if (statusEl) {
+      statusEl.textContent = verifiedAuthState.authenticated
+        ? 'This inquiry is not yet ready to share.'
+        : 'Sign in to share this inquiry.';
+      statusEl.style.display = 'block';
+    }
+    return;
+  }
 
   // Show loading state on button
   var continueBtn = document.getElementById('shareContinueBtn');
   if (continueBtn) { continueBtn.disabled = true; continueBtn.textContent = 'Creating…'; }
 
   try {
-    var res = await fetch('/api/share', {
+    var res = await authenticatedFetch('/api/share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-user-email': senderEmail || '' },
       body: JSON.stringify({
-        snapshot,
         subject:            currentSubject,
         senderEmail,
         threadId,
+        artifactId,
+        artifactRevision,
         collaborationOpen:  _shareMode === 'bidirectional',
         collaborationMode:  _shareMode || 'read_only'
       })
@@ -7297,9 +7936,9 @@ function startLiveSync() {
     selectThread(activeThreadId);
   }
   // Immediate fetch to surface any existing recipient contributions
-  var email = typeof userEmail === 'function' ? userEmail() : localStorage.getItem('qt_user_email');
+  var email = userEmail();
   if (email && activeThreadId) {
-    fetch((window.API_BASE || '') + '/api/followups?threadId=' + encodeURIComponent(activeThreadId), {
+    authenticatedFetch((window.API_BASE || '') + '/api/followups?threadId=' + encodeURIComponent(activeThreadId), {
       headers: { 'x-user-email': email }
     })
     .then(function(r) { return r.json(); })
@@ -7397,9 +8036,9 @@ async function toggleShareOnOff() {
   updateShareManageUI();
 
   try {
-    var res = await fetch('/api/share', {
+    var res = await authenticatedFetch('/api/share', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': localStorage.getItem('qt_user_email') || '' },
+      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() || '' },
       body: JSON.stringify({ shareId: _currentSharedSessionId, status: newStatus })
     });
     if (!res.ok) throw new Error('patch failed');
@@ -7432,9 +8071,9 @@ async function toggleCollaboration() {
   }
 
   try {
-    var res = await fetch('/api/share', {
+    var res = await authenticatedFetch('/api/share', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': localStorage.getItem('qt_user_email') || '' },
+      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() || '' },
       body: JSON.stringify({ shareId: _currentSharedSessionId, collaborationOpen: _collabOpen })
     });
     if (!res.ok) throw new Error('patch failed');
@@ -7484,7 +8123,7 @@ function updateCollabToggleUI() {
 
 function openEmailCapture() {
   // Only show if user is anonymous and has done at least one query
-  if (localStorage.getItem('qt_user_email')) return;
+  if (userEmail()) return;
   var el = document.getElementById('emailCaptureModal');
   if (el) el.style.display = 'flex';
 }
@@ -7813,7 +8452,7 @@ function showFreeAccountModal(context) {
 
 function checkLimitEmailGate() {
   // Applies a known email to the purchase links if one's already on file.
-  var existingEmail = localStorage.getItem('qt_user_email');
+  var existingEmail = userEmail();
   if (existingEmail) applyLimitEmailToOptions(existingEmail);
 }
 
@@ -7917,7 +8556,7 @@ function restoreResumeSnapshot() {
 function handlePurchaseLinkClick(event, anchorEl) {
   saveResumeSnapshot(); // preserve the in-progress conversation either way
 
-  var email = localStorage.getItem('qt_user_email');
+  var email = userEmail();
   if (email) return true; // already registered — proceed to Stripe as normal
 
   event.preventDefault();
@@ -7987,12 +8626,11 @@ async function submitFreeAccount() {
       headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
       body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
     });
-    localStorage.setItem('qt_user_email', email);
-    localStorage.setItem('qt_user_password', btoa(password));
+    await hydrateVerifiedAuthState();
 
     // Send welcome email + credit 3 bonus queries via API
     try {
-      await fetch('/api/welcome', {
+      await authenticatedFetch('/api/welcome', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email })
@@ -8008,7 +8646,7 @@ async function submitFreeAccount() {
     // nothing to claim keeps this from firing on every free-account signup.
     if (window._freeAcctContext === 'save-session' && window._sharedViewToken && activeThreadId) {
       try {
-        await fetch('/api/followups?action=claim-anon-session', {
+        await authenticatedFetch('/api/followups?action=claim-anon-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ anonId: getAnonSessionId(), userEmail: email, threadId: activeThreadId })
@@ -8053,7 +8691,7 @@ async function submitFreeAccount() {
 }
 
 async function runPreflightCheck() {
-  var userEmail = localStorage.getItem('qt_user_email');
+  var userEmail = window.userEmail();
   var _anonMode = sessionStorage.getItem('qt_anon_mode') === '1';
   var _paidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
 
@@ -8065,11 +8703,20 @@ async function runPreflightCheck() {
 
   if (userEmail && !_anonMode && _paidTier) return;
   try {
-    var url = '/api/interpret' + (userEmail ? '?email=' + encodeURIComponent(userEmail) + '&_ts=' : '?_ts=') + Date.now();
-    var res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' }, cache: 'no-store' });
+    var url = '/api/interpret?_ts=' + Date.now();
+    var res = await fetch(url, {
+      method: 'GET',
+      headers: await getInterpretRequestHeaders(),
+      cache: 'no-store'
+    });
     if (!res.ok) return;
     var data = await res.json();
-    if (data.locked) {
+    previewTestAccess = data.previewTestAccess === true;
+    releaseServerAuthorizedPreviewLock();
+    // Preview validation allowance is granted only by the verified server
+    // identity returned above. Do not render the ordinary free-tier wall for
+    // that server-authorized test session.
+    if (!previewTestAccess && data.locked) {
       var hrs  = data.hoursRemaining || 0;
       var secs = data.secondsRemaining || hrs * 3600;
       var msg  = "You've used your " + (data.queriesUsed || 3) + " free queries. Access resets in " + hrs + " hour" + (hrs !== 1 ? "s" : "") + ".";
@@ -8091,7 +8738,7 @@ async function handleCreditsAdded() {
   const cleanUrl = window.location.pathname;
   window.history.replaceState({}, '', cleanUrl);
 
-  const email = localStorage.getItem('qt_user_email');
+  const email = userEmail();
   if (!email) return;
 
   // Show a brief status message while we verify
@@ -8244,7 +8891,8 @@ async function handleCreditsAdded() {
   }
 })();
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+  await hydrateVerifiedAuthState();
   var _bootParams = new URLSearchParams(window.location.search);
 
   // Share-token entry — qt.html rendering a specific shared thread
@@ -8554,7 +9202,7 @@ function injectSharedThreadEntry() {
   item.addEventListener('click', function() {
     // If R1 has unsaved work, prompt to save before navigating away
     var hasWork = allThreads && allThreads.length > 0;
-    var hasEmail = !!localStorage.getItem('qt_user_email');
+    var hasEmail = !!userEmail();
     if (hasWork && !hasEmail) {
       var go = confirm('Your new query will not be saved when you return to the shared thread. Add your email first to keep it — or press OK to continue without saving.');
       if (!go) return;

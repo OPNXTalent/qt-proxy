@@ -3,8 +3,11 @@
 // Called after submitFreeAccount() in qt.html.
 // Also deposits 3 bonus queries into the subscriber's account.
 
+import { verifySupabaseIdentity } from '../lib/server-auth.js';
+
 const RESEND_API_KEY        = process.env.RESEND_API_KEY;
 const SUPABASE_URL           = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY      = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function sbHeaders() {
@@ -18,7 +21,7 @@ function sbHeaders() {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -29,8 +32,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const { email } = body || {};
-  if (!email) return res.status(400).json({ error: 'Email required' });
+  const auth = await verifySupabaseIdentity({
+    authorizationHeader: req.headers.authorization,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
+  if (!auth.identity) {
+    return res.status(auth.unavailable ? 503 : 401).json({ error: auth.unavailable ? 'Identity provider unavailable' : 'Unauthorized' });
+  }
+  const email = auth.identity.email;
 
   // 1. Credit 3 bonus queries
   try {

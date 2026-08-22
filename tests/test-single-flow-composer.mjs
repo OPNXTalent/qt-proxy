@@ -73,7 +73,7 @@ assert.match(
   'A completed live query must preserve its reading position',
 );
 
-const addThreadStart = frontend.indexOf('function addThreadToSidebar(queryText) {');
+const addThreadStart = frontend.indexOf('function addThreadToSidebar(queryText, threadId) {');
 const addThreadEnd = frontend.indexOf('// SHOW SIDEBAR AFTER QUERY', addThreadStart);
 const addThreadFlow = frontend.slice(addThreadStart, addThreadEnd);
 assert.doesNotMatch(
@@ -100,6 +100,11 @@ assert.doesNotMatch(
   initSidebarFlow,
   /wasOpen|sidebar\.classList\.add\('open'\)|mainContent\.classList\.add\('sidebar-open'\)/,
   'Archive must not reopen itself from saved or populated state',
+);
+assert.match(
+  initSidebarFlow,
+  /if \(sessionStorage\.getItem\('prism_r1_session'\)\) \{[\s\S]*if \(!verifiedAuthState\.authenticated\) \{[\s\S]*allThreads = \[\];[\s\S]*renderThreads\(allThreads\);[\s\S]*return;[\s\S]*sessionStorage\.removeItem\('prism_r1_active'\);[\s\S]*authenticatedFetch\(API_BASE \+ '\/api\/threads'/,
+  'R1 must isolate an anonymous Archive while allowing a verified account to reach the server-authoritative Archive load',
 );
 
 const applyHighlightStart = frontend.indexOf('function applyHighlight(color) {');

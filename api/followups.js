@@ -33,7 +33,10 @@
 // only ever affects what the MUTER sees — never removes anything for anyone
 // else, never notifies the muted person.
 
+import { verifySupabaseIdentity } from '../lib/server-auth.js';
+
 const SUPABASE_URL              = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY         = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function sbHeaders(extra) {
@@ -42,15 +45,6 @@ function sbHeaders(extra) {
     'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
     ...extra
   };
-}
-
-async function getSubscriberId(userEmail) {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id&limit=1`,
-    { headers: sbHeaders() }
-  );
-  const subs = await res.json();
-  return subs?.[0]?.id || null;
 }
 
 async function getMutedUserIds(threadId, viewerUserId) {
@@ -98,13 +92,11 @@ async function handleClaimAnonSession(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const { anonId, userEmail, threadId } = body || {};
-  if (!anonId || !userEmail || !threadId) {
-    return res.status(400).json({ error: 'anonId, userEmail, and threadId are required' });
+  const { anonId, threadId } = body || {};
+  const userId = req.verifiedIdentity?.userId || null;
+  if (!anonId || !userId || !threadId) {
+    return res.status(400).json({ error: 'anonId, authenticated user, and threadId are required' });
   }
-
-  const userId = await getSubscriberId(userEmail);
-  if (!userId) return res.status(404).json({ error: 'Subscriber not found' });
 
   const results = { followUps: false, notes: false, participant: false };
 
@@ -156,8 +148,8 @@ async function handleClaimAnonSession(req, res) {
 // rather than an anon session. Confirmed-only, on purpose — see the
 // consolidation notes on why silent auto-join on link-open was rejected.
 async function handleJoinCircle(req, res) {
-  const userEmail = req.headers['x-user-email'] || null;
-  if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
+  const userId = req.verifiedIdentity?.userId || null;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   let body;
   try {
@@ -167,9 +159,6 @@ async function handleJoinCircle(req, res) {
   }
   const { threadId } = body || {};
   if (!threadId) return res.status(400).json({ error: 'threadId required' });
-
-  const userId = await getSubscriberId(userEmail);
-  if (!userId) return res.status(404).json({ error: 'Subscriber not found' });
 
   const partRes = await fetch(`${SUPABASE_URL}/rest/v1/thread_participants`, {
     method: 'POST',
@@ -198,7 +187,7 @@ async function handleJoinCircle(req, res) {
 // deletable by whoever wrote it. quote is optional — a note can exist with
 // or without a highlighted passage attached.
 async function handleNoteRequest(req, res) {
-  const userEmail = req.headers['x-user-email']   || null;
+  const userEmail = req.verifiedIdentity?.email || null;
   const anonId    = req.headers['x-anon-session'] || null;
   if (!userEmail && !anonId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -206,11 +195,7 @@ async function handleNoteRequest(req, res) {
   // otherwise the anonymous session identifier. A note anchored to an
   // anon session today is exactly what the migration step (still to come)
   // will hand over to a real user_id once that session registers.
-  let userId = null;
-  if (userEmail) {
-    userId = await getSubscriberId(userEmail);
-    if (!userId) return res.status(404).json({ error: 'Subscriber not found' });
-  }
+  const userId = req.verifiedIdentity?.userId || null;
 
   // Query-string fragment and insert fields, built once, used everywhere
   // below — keeps every branch correct for both identity types without
@@ -328,11 +313,21 @@ async function handleNoteRequest(req, res) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-user-email, x-share-id');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-share-id');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  const auth = await verifySupabaseIdentity({
+    authorizationHeader: req.headers.authorization,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
+  if (auth.provided && !auth.identity) {
+    return res.status(auth.unavailable ? 503 : 401).json({ error: auth.unavailable ? 'Identity provider unavailable' : 'Unauthorized' });
+  }
+  req.verifiedIdentity = auth.identity;
+
   // Route to the notes branch before anything else — completely separate
-  // logic, sharing only the file (and the sbHeaders/getSubscriberId helpers)
+  // logic, sharing only the file and the sbHeaders helper
   // to stay within the serverless function count limit.
   if (req.query?.kind === 'note') {
     return handleNoteRequest(req, res);
@@ -346,7 +341,8 @@ export default async function handler(req, res) {
     return handleJoinCircle(req, res);
   }
 
-  const userEmail = req.headers['x-user-email'] || null;
+  const userEmail = req.verifiedIdentity?.email || null;
+  const authenticatedUserId = req.verifiedIdentity?.userId || null;
   const shareId   = req.headers['x-share-id']   || null;
 
   // ── GET — fetch follow-ups for a thread ──────────────────────────────────
@@ -373,8 +369,7 @@ export default async function handler(req, res) {
 
     if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
 
-    const viewerUserId = await getSubscriberId(userEmail);
-    if (!viewerUserId) return res.status(404).json({ error: 'Subscriber not found' });
+    const viewerUserId = authenticatedUserId;
 
     const [threadRes, participantRes] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&select=id,user_id&limit=1`, { headers: sbHeaders() }),
@@ -453,8 +448,7 @@ export default async function handler(req, res) {
 
     if (postSource === 'participant') {
       if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
-      const participantUserId = await getSubscriberId(userEmail);
-      if (!participantUserId) return res.status(404).json({ error: 'Subscriber not found' });
+      const participantUserId = authenticatedUserId;
 
       const partRes = await fetch(
         `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&user_id=eq.${participantUserId}&active=eq.true&select=id&limit=1`,
@@ -501,8 +495,7 @@ export default async function handler(req, res) {
 
     if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
 
-    const ownerUserId = await getSubscriberId(userEmail);
-    if (!ownerUserId) return res.status(404).json({ error: 'Subscriber not found' });
+    const ownerUserId = authenticatedUserId;
 
     const threadRes = await fetch(
       `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${ownerUserId}&select=id&limit=1`,
@@ -542,8 +535,7 @@ export default async function handler(req, res) {
     const { followUpId } = req.body || {};
     if (!followUpId) return res.status(400).json({ error: 'followUpId required' });
 
-    const requesterId = await getSubscriberId(userEmail);
-    if (!requesterId) return res.status(404).json({ error: 'Subscriber not found' });
+    const requesterId = authenticatedUserId;
 
     const fuRes = await fetch(
       `${SUPABASE_URL}/rest/v1/follow_ups?id=eq.${followUpId}&user_id=eq.${requesterId}&select=id&limit=1`,

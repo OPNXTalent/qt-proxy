@@ -2,18 +2,29 @@
 // One-time localStorage thread migration to Supabase
 // Called by qt.html on first authenticated load
 
+import { verifySupabaseIdentity } from '../lib/server-auth.js';
+
 const SUPABASE_URL             = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY        = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const userEmail = req.headers['x-user-email'] || null;
+  const auth = await verifySupabaseIdentity({
+    authorizationHeader: req.headers.authorization,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
+  if (auth.provided && !auth.identity) {
+    return res.status(auth.unavailable ? 503 : 401).json({ error: auth.unavailable ? 'Identity provider unavailable' : 'Unauthorized' });
+  }
+  const userEmail = auth.identity?.email || null;
   if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
 
   try {

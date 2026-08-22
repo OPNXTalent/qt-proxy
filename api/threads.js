@@ -14,7 +14,10 @@
 // "delete from my Archive" safe for anyone to do without destroying the
 // thread for other participants — see the DELETE handler below.
 
+import { verifySupabaseIdentity } from '../lib/server-auth.js';
+
 const SUPABASE_URL              = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY         = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function sbHeaders(extra) {
@@ -25,7 +28,78 @@ function sbHeaders(extra) {
   };
 }
 
-async function getSubscriberId(userEmail) {
+function responseFromArtifact(artifactRow, packetRows) {
+  const artifact = artifactRow?.artifact;
+  if (!artifact) return null;
+  const response = {
+    response_mode: artifact.responseMode || 'reflective',
+    recognition: artifact.orientation || '',
+    core_insight: artifact.canonicalResponse || '',
+    open_door_question: artifact.openDoorQuestion || '',
+    verse_identified: artifact.verseIdentified || '',
+    verse_text: artifact.verseText || '',
+    key_terms: [],
+    _artifactId: artifact.artifactId,
+    _artifactRevision: artifact.revision,
+  };
+  let hasCompletedEnrichmentPacket = false;
+  for (const packet of packetRows || []) {
+    const content = packet.content || {};
+    if (packet.packet_type === 'interpretive_context') {
+      hasCompletedEnrichmentPacket = true;
+      response.interpretive_context = content.text || '';
+    } else if (packet.packet_type === 'prism_analysis') {
+      hasCompletedEnrichmentPacket = true;
+      response.prism_analysis = content;
+      const framework = content.framework || {};
+      response.prism_summary = framework.prismSummary || '';
+      response.entanglement = framework.entanglement || '';
+      response.coherence_alignment = framework.coherenceAlignment || '';
+      response.noise_decoherence = framework.noiseDecoherence || '';
+      response.telos_insight = framework.telosInsight || '';
+      response.olam_haba = framework.olamHaba || '';
+      response.key_terms = (content.keyTerms || []).map(term => ({
+        term: term.term || '',
+        hebrew: term.original || '',
+        prism_meaning: term.meaning || '',
+      }));
+    }
+  }
+  if (hasCompletedEnrichmentPacket) {
+    const analysis = response.prism_analysis || {};
+    const framework = analysis.framework || {};
+    const hasSubstantiveEnrichment = Boolean(
+      response.interpretive_context
+      || Object.values(framework).some(value => typeof value === 'string' && value.trim())
+      || response.key_terms.length
+      || (Array.isArray(analysis.constraintFindings) && analysis.constraintFindings.some(value => typeof value === 'string' && value.trim()))
+      || (Array.isArray(analysis.futureAnalysisProjections) && analysis.futureAnalysisProjections.some(value => typeof value === 'string' && value.trim()))
+    );
+    if (!hasSubstantiveEnrichment) response._analysisIncomplete = true;
+  }
+  return response;
+}
+
+function selectAuthoritativeArtifacts(artifacts) {
+  const byThread = new Map();
+  for (const artifact of Array.isArray(artifacts) ? artifacts : []) {
+    const current = byThread.get(artifact.thread_id);
+    // `server:` identifies the server-minted inquiry lineage. `thread:` is the
+    // client recovery fallback and must not supersede that lineage in Archive.
+    const isServerIssued = typeof artifact.inquiry_key === 'string'
+      && artifact.inquiry_key.startsWith('server:');
+    const currentIsServerIssued = typeof current?.inquiry_key === 'string'
+      && current.inquiry_key.startsWith('server:');
+    if (!current || (isServerIssued && !currentIsServerIssued)) {
+      byThread.set(artifact.thread_id, artifact);
+    }
+  }
+  return byThread;
+}
+
+export { responseFromArtifact, selectAuthoritativeArtifacts };
+
+async function getSubscriberProfile(userEmail) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(userEmail)}&select=id,tier,display_name&limit=1`,
     { headers: sbHeaders() }
@@ -37,11 +111,21 @@ async function getSubscriberId(userEmail) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, DELETE, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Cache-Control', 'private, no-store');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const userEmail = req.headers['x-user-email'] || null;
+  const auth = await verifySupabaseIdentity({
+    authorizationHeader: req.headers.authorization,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
+  if (auth.provided && !auth.identity) {
+    return res.status(auth.unavailable ? 503 : 401).json({ error: auth.unavailable ? 'Identity provider unavailable' : 'Unauthorized' });
+  }
+  const userEmail = auth.identity?.email || null;
+  const verifiedUserId = auth.identity?.userId || null;
 
   if (!userEmail) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -50,9 +134,10 @@ export default async function handler(req, res) {
   // ── GET — fetch thread list (owned + Trust Circle threads joined) ─────────
   if (req.method === 'GET') {
     try {
-      const subscriber = await getSubscriberId(userEmail);
-      if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
-      const { id: userId, tier, display_name } = subscriber;
+      const subscriber = await getSubscriberProfile(userEmail);
+      const userId = verifiedUserId;
+      const tier = subscriber?.tier || 'free';
+      const display_name = subscriber?.display_name || null;
 
       // Threads this person owns — unchanged query, now also pulling visibility.
       const ownedRes = await fetch(
@@ -91,6 +176,46 @@ export default async function handler(req, res) {
             active: row.active,
             lastSeenAt: row.last_seen_at
           });
+        }
+      }
+
+      // Restore completed root artifacts and enrichments from the server.
+      const threadIds = [...byId.keys()];
+      let artifactByThread = new Map();
+      const packetsByArtifact = new Map();
+      const packetsByLineage = new Map();
+      if (threadIds.length) {
+        try {
+          const idsFilter = threadIds.map(id => `"${id}"`).join(',');
+          const artifactRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/interpretation_artifacts?thread_id=in.(${idsFilter})&order=artifact_revision.desc&select=thread_id,artifact_id,artifact_revision,inquiry_key,artifact`,
+            { headers: sbHeaders() },
+          );
+          const artifacts = artifactRes.ok ? await artifactRes.json() : [];
+          artifactByThread = selectAuthoritativeArtifacts(artifacts);
+          const artifactIds = [...new Set((Array.isArray(artifacts) ? artifacts : [])
+            .map(row => row.artifact_id))];
+          if (artifactIds.length) {
+            const artifactFilter = artifactIds.map(id => `"${id}"`).join(',');
+            const packetRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/interpretation_packets?artifact_id=in.(${artifactFilter})&status=eq.complete&order=artifact_revision.desc,sequence.asc&select=artifact_id,artifact_revision,packet_type,sequence,content`,
+              { headers: sbHeaders() },
+            );
+            const packets = packetRes.ok ? await packetRes.json() : [];
+            for (const packet of Array.isArray(packets) ? packets : []) {
+              const key = `${packet.artifact_id}:${packet.artifact_revision}`;
+              const list = packetsByArtifact.get(key) || [];
+              list.push(packet);
+              packetsByArtifact.set(key, list);
+              const lineage = packetsByLineage.get(packet.artifact_id) || [];
+              lineage.push(packet);
+              packetsByLineage.set(packet.artifact_id, lineage);
+            }
+          }
+        } catch (artifactRestoreError) {
+          // A rollout where the artifact schema is not yet present must not
+          // make the legacy Archive unavailable.
+          console.warn('artifact restoration unavailable:', artifactRestoreError.message);
         }
       }
 
@@ -137,7 +262,40 @@ export default async function handler(req, res) {
           supabaseId:   t.id,
           title:        t.title || t.query?.substring(0, 60) || 'Untitled',
           query:        t.query || '',
-          response:     t.response || null,
+          response:     artifactByThread.has(t.id)
+            ? (() => {
+              const artifactRow = artifactByThread.get(t.id);
+              const exactKey = `${artifactRow.artifact_id}:${artifactRow.artifact_revision}`;
+              const packetRows = [...(packetsByArtifact.get(exactKey) || [])];
+              const packetTypes = new Set(packetRows.map(packet => packet.packet_type));
+              for (const packet of packetsByLineage.get(artifactRow.artifact_id) || []) {
+                if (packet.artifact_revision > artifactRow.artifact_revision
+                  || packetTypes.has(packet.packet_type)
+                  || !['interpretive_context', 'prism_analysis'].includes(packet.packet_type)) continue;
+                packetRows.push(packet);
+                packetTypes.add(packet.packet_type);
+              }
+              const restoredResponse = responseFromArtifact(artifactRow, packetRows);
+              console.info('archive restoration response boundary:', {
+                threadId: t.id,
+                artifactId: artifactRow.artifact_id,
+                artifactRevision: artifactRow.artifact_revision,
+                packetTypes: (packetRows || []).map(packet => packet.packet_type),
+                hasArtifactId: Boolean(restoredResponse?._artifactId),
+                hasArtifactRevision: restoredResponse?._artifactRevision !== undefined
+                  && restoredResponse?._artifactRevision !== null,
+                hasInterpretiveContext: Object.prototype.hasOwnProperty.call(
+                  restoredResponse || {},
+                  'interpretive_context',
+                ),
+                hasPrismAnalysis: Object.prototype.hasOwnProperty.call(
+                  restoredResponse || {},
+                  'prism_analysis',
+                ),
+              });
+              return restoredResponse;
+            })()
+            : (t.response || null),
           queryType:    t.query_type || 'free_text',
           createdAt:    new Date(t.created_at).getTime(),
           daysLeft,
@@ -177,9 +335,7 @@ export default async function handler(req, res) {
       const { threadId } = req.body || {};
       if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
-      const subscriber = await getSubscriberId(userEmail);
-      if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
-      const userId = subscriber.id;
+      const userId = verifiedUserId;
 
       const participantsRes = await fetch(
         `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&select=id,user_id`,
@@ -235,9 +391,9 @@ export default async function handler(req, res) {
       const { threadId, title, action, targetUserId } = req.body || {};
       if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
-      const subscriber = await getSubscriberId(userEmail);
-      if (!subscriber) return res.status(404).json({ error: 'Subscriber not found' });
-      const { id: userId, tier } = subscriber;
+      const subscriber = await getSubscriberProfile(userEmail);
+      const userId = verifiedUserId;
+      const tier = subscriber?.tier || 'free';
 
       // ── Toggle thread-level visibility ──────────────────────────────────
       // No special privileges for the creator here, same as everywhere
