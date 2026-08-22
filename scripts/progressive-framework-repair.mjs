@@ -21,36 +21,38 @@ let interpret = readFileSync('api/interpret.js', 'utf8');
 
 const auditStart = "    const auditPrompt = `Audit this enrichment against the sealed Interpretation Artifact.";
 const auditEnd = "    const packets = createEnrichmentPackets(artifact, enrichment);";
-const auditedFallbackBlock = String.raw`    // A substantive generated Framework is already valid Prism Analysis. The
-    // secondary audit is quality assurance, not an availability gate. If the
-    // auditor times out, truncates, emits invalid JSON, or otherwise fails, keep
-    // the validated generated analysis instead of discarding the entire Framework.
-    let enrichment = generatedEnrichment;
-    const auditPrompt = `Audit this enrichment against the sealed Interpretation Artifact.
-Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.
-
-Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${JSON.stringify(generatedEnrichment)}`;
-    timing('progressive_analysis_audit_start');
-    try {
-      const auditedCandidate = await callInquiryModel({
-        model: 'claude-haiku-4-5-20251001',
-        maxTokens: 3600,
-        timeoutMs: 20000,
-        prompt: auditPrompt,
-        structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,
-        structuredOutputName: 'emit_audited_enrichment',
-      });
-      const validatedAudit = validateEnrichment(auditedCandidate);
-      if (!hasSubstantiveEnrichment(validatedAudit)) throw new Error('ENRICHMENT_AUDIT_EMPTY');
-      enrichment = validatedAudit;
-      timing('progressive_analysis_audit_complete', { degraded: false });
-    } catch (auditError) {
-      timing('progressive_analysis_audit_degraded', {
-        error: String(auditError?.message || auditError).slice(0, 180),
-        fallback: 'validated_generated_enrichment',
-      });
-    }
-    const packets = createEnrichmentPackets(artifact, enrichment);`;
+const auditedFallbackBlock = [
+  "    // A substantive generated Framework is already valid Prism Analysis. The",
+  "    // secondary audit is quality assurance, not an availability gate. If the",
+  "    // auditor times out, truncates, emits invalid JSON, or otherwise fails, keep",
+  "    // the validated generated analysis instead of discarding the entire Framework.",
+  "    let enrichment = generatedEnrichment;",
+  "    const auditPrompt = `Audit this enrichment against the sealed Interpretation Artifact.",
+  "Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.",
+  "",
+  "Artifact:\\n${serializeArtifactForEnrichment(artifact)}\\n\\nEnrichment:\\n${JSON.stringify(generatedEnrichment)}`;",
+  "    timing('progressive_analysis_audit_start');",
+  "    try {",
+  "      const auditedCandidate = await callInquiryModel({",
+  "        model: 'claude-haiku-4-5-20251001',",
+  "        maxTokens: 3600,",
+  "        timeoutMs: 20000,",
+  "        prompt: auditPrompt,",
+  "        structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,",
+  "        structuredOutputName: 'emit_audited_enrichment',",
+  "      });",
+  "      const validatedAudit = validateEnrichment(auditedCandidate);",
+  "      if (!hasSubstantiveEnrichment(validatedAudit)) throw new Error('ENRICHMENT_AUDIT_EMPTY');",
+  "      enrichment = validatedAudit;",
+  "      timing('progressive_analysis_audit_complete', { degraded: false });",
+  "    } catch (auditError) {",
+  "      timing('progressive_analysis_audit_degraded', {",
+  "        error: String(auditError?.message || auditError).slice(0, 180),",
+  "        fallback: 'validated_generated_enrichment',",
+  "      });",
+  "    }",
+  "    const packets = createEnrichmentPackets(artifact, enrichment);",
+].join('\n');
 
 interpret = replaceBetween(
   interpret,
