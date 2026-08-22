@@ -45,5 +45,10 @@ assert.match(
   /onclick=\"retryProgressiveAnalysis\(this\)\"/,
   'Framework retry control should remain wired to the recovery endpoint',
 );
+assert.match(
+  qt,
+  /\.qt-framework-body\s*>\s*ul\s*\{[\s\S]*?padding-left:\s*24px;[\s\S]*?list-style-position:\s*outside;/,
+  'Prism Analysis list markers should be inset from the left accent rail',
+);
 
-console.log('Progressive Framework resilience regression passed.');
+console.log('Progressive Framework resilience and list-clearance regression passed.');
