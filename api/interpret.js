@@ -5809,6 +5809,23 @@ function progressiveSystemPrompt(systemPrompt, contract) {
     : `${source}\n${contract}`;
 }
 
+function cachedArtifactConstructionSystem(systemPrompt) {
+  const source = String(systemPrompt || PRISM_SYSTEM_PROMPT);
+  if (!source.startsWith(PRISM_SYSTEM_PROMPT)) {
+    return [{ type: 'text', text: progressiveSystemPrompt(source, PRISM_ARTIFACT_CORE_CONTRACT) }];
+  }
+  const staticPrefix = progressiveSystemPrompt(PRISM_SYSTEM_PROMPT, PRISM_ARTIFACT_CORE_CONTRACT);
+  const dynamicSuffix = source.slice(PRISM_SYSTEM_PROMPT.length);
+  return [
+    {
+      type: 'text',
+      text: staticPrefix,
+      cache_control: { type: 'ephemeral' },
+    },
+    ...(dynamicSuffix ? [{ type: 'text', text: dynamicSuffix }] : []),
+  ];
+}
+
 function artifactRpcBody(artifact, packets, {
   inquiryKey,
   completionKey,
@@ -6000,10 +6017,10 @@ async function constructAuditedArtifact({
   timing('artifact_construction_start');
   const rawCoreText = await callInquiryModel({
     model: 'claude-sonnet-4-6',
-    maxTokens: 1800,
+    maxTokens: 2400,
     temperature: 0.2,
-    timeoutMs: 45000,
-    system: progressiveSystemPrompt(systemPrompt, PRISM_ARTIFACT_CORE_CONTRACT),
+    timeoutMs: 75000,
+    system: cachedArtifactConstructionSystem(systemPrompt),
     prompt: query,
   });
   let rawCore;
