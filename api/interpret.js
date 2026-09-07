@@ -6041,6 +6041,15 @@ export async function callInquiryModel({
   return text;
 }
 
+export async function runArtifactConstructionWithRetry(attempt) {
+  try {
+    return await attempt({ maxTokens: 2400, retryOrdinal: 0, forwardProvisional: true });
+  } catch (error) {
+    if (error?.message !== 'INQUIRY_MODEL_OUTPUT_TRUNCATED') throw error;
+    return attempt({ maxTokens: 3600, retryOrdinal: 1, forwardProvisional: false });
+  }
+}
+
 function progressiveSystemPrompt(systemPrompt, contract) {
   const source = String(systemPrompt || PRISM_SYSTEM_PROMPT);
   return source.includes(PRISM_OUTPUT_CONTRACT)
@@ -6256,26 +6265,37 @@ async function constructAuditedArtifact({
   let started = Date.now();
   let firstProvisionalDelta = true;
   timing('artifact_construction_start');
-  const rawCoreText = await callInquiryModel({
-    model: 'claude-sonnet-4-6',
-    maxTokens: 2400,
-    temperature: 0.2,
-    timeoutMs: 75000,
-    system: cachedArtifactConstructionSystem(systemPrompt),
-    prompt: query,
-    structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
-    structuredOutputName: 'emit_interpretation_artifact',
-    structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', diagnostic),
-    telemetryStage: 'artifact_construction',
-    telemetryTurnType: 'primary',
-    onTextDelta: delta => {
-      if (firstProvisionalDelta) {
-        firstProvisionalDelta = false;
-        timing('artifact_provisional_stream_start');
-      }
-      sse?.write({ type: 'delta', text: delta, provisional: true });
-    },
-    maxTotalMs: 240000,
+  const rawCoreText = await runArtifactConstructionWithRetry(async ({
+    maxTokens,
+    retryOrdinal,
+    forwardProvisional,
+  }) => {
+    if (retryOrdinal > 0) timing('artifact_truncation_retry_start', { maxTokens });
+    const result = await callInquiryModel({
+      model: 'claude-sonnet-4-6',
+      maxTokens,
+      temperature: 0.2,
+      timeoutMs: 75000,
+      system: cachedArtifactConstructionSystem(systemPrompt),
+      prompt: query,
+      structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
+      structuredOutputName: 'emit_interpretation_artifact',
+      structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', diagnostic),
+      telemetryStage: 'artifact_construction',
+      telemetryTurnType: 'primary',
+      telemetryRetryOrdinal: retryOrdinal,
+      onTextDelta: delta => {
+        if (!forwardProvisional) return;
+        if (firstProvisionalDelta) {
+          firstProvisionalDelta = false;
+          timing('artifact_provisional_stream_start');
+        }
+        sse?.write({ type: 'delta', text: delta, provisional: true });
+      },
+      maxTotalMs: 240000,
+    });
+    if (retryOrdinal > 0) timing('artifact_truncation_retry_complete', { maxTokens });
+    return result;
   });
   let rawCore;
   if (rawCoreText && typeof rawCoreText === 'object' && !Array.isArray(rawCoreText)) {

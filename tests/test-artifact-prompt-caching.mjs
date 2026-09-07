@@ -35,11 +35,11 @@ assert.match(
 );
 
 const artifactCall = api.match(
-  /const rawCoreText = await callInquiryModel\(\{[\s\S]*?prompt: query,[\s\S]*?\n\s*\}\);/,
+  /const result = await callInquiryModel\(\{[\s\S]*?prompt: query,[\s\S]*?\n\s*\}\);/,
 )?.[0] || '';
 
 assert.match(artifactCall, /model: 'claude-sonnet-4-6'/);
-assert.match(artifactCall, /maxTokens: 2400/);
+assert.match(artifactCall, /maxTokens,/);
 assert.match(artifactCall, /timeoutMs: 75000/);
 assert.match(artifactCall, /system: cachedArtifactConstructionSystem\(systemPrompt\)/);
 assert.match(artifactCall, /prompt: query/);
