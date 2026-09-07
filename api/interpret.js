@@ -5373,10 +5373,39 @@ export function getReversingHermonGuidance() {
 
 export function createSseWriter(res, timing, isAborted = () => false) {
   let terminalType = null;
+  let heartbeat = null;
+
+  const canWrite = () => !isAborted() && !res.destroyed && !res.writableEnded && !terminalType;
+  const stop = () => {
+    if (!heartbeat) return;
+    clearInterval(heartbeat);
+    heartbeat = null;
+  };
+  const writeChunk = chunk => res.write(chunk);
+
+  if (typeof res.once === 'function') res.once('close', stop);
 
   return {
+    start({ heartbeatMs = 15000 } = {}) {
+      if (!canWrite()) return false;
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
+      writeChunk(': prism-stream-connected\n\n');
+      if (!heartbeat && heartbeatMs > 0) {
+        heartbeat = setInterval(() => {
+          if (!canWrite()) {
+            stop();
+            return;
+          }
+          writeChunk(': prism-stream-keepalive\n\n');
+          timing('sse_keepalive_sent');
+        }, heartbeatMs);
+        if (typeof heartbeat.unref === 'function') heartbeat.unref();
+      }
+      timing('sse_stream_started');
+      return true;
+    },
     write(event, details = {}) {
-      if (isAborted() || res.destroyed || res.writableEnded || terminalType) {
+      if (!canWrite()) {
         timing('sse_write_skipped', {
           eventType: event?.type || 'unknown',
           terminalType,
@@ -5385,10 +5414,11 @@ export function createSseWriter(res, timing, isAborted = () => false) {
         return false;
       }
 
-      res.write(`data: ${JSON.stringify(event)}\n\n`);
+      writeChunk(`data: ${JSON.stringify(event)}\n\n`);
 
       if (event.type === 'done' || event.type === 'error') {
         terminalType = event.type;
+        stop();
         timing(event.type === 'done' ? 'done_sent' : 'error_sent', details);
       }
 
@@ -5397,6 +5427,7 @@ export function createSseWriter(res, timing, isAborted = () => false) {
     get terminalType() {
       return terminalType;
     },
+    stop,
   };
 }
 
@@ -7185,13 +7216,15 @@ Do not add any question after the exit offer. The person chooses the next move.
         })();
 
         res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
         res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
         res.setHeader('X-Prism-Tier', tier);
         res.setHeader('X-Prism-Subscriber', 'true');
         if (previewTestEntitlement) {
           res.setHeader('X-Prism-Preview-Test', 'true');
         }
+        sse.start();
 
         if (followUpContext.isFollowUp) {
           try {
@@ -7481,10 +7514,12 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   try {
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('X-Prism-Tier', 'free');
     res.setHeader('X-Prism-Subscriber', 'false');
+    sse.start();
 
     const hasFollowUpCandidate = Boolean(
       isFollowUp || inquiryKey || inquiryToken || threadId || sharedFollowUpId,

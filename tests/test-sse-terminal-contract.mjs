@@ -5,9 +5,13 @@ import { createSseWriter } from '../api/interpret.js';
 function createHarness() {
   const writes = [];
   const timings = [];
+  let flushed = 0;
   const res = {
     destroyed: false,
     writableEnded: false,
+    flushHeaders() {
+      flushed += 1;
+    },
     write(chunk) {
       writes.push(chunk);
     },
@@ -16,8 +20,19 @@ function createHarness() {
     res,
     (event, details) => timings.push({ event, details }),
   );
-  const events = () => writes.map(chunk => JSON.parse(chunk.slice(6).trim()));
-  return { res, writer, events, timings };
+  const events = () => writes
+    .filter(chunk => chunk.startsWith('data: '))
+    .map(chunk => JSON.parse(chunk.slice(6).trim()));
+  return { res, writer, events, timings, writes, get flushed() { return flushed; } };
+}
+
+{
+  const harness = createHarness();
+  assert.equal(harness.writer.start({ heartbeatMs: 0 }), true);
+  assert.equal(harness.flushed, 1, 'The SSE headers must be flushed before long-running model work');
+  assert.equal(harness.writes[0], ': prism-stream-connected\n\n');
+  assert.equal(harness.writer.write({ type: 'done', tier: 'free' }), true);
+  assert.deepEqual(harness.events().map(event => event.type), ['done']);
 }
 
 {
@@ -86,6 +101,13 @@ assert.equal(
   1,
   'All SSE writes must pass through createSseWriter',
 );
+assert.equal(
+  (interpretSource.match(/sse\.start\(\)/g) || []).length,
+  2,
+  'Authenticated and anonymous query paths must establish SSE before long-running work',
+);
+assert.match(interpretSource, /Cache-Control', 'no-cache, no-transform'/);
+assert.match(interpretSource, /X-Accel-Buffering', 'no'/);
 assert.doesNotMatch(
   interpretSource,
   /parsed\.type === 'message_stop'[\s\S]{0,200}type: 'done'/,
