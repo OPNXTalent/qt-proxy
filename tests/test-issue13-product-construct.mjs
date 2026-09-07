@@ -59,6 +59,8 @@ assert.match(client, /entitlementSource/);
 assert.match(client, /action: 'fork', shareId: window\._sharedViewShareId, token: window\._sharedViewToken/);
 assert.match(client, /signInWithPassword\(\{ email: email, password: password \}\)/);
 assert.match(client, /sessionStorage\.setItem\('prism_return_share', window\._sharedViewToken\)/);
+assert.match(client, /fetch\(API_BASE \+ '\/api\/threads'/);
+assert.match(client, /action: 'claim_guest'/);
 assert.match(client, /x-share-token/);
 assert.match(client, /entitlementSource === 'bank' \|\| entitlementSource === 'subscription'/);
 assert.match(interpret, /\[prism-provider-cogs\]/);

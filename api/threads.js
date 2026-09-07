@@ -15,7 +15,11 @@
 // thread for other participants — see the DELETE handler below.
 
 import { verifySupabaseIdentity } from '../lib/server-auth.js';
-import { verifyGuestIdentity } from '../lib/guest-identity.js';
+import {
+  claimGuestIdentity,
+  clearGuestCookieHeader,
+  verifyGuestIdentity,
+} from '../lib/guest-identity.js';
 
 const SUPABASE_URL              = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY         = process.env.SUPABASE_ANON_KEY;
@@ -111,7 +115,7 @@ async function getSubscriberProfile(userEmail) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, DELETE, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Cache-Control', 'private, no-store');
 
@@ -127,6 +131,28 @@ export default async function handler(req, res) {
   }
   const userEmail = auth.identity?.email || null;
   const verifiedUserId = auth.identity?.userId || null;
+  if (req.method === 'POST' && req.body?.action === 'claim_guest') {
+    if (!verifiedUserId) return res.status(401).json({ error: 'verified_authentication_required' });
+    const claimableGuest = await verifyGuestIdentity({
+      cookieHeader: req.headers.cookie,
+      supabaseUrl: SUPABASE_URL,
+      serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+      allowClaimed: true,
+    });
+    if (!claimableGuest) return res.status(400).json({ error: 'guest_credential_required' });
+    try {
+      const result = await claimGuestIdentity({
+        guestId: claimableGuest.guestId,
+        userId: verifiedUserId,
+        supabaseUrl: SUPABASE_URL,
+        serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+      });
+      res.setHeader('Set-Cookie', clearGuestCookieHeader());
+      return res.status(200).json({ claimed: true, alreadyClaimed: Boolean(result?.[0]?.already_claimed) });
+    } catch (error) {
+      return res.status(409).json({ error: String(error?.message || error) });
+    }
+  }
   const guest = verifiedUserId ? null : await verifyGuestIdentity({
     cookieHeader: req.headers.cookie,
     supabaseUrl: SUPABASE_URL,

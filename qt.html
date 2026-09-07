@@ -5222,14 +5222,14 @@ async function hydrateVerifiedAuthState() {
   // artifact lineage, and original usage timestamp. A missing guest cookie is
   // an expected no-op for returning users.
   try {
-    var claimResponse = await fetch(API_BASE + '/api/guest', {
+    var claimResponse = await fetch(API_BASE + '/api/threads', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + session.access_token
       },
       credentials: 'same-origin',
-      body: JSON.stringify({ action: 'claim' })
+      body: JSON.stringify({ action: 'claim_guest' })
     });
     if (claimResponse.ok) {
       // Refresh server-authoritative Archive state after a successful claim.
