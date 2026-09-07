@@ -120,8 +120,8 @@ assert.match(
 );
 assert.match(
   interpretSource,
-  /source: 'upstream_stream_incomplete'/,
-  'Incomplete upstream streams must produce a terminal error',
+  /type: 'error', error: err\.message/,
+  'Provider, validation, audit, or persistence failures must produce a terminal error',
 );
 
 console.log('SSE terminal contract checks passed.');

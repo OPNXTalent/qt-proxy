@@ -68,6 +68,8 @@ function responseFromArtifact(artifactRow, packetRows) {
         hebrew: term.original || '',
         prism_meaning: term.meaning || '',
       }));
+    } else if (packet.packet_type === 'explore_context') {
+      response.explore_context = Array.isArray(content.nodes) ? content.nodes : [];
     }
   }
   if (hasCompletedEnrichmentPacket) {

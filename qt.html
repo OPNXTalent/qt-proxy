@@ -2553,6 +2553,21 @@ function appendProvisionalOrientation(fragment, requestId) {
   }
 }
 
+function renderProvisionalResponse(text, requestId, targetEl) {
+  if (typeof text !== 'string' || !text) return;
+  var target = targetEl || document.getElementById('resultContent');
+  if (!target) return;
+  target.innerHTML = '<div class="qt-core-insight" aria-live="polite">' +
+    text.split(/\n\n/).map(function(paragraph) {
+      return '<p>' + escHtml(paragraph.replace(/\n/g, ' ')) + '</p>';
+    }).join('') + '</div>' +
+    '<div class="early-recognition-progress">Still interpreting…</div>';
+  if (!prismEarlyRecognitionRequests.has(requestId)) {
+    prismEarlyRecognitionRequests.add(requestId);
+    markPrismBrowserTiming(requestId, 'first_response_text_visible', { source: 'response_delta' });
+  }
+}
+
 function setType(type, el) {
   // No-op: type selector removed in Phase 1. Type is now inferred by the model.
   currentType = type;
@@ -3174,7 +3189,20 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
           const parsed = JSON.parse(data);
           if (parsed.type === 'packet' && parsed.packet) {
             renderFollowUpPacket(parsed.packet);
+          } else if (parsed.type === 'response_delta' && parsed.text) {
+            fullText += parsed.text;
+            firstVisibleDeltaSeen = true;
+            renderProvisionalResponse(fullText, requestId, targetEl);
           } else if (parsed.type === 'canonical_complete') {
+            fullText = parsed.response || fullText;
+            if (targetEl) targetEl.innerHTML = fullText.split(/\n\n/).map(function(p) {
+              return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
+            }).join('');
+            if (window._lastParsedResult) {
+              window._lastParsedResult.core_insight = fullText;
+              window._lastParsedResult._artifactId = parsed.artifactId;
+              window._lastParsedResult._artifactRevision = parsed.artifactRevision;
+            }
             latestInquiryState = parsed.canonicalState === true ? (parsed.state || null) : null;
             latestStateVersion = parsed.stateVersion ?? null;
             latestStateCanonical = parsed.canonicalState === true;
@@ -3182,14 +3210,10 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
             document.getElementById('inputSection').style.pointerEvents = '';
             document.getElementById('submitBtn').disabled = false;
             markPrismBrowserTiming(requestId, 'canonical_completion_available');
-          } else if (parsed.type === 'analysis_status' && parsed.status === 'incomplete') {
-            if (targetEl) {
-              var progress = targetEl.querySelector('[data-progressive-analysis]');
-              if (progress) progress.innerHTML = 'Prism Analysis incomplete. ' +
-                '<button type="button" class="query-secondary-btn" data-artifact-id="' + escHtml(parsed.artifactId || '') +
-                '" data-artifact-revision="' + escHtml(String(parsed.artifactRevision || '')) +
-                '" onclick="retryFollowUpAnalysis(this)">Retry Analysis</button>';
-            }
+          } else if (parsed.type === 'interpretive_context' && parsed.text && targetEl) {
+            targetEl.insertAdjacentHTML('beforeend', '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(parsed.text) + '</p></div>');
+          } else if (parsed.type === 'explore_context' && Array.isArray(parsed.nodes) && targetEl) {
+            targetEl.insertAdjacentHTML('beforeend', renderConceptNodes(parsed.nodes));
           } else if (parsed.type === 'stage' && parsed.text) {
             markPrismBrowserTiming(requestId, 'followup_stage_visible', {
               stage: parsed.stage || 'unknown'
@@ -3340,6 +3364,8 @@ function applyProgressivePacket(result, packet) {
     result._analysisPending = true;
   } else if (packet.packetType === 'interpretive_context') {
     result.interpretive_context = content.text || '';
+  } else if (packet.packetType === 'explore_context') {
+    result.explore_context = Array.isArray(content.nodes) ? content.nodes : [];
   } else if (packet.packetType === 'prism_analysis') {
     var framework = content.framework || {};
     var hasSubstantiveAnalysis = progressiveAnalysisHasSubstance(content);
@@ -3372,82 +3398,10 @@ function showProgressiveAnalysisIncomplete(status) {
   var notice = document.createElement('div');
   notice.id = 'prismAnalysisIncomplete';
   notice.className = 'qt-framework-callout';
-  notice.innerHTML = '<span>Prism Analysis incomplete.</span> ' +
-    '<button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button>';
+  notice.innerHTML = '<span>Historical Prism Analysis is incomplete.</span>';
   notice.dataset.artifactId = status.artifactId || '';
   notice.dataset.artifactRevision = String(status.artifactRevision || '');
   content.appendChild(notice);
-}
-
-async function retryProgressiveAnalysis(button) {
-  var notice = button && button.closest ? button.closest('#prismAnalysisIncomplete') : null;
-  if (!notice) return;
-  button.disabled = true;
-  button.textContent = 'Retrying…';
-  try {
-    var response = await fetch('/api/interpret', {
-      method: 'POST',
-      headers: await getInterpretRequestHeaders(),
-      body: JSON.stringify({
-        operation: 'retry_artifact_analysis',
-        artifactId: notice.dataset.artifactId,
-        artifactRevision: Number(notice.dataset.artifactRevision),
-        inquiryKey: getPersistentInquiryKey(),
-        inquiryToken: activeInquiryCredential ? activeInquiryCredential.inquiryToken : undefined,
-        requestId: createPrismRequestId()
-      })
-    });
-    if (!response.ok) throw new Error('ANALYSIS_RETRY_FAILED');
-    var payload = await response.json();
-    (payload.packets || []).forEach(function(packet) {
-      window._lastParsedResult = applyProgressivePacket(window._lastParsedResult || {}, packet);
-    });
-    renderResult(window._lastParsedResult || {});
-  } catch {
-    button.disabled = false;
-    button.textContent = 'Retry Analysis';
-  }
-}
-
-async function retryFollowUpAnalysis(button) {
-  var target = button && button.closest ? button.closest('.assistant-msg, .followup-assistant, [data-followup-response]') : null;
-  if (!target) target = button.parentElement && button.parentElement.parentElement;
-  button.disabled = true;
-  button.textContent = 'Retryingâ€¦';
-  try {
-    var response = await fetch('/api/interpret', {
-      method: 'POST',
-      headers: await getInterpretRequestHeaders(),
-      body: JSON.stringify({
-        operation: 'retry_artifact_analysis',
-        artifactId: button.dataset.artifactId,
-        artifactRevision: Number(button.dataset.artifactRevision),
-        inquiryKey: getPersistentInquiryKey(),
-        inquiryToken: activeInquiryCredential ? activeInquiryCredential.inquiryToken : undefined,
-        requestId: createPrismRequestId()
-      })
-    });
-    if (!response.ok) throw new Error('ANALYSIS_RETRY_FAILED');
-    var payload = await response.json();
-    (payload.packets || []).forEach(function(packet) {
-      var content = packet.content || {};
-      if (packet.packetType === 'interpretive_context') {
-        var context = document.createElement('div');
-        context.className = 'qt-interpretive-context';
-        context.innerHTML = '<div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(content.text || '') + '</p>';
-        target.insertBefore(context, button.parentElement);
-      } else if (packet.packetType === 'prism_analysis') {
-        var analysis = document.createElement('details');
-        analysis.className = 'qt-framework-body open';
-        analysis.innerHTML = followUpPrismAnalysisHtml(content);
-        target.insertBefore(analysis, button.parentElement);
-      }
-    });
-    button.parentElement.remove();
-  } catch (_) {
-    button.disabled = false;
-    button.textContent = 'Retry Analysis';
-  }
 }
 
 async function callProxy(messages, rawQuery, requestId) {
@@ -3574,7 +3528,14 @@ async function callProxy(messages, rawQuery, requestId) {
           const data = line.slice(6).trim();
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type === 'provisional_orientation' && parsed.text) {
+            if (parsed.type === 'response_delta' && parsed.text) {
+              fullText += parsed.text;
+              if (!firstDeltaSeen) {
+                firstDeltaSeen = true;
+                markPrismBrowserTiming(requestId, 'first_delta_received');
+              }
+              renderProvisionalResponse(fullText, requestId);
+            } else if (parsed.type === 'provisional_orientation' && parsed.text) {
               appendProvisionalOrientation(parsed.text, requestId);
             } else if (parsed.type === 'packet' && parsed.packet) {
               if (parsed.packet.packetType === 'inquiry_orientation') {
@@ -3595,6 +3556,13 @@ async function callProxy(messages, rawQuery, requestId) {
               }
             } else if (parsed.type === 'canonical_complete') {
               canonicalAvailable = true;
+              progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
+              progressiveResult.core_insight = parsed.response || fullText;
+              progressiveResult._artifactId = parsed.artifactId;
+              progressiveResult._artifactRevision = parsed.artifactRevision;
+              window._lastParsedResult = progressiveResult;
+              renderResult(progressiveResult);
+              showResult(true);
               tierFromStream = parsed.tier || tierFromStream;
               acceptInquiryCredential(parsed);
               if (parsed.threadId) activeThreadId = parsed.threadId;
@@ -3605,6 +3573,21 @@ async function callProxy(messages, rawQuery, requestId) {
               document.getElementById('inputSection').style.pointerEvents = '';
               document.getElementById('submitBtn').disabled = false;
               markPrismBrowserTiming(requestId, 'canonical_completion_available');
+            } else if (parsed.type === 'interpretive_context') {
+              progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
+              progressiveResult.interpretive_context = parsed.text || '';
+              if (parsed.packet) progressiveResult = applyProgressivePacket(progressiveResult, parsed.packet);
+              window._lastParsedResult = progressiveResult;
+              renderResult(progressiveResult);
+              markPrismBrowserTiming(requestId, 'interpretive_context_visible');
+            } else if (parsed.type === 'explore_context') {
+              progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
+              progressiveResult.explore_context = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+              progressiveResult._artifactId = parsed.packet?.artifactId || progressiveResult._artifactId;
+              progressiveResult._artifactRevision = parsed.packet?.artifactRevision || progressiveResult._artifactRevision;
+              window._lastParsedResult = progressiveResult;
+              renderResult(progressiveResult);
+              markPrismBrowserTiming(requestId, 'explore_context_visible');
             } else if (parsed.type === 'analysis_status' && parsed.status === 'incomplete') {
               progressiveResult._analysisIncomplete = true;
               progressiveResult._analysisPending = false;
@@ -3645,7 +3628,10 @@ async function callProxy(messages, rawQuery, requestId) {
           const data = line.slice(6).trim();
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type === 'provisional_orientation' && parsed.text) {
+            if (parsed.type === 'response_delta' && parsed.text) {
+              fullText += parsed.text;
+              renderProvisionalResponse(fullText, requestId);
+            } else if (parsed.type === 'provisional_orientation' && parsed.text) {
               appendProvisionalOrientation(parsed.text, requestId);
             } else if (parsed.type === 'packet' && parsed.packet) {
               if (parsed.packet.packetType === 'inquiry_orientation') {
@@ -3655,8 +3641,22 @@ async function callProxy(messages, rawQuery, requestId) {
               renderResult(progressiveResult);
             } else if (parsed.type === 'canonical_complete') {
               canonicalAvailable = true;
+              progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
+              progressiveResult.core_insight = parsed.response || fullText;
+              progressiveResult._artifactId = parsed.artifactId;
+              progressiveResult._artifactRevision = parsed.artifactRevision;
+              window._lastParsedResult = progressiveResult;
+              renderResult(progressiveResult);
               tierFromStream = parsed.tier || tierFromStream;
               acceptInquiryCredential(parsed);
+            } else if (parsed.type === 'interpretive_context') {
+              progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
+              progressiveResult.interpretive_context = parsed.text || '';
+              renderResult(progressiveResult);
+            } else if (parsed.type === 'explore_context') {
+              progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
+              progressiveResult.explore_context = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+              renderResult(progressiveResult);
             } else if (parsed.type === 'delta' && parsed.text) {
               if (!firstDeltaSeen) {
                 firstDeltaSeen = true;
@@ -3807,11 +3807,7 @@ function renderResult(d) {
     html += '<div class="orientation-block"><p>' + escHtml(recognitionText) + '</p></div>';
   }
 
-  // ── 3. INTERPRETATION ─────────────────────────────────────────────────────────
-  if (d.interpretive_context) {
-    html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
-  }
-
+  // ── 3. PRISM RESPONSE ─────────────────────────────────────────────────────────
   if (d.core_insight) {
     html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';
   }
@@ -3819,12 +3815,15 @@ function renderResult(d) {
     html += '<div class="qt-core-insight qt-open-door"><p>' + escHtml(openDoorQuestion) + '</p></div>';
   }
 
+  if (d.interpretive_context) {
+    html += '<div class="qt-interpretive-context"><div class="qt-ic-label">Interpretive Context</div><p>' + escHtml(d.interpretive_context) + '</p></div>';
+  }
+
   // Kingdom implication — hidden, preserved for compatibility
   html += '<div class="kingdom-block" style="display:none;"><div class="kingdom-label">Kingdom Implication</div><div class="kingdom-text">' + escHtml(d.kingdom_implication || '') + '</div></div>';
 
-  // Concept nodes
-  var _conceptText = [d.recognition || '', d.core_insight || '', d.kingdom_implication || ''].join(' ');
-  var _conceptNodes = getConceptNodes(_conceptText);
+  // Explore Context is selected by the server and resolved from the approved library.
+  var _conceptNodes = Array.isArray(d.explore_context) ? d.explore_context : [];
   if (_conceptNodes.length > 0) {
     html += renderConceptNodes(_conceptNodes);
   }
@@ -3853,7 +3852,7 @@ function renderResult(d) {
   if (d._analysisIncomplete) {
     html += '<div id="prismAnalysisIncomplete" class="qt-framework-callout" data-artifact-id="' +
       escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
-      '<span>Prism Analysis incomplete.</span> <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
+      '<span>Historical Prism Analysis is incomplete.</span></div>';
   }
 
   document.getElementById('resultContent').innerHTML = html;

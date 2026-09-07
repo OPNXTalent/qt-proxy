@@ -18,21 +18,17 @@ import {
   RUNTIME_CONSTITUTION_VERSION,
   createCanonicalPackets,
   createCompletionKey,
-  createEnrichmentPackets,
-  hasSubstantiveEnrichment,
-  hasSubstantiveEnrichmentPacket,
+  createContextPackets,
   validateArtifactCore,
-  validateEnrichment,
+  validateContextCompanion,
 } from '../lib/interpretation-artifact.js';
 import {
-  PRISM_ARTIFACT_CORE_CONTRACT,
-  PRISM_ARTIFACT_CORE_SCHEMA,
-  PRISM_ENRICHMENT_CONTRACT,
-  PRISM_ENRICHMENT_SCHEMA,
-  serializeArtifactForEnrichment,
+  PRISM_CANONICAL_RESPONSE_CONTRACT,
+  PRISM_CONTEXT_COMPANION_CONTRACT,
+  PRISM_CONTEXT_COMPANION_SCHEMA,
 } from '../lib/prompt-modules/progressive-inquiry.js';
+import { conceptNodes } from '../lib/concept-nodes-v1.js';
 import {
-  FOLLOWUP_STAGE_LABELS,
   applyInquiryPatch,
   assertFollowUpPromptSize,
   boundRetrievedContext,
@@ -6047,66 +6043,6 @@ export async function callInquiryModel({
   return text;
 }
 
-export async function runArtifactConstructionWithRetry(attempt) {
-  try {
-    return await attempt({ maxTokens: 2400, retryOrdinal: 0, forwardProvisional: true });
-  } catch (error) {
-    if (error?.message !== 'INQUIRY_MODEL_OUTPUT_TRUNCATED') throw error;
-    return attempt({ maxTokens: 3600, retryOrdinal: 1, forwardProvisional: false });
-  }
-}
-
-export function extractProvisionalJsonStringValue(source, targetKey) {
-  if (typeof source !== 'string' || typeof targetKey !== 'string' || !targetKey) {
-    return { found: false, complete: false, value: '' };
-  }
-  const keyPattern = new RegExp(`(?:^|[,\\{]\\s*)"${targetKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s*:\\s*"`);
-  const match = keyPattern.exec(source);
-  if (!match) return { found: false, complete: false, value: '' };
-  let cursor = match.index + match[0].length;
-  let value = '';
-  while (cursor < source.length) {
-    const char = source[cursor++];
-    if (char === '"') return { found: true, complete: true, value };
-    if (char !== '\\') {
-      if (char.charCodeAt(0) < 0x20) return { found: true, complete: false, value };
-      value += char;
-      continue;
-    }
-    if (cursor >= source.length) break;
-    const escaped = source[cursor++];
-    if (escaped === 'u') {
-      const hex = source.slice(cursor, cursor + 4);
-      if (!/^[0-9a-fA-F]{4}$/.test(hex)) break;
-      value += String.fromCharCode(parseInt(hex, 16));
-      cursor += 4;
-    } else {
-      const escapes = { '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t' };
-      if (!(escaped in escapes)) return { found: true, complete: false, value };
-      value += escapes[escaped];
-    }
-  }
-  return { found: true, complete: false, value };
-}
-
-export async function runProgressiveAnalysisAuditWithRetry(attempt) {
-  try {
-    return { value: await attempt({ maxTokens: 1800, retryOrdinal: 0 }), retried: false };
-  } catch (error) {
-    if (error?.message !== 'INQUIRY_MODEL_OUTPUT_TRUNCATED') throw error;
-    return { value: await attempt({ maxTokens: 3000, retryOrdinal: 1 }), retried: true };
-  }
-}
-
-export async function runProgressiveAnalysisGenerationWithRetry(attempt) {
-  try {
-    return await attempt({ maxTokens: 3000, retryOrdinal: 0 });
-  } catch (error) {
-    if (error?.message !== 'INQUIRY_MODEL_OUTPUT_TRUNCATED') throw error;
-    return attempt({ maxTokens: 4500, retryOrdinal: 1 });
-  }
-}
-
 function progressiveSystemPrompt(systemPrompt, contract) {
   const source = String(systemPrompt || PRISM_SYSTEM_PROMPT);
   return source.includes(PRISM_OUTPUT_CONTRACT)
@@ -6114,21 +6050,111 @@ function progressiveSystemPrompt(systemPrompt, contract) {
     : `${source}\n${contract}`;
 }
 
-function cachedArtifactConstructionSystem(systemPrompt) {
+function cachedCanonicalResponseSystem(systemPrompt) {
   const source = String(systemPrompt || PRISM_SYSTEM_PROMPT);
   if (!source.startsWith(PRISM_SYSTEM_PROMPT)) {
-    return [{ type: 'text', text: progressiveSystemPrompt(source, PRISM_ARTIFACT_CORE_CONTRACT) }];
+    return [{ type: 'text', text: progressiveSystemPrompt(source, PRISM_CANONICAL_RESPONSE_CONTRACT) }];
   }
-  const staticPrefix = progressiveSystemPrompt(PRISM_SYSTEM_PROMPT, PRISM_ARTIFACT_CORE_CONTRACT);
-  const dynamicSuffix = source.slice(PRISM_SYSTEM_PROMPT.length);
   return [
     {
       type: 'text',
-      text: staticPrefix,
+      text: progressiveSystemPrompt(PRISM_SYSTEM_PROMPT, PRISM_CANONICAL_RESPONSE_CONTRACT),
       cache_control: { type: 'ephemeral' },
     },
-    ...(dynamicSuffix ? [{ type: 'text', text: dynamicSuffix }] : []),
+    ...(source.slice(PRISM_SYSTEM_PROMPT.length)
+      ? [{ type: 'text', text: source.slice(PRISM_SYSTEM_PROMPT.length) }]
+      : []),
   ];
+}
+
+function deterministicArtifact({ response, query, inquiryKey, revision, ownerUserId, threadId }) {
+  const thesis = String(response || '').split(/(?<=[.!?])\s/)[0] || String(response || '');
+  return validateArtifactCore({
+    proposition: query,
+    thesis,
+    canonical_response: response,
+    orientation: '',
+    scope: '',
+    jurisdiction: '',
+    governing_authority: '',
+    observations: [],
+    inferences: [],
+    assumptions: [],
+    epistemic_boundaries: [],
+    conclusions: [],
+    qualifications: [],
+    unresolved: [],
+    open_door_question: '',
+    verse_identified: '',
+    verse_text: '',
+    response_mode: 'reflective',
+  }, {
+    inquiryId: inquiryKey,
+    inquiryKey,
+    revision,
+    query,
+    ownerUserId,
+    threadId,
+  });
+}
+
+async function auditCanonicalResponse({ query, response, turnType, timing }) {
+  timing('canonical_audit_start');
+  const audited = await callInquiryModel({
+    model: 'claude-haiku-4-5-20251001',
+    maxTokens: 2400,
+    timeoutMs: 30000,
+    prompt: `Audit the candidate response against the user's inquiry and the Prism Epistemic Contract. Preserve sound prose and its natural ending. Correct only material overclaim, unsupported psychology, contradiction, fabricated sourcing, or failure to answer. Do not add Framework exposition, an audit report, JSON, or a routine engagement question. Return only the complete approved response in plain prose.\n\nInquiry:\n${query}\n\nCandidate response:\n${response}`,
+    telemetryStage: 'canonical_audit',
+    telemetryTurnType: turnType,
+  });
+  if (!audited || audited.length < 40 || /^(?:```|\{|\s*AUDIT\b)/i.test(audited)) {
+    throw new Error('CANONICAL_AUDIT_INVALID');
+  }
+  timing('canonical_audit_complete', { corrected: audited !== response, canonicalChars: audited.length });
+  return audited;
+}
+
+function conceptCatalogForSelection() {
+  return Object.values(conceptNodes).map(node => ({
+    id: node.id,
+    title: node.title,
+    summary: node.shortSummary,
+  }));
+}
+
+async function generateAndAttachContext({ artifact, sse, timing }) {
+  timing('context_companion_start');
+  try {
+    const raw = await callInquiryModel({
+      model: 'claude-sonnet-4-6',
+      maxTokens: 1400,
+      temperature: 0.2,
+      timeoutMs: 45000,
+      system: PRISM_CONTEXT_COMPANION_CONTRACT,
+      prompt: `Canonical response:\n${artifact.canonicalResponse}\n\nApproved concept catalog:\n${JSON.stringify(conceptCatalogForSelection())}`,
+      structuredOutputSchema: PRISM_CONTEXT_COMPANION_SCHEMA,
+      structuredOutputName: 'emit_context_companion',
+      telemetryStage: 'context_companion',
+      telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
+    });
+    const companion = validateContextCompanion(raw, new Set(Object.keys(conceptNodes)));
+    const packets = createContextPackets(artifact, companion, conceptNodes);
+    for (const packet of packets) {
+      const durablePacket = await attachInterpretationPacket(packet);
+      if (durablePacket.packetType === PACKET_TYPES.CONTEXT) {
+        sse.write({ type: 'interpretive_context', packet: durablePacket, text: durablePacket.content?.text || '' });
+      } else if (durablePacket.packetType === PACKET_TYPES.EXPLORE) {
+        sse.write({ type: 'explore_context', packet: durablePacket, nodes: durablePacket.content?.nodes || [] });
+      }
+    }
+    timing('context_companion_complete', { packetCount: packets.length });
+    return { complete: true, packetCount: packets.length };
+  } catch (error) {
+    timing('context_companion_incomplete', { error: String(error?.message || error).slice(0, 180) });
+    sse.write({ type: 'context_incomplete', message: 'Additional context is unavailable.' });
+    return { complete: false, error };
+  }
 }
 
 function artifactRpcBody(artifact, packets, {
@@ -6232,7 +6258,7 @@ async function completeFollowUpArtifact({
   return { committed: true, version: result.state_version, state: result.canonical_state };
 }
 
-async function attachInterpretationPacket(packet, { replaceInvalidEmpty = false } = {}) {
+async function attachInterpretationPacket(packet) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/attach_interpretation_packet`, {
     method: 'POST',
     headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
@@ -6251,30 +6277,6 @@ async function attachInterpretationPacket(packet, { replaceInvalidEmpty = false 
     throw new Error(`PACKET_ATTACHMENT_FAILED:${response.status}:${detail.slice(0, 160)}`);
   }
   const stored = await response.json();
-  if (replaceInvalidEmpty
-    && stored?.packetId === packet.packetId
-    && !hasSubstantiveEnrichmentPacket(stored)
-    && hasSubstantiveEnrichmentPacket(packet)) {
-    const replacement = await fetch(
-      `${SUPABASE_URL}/rest/v1/interpretation_packets?packet_id=eq.${encodeURIComponent(packet.packetId)}`,
-      {
-        method: 'PATCH',
-        headers: inquiryServiceHeaders({
-          'Content-Type': 'application/json',
-          Prefer: 'return=representation',
-        }),
-        body: JSON.stringify({ content: packet.content, status: packet.status }),
-      },
-    );
-    if (!replacement.ok) {
-      const detail = await replacement.text().catch(() => '');
-      throw new Error(`PACKET_REPLACEMENT_FAILED:${replacement.status}:${detail.slice(0, 160)}`);
-    }
-    const rows = await replacement.json();
-    const row = Array.isArray(rows) ? rows[0] : rows;
-    if (!row) throw new Error('PACKET_REPLACEMENT_UNCONFIRMED');
-    return packet;
-  }
   return stored && typeof stored === 'object' && stored.packetId ? stored : packet;
 }
 
@@ -6308,242 +6310,6 @@ function canonicalThreadPayload({ query, queryType, artifact, tier }) {
   };
 }
 
-async function constructAuditedArtifact({
-  timing,
-  requestId,
-  query,
-  inquiryKey,
-  revision,
-  systemPrompt,
-  ownerUserId,
-  threadId,
-  sse,
-}) {
-  let started = Date.now();
-  let firstProvisionalDelta = true;
-  let provisionalOrientationLength = 0;
-  timing('artifact_construction_start');
-  const rawCoreText = await runArtifactConstructionWithRetry(async ({
-    maxTokens,
-    retryOrdinal,
-    forwardProvisional,
-  }) => {
-    if (retryOrdinal > 0) timing('artifact_truncation_retry_start', { maxTokens });
-    const result = await callInquiryModel({
-      model: 'claude-sonnet-4-6',
-      maxTokens,
-      temperature: 0.2,
-      timeoutMs: 75000,
-      system: cachedArtifactConstructionSystem(systemPrompt),
-      prompt: query,
-      structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
-      structuredOutputName: 'emit_interpretation_artifact',
-      structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', diagnostic),
-      telemetryStage: 'artifact_construction',
-      telemetryTurnType: 'primary',
-      telemetryRetryOrdinal: retryOrdinal,
-      onStructuredInputProgress: ({ name, partialJson }) => {
-        if (!forwardProvisional) return;
-        if (name !== 'emit_interpretation_artifact') return;
-        const orientation = extractProvisionalJsonStringValue(partialJson, 'orientation');
-        if (!orientation.found || orientation.value.length <= provisionalOrientationLength) return;
-        const text = orientation.value.slice(provisionalOrientationLength);
-        provisionalOrientationLength = orientation.value.length;
-        if (firstProvisionalDelta && text.trim()) {
-          firstProvisionalDelta = false;
-          timing('artifact_provisional_stream_start');
-        }
-        sse?.write({ type: 'provisional_orientation', text });
-      },
-      maxTotalMs: 240000,
-    });
-    if (retryOrdinal > 0) timing('artifact_truncation_retry_complete', { maxTokens });
-    return result;
-  });
-  let rawCore;
-  if (rawCoreText && typeof rawCoreText === 'object' && !Array.isArray(rawCoreText)) {
-    rawCore = rawCoreText;
-  } else try {
-    rawCore = parseModelJson(rawCoreText);
-  } catch (error) {
-    timing('artifact_json_repair_start', {
-      reason: error?.message || 'MODEL_JSON_INVALID',
-      candidateChars: String(rawCoreText || '').length,
-    });
-    const repairedCore = await callInquiryModel({
-      model: 'claude-haiku-4-5-20251001',
-      maxTokens: 3000,
-      timeoutMs: 20000,
-      system: PRISM_ARTIFACT_CORE_CONTRACT,
-      prompt: `Repair serialization only. Convert the candidate below into the exact JSON contract without changing its substantive interpretation, thesis, conclusions, qualifications, or canonical response. Fill only structurally required fields from the query when absent. Return JSON only.\n\nQuery:\n${query}\n\nCandidate:\n${rawCoreText}`,
-      structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
-      structuredOutputName: 'emit_interpretation_artifact',
-      structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', diagnostic),
-      telemetryStage: 'artifact_repair',
-      telemetryTurnType: 'primary',
-      telemetryRetryOrdinal: 1,
-    });
-    rawCore = repairedCore;
-    timing('artifact_json_repair_complete', {
-      candidateChars: rawCoreText.length,
-      repairedChars: JSON.stringify(repairedCore).length,
-      boundary: 'forced_tool_schema',
-    });
-  }
-  let artifact = validateArtifactCore(rawCore, {
-    inquiryId: inquiryKey,
-    inquiryKey,
-    revision,
-    query,
-    ownerUserId,
-    threadId,
-  });
-  timing('artifact_construction_complete', {
-    stageMs: Date.now() - started,
-    artifactChars: JSON.stringify(artifact).length,
-  });
-
-  started = Date.now();
-  timing('canonical_audit_start');
-  const auditedCanonical = await callInquiryModel({
-    model: 'claude-haiku-4-5-20251001',
-    maxTokens: 1400,
-    timeoutMs: 8000,
-    prompt: `Audit the Canonical Response against the sealed artifact candidate and the user's query.
-Apply the Prism Epistemic Contract symmetrically. Preserve sound prose. Correct only material overclaim, unsupported psychology, contradiction, or failure to answer. Do not add Framework exposition. Return only the complete approved response in plain prose.
-
-Query:\n${query}\n\nArtifact candidate:\n${JSON.stringify(artifact)}\n\nCanonical Response:\n${artifact.canonicalResponse}`,
-    telemetryStage: 'canonical_audit',
-    telemetryTurnType: 'primary',
-  });
-  if (!auditedCanonical || auditedCanonical.length < 40 || /^(?:```|\{)/.test(auditedCanonical)) {
-    throw new Error('CANONICAL_AUDIT_INVALID');
-  }
-  const auditReturnedMeta = /(?:^|\n)\s*(?:[#>*_`~-]+\s*)*Audit Result\b/i.test(auditedCanonical)
-    || /\bVerification against (?:the )?contract\b/i.test(auditedCanonical)
-    || /\bNo corrections required\b/i.test(auditedCanonical)
-    || /\bMaterial claims verified\b/i.test(auditedCanonical)
-    || /\bAPPROVED RESPONSE\b/i.test(auditedCanonical);
-  const unauditedCanonical = rawCore.canonical_response;
-  rawCore = {
-    ...rawCore,
-    canonical_response: auditReturnedMeta ? artifact.canonicalResponse : auditedCanonical,
-  };
-  artifact = validateArtifactCore(rawCore, {
-    inquiryId: inquiryKey,
-    inquiryKey,
-    revision,
-    query,
-    ownerUserId,
-    threadId,
-  });
-  timing('canonical_audit_complete', {
-    stageMs: Date.now() - started,
-    corrected: !auditReturnedMeta && auditedCanonical !== unauditedCanonical,
-    metaFallback: auditReturnedMeta,
-    canonicalChars: artifact.canonicalResponse.length,
-  });
-  return artifact;
-}
-
-async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing, replaceInvalidEmpty = false }) {
-  const started = Date.now();
-  timing('progressive_analysis_start');
-  try {
-    const generatedOutput = await runProgressiveAnalysisGenerationWithRetry(async ({ maxTokens, retryOrdinal }) => {
-      if (retryOrdinal > 0) timing('progressive_analysis_generation_truncation_retry_start', { maxTokens });
-      const value = await callInquiryModel({
-        model: 'claude-sonnet-4-6',
-        maxTokens,
-        temperature: 0.2,
-        timeoutMs: 90000,
-        system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
-        prompt: `Sealed Interpretation Artifact:\n${serializeArtifactForEnrichment(artifact)}`,
-        structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,
-        structuredOutputName: 'emit_prism_enrichment',
-        telemetryStage: 'progressive_analysis_generation',
-        telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
-        telemetryRetryOrdinal: retryOrdinal,
-      });
-      if (retryOrdinal > 0) timing('progressive_analysis_generation_truncation_retry_complete', { maxTokens });
-      return value;
-    });
-    const generatedEnrichment = validateEnrichment(generatedOutput);
-    if (!hasSubstantiveEnrichment(generatedEnrichment)) throw new Error('ENRICHMENT_EMPTY');
-    timing('progressive_analysis_generation_complete', { substantive: true });
-    const rawText = JSON.stringify(generatedOutput);
-    const auditPrompt = `Audit this enrichment against the sealed Interpretation Artifact.
-Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.
-
-Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText}`;
-    timing('progressive_analysis_audit_start');
-    const auditResult = await runProgressiveAnalysisAuditWithRetry(async ({ maxTokens, retryOrdinal }) => {
-      if (retryOrdinal > 0) timing('progressive_analysis_audit_truncation_retry_start', { maxTokens });
-      const value = await callInquiryModel({
-        model: 'claude-haiku-4-5-20251001',
-        maxTokens,
-        timeoutMs: 40000,
-        prompt: auditPrompt,
-        telemetryStage: 'progressive_analysis_audit',
-        telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
-        telemetryRetryOrdinal: retryOrdinal,
-      });
-      if (retryOrdinal > 0) timing('progressive_analysis_audit_truncation_retry_complete', { maxTokens });
-      return value;
-    });
-    const auditedText = auditResult.value;
-    let enrichment = validateEnrichment(parseModelJson(auditedText));
-    timing('progressive_analysis_audit_complete');
-    if (!hasSubstantiveEnrichment(enrichment)) {
-      timing('progressive_analysis_audit_empty', { error: 'ENRICHMENT_AUDIT_EMPTY' });
-      if (auditResult.retried) throw new Error('ENRICHMENT_AUDIT_EMPTY');
-      timing('progressive_analysis_audit_retry_start');
-      const retriedAudit = await callInquiryModel({
-        model: 'claude-haiku-4-5-20251001',
-        maxTokens: 1800,
-        timeoutMs: 40000,
-        prompt: auditPrompt,
-        structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,
-        structuredOutputName: 'emit_audited_enrichment',
-        telemetryStage: 'progressive_analysis_audit',
-        telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
-        telemetryRetryOrdinal: 1,
-      });
-      enrichment = validateEnrichment(retriedAudit);
-      timing('progressive_analysis_audit_retry_complete', {
-        substantive: hasSubstantiveEnrichment(enrichment),
-      });
-      if (!hasSubstantiveEnrichment(enrichment)) throw new Error('ENRICHMENT_AUDIT_EMPTY');
-    }
-    const packets = createEnrichmentPackets(artifact, enrichment);
-    for (const packet of packets) {
-      const durablePacket = await attachInterpretationPacket(packet, { replaceInvalidEmpty });
-      sse.write({ type: 'packet', packet: durablePacket });
-      timing('progressive_packet_complete', {
-        packetType: durablePacket.packetType,
-        sequence: durablePacket.sequence,
-      });
-    }
-    timing('progressive_analysis_complete', { stageMs: Date.now() - started });
-    sse.write({ type: 'analysis_status', status: 'complete' });
-    return { complete: true };
-  } catch (error) {
-    timing('progressive_analysis_incomplete', {
-      stageMs: Date.now() - started,
-      error: String(error?.message || error).slice(0, 180),
-    });
-    sse.write({
-      type: 'analysis_status',
-      status: 'incomplete',
-      message: 'Prism Analysis incomplete.',
-      retryablePackets: [PACKET_TYPES.CONTEXT, PACKET_TYPES.ANALYSIS],
-      artifactId: artifact.artifactId,
-      artifactRevision: artifact.revision,
-    });
-    return { complete: false, error };
-  }
-}
-
 async function runProgressiveInitialInquiry({
   sse,
   timing,
@@ -6559,15 +6325,34 @@ async function runProgressiveInitialInquiry({
   usageCreditSource,
 }) {
   if (!inquiryCredential?.inquiryKey) throw new Error('INQUIRY_CREDENTIAL_UNAVAILABLE');
-  let artifact = await constructAuditedArtifact({
+  timing('canonical_generation_start');
+  const streamedResponse = await callInquiryModel({
+    model: 'claude-sonnet-4-6',
+    maxTokens: 3600,
+    temperature: 0.2,
+    timeoutMs: 75000,
+    maxTotalMs: 240000,
+    system: cachedCanonicalResponseSystem(systemPrompt),
+    prompt: query,
+    telemetryStage: 'canonical_generation',
+    telemetryTurnType: 'primary',
+    onTextDelta: text => sse.write({ type: 'response_delta', text }),
+  });
+  if (!streamedResponse || streamedResponse.length < 40) throw new Error('CANONICAL_RESPONSE_INVALID');
+  timing('canonical_generation_complete', { responseChars: streamedResponse.length });
+  const canonicalResponse = await auditCanonicalResponse({
+    query,
+    response: streamedResponse,
+    turnType: 'primary',
     timing,
-    requestId,
+  });
+  const artifact = deterministicArtifact({
+    response: canonicalResponse,
     query,
     inquiryKey: inquiryCredential.inquiryKey,
     revision: 1,
-    systemPrompt,
     ownerUserId,
-    sse,
+    threadId: null,
   });
 
   let threadId = null;
@@ -6593,10 +6378,10 @@ async function runProgressiveInitialInquiry({
     artifactRevision: artifact.revision,
   });
 
-  for (const packet of packets) sse.write({ type: 'packet', packet });
   sse.write({
     type: 'canonical_complete',
     tier,
+    response: artifact.canonicalResponse,
     artifactId: artifact.artifactId,
     artifactRevision: artifact.revision,
     threadId,
@@ -6604,7 +6389,7 @@ async function runProgressiveInitialInquiry({
   });
   timing('canonical_response_available', { artifactId: artifact.artifactId });
 
-  await generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing });
+  await generateAndAttachContext({ artifact, sse, timing });
   sse.write(
     { type: 'done', tier, artifactId: artifact.artifactId, artifactRevision: artifact.revision },
     { source: 'progressive_inquiry_delivery', tier },
@@ -6629,7 +6414,6 @@ async function runPersistentInquiryFollowUp({
   const runtimeStartedAt = Date.now();
   const emitStage = (stage) => {
     timing(`followup_${stage}_start`);
-    sse.write({ type: 'stage', stage, text: FOLLOWUP_STAGE_LABELS[stage] });
     return Date.now();
   };
   const completeStage = (stage, stageStartedAt, details = {}) => {
@@ -6716,12 +6500,14 @@ async function runPersistentInquiryFollowUp({
   }));
   const draft = await callInquiryModel({
     model: 'claude-sonnet-4-6',
-    maxTokens: 1400,
+    maxTokens: 2400,
     temperature: 0.2,
-    timeoutMs: 25000,
+    timeoutMs: 75000,
+    maxTotalMs: 240000,
     prompt: draftPrompt,
     telemetryStage: 'followup_draft',
     telemetryTurnType: 'follow_up',
+    onTextDelta: text => sse.write({ type: 'response_delta', text }),
   });
   completeStage('draft', stageStartedAt, { draftChars: draft.length });
 
@@ -6750,30 +6536,11 @@ async function runPersistentInquiryFollowUp({
 
   stageStartedAt = emitStage('persist');
   if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
-  const followUpArtifact = validateArtifactCore({
-    proposition: analysis.reduction.primaryProposition,
-    scope: subject || previousState.orientation,
-    jurisdiction: 'domain-appropriate inquiry',
-    governing_authority: 'The authority legitimately governing the inquiry domain',
-    observations: analysis.constraintGate.observations,
-    inferences: analysis.constraintGate.inferences,
-    assumptions: [
-      ...analysis.constraintGate.activeAssumptions,
-      ...analysis.constraintGate.unsupportedAssumptions,
-    ],
-    epistemic_boundaries: analysis.constraintGate.evidenceBoundaries,
-    thesis: approved.split(/(?<=[.!?])\s/)[0] || approved,
-    conclusions: [approved],
-    qualifications: analysis.constraintGate.evidenceBoundaries,
-    unresolved: nextState.unresolvedClaims,
-    orientation: nextState.orientation || analysis.reduction.primaryProposition,
-    canonical_response: approved,
-    response_mode: 'reflective',
-  }, {
-    inquiryId: canonicalInquiryKey,
+  const followUpArtifact = deterministicArtifact({
+    response: approved,
+    query: input,
     inquiryKey: canonicalInquiryKey,
     revision: Math.max(previousState.version + 1, restored.artifactRevision + 1),
-    query: input,
     ownerUserId,
     threadId,
   });
@@ -6802,10 +6569,10 @@ async function runPersistentInquiryFollowUp({
   });
 
   stageStartedAt = emitStage('stream');
-  for (const packet of canonicalPackets) sse.write({ type: 'packet', packet });
   sse.write({
     type: 'canonical_complete',
     tier,
+    response: followUpArtifact.canonicalResponse,
     artifactId: followUpArtifact.artifactId,
     artifactRevision: followUpArtifact.revision,
     stateVersion: commit.version,
@@ -6815,12 +6582,7 @@ async function runPersistentInquiryFollowUp({
   });
   completeStage('stream', stageStartedAt, { packetCount: canonicalPackets.length });
 
-  await generateAndAttachEnrichment({
-    artifact: followUpArtifact,
-    systemPrompt: PRISM_RESPONSE_REFRESH,
-    sse,
-    timing,
-  });
+  await generateAndAttachContext({ artifact: followUpArtifact, sse, timing });
 
   timing('followup_total_complete', {
     totalMs: Date.now() - runtimeStartedAt,
@@ -6953,39 +6715,10 @@ export default async function handler(req, res) {
 
   // ── GET — preflight status check ─────────────────────────────────────────
   if (req.method === 'POST' && correlationBody?.operation === 'retry_artifact_analysis') {
-    const artifactId = correlationBody.artifactId;
-    const artifactRevision = Number(correlationBody.artifactRevision);
-    if (!/^[0-9a-f-]{36}$/i.test(artifactId || '')
-      || !Number.isInteger(artifactRevision)
-      || artifactRevision < 1) {
-      return res.status(400).json({ error: 'Invalid artifact reference' });
-    }
-    const artifactResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact,inquiry_key,owner_user_id&limit=1`,
-      { headers: inquiryServiceHeaders() },
-    );
-    const rows = artifactResponse.ok ? await artifactResponse.json() : [];
-    const row = rows?.[0];
-    if (!row?.artifact) return res.status(404).json({ error: 'Artifact not found' });
-    if (row.owner_user_id) {
-      if (!verifiedIdentity) return res.status(401).json({ error: 'Authentication required' });
-      if (row.owner_user_id !== verifiedIdentity.userId) return res.status(403).json({ error: 'Forbidden' });
-    } else if (correlationBody.inquiryKey !== row.inquiry_key
-      || !verifyInquiryCredential(row.inquiry_key, correlationBody.inquiryToken)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    const packets = [];
-    const result = await generateAndAttachEnrichment({
-      artifact: Object.freeze(row.artifact),
-      systemPrompt: PRISM_SYSTEM_PROMPT,
-      sse: { write(event) { if (event?.type === 'packet') packets.push(event.packet); return true; } },
-      timing,
-      replaceInvalidEmpty: true,
+    return res.status(410).json({
+      error: 'Legacy Prism Analysis regeneration is retired for reconstructed inquiries.',
+      charged: false,
     });
-    if (!result.complete) {
-      return res.status(503).json({ error: 'Prism Analysis incomplete.', retryable: true });
-    }
-    return res.status(200).json({ packets, charged: false });
   }
 
   if (req.method === 'GET') {
@@ -7593,163 +7326,6 @@ Do not add any question after the exit offer. The person chooses the next move.
         timing('request_complete', { route: 'subscriber', tier });
         return res.end();
 
-        timing('anthropic_request_start');
-        const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 2500,
-            stream: true,
-            system: enhancedSystemPrompt,
-            messages: apiMessages
-          })
-        });
-
-        timing('anthropic_headers_received', {
-          status: anthropicRes.status,
-          ok: anthropicRes.ok,
-        });
-        console.log(`[interpret:${requestId}] anthropic-response`, {
-          status: anthropicRes.status,
-          ok: anthropicRes.ok,
-          elapsedMs: Date.now() - startedAt,
-        });
-
-        if (!anthropicRes.ok) {
-          const errText = await anthropicRes.text();
-          console.error(`[interpret:${requestId}] anthropic-error`, {
-            status: anthropicRes.status,
-            body: errText.slice(0, 500),
-          });
-          sse.write(
-            { type: 'error', error: errText },
-            { source: 'anthropic_response', status: anthropicRes.status },
-          );
-          return res.end();
-        }
-
-        const reader = anthropicRes.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let fullResponse = '';
-        let streamDone = false;
-        let firstUpstreamDeltaSeen = false;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                  if (!firstUpstreamDeltaSeen) {
-                    firstUpstreamDeltaSeen = true;
-                    timing('first_upstream_delta');
-                  }
-                  fullResponse += parsed.delta.text;
-                  sse.write({ type: 'delta', text: parsed.delta.text });
-                } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-                  sse.write({ type: 'truncated' });
-                } else if (parsed.type === 'message_stop') {
-                  streamDone = true;
-                  timing('anthropic_message_stop');
-                }
-              } catch {}
-            }
-          }
-        }
-
-        if (buffer.trim()) {
-          for (const line of buffer.split('\n')) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                  if (!firstUpstreamDeltaSeen) {
-                    firstUpstreamDeltaSeen = true;
-                    timing('first_upstream_delta');
-                  }
-                  fullResponse += parsed.delta.text;
-                  sse.write({ type: 'delta', text: parsed.delta.text });
-                } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-                  sse.write({ type: 'truncated' });
-                } else if (parsed.type === 'message_stop') {
-                  streamDone = true;
-                  timing('anthropic_message_stop');
-                }
-              } catch {}
-            }
-          }
-        }
-
-        // ── COHERENCE CHECK — post-generation landing detection ────────────
-        // Runs after full response is assembled. If the draft ends on a
-        // momentum question after a landing, trims it and sends a corrected
-        // event to the client before the done event fires.
-        if (streamDone) {
-          const userTurnCount = apiMessages.filter(m => m.role === 'user').length;
-          timing('coherence_start');
-          const checkedResponse = await buildCoherenceCheck(userTurnCount, fullResponse, lastUserText);
-          timing('coherence_complete', { corrected: checkedResponse !== fullResponse });
-          if (checkedResponse !== fullResponse) {
-            // Send corrected event — client replaces accumulated fullText
-            sse.write({ type: 'corrected', text: checkedResponse });
-            fullResponse = checkedResponse;
-          }
-          sse.write(
-            { type: 'done', tier, ...(initialInquiryCredential || {}) },
-            { source: 'post_coherence', tier },
-          );
-        } else {
-          sse.write(
-            { type: 'error', error: 'UPSTREAM_STREAM_INCOMPLETE' },
-            { source: 'upstream_stream_incomplete', tier },
-          );
-        }
-
-        if (streamDone && userId) {
-          timing('persistence_start', { followUp: Boolean(isFollowUp || (messages && messages.length > 1)) });
-          const isFollowUpQuery = isFollowUp || (messages && messages.length > 1);
-          if (!isFollowUpQuery) {
-            const threadId = await saveThread({
-              userId,
-              query:     lastUserText,
-              queryType,
-              response:  fullResponse,
-              tier
-            });
-            await updateQueryCount({ userId, tier, threadId });
-          } else {
-            await updateQueryCount({ userId, tier, threadId: null });
-          }
-          timing('persistence_complete');
-        }
-
-        console.log(`[interpret:${requestId}] complete`, {
-          streamDone,
-          responseLength: fullResponse.length,
-          durationMs: Date.now() - startedAt,
-        });
-        timing('request_complete', {
-          route: 'subscriber',
-          streamDone,
-          responseChars: fullResponse.length,
-          tier,
-        });
-        return res.end();
       }
     }
   } catch (err) {
@@ -7895,126 +7471,6 @@ Do not add any question after the exit offer. The person chooses the next move.
     timing('request_complete', { route: 'free', tier: 'free' });
     return res.end();
 
-    timing('anthropic_request_start');
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2500,
-        stream: true,
-        system: enhancedSystemPrompt,
-        messages: apiMessages
-      })
-    });
-
-    timing('anthropic_headers_received', {
-      status: anthropicRes.status,
-      ok: anthropicRes.ok,
-    });
-
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      sse.write(
-        { type: 'error', error: errText },
-        { source: 'anthropic_response', status: anthropicRes.status },
-      );
-      return res.end();
-    }
-
-    const reader = anthropicRes.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let fullResponseFree = '';
-    let streamDoneFree = false;
-    let firstUpstreamDeltaSeenFree = false;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-              if (!firstUpstreamDeltaSeenFree) {
-                firstUpstreamDeltaSeenFree = true;
-                timing('first_upstream_delta');
-              }
-              fullResponseFree += parsed.delta.text;
-              sse.write({ type: 'delta', text: parsed.delta.text });
-            } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-              sse.write({ type: 'truncated' });
-            } else if (parsed.type === 'message_stop') {
-              streamDoneFree = true;
-              timing('anthropic_message_stop');
-            }
-          } catch {}
-        }
-      }
-    }
-
-    if (buffer.trim()) {
-      for (const line of buffer.split('\n')) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-              if (!firstUpstreamDeltaSeenFree) {
-                firstUpstreamDeltaSeenFree = true;
-                timing('first_upstream_delta');
-              }
-              fullResponseFree += parsed.delta.text;
-              sse.write({ type: 'delta', text: parsed.delta.text });
-            } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-              sse.write({ type: 'truncated' });
-            } else if (parsed.type === 'message_stop') {
-              streamDoneFree = true;
-              timing('anthropic_message_stop');
-            }
-          } catch {}
-        }
-      }
-    }
-
-    // ── COHERENCE CHECK — post-generation landing detection ────────────
-    if (streamDoneFree) {
-      const userTurnCountFree = apiMessages.filter(m => m.role === 'user').length;
-      timing('coherence_start');
-      const checkedResponseFree = await buildCoherenceCheck(userTurnCountFree, fullResponseFree, lastUserText);
-      timing('coherence_complete', { corrected: checkedResponseFree !== fullResponseFree });
-      if (checkedResponseFree !== fullResponseFree) {
-        sse.write({ type: 'corrected', text: checkedResponseFree });
-      }
-      sse.write(
-        { type: 'done', tier: 'free', ...(initialInquiryCredential || {}) },
-        { source: 'post_coherence', tier: 'free' },
-      );
-    } else {
-      sse.write(
-        { type: 'error', error: 'UPSTREAM_STREAM_INCOMPLETE' },
-        { source: 'upstream_stream_incomplete', tier: 'free' },
-      );
-    }
-
-    timing('request_complete', {
-      route: 'free',
-      streamDone: streamDoneFree,
-      responseChars: fullResponseFree.length,
-      tier: 'free',
-    });
-    return res.end();
   } catch (err) {
     sse.write(
       { type: 'error', error: err.message },
