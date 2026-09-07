@@ -174,13 +174,13 @@ begin
     end if;
   end if;
   v_reset := now() - interval '24 hours';
-  select count(*) into v_used from public.prism_query_ledger
-    where ((p_guest_id is not null and guest_id = p_guest_id) or (p_user_id is not null and user_id = p_user_id))
-      and entitlement_source = 'explorer' and created_at > v_reset;
+  select count(*) into v_used from public.prism_query_ledger l
+    where ((p_guest_id is not null and l.guest_id = p_guest_id) or (p_user_id is not null and l.user_id = p_user_id))
+      and l.entitlement_source = 'explorer' and l.created_at > v_reset;
   return query select v_used < 1, 'explorer'::text, greatest(1 - v_used, 0),
-    (select min(created_at) + interval '24 hours' from public.prism_query_ledger
-      where ((p_guest_id is not null and guest_id = p_guest_id) or (p_user_id is not null and user_id = p_user_id))
-        and entitlement_source = 'explorer' and created_at > v_reset);
+    (select min(l.created_at) + interval '24 hours' from public.prism_query_ledger l
+      where ((p_guest_id is not null and l.guest_id = p_guest_id) or (p_user_id is not null and l.user_id = p_user_id))
+        and l.entitlement_source = 'explorer' and l.created_at > v_reset);
 end;
 $$;
 
@@ -415,8 +415,8 @@ begin
   end if;
   select * into v_share from public.shares where id = p_share_id and status = 'active' and revoked_at is null for share;
   if not found then raise exception 'PRISM_SHARE_UNAVAILABLE'; end if;
-  select * into v_source from public.interpretation_artifacts
-    where artifact_id = v_share.artifact_id and artifact_revision = v_share.artifact_revision;
+  select * into v_source from public.interpretation_artifacts a
+    where a.artifact_id = v_share.artifact_id and a.artifact_revision = v_share.artifact_revision;
   if not found then raise exception 'PRISM_SOURCE_ARTIFACT_MISSING'; end if;
   select * into v_source_thread from public.threads where id = v_source.thread_id;
   if not found then raise exception 'PRISM_SOURCE_THREAD_MISSING'; end if;
@@ -441,9 +441,9 @@ begin
   );
   insert into public.interpretation_packets(packet_id, artifact_id, artifact_revision,
     packet_type, sequence, status, content)
-    select gen_random_uuid()::text, v_artifact_id, 1, packet_type, sequence, status, content
-    from public.interpretation_packets
-    where artifact_id = v_source.artifact_id and artifact_revision = v_source.artifact_revision;
+    select gen_random_uuid()::text, v_artifact_id, 1, p.packet_type, p.sequence, p.status, p.content
+    from public.interpretation_packets p
+    where p.artifact_id = v_source.artifact_id and p.artifact_revision = v_source.artifact_revision;
   insert into public.prism_inquiry_forks(share_id, source_thread_id, source_artifact_id,
     source_artifact_revision, fork_thread_id, fork_artifact_id, owner_user_id)
   values (p_share_id, v_source.thread_id, v_source.artifact_id, v_source.artifact_revision,
