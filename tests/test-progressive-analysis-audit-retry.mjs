@@ -1,6 +1,41 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { runProgressiveAnalysisAuditWithRetry } from '../api/interpret.js';
+import {
+  runProgressiveAnalysisAuditWithRetry,
+  runProgressiveAnalysisGenerationWithRetry,
+} from '../api/interpret.js';
+
+const generationAttempts = [];
+const generated = await runProgressiveAnalysisGenerationWithRetry(async options => {
+  generationAttempts.push(options);
+  if (options.retryOrdinal === 0) throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
+  return { interpretive_context: 'Substantive context' };
+});
+assert.deepEqual(generationAttempts, [
+  { maxTokens: 3000, retryOrdinal: 0 },
+  { maxTokens: 4500, retryOrdinal: 1 },
+]);
+assert.deepEqual(generated, { interpretive_context: 'Substantive context' });
+
+let generationValidationFailures = 0;
+await assert.rejects(
+  runProgressiveAnalysisGenerationWithRetry(async () => {
+    generationValidationFailures++;
+    throw new Error('ENRICHMENT_EMPTY');
+  }),
+  /ENRICHMENT_EMPTY/,
+);
+assert.equal(generationValidationFailures, 1, 'non-truncation generation failures are not retried');
+
+let exhaustedGenerationAttempts = 0;
+await assert.rejects(
+  runProgressiveAnalysisGenerationWithRetry(async () => {
+    exhaustedGenerationAttempts++;
+    throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
+  }),
+  /INQUIRY_MODEL_OUTPUT_TRUNCATED/,
+);
+assert.equal(exhaustedGenerationAttempts, 2, 'generation truncation retries exactly once');
 
 const attempts = [];
 const recovered = await runProgressiveAnalysisAuditWithRetry(async options => {
@@ -45,5 +80,19 @@ assert.ok(generation >= 0 && auditRetry > generation && packetConstruction > aud
   'the same generated analysis is audited with bounded recovery before packet attachment');
 assert.match(api, /if \(auditResult\.retried\) throw new Error\('ENRICHMENT_AUDIT_EMPTY'\)/,
   'a truncation retry that remains empty fails closed instead of adding another audit attempt');
+assert.match(api, /runProgressiveAnalysisGenerationWithRetry\([\s\S]*?structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,[\s\S]*?structuredOutputName: 'emit_prism_enrichment'/,
+  'Sonnet enrichment generation uses the existing forced structured schema');
+assert.match(api, /const durablePacket = await attachInterpretationPacket\(packet,[\s\S]*?sse\.write\(\{ type: 'packet', packet: durablePacket \}\)/,
+  'enrichment packets are emitted only after durable attachment');
+assert.match(api, /status: 'incomplete',[\s\S]*?artifactId: artifact\.artifactId,[\s\S]*?artifactRevision: artifact\.revision/,
+  'exhausted enrichment recovery identifies the artifact in the explicit incomplete state');
+const initialPipeline = api.slice(api.indexOf('async function runProgressiveInitialInquiry'), api.indexOf('async function runPersistentInquiryFollowUp'));
+assert.ok(
+  initialPipeline.indexOf("type: 'canonical_complete'") < initialPipeline.indexOf('await generateAndAttachEnrichment('),
+  'canonical completion remains available before enrichment begins',
+);
+const enrichmentPipeline = api.slice(api.indexOf('async function generateAndAttachEnrichment'), api.indexOf('async function runProgressiveInitialInquiry'));
+assert.doesNotMatch(enrichmentPipeline, /completeInterpretationArtifact|preparePrismInquiry|consumePrismQuery/,
+  'enrichment generation and audit retries cannot consume customer entitlement');
 
-console.log('progressive analysis audit retry tests passed');
+console.log('progressive analysis generation and audit retry tests passed');

@@ -62,6 +62,28 @@ assert.match(frontend, /cachePersistentInquiryState/);
 assert.match(frontend, /parsed\.canonicalState === true/);
 assert.match(frontend, /parsed\.type === 'canonical_complete'/);
 assert.match(frontend, /renderFollowUpPacket/);
+for (const frameworkField of [
+  'framework.prismSummary',
+  'framework.entanglement',
+  'framework.coherenceAlignment',
+  'framework.noiseDecoherence',
+  'framework.telosInsight',
+  'framework.olamHaba',
+]) {
+  assert.ok(frontend.includes(frameworkField), `Follow-up Framework omits ${frameworkField}`);
+}
+assert.match(frontend, /followUpPrismAnalysisHtml\(content\)/);
+assert.match(frontend, /content\.keyTerms/);
+for (const title of [
+  "Echad b\\'Emet",
+  'Entanglement',
+  'Coherence & Alignment',
+  'Noise & Decoherence',
+  'Telos',
+  'Olam HaBa — Non-Local View',
+]) {
+  assert.ok(frontend.includes(title), `Follow-up Framework omits ${title}`);
+}
 assert.match(frontend, /parsed\.type === 'state_unavailable'/);
 assert.match(frontend, /STALE_INQUIRY_STATE/);
 assert.match(frontend, /beginNewPersistentInquiry\(\)/);

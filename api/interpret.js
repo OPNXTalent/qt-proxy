@@ -6098,6 +6098,15 @@ export async function runProgressiveAnalysisAuditWithRetry(attempt) {
   }
 }
 
+export async function runProgressiveAnalysisGenerationWithRetry(attempt) {
+  try {
+    return await attempt({ maxTokens: 3000, retryOrdinal: 0 });
+  } catch (error) {
+    if (error?.message !== 'INQUIRY_MODEL_OUTPUT_TRUNCATED') throw error;
+    return attempt({ maxTokens: 4500, retryOrdinal: 1 });
+  }
+}
+
 function progressiveSystemPrompt(systemPrompt, contract) {
   const source = String(systemPrompt || PRISM_SYSTEM_PROMPT);
   return source.includes(PRISM_OUTPUT_CONTRACT)
@@ -6441,19 +6450,28 @@ async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing
   const started = Date.now();
   timing('progressive_analysis_start');
   try {
-    const rawText = await callInquiryModel({
-      model: 'claude-sonnet-4-6',
-      maxTokens: 3000,
-      temperature: 0.2,
-      timeoutMs: 90000,
-      system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
-      prompt: `Sealed Interpretation Artifact:\n${serializeArtifactForEnrichment(artifact)}`,
-      telemetryStage: 'progressive_analysis_generation',
-      telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
+    const generatedOutput = await runProgressiveAnalysisGenerationWithRetry(async ({ maxTokens, retryOrdinal }) => {
+      if (retryOrdinal > 0) timing('progressive_analysis_generation_truncation_retry_start', { maxTokens });
+      const value = await callInquiryModel({
+        model: 'claude-sonnet-4-6',
+        maxTokens,
+        temperature: 0.2,
+        timeoutMs: 90000,
+        system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
+        prompt: `Sealed Interpretation Artifact:\n${serializeArtifactForEnrichment(artifact)}`,
+        structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,
+        structuredOutputName: 'emit_prism_enrichment',
+        telemetryStage: 'progressive_analysis_generation',
+        telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
+        telemetryRetryOrdinal: retryOrdinal,
+      });
+      if (retryOrdinal > 0) timing('progressive_analysis_generation_truncation_retry_complete', { maxTokens });
+      return value;
     });
-    const generatedEnrichment = validateEnrichment(parseModelJson(rawText));
+    const generatedEnrichment = validateEnrichment(generatedOutput);
     if (!hasSubstantiveEnrichment(generatedEnrichment)) throw new Error('ENRICHMENT_EMPTY');
     timing('progressive_analysis_generation_complete', { substantive: true });
+    const rawText = JSON.stringify(generatedOutput);
     const auditPrompt = `Audit this enrichment against the sealed Interpretation Artifact.
 Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.
 

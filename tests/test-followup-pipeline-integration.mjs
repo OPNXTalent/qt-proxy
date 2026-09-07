@@ -158,14 +158,26 @@ globalThis.fetch = async (url, options = {}) => {
       });
     }
     if (body.system?.includes('Generate inspectable enrichment')) {
+      assert.equal(body.tool_choice?.name, 'emit_prism_enrichment');
       return Response.json({
-        content: [{ type: 'text', text: JSON.stringify({
-          interpretive_context: 'The argument concerns causal dependence and agency.',
-          framework: { noise_decoherence: 'Non-identification was promoted to proof of absence.' },
-          key_terms: [],
-          constraint_findings: ['The conclusion exceeds the stated observation.'],
-          future_analysis_projections: [],
-        }) }],
+        content: [{
+          type: 'tool_use',
+          name: 'emit_prism_enrichment',
+          input: {
+            interpretive_context: 'The argument concerns causal dependence and agency.',
+            framework: {
+              prism_summary: 'The inference must remain proportionate to its evidence.',
+              entanglement: 'The question joins causal dependence to moral agency.',
+              coherence_alignment: 'Agency remains possible while its mechanism is unresolved.',
+              noise_decoherence: 'Non-identification was promoted to proof of absence.',
+              telos_insight: 'The inquiry should distinguish explanation from elimination.',
+              olam_haba: 'A wider frame preserves unresolved agency without inventing it.',
+            },
+            key_terms: [],
+            constraint_findings: ['The conclusion exceeds the stated observation.'],
+            future_analysis_projections: [],
+          },
+        }],
       });
     }
     if (prompt.includes('Audit this enrichment')) {

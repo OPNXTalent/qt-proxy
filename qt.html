@@ -3005,6 +3005,43 @@ function getTheodicyDebugMode() {
   return undefined;
 }
 
+function followUpPrismAnalysisHtml(content) {
+  content = content || {};
+  var framework = content.framework || {};
+  var sections = [
+    { num: '00', title: 'Echad b\'Emet', hebrew: 'אֶחָד בֶאֱמֶת', value: framework.prismSummary },
+    { num: '01', title: 'Entanglement', hebrew: 'קֶשֶר', value: framework.entanglement },
+    { num: '02', title: 'Coherence & Alignment', hebrew: 'יִחוּד', value: framework.coherenceAlignment },
+    { num: '03', title: 'Noise & Decoherence', hebrew: 'פֵּרוּד', value: framework.noiseDecoherence },
+    { num: '04', title: 'Telos', hebrew: 'תַּכְלִית', value: framework.telosInsight },
+    { num: '05', title: 'Olam HaBa — Non-Local View', hebrew: 'עוֹלָם הַבָּא', value: framework.olamHaba }
+  ];
+  var body = sections.filter(function(section) {
+    return typeof section.value === 'string' && section.value.trim();
+  }).map(function(section) {
+    return '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">' + section.num +
+      '</span><span class="qt-section-title">' + section.title + '</span><span class="qt-section-hebrew">' + section.hebrew +
+      '</span></div><div class="qt-section-body"><p>' +
+      escHtml(section.value) + '</p></div></div>';
+  }).join('');
+  var terms = (content.keyTerms || []).filter(function(term) {
+    return term && (term.term || term.meaning || term.original);
+  }).map(function(term) {
+    var original = term.original ? ' <span style="color:var(--hebrew); font-family:var(--crimson);">' +
+      escHtml(term.original) + '</span>' : '';
+    return '<p><strong>' + escHtml(term.term || '') + original + '</strong> — ' + escHtml(term.meaning || '') + '</p>';
+  }).join('');
+  if (terms) {
+    body += '<div class="qt-section"><div class="qt-section-head"><span class="qt-section-num">06</span>' +
+      '<span class="qt-section-title">Key Terms</span></div><div class="qt-section-body">' + terms + '</div></div>';
+  }
+  var findings = (content.constraintFindings || []).map(function(item) {
+    return '<li>' + escHtml(item) + '</li>';
+  }).join('');
+  if (findings) body += '<ul>' + findings + '</ul>';
+  return '<summary>Prism Analysis</summary>' + body;
+}
+
 async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, requestId) {
   // Streams plain text response directly into targetEl
   let response;
@@ -3114,10 +3151,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
     } else if (packet.packetType === 'prism_analysis' && targetEl) {
       var analysis = document.createElement('details');
       analysis.className = 'qt-framework-body open';
-      var findings = (content.constraintFindings || []).map(function(item) {
-        return '<li>' + escHtml(item) + '</li>';
-      }).join('');
-      analysis.innerHTML = '<summary>Prism Analysis</summary>' + (findings ? '<ul>' + findings + '</ul>' : '');
+      analysis.innerHTML = followUpPrismAnalysisHtml(content);
       var loading = targetEl.querySelector('[data-progressive-analysis]');
       if (loading) loading.replaceWith(analysis); else targetEl.appendChild(analysis);
       markPrismBrowserTiming(requestId, 'prism_analysis_visible');
@@ -3405,8 +3439,7 @@ async function retryFollowUpAnalysis(button) {
       } else if (packet.packetType === 'prism_analysis') {
         var analysis = document.createElement('details');
         analysis.className = 'qt-framework-body open';
-        analysis.innerHTML = '<summary>Prism Analysis</summary><ul>' +
-          (content.constraintFindings || []).map(function(item) { return '<li>' + escHtml(item) + '</li>'; }).join('') + '</ul>';
+        analysis.innerHTML = followUpPrismAnalysisHtml(content);
         target.insertBefore(analysis, button.parentElement);
       }
     });
