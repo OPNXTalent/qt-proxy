@@ -1,22 +1,14 @@
 // api/welcome.js
 // Sends a welcome email to new free account registrants via Resend.
 // Called after submitFreeAccount() in qt.html.
-// Also deposits 3 bonus queries into the subscriber's account.
+// Account creation is identity/persistence only. Query entitlement is owned by
+// the server-authoritative ledger and is never granted by this endpoint.
 
 import { verifySupabaseIdentity } from '../lib/server-auth.js';
 
 const RESEND_API_KEY        = process.env.RESEND_API_KEY;
 const SUPABASE_URL           = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY      = process.env.SUPABASE_ANON_KEY;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-function sbHeaders() {
-  return {
-    'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-    'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-    'Content-Type':  'application/json'
-  };
-}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -42,20 +34,7 @@ export default async function handler(req, res) {
   }
   const email = auth.identity.email;
 
-  // 1. Credit 3 bonus queries
-  try {
-    await fetch(`${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}`, {
-      method: 'PATCH',
-      headers: { ...sbHeaders(), 'Prefer': 'return=minimal' },
-      body: JSON.stringify({
-        purchased_credits: 3
-      })
-    });
-  } catch(err) {
-    console.error('Credit error:', err.message);
-  }
-
-  // 2. Send welcome email via Resend
+  // Send welcome email via Resend.
   if (!RESEND_API_KEY) {
     console.warn('RESEND_API_KEY not set — skipping email');
     return res.status(200).json({ success: true, email_sent: false });
@@ -91,19 +70,8 @@ export default async function handler(req, res) {
                 Welcome. You have brought a question — and the Prism is ready to work.
               </p>
               <p style="font-family:'Arial',sans-serif;font-size:15px;color:#9090a8;line-height:1.8;margin:0 0 20px;">
-                Your free account is active. Three queries every 24 hours, your session history saved for 30 days, and the full Prism framework available whenever you return.
+                Your free account is active. Your inquiry history is saved so you can return and continue where you left off. Explorer access includes one successful Query per rolling 24 hours.
               </p>
-
-              <!-- Bonus queries -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid rgba(201,168,76,0.25);background:rgba(201,168,76,0.04);margin:24px 0;">
-                <tr>
-                  <td style="padding:20px 24px;">
-                    <div style="font-family:'Arial',sans-serif;font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:#c9a84c;margin-bottom:6px;">A GIFT FROM THE PRISM</div>
-                    <div style="font-family:'Arial',sans-serif;font-size:17px;color:#e8d5a0;margin-bottom:6px;">3 bonus queries have been deposited into your account.</div>
-                    <div style="font-family:'Arial',sans-serif;font-size:13px;color:#7a7890;line-height:1.6;">They are waiting for you. No expiry. Use them whenever you are ready.</div>
-                  </td>
-                </tr>
-              </table>
 
               <p style="font-family:'Arial',sans-serif;font-size:15px;color:#9090a8;line-height:1.8;margin:0 0 32px;">
                 The Prism is a lens, not an authority. It surfaces relational architecture already present in the text — and asks only that you bring an honest question.
@@ -150,7 +118,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         from:    'The Prism <support@theprism.io>',
         to:      [email],
-        subject: 'Welcome to The Prism — 3 bonus queries are waiting for you',
+        subject: 'Welcome to The Prism — your inquiry is waiting for you',
         html:    html
       })
     });

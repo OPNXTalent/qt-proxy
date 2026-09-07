@@ -6,6 +6,8 @@
 
 import { verifySupabaseIdentity } from '../lib/server-auth.js';
 import { responseFromArtifact } from './threads.js';
+import { randomBytes } from 'node:crypto';
+import { getOrIssueGuestIdentity, guestCookieHeader } from '../lib/guest-identity.js';
 
 const SUPABASE_URL          = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -14,13 +16,8 @@ const BASE_URL              = 'https://theprism.io';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function generateToken(length = 12) {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < length; i++) {
-    token += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return token;
+function generateToken() {
+  return randomBytes(24).toString('base64url');
 }
 
 function sbHeaders(useServiceKey = false) {
@@ -35,6 +32,17 @@ function sbHeaders(useServiceKey = false) {
 async function sbFetch(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, options);
   return res;
+}
+
+async function resolveActiveShareCredential({ shareId, token }) {
+  if (!shareId || !token) return null;
+  const shareRes = await sbFetch(
+    `/shares?id=eq.${encodeURIComponent(shareId)}&token=eq.${encodeURIComponent(token)}` +
+    '&status=eq.active&select=id,owner_user_id,permission,revoked_at&limit=1',
+    { headers: sbHeaders(true) },
+  );
+  const share = shareRes.ok ? (await shareRes.json())?.[0] : null;
+  return share && !share.revoked_at ? share : null;
 }
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
@@ -55,7 +63,85 @@ async function handlePost(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const { subject, threadId, artifactId, artifactRevision, collaborationOpen } = body || {};
+  if (body?.action === 'comment') {
+    if (!body.shareId || !String(body.content || '').trim()) {
+      return res.status(400).json({ error: 'shareId and content are required' });
+    }
+    let share = await resolveActiveShareCredential({ shareId: body.shareId, token: body.token });
+    let isOwner = false;
+    if (!share && req.verifiedIdentity?.userId) {
+      const ownerRes = await sbFetch(
+        `/shares?id=eq.${encodeURIComponent(body.shareId)}&owner_user_id=eq.${encodeURIComponent(req.verifiedIdentity.userId)}` +
+        '&status=eq.active&select=id,owner_user_id,permission,revoked_at&limit=1',
+        { headers: sbHeaders(true) },
+      );
+      share = ownerRes.ok ? (await ownerRes.json())?.[0] : null;
+      isOwner = Boolean(share && !share.revoked_at);
+    } else {
+      isOwner = req.verifiedIdentity?.userId === share?.owner_user_id;
+    }
+    if (!share || share.revoked_at) return res.status(410).json({ error: 'This share credential is no longer active' });
+    if (!isOwner && share.permission !== 'contributor') {
+      return res.status(403).json({ error: 'This Trust Circle link is view-only' });
+    }
+    let guest = null;
+    if (!req.verifiedIdentity) {
+      guest = await getOrIssueGuestIdentity({
+        cookieHeader: req.headers.cookie,
+        supabaseUrl: SUPABASE_URL,
+        serviceRoleKey: SUPABASE_SERVICE_KEY,
+      });
+      if (guest.issued) res.setHeader('Set-Cookie', guestCookieHeader(guest.credential));
+    }
+    const insertRes = await sbFetch('/share_chat_messages', {
+      method: 'POST',
+      headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        share_id: share.id,
+        content: String(body.content).trim().slice(0, 8000),
+        message_type: isOwner ? 'sender' : 'recipient',
+        display_name: String(body.displayName || 'Guest').trim().slice(0, 120),
+        session_token: guest?.guestId || null,
+        node_id: body.nodeId || 'root',
+        visibility: 'trust_circle',
+      }),
+    });
+    if (!insertRes.ok) return res.status(500).json({ error: 'Could not save comment' });
+    const rows = await insertRes.json();
+    return res.status(200).json({ success: true, comment: rows?.[0] || null });
+  }
+
+  if (body?.action === 'fork') {
+    const userId = req.verifiedIdentity?.userId || null;
+    if (!userId) return res.status(401).json({ error: 'Verified authentication is required to save this inquiry' });
+    if (!body.shareId) return res.status(400).json({ error: 'shareId is required' });
+    const share = await resolveActiveShareCredential({ shareId: body.shareId, token: body.token });
+    if (!share) return res.status(410).json({ error: 'This share credential is no longer active' });
+    const forkRes = await sbFetch('/rpc/fork_shared_prism_inquiry', {
+      method: 'POST',
+      headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
+      body: JSON.stringify({ p_share_id: body.shareId, p_user_id: userId }),
+    });
+    if (!forkRes.ok) {
+      const detail = await forkRes.text();
+      console.error('Share fork failed:', detail.slice(0, 240));
+      return res.status(409).json({ error: 'Could not save this inquiry' });
+    }
+    const rows = await forkRes.json();
+    const fork = rows?.[0] || null;
+    return res.status(200).json({
+      success: true,
+      threadId: fork?.fork_thread_id || null,
+      artifactId: fork?.fork_artifact_id || null,
+      artifactRevision: fork?.artifact_revision || 1,
+      alreadySaved: fork?.already_forked === true,
+    });
+  }
+
+  const { subject, threadId, artifactId, artifactRevision } = body || {};
+  const permission = body?.permission === 'contributor' || body?.collaborationOpen === true
+    ? 'contributor'
+    : 'viewer';
   const senderEmail = req.verifiedIdentity?.email || null;
   const senderUserId = req.verifiedIdentity?.userId || null;
 
@@ -98,13 +184,17 @@ async function handlePost(req, res) {
 
   const record = {
     token,
+    owner_user_id:     senderUserId,
     sender_email:       senderEmail,
     recipient_email:    null,           // no longer required — link-based sharing
     snapshot:           snapshot,
     subject:            subject || null,
     thread_id:          artifact.thread_id,
     status:             'active',
-    collaboration_open: collaborationOpen === true
+    collaboration_open: permission === 'contributor',
+    permission,
+    artifact_id:        artifact.artifact_id,
+    artifact_revision:  artifact.artifact_revision,
   };
 
   // Insert share record
@@ -137,7 +227,7 @@ async function handlePost(req, res) {
 
   // If collaboration is being opened immediately, create a room channel
   // anchored to this share so room_messages can be scoped to it
-  if (collaborationOpen && shareId && senderEmail) {
+  if (permission === 'contributor' && shareId && senderEmail) {
     await openCollabChannel(shareId, senderEmail);
   }
 
@@ -160,8 +250,8 @@ async function handlePost(req, res) {
 // ── PATCH — Toggle collaboration or status ───────────────────────────────────
 
 async function handlePatch(req, res) {
-  const senderEmail = req.verifiedIdentity?.email || null;
-  if (!senderEmail) return res.status(401).json({ error: 'Unauthorized' });
+  const senderUserId = req.verifiedIdentity?.userId || null;
+  if (!senderUserId) return res.status(401).json({ error: 'Unauthorized' });
 
   let body;
   try {
@@ -170,7 +260,7 @@ async function handlePatch(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const { shareId, token, collaborationOpen, status } = body || {};
+  const { shareId, token, collaborationOpen, status, permission } = body || {};
 
   if (!shareId && !token) {
     return res.status(400).json({ error: 'shareId or token required' });
@@ -178,14 +268,22 @@ async function handlePatch(req, res) {
 
   // Build update payload — only include fields explicitly provided
   const updates = {};
-  if (typeof collaborationOpen === 'boolean') updates.collaboration_open = collaborationOpen;
+  if (permission === 'viewer' || permission === 'contributor') {
+    updates.permission = permission;
+    updates.collaboration_open = permission === 'contributor';
+  } else if (typeof collaborationOpen === 'boolean') {
+    updates.permission = collaborationOpen ? 'contributor' : 'viewer';
+    updates.collaboration_open = collaborationOpen;
+  }
   if (status === 'active' || status === 'inactive') updates.status = status;
+  if (status === 'inactive') updates.revoked_at = new Date().toISOString();
+  if (status === 'active') updates.revoked_at = null;
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No valid fields to update' });
   }
 
-  const ownerFilter = `&sender_email=eq.${encodeURIComponent(senderEmail)}`;
+  const ownerFilter = `&owner_user_id=eq.${encodeURIComponent(senderUserId)}`;
   const filter = shareId
     ? `/shares?id=eq.${encodeURIComponent(shareId)}${ownerFilter}`
     : `/shares?token=eq.${encodeURIComponent(token)}${ownerFilter}`;
@@ -208,7 +306,7 @@ async function handlePatch(req, res) {
   // If collaboration just opened, ensure a room channel exists and return its id
   let channelId = null;
   if (collaborationOpen === true && updated?.id) {
-    channelId = await openCollabChannel(updated.id, senderEmail);
+    channelId = await openCollabChannel(updated.id, req.verifiedIdentity.email);
   }
 
   return res.status(200).json({ success: true, share: updated, channelId });
@@ -217,6 +315,22 @@ async function handlePatch(req, res) {
 // ── GET — Fetch share by token ────────────────────────────────────────────────
 
 async function handleGet(req, res) {
+  const memberShareId = req.query?.shareId || new URL(req.url, BASE_URL).searchParams.get('shareId');
+  if (memberShareId && req.verifiedIdentity?.userId) {
+    const ownerId = req.verifiedIdentity.userId;
+    const ownerRes = await sbFetch(
+      `/shares?id=eq.${encodeURIComponent(memberShareId)}&owner_user_id=eq.${encodeURIComponent(ownerId)}&select=id&limit=1`,
+      { headers: sbHeaders(true) }
+    );
+    const owned = ownerRes.ok ? await ownerRes.json() : [];
+    if (!owned?.length) return res.status(403).json({ error: 'Share not owned by authenticated user' });
+    const membersRes = await sbFetch(
+      `/trust_circle_members?share_id=eq.${encodeURIComponent(memberShareId)}&select=user_id,guest_id,display_name,joined_at,last_seen_at&order=joined_at.asc`,
+      { headers: sbHeaders(true) }
+    );
+    const members = membersRes.ok ? await membersRes.json() : [];
+    return res.status(200).json({ members: Array.isArray(members) ? members : [] });
+  }
   const token = req.query?.t || new URL(req.url, BASE_URL).searchParams.get('t');
 
   if (!token) {
@@ -224,7 +338,7 @@ async function handleGet(req, res) {
   }
 
   const fetchRes = await sbFetch(
-    `/shares?token=eq.${encodeURIComponent(token)}&select=id,token,snapshot,subject,status,collaboration_open,sender_email,thread_id,created_at`,
+    `/shares?token=eq.${encodeURIComponent(token)}&select=id,token,snapshot,subject,status,collaboration_open,permission,sender_email,thread_id,artifact_id,artifact_revision,created_at,revoked_at`,
     { headers: sbHeaders(false) }
   );
 
@@ -241,9 +355,45 @@ async function handleGet(req, res) {
   const share = rows[0];
 
   // Inactive shares return a clear signal so share.html can show an appropriate message
-  if (share.status === 'inactive') {
+  if (share.status === 'inactive' || share.revoked_at) {
     return res.status(410).json({ error: 'This share has been closed by the sender.' });
   }
+
+  // Preserve member identity explicitly. Authentication wins; otherwise a
+  // server-verified guest credential anchors this recipient across refreshes.
+  let member = req.verifiedIdentity?.userId
+    ? { user_id: req.verifiedIdentity.userId, guest_id: null }
+    : null;
+  if (!member) {
+    const guest = await getOrIssueGuestIdentity({
+      cookieHeader: req.headers.cookie,
+      supabaseUrl: SUPABASE_URL,
+      serviceRoleKey: SUPABASE_SERVICE_KEY,
+    });
+    if (guest.issued) res.setHeader('Set-Cookie', guestCookieHeader(guest.credential));
+    member = { user_id: null, guest_id: guest.guestId };
+  }
+  const memberFilter = member.user_id
+    ? `user_id=eq.${encodeURIComponent(member.user_id)}`
+    : `guest_id=eq.${encodeURIComponent(member.guest_id)}`;
+  const existingMemberRes = await sbFetch(
+    `/trust_circle_members?share_id=eq.${encodeURIComponent(share.id)}&${memberFilter}&select=membership_id&limit=1`,
+    { headers: sbHeaders(true) },
+  );
+  const existingMembers = existingMemberRes.ok ? await existingMemberRes.json() : [];
+  const memberRecord = {
+    share_id: share.id,
+    ...member,
+    display_name: null,
+    last_seen_at: new Date().toISOString(),
+  };
+  await sbFetch(existingMembers?.length
+    ? `/trust_circle_members?membership_id=eq.${encodeURIComponent(existingMembers[0].membership_id)}`
+    : '/trust_circle_members', {
+    method: existingMembers?.length ? 'PATCH' : 'POST',
+    headers: { ...sbHeaders(true), 'Prefer': 'return=minimal' },
+    body: JSON.stringify(memberRecord),
+  }).catch(() => {});
 
   // Look up the sender's display name — a bare email address isn't a warm
   // "so-and-so shared this with you" moment, and showing someone's raw

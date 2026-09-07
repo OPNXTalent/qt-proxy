@@ -2136,7 +2136,7 @@
 
     <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
       <div style="font-family:var(--cinzel); font-size:16px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Free Query Limit Reached</div>
-      <div class="limit-message" style="font-family:var(--crimson); font-size:22px; color:var(--text); line-height:1.8; margin-bottom:32px;">You've used your 3 free interpretations.</div>
+      <div class="limit-message" style="font-family:var(--crimson); font-size:22px; color:var(--text); line-height:1.8; margin-bottom:32px;">You've used your Explorer Query for this rolling 24-hour window.</div>
 
       <!-- Disclaimer -->
       <div style="font-family:var(--crimson); font-style:italic; font-size:19px; color:var(--text-muted); line-height:1.8; text-align:left; border-top:1px solid var(--border); padding-top:24px; margin-bottom:28px;">
@@ -2151,20 +2151,12 @@
           <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Query Bundles</div>
           <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.6; margin-bottom:16px;">No subscription required. Credits never expire.</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <a href="https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="#" data-product="bank10" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:17px; color:var(--text);">10 queries</span>
-              <span style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--gold-dim);">$2.99 →</span>
+              <span style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--gold-dim);">$9.99 →</span>
             </a>
-            <a href="https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+            <a href="#" data-product="bank25" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
               <span style="font-family:var(--crimson); font-size:17px; color:var(--text);">25 queries</span>
-              <span style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--gold-dim);">$6.99 →</span>
-            </a>
-            <a href="https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
-              <span style="font-family:var(--crimson); font-size:17px; color:var(--text);">50 queries</span>
-              <span style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--gold-dim);">$12.99 →</span>
-            </a>
-            <a href="https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
-              <span style="font-family:var(--crimson); font-size:17px; color:var(--text);">100 queries</span>
               <span style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--gold-dim);">$19.99 →</span>
             </a>
           </div>
@@ -2177,8 +2169,8 @@
           <div style="border:1px solid var(--gold-dim); padding:20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative; flex:1;">
             <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Recommended</div>
             <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Subscribe</div>
-            <div style="font-family:var(--cinzel); font-size:23px; color:var(--gold-pale); margin-bottom:4px;">from $9.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
-            <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">Full framework access. Session history. Choose the plan that fits.</div>
+            <div style="font-family:var(--cinzel); font-size:23px; color:var(--gold-pale); margin-bottom:4px;">$19.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
+            <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">35 Queries each month. Subscription allowance is used before banked Queries.</div>
             <a href="/purchase.html" id="subscribeSeePlansLink" style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">See Plans →</a>
           </div>
 
@@ -2186,7 +2178,7 @@
           <div style="border:1px solid var(--gold-dim); padding:20px; background:var(--surface); position:relative;">
             <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--void);padding:0 10px;font-family:var(--mono);font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);">Always Free</div>
             <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:4px;">Free Account</div>
-            <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:16px; color:var(--text-dim); line-height:1.5; margin-bottom:10px;">3 queries every 24 hours. History saved 30 days. No subscription ever.</div>
+              <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:16px; color:var(--text-dim); line-height:1.5; margin-bottom:10px;">1 successful Query per rolling 24 hours. Create an account to keep your inquiry history.</div>
             <div id="resetTicker" style="font-family:var(--mono); font-size:21px; letter-spacing:0.18em; color:var(--gold-dim); margin-bottom:10px; display:none;">--:--:--</div>
             <div id="freeAccountAlreadyActive" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.1em; color:rgba(80,180,120,0.8); margin-bottom:6px;">✓ Account active</div>
             <button id="createFreeAccountBtn" onclick="showFreeAccountModal()" style="font-family:var(--mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); border:1px solid var(--gold-dim); background:var(--gold-dim); padding:9px 16px; width:100%; text-align:center; cursor:pointer; transition:all 0.25s; margin-bottom:6px;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Create Free Account →</button>
@@ -2210,9 +2202,9 @@
       <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
         <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Continue Now</div>
         <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Signal Bank</div>
-        <div style="font-family:var(--cinzel); font-size:25px; color:var(--gold-pale); margin-bottom:4px;">$2.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
+        <div style="font-family:var(--cinzel); font-size:25px; color:var(--gold-pale); margin-bottom:4px;">$9.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
         <div style="font-family:var(--crimson); font-size:18px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">One-time top-up.<br>No plan change required.</div>
-        <a href="https://buy.stripe.com/fZu6oH1QGcHe8Kl3eE18c07" target="_blank" style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Signal Bank →</a>
+        <a href="#" data-product="bank10" onclick="return handlePurchaseLinkClick(event, this)" style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Query Bank →</a>
       </div>
 
       <!-- Wait for reset -->
@@ -2402,14 +2394,14 @@
     <div id="saveSessionBox" style="display:none; margin:10px 14px; flex-shrink:0;">
       <div style="border:1px solid rgba(201,168,76,0.35); background:rgba(201,168,76,0.06); padding:14px 16px;">
         <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleSaveSession()">
-          <div style="font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(201,168,76,0.85);">Save This Session</div>
+          <div style="font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(201,168,76,0.85);">Save to My Prism</div>
           <button id="saveSessionToggle" style="background:none; border:none; color:rgba(201,168,76,0.85); font-size:16px; cursor:pointer; padding:0; line-height:1; transition:transform 0.2s;">↓</button>
         </div>
         <div id="saveSessionBody" style="display:none; margin-top:12px;">
-          <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">This view disappears once you leave. A free account keeps your notes, questions, and this conversation here for you.</div>
-          <button onclick="showFreeAccountModal('save-session')" style="display:block; width:100%; font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.1); color:var(--gold-pale); cursor:pointer; transition:all 0.2s; text-align:center; box-sizing:border-box;"
+          <div style="font-family:var(--crimson); font-style:italic; font-size:16px; color:var(--text-dim); line-height:1.6; margin-bottom:14px;">Save an independent copy of this inquiry so you can return and continue it without changing the owner's original.</div>
+          <button id="saveToMyPrismBtn" onclick="saveSharedInquiry()" style="display:block; width:100%; font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; padding:11px 16px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.1); color:var(--gold-pale); cursor:pointer; transition:all 0.2s; text-align:center; box-sizing:border-box;"
             onmouseover="this.style.background='rgba(201,168,76,0.18)'" onmouseout="this.style.background='rgba(201,168,76,0.1)'">
-            Create Free Account →
+            Sign In to Save →
           </button>
         </div>
       </div>
@@ -2572,7 +2564,7 @@ function updateCharCount() {
 
 // --- Query limit state ---
 let sessionQueryCount = 0;
-const QUERY_LIMIT = 3;
+const QUERY_LIMIT = 1;
 let previewTestAccess = false;
 
 // Live ticker state
@@ -2621,7 +2613,7 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
       const returnLabel = document.getElementById('returnTomorrowLabel');
       const returnBody = document.getElementById('returnTomorrowBody');
       if (returnLabel) returnLabel.textContent = hoursRemaining <= 1 ? 'Resets Soon' : 'Return in ' + hoursRemaining + ' Hour' + (hoursRemaining !== 1 ? 's' : '');
-      if (returnBody) returnBody.textContent = 'Your 3 free queries reset in ' + hoursRemaining + ' hour' + (hoursRemaining !== 1 ? 's' : '') + '.';
+      if (returnBody) returnBody.textContent = 'Your Explorer Query resets in ' + hoursRemaining + ' hour' + (hoursRemaining !== 1 ? 's' : '') + '.';
     }
     // Start live countdown ticker
     if (secondsRemaining != null) {
@@ -2743,10 +2735,7 @@ async function runInterpretation() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
-  // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
-  const _isAnon = !verifiedAuthState.authenticated;
-  const _isPaidTier = ['scholar','theologian','companion','refraction','full_spectrum'].includes(getActualTier());
-  if (!previewTestAccess && (_isAnon || !_isPaidTier) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Admission is server-authoritative. The browser counter is presentation only.
   const requestId = createPrismRequestId();
   markPrismBrowserTiming(requestId, 'submit', {
     queryLength: input.length,
@@ -2864,16 +2853,8 @@ async function runInterpretation() {
 
     sessionQueryCount++;
     // Live refresh from the server — this is what actually reflects a
-    // Signal Bank credit draw-down, not just the free-tier count. The
-    // local-only decrement was leaving Signal Bank stale until a manual
-    // page refresh, since it never re-reads purchased_credits.
+    // subscription or Query Bank draw-down from the authoritative ledger.
     loadSidebarCredits();
-    // Only lock the UI for free/anonymous users — paid subscribers are gated server-side
-    const _isAnonPost = !verifiedAuthState.authenticated;
-    const _isPaidPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
-    if (!previewTestAccess && (_isAnonPost || !_isPaidPost) && sessionQueryCount >= QUERY_LIMIT) {
-      applyQueryLock();
-    }
 
     // Show sidebar after first successful query
     const queryText = input;
@@ -2924,10 +2905,7 @@ async function runFollowUp() {
   const input = document.getElementById('userInput').value.trim();
   if (!input) return;
 
-  // Hard gate — only applies to free/anonymous users; paid subscribers bypass via server
-  const _isAnonFU = !verifiedAuthState.authenticated;
-  const _isPaidTierFU = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
-  if (!previewTestAccess && (_isAnonFU || !_isPaidTierFU) && sessionQueryCount >= QUERY_LIMIT) { applyQueryLock(); return; }
+  // Follow-ups consume the same server-authoritative Query unit as primaries.
   const requestId = createPrismRequestId();
   markPrismBrowserTiming(requestId, 'submit', {
     queryLength: input.length,
@@ -2971,14 +2949,9 @@ async function runFollowUp() {
     document.getElementById('userInput').value = '';
     updateCharCount();
 
-    // Increment counter and apply lock for non-subscribers after successful follow-up
+    // Local count is informational; the durable completion ledger is authoritative.
     sessionQueryCount++;
     loadSidebarCredits();
-    const _isAnonFUPost = !verifiedAuthState.authenticated;
-    const _isPaidFUPost = ['scholar','theologian','companion','refraction','full_spectrum'].includes(localStorage.getItem('qt_user_tier'));
-    if (!previewTestAccess && (_isAnonFUPost || !_isPaidFUPost) && sessionQueryCount >= QUERY_LIMIT) {
-      applyQueryLock();
-    }
 
     // Save follow-up via unified saveFollowUp
     if (activeThreadId) {
@@ -4618,7 +4591,7 @@ function noteIdentityHeaders() {
 function canActAsThreadMember() {
   var email = userEmail();
   if (!window._sharedViewToken) return !!email;
-  return !!email && window._sharedViewIsParticipant === true;
+  return false;
 }
 
 // ── Anonymous share-token entry point ───────────────────────────────────────
@@ -4632,6 +4605,7 @@ function canActAsThreadMember() {
 window._sharedViewToken         = null;
 window._sharedViewShareId       = null;
 window._sharedViewIsParticipant = false;
+window._sharedViewPermission    = null;
 
 async function loadSharedThread(token) {
   window._sharedViewToken = token;
@@ -4650,6 +4624,7 @@ async function loadSharedThread(token) {
     }
 
     window._sharedViewShareId = share.id;
+    window._sharedViewPermission = share.permission || (share.collaboration_open ? 'contributor' : 'viewer');
 
     var email = userEmail();
 
@@ -4693,6 +4668,8 @@ function enterSharedThread(share) {
   activeThreadId = null;
   selectThread(syntheticThread.id);
   updateSaveSessionVisibility();
+  var composeBar = document.getElementById('chatComposeBar');
+  if (composeBar) composeBar.style.display = window._sharedViewPermission === 'contributor' ? 'flex' : 'none';
 
   // initSidebar() is what normally adds the "visible" class the hamburger
   // toggle and sidebar need to appear at all — this entry point bypasses
@@ -4718,15 +4695,11 @@ function enterSharedThread(share) {
     bannerEl.style.display = 'block';
   }
 
-  // Signed-in visitor opening someone else's share link — check whether
-  // they're already a Trust Circle member on this thread (participant
-  // status is never assumed; see handleJoinCircle for why this stays an
-  // explicit, confirmed action rather than something that happens just
-  // from opening the link), and separately bring in their own thread
-  // history so it's not lost underneath the one shared thread.
+  // A signed-in recipient remains a share recipient until they explicitly
+  // save an independent fork. Their own Archive can still be shown alongside
+  // the immutable shared inquiry.
   var email = userEmail();
   if (email) {
-    checkCircleParticipant(share.thread_id, email);
     mergeOwnThreadHistory(syntheticThread);
   }
 }
@@ -5134,7 +5107,7 @@ function restoreFollowUps(id) {
   // follow-up (R1/R2/R3) history, only the root interpretation — even
   // though the backend already supports this exact read via x-share-id.
   if (window._sharedViewToken && window._sharedViewShareId) {
-    authenticatedFetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-share-id': window._sharedViewShareId } })
+    authenticatedFetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), { headers: { 'x-share-id': window._sharedViewShareId, 'x-share-token': window._sharedViewToken } })
     .then(function(r) { return r.json(); })
     .then(function(data) { if (data.followUps && data.followUps.length > 0) renderFUWithSource(data.followUps, false); })
     .catch(function() {});
@@ -5155,7 +5128,7 @@ function startFollowUpPolling(threadId) {
   _qtPollInterval = setInterval(function() {
     var headers = canActAsThreadMember()
       ? { 'x-user-email': userEmail() }
-      : (window._sharedViewToken && window._sharedViewShareId ? { 'x-share-id': window._sharedViewShareId } : null);
+      : (window._sharedViewToken && window._sharedViewShareId ? { 'x-share-id': window._sharedViewShareId, 'x-share-token': window._sharedViewToken } : null);
     if (!headers) return;
     authenticatedFetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(threadId), { headers: headers })
     .then(function(r) { return r.json(); })
@@ -5244,6 +5217,27 @@ async function hydrateVerifiedAuthState() {
     tier: tier,
     displayName: displayName
   };
+
+  // If this verified account began as a guest, atomically claim its inquiry,
+  // artifact lineage, and original usage timestamp. A missing guest cookie is
+  // an expected no-op for returning users.
+  try {
+    var claimResponse = await fetch(API_BASE + '/api/guest', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + session.access_token
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ action: 'claim' })
+    });
+    if (claimResponse.ok) {
+      // Refresh server-authoritative Archive state after a successful claim.
+      sessionStorage.setItem('prism_guest_claimed', '1');
+    }
+  } catch (e) {
+    // Identity remains authenticated; claim can safely retry on next hydration.
+  }
 
   // Compatibility caches are written only after server-verified authentication.
   localStorage.setItem('qt_user_email', verifiedAuthState.email);
@@ -5752,16 +5746,46 @@ function toggleSaveSession() {
   if (btn) btn.textContent = open ? '↓' : '↑';
 }
 
-// Shows the Save This Session box only for an anonymous visitor currently
-// inside a loaded shared thread — never the owner viewing their own work,
-// never someone already signed in (their thread already lives in their own
-// account via thread_participants, nothing left to save).
+// Saving is explicit for every shared-link recipient. Anonymous visitors are
+// taken through verified authentication first; signed-in recipients fork now.
 function updateSaveSessionVisibility() {
   var box = document.getElementById('saveSessionBox');
   if (!box) return;
   var email = userEmail();
-  var show = !!(window._sharedViewToken && !email);
+  var show = !!window._sharedViewToken;
   box.style.display = show ? 'block' : 'none';
+  var btn = document.getElementById('saveToMyPrismBtn');
+  if (btn) btn.textContent = email ? 'Save to My Prism →' : 'Sign In to Save →';
+}
+
+async function saveSharedInquiry() {
+  if (!window._sharedViewShareId) return;
+  if (!verifiedAuthState.authenticated) {
+    if (window._sharedViewToken) sessionStorage.setItem('prism_return_share', window._sharedViewToken);
+    showFreeAccountModal('save-session');
+    return;
+  }
+  var btn = document.getElementById('saveToMyPrismBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    var res = await authenticatedFetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'fork', shareId: window._sharedViewShareId, token: window._sharedViewToken })
+    });
+    var data = await res.json();
+    if (!res.ok || !data.threadId) throw new Error(data.error || 'save failed');
+    activeThreadId = data.threadId;
+    localStorage.setItem('qt_last_thread_id', data.threadId);
+    window._sharedViewToken = null;
+    window._sharedViewShareId = null;
+    updateSaveSessionVisibility();
+    await initSidebar();
+    selectThread(data.threadId);
+  } catch (e) {
+    console.error('[saveSharedInquiry] failed:', e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Try Save Again'; }
+  }
 }
 
 function toggleJoinCircle() {
@@ -5780,9 +5804,7 @@ function toggleJoinCircle() {
 function updateJoinCircleVisibility() {
   var box = document.getElementById('joinCircleBox');
   if (!box) return;
-  var email = userEmail();
-  var show = !!(window._sharedViewToken && email && !window._sharedViewIsParticipant);
-  box.style.display = show ? 'block' : 'none';
+  box.style.display = 'none';
 }
 
 async function joinCircle() {
@@ -5878,19 +5900,15 @@ async function loadSidebarCreditsAnon() {
       cache: 'no-store'
     });
     const data = await res.json();
+    if (data.product) window._prismProduct = data.product;
     previewTestAccess = data.previewTestAccess === true;
     releaseServerAuthorizedPreviewLock();
     const countEl = document.getElementById('sidebarQueryCountText');
     const wrapEl  = document.getElementById('sidebarCredits');
     if (!countEl || !wrapEl) return;
-    if (data.locked) {
-      setQueryCount(countEl, 0, 3);
-    } else {
-      const used = data.queriesUsed || 0;
-      const limit = data.limit || 3;
-      const remaining = Math.max(0, limit - used);
-      setQueryCount(countEl, remaining, limit);
-    }
+    const limit = 1;
+    const remaining = data.locked ? 0 : Math.max(0, Number(data.remaining ?? 1));
+    setQueryCount(countEl, remaining, limit);
     // No refill date for anonymous/free users
     var refillEl = document.getElementById('sidebarRefillDate');
     if (refillEl) refillEl.style.display = 'none';
@@ -5899,68 +5917,32 @@ async function loadSidebarCreditsAnon() {
 }
 
 async function loadSidebarCredits() {
-  const email = userEmail();
-  if (!email) {
-    loadSidebarCreditsAnon();
-    return;
-  }
-
-  // For free/Observer tier — check if they have purchased Signal Bank credits
-  if (CURRENT_TIER === 'free') {
-    // Show Keep Questioning for logged-in Observer users
-    var kqBox = document.getElementById('keepQuestioningBox');
-    if (kqBox) kqBox.style.display = 'block';
-    try {
-      const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-      const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-      const res = await fetch(
-        `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=purchased_credits&limit=1`,
-        { headers: { 'apikey': sbAnon, 'Authorization': `Bearer ${sbAnon}` }, cache: 'no-store' }
-      );
-      const data = await res.json();
-      const credits = data?.[0]?.purchased_credits || 0;
-      setQueryCredits(credits);
-      const wrapEl = document.getElementById('sidebarCredits');
-      if (wrapEl) wrapEl.style.display = 'flex';
-    } catch {}
-    loadSidebarCreditsAnon();
-    return;
-  }
-
-  const tierLimits = { refraction: 100, full_spectrum: 250, scholar: 100, theologian: 250 };
-  const limit = tierLimits[CURRENT_TIER];
-
-  // Tier not in limits map — hide the counter
-  if (limit === null || limit === undefined) return;
-
   try {
-    const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-    const res = await fetch(
-      `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=query_count,purchased_credits,created_at&limit=1`,
-      { headers: { 'apikey': sbAnon, 'Authorization': `Bearer ${sbAnon}` }, cache: 'no-store' }
-    );
+    const res = await authenticatedFetch(API_BASE + '/api/interpret?_ts=' + Date.now(), {
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' }
+    });
     const data = await res.json();
-    if (!data?.[0]) return;
-
-    const used      = data[0].query_count || 0;
-    const credits   = data[0].purchased_credits || 0;
-    const createdAt = data[0].created_at || null;
-    const monthly   = Math.max(0, limit - used);
-
+    if (data.product) window._prismProduct = data.product;
     const countEl = document.getElementById('sidebarQueryCountText');
     const wrapEl  = document.getElementById('sidebarCredits');
     if (!countEl || !wrapEl) return;
-
-    setQueryCount(countEl, monthly, limit);
-    setRefillDate(createdAt);
-    setQueryCredits(credits);
+    const remaining = Math.max(0, Number(data.remaining || 0));
+    const source = data.entitlementSource || 'explorer';
+    if (source === 'bank') {
+      setQueryCount(countEl, remaining, null);
+      setQueryCredits(remaining);
+    } else {
+      const limit = source === 'subscription' ? 35 : (data.previewTestAccess ? Math.max(remaining, 1) : 1);
+      setQueryCount(countEl, remaining, limit);
+      if (source === 'subscription') setRefillDate(data.resetAt || null);
+    }
     wrapEl.style.display = 'flex';
-
-    // Show Keep Questioning box for all logged-in users
     var kqBox = document.getElementById('keepQuestioningBox');
     if (kqBox) kqBox.style.display = 'block';
-  } catch {}
+  } catch {
+    loadSidebarCreditsAnon();
+  }
 }
 
 function updateSidebarCredits(newCredits) {
@@ -6013,16 +5995,9 @@ function initSidebar() {
     sessionStorage.removeItem('prism_r1_active');
   }
 
-  // Anonymous — no identity at all — lightweight sidebar, nothing to fetch
-  if (!email) {
-    allThreads = [];
-    renderThreads(allThreads);
-    if (sidebar) sidebar.classList.add('visible');
-    if (toggle)  toggle.classList.add('visible');
-    sidebarHasAppeared = true;
-    loadSidebarCreditsAnon();
-    return;
-  }
+  // Direct Explorer visitors have a server-issued guest identity. Their
+  // Archive is hydrated through the same endpoint; verified authentication
+  // later claims these records without reconstructing them.
 
   // Registered — including free tier — always fetches real thread history
   // below. Free tier used to be treated identically to anonymous visitors
@@ -6041,7 +6016,8 @@ function initSidebar() {
 
   authenticatedFetch(API_BASE + '/api/threads', {
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', 'x-user-email': email }
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...(email ? { 'x-user-email': email } : {}) }
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
@@ -6934,6 +6910,10 @@ function renderActiveRefractionView() {
 }
 
 async function sendChatMessage() {
+  if (window._sharedViewToken && window._sharedViewPermission !== 'contributor') {
+    if (typeof showQueryActionConfirm === 'function') showQueryActionConfirm('This Trust Circle link is view-only');
+    return;
+  }
   var input = document.getElementById('chatInput');
   if (!input) return;
   var text = input.value.trim();
@@ -6974,33 +6954,16 @@ async function sendChatMessage() {
   _sentByMe.add(name + '::' + text);
   renderChatMessage(msg);
 
-  var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-  var messagePayload = {
-    share_id:     _currentChannelId,
-    content:      text,
-    message_type: isAnonSender ? 'recipient' : 'sender',
-    display_name: name,
-    node_id:      _activeNodeId,
-    visibility:   'trust_circle'
-  };
-  if (isAnonSender) messagePayload.session_token = getAnonSessionId();
-
   try {
-    var sendRes = await fetch(SUPA_URL + '/rest/v1/share_chat_messages', {
+    var sendRes = await authenticatedFetch('/api/share', {
       method: 'POST',
-      headers: {
-        'apikey': SUPA_ANON,
-        'Authorization': 'Bearer ' + SUPA_ANON,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      },
-      body: JSON.stringify(messagePayload)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'comment', shareId: _currentChannelId, token: window._sharedViewToken, content: text, displayName: name, nodeId: _activeNodeId })
     });
     if (sendRes.ok) {
-      var rows = await sendRes.json();
-      if (rows && rows[0] && rows[0].id) {
-        _renderedChatIds.add(rows[0].id);
+      var saved = await sendRes.json();
+      if (saved.comment && saved.comment.id) {
+        _renderedChatIds.add(saved.comment.id);
       }
     }
   } catch(e) { console.error('Chat send error:', e); }
@@ -7737,7 +7700,7 @@ function escapeHtml(str) {
 
 // _collabOpen:  bool — current collaboration state
 var _shareStatus           = 'off';
-var _shareMode             = 'personal';
+var _shareMode             = 'viewer';
 var _currentSharedSessionId = null;
 var _currentChannelId      = null;
 var _collabOpen            = false;
@@ -7748,7 +7711,7 @@ function openShareModal() {
   if (!window._lastParsedResult) return;
   // Reset to step 1 each time unless a share already exists
   if (!_currentSharedSessionId) {
-    _shareMode = 'read_only';
+    _shareMode = 'viewer';
     selectShareMode('read_only');
     document.getElementById('shareStep1').style.display = 'block';
     document.getElementById('shareStep2').style.display = 'none';
@@ -7772,9 +7735,8 @@ function closeShareModal() {
 function selectShareMode(mode) {
   _shareMode = mode;
   var modes = {
-    read_only:     { id: 'shareModeReadOnly',     border: 'var(--gold-dim)', bg: 'rgba(201,168,76,0.04)', color: 'var(--gold-pale)' },
-    asymmetrical:  { id: 'shareModeAsymmetrical', border: 'rgba(80,180,120,0.5)', bg: 'rgba(80,180,120,0.04)', color: 'rgba(80,180,120,0.9)' },
-    bidirectional: { id: 'shareModeBidirectional', border: 'rgba(120,160,220,0.5)', bg: 'rgba(120,160,220,0.04)', color: 'rgba(120,160,220,0.9)' }
+    viewer:     { id: 'shareModeReadOnly',     border: 'var(--gold-dim)', bg: 'rgba(201,168,76,0.04)', color: 'var(--gold-pale)' },
+    contributor: { id: 'shareModeBidirectional', border: 'rgba(120,160,220,0.5)', bg: 'rgba(120,160,220,0.04)', color: 'rgba(120,160,220,0.9)' }
   };
   Object.keys(modes).forEach(function(m) {
     var el = document.getElementById(modes[m].id);
@@ -7799,28 +7761,29 @@ async function setShareMode(mode) {
     var res = await authenticatedFetch('/api/share', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shareId: _currentSharedSessionId, collaborationMode: mode })
+      body: JSON.stringify({ shareId: _currentSharedSessionId, permission: mode })
     });
     var data = await res.json();
-    if (data.ok) {
+    if (res.ok && data.success) {
       _shareMode = mode;
-      _collabOpen = (mode === 'bidirectional');
+      _collabOpen = (mode === 'contributor');
       // Update button styles
-      var labels = { read_only: 'Read Only', asymmetrical: 'Read + Explore', bidirectional: 'Collaborate' };
-      ['read_only', 'asymmetrical', 'bidirectional'].forEach(function(m) {
-        var btn = document.getElementById('mode' + m.split('_').map(function(w){return w[0].toUpperCase()+w.slice(1)}).join('') + 'Btn');
+      var labels = { viewer: 'Viewer', contributor: 'Contributor' };
+      var modeButtonIds = { viewer: 'modeViewerBtn', contributor: 'modeContributorBtn' };
+      ['viewer', 'contributor'].forEach(function(m) {
+        var btn = document.getElementById(modeButtonIds[m]);
         if (!btn) return;
         if (m === mode) {
-          btn.style.borderColor = m === 'read_only' ? 'var(--gold-dim)' : m === 'asymmetrical' ? 'rgba(80,180,120,0.5)' : 'rgba(120,160,220,0.5)';
-          btn.style.background  = m === 'read_only' ? 'rgba(201,168,76,0.04)' : m === 'asymmetrical' ? 'rgba(80,180,120,0.04)' : 'rgba(120,160,220,0.04)';
-          btn.style.color       = m === 'read_only' ? 'var(--gold-pale)' : m === 'asymmetrical' ? 'rgba(80,180,120,0.9)' : 'rgba(120,160,220,0.9)';
+          btn.style.borderColor = m === 'viewer' ? 'var(--gold-dim)' : 'rgba(120,160,220,0.5)';
+          btn.style.background  = m === 'viewer' ? 'rgba(201,168,76,0.04)' : 'rgba(120,160,220,0.04)';
+          btn.style.color       = m === 'viewer' ? 'var(--gold-pale)' : 'rgba(120,160,220,0.9)';
         } else {
           btn.style.borderColor = 'var(--border)';
           btn.style.background  = 'transparent';
           btn.style.color       = 'var(--text-muted)';
         }
       });
-      if (statusEl) statusEl.textContent = 'Flow set to: ' + ({ read_only: 'Read Only', asymmetrical: 'Read + Explore', bidirectional: 'Collaborate' }[mode] || mode);
+      if (statusEl) statusEl.textContent = 'Permission set to: ' + (labels[mode] || mode);
     } else {
       if (statusEl) statusEl.textContent = 'Could not update. Please try again.';
     }
@@ -7861,8 +7824,7 @@ async function proceedToShareDelivery() {
         threadId,
         artifactId,
         artifactRevision,
-        collaborationOpen:  _shareMode === 'bidirectional',
-        collaborationMode:  _shareMode || 'read_only'
+        permission: _shareMode || 'viewer'
       })
     });
     var data = await res.json();
@@ -7876,7 +7838,7 @@ async function proceedToShareDelivery() {
     _shareStatus = 'on';
     window._currentShareUrl = data.shareUrl;
 
-    if (_shareMode === 'bidirectional') {
+    if (_shareMode === 'contributor') {
       _collabOpen = true;
     }
 
@@ -8026,6 +7988,32 @@ function updateShareManageUI() {
 
   // Also update the downloadRow collab toggle
   updateCollabToggleUI();
+  loadTrustCircleMembers();
+}
+
+async function loadTrustCircleMembers() {
+  var list = document.getElementById('trustCircleMemberList');
+  if (!list || !_currentSharedSessionId || !verifiedAuthState.authenticated) return;
+  list.textContent = 'Loading…';
+  try {
+    var response = await authenticatedFetch('/api/share?shareId=' + encodeURIComponent(_currentSharedSessionId), { cache: 'no-store' });
+    var data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'member load failed');
+    var members = Array.isArray(data.members) ? data.members : [];
+    if (!members.length) {
+      list.textContent = 'No one has joined yet.';
+      return;
+    }
+    list.innerHTML = '';
+    members.forEach(function(member, index) {
+      var row = document.createElement('div');
+      row.style.cssText = 'padding:7px 0;border-top:1px solid var(--border);font-family:var(--crimson);font-size:15px;color:var(--text-dim);';
+      row.textContent = member.display_name || (member.user_id ? 'Signed-in member' : 'Guest ' + (index + 1));
+      list.appendChild(row);
+    });
+  } catch (error) {
+    list.textContent = 'Could not load members.';
+  }
 }
 
 async function toggleShareOnOff() {
@@ -8400,11 +8388,11 @@ function showFreeAccountModal(context) {
 
   var perkLines;
   if (window._freeAcctContext === 'save-session') {
-    desc.textContent = 'This view disappears once you leave. A free account keeps it here — the conversation, your notes, and anything you asked.';
-    perkLines = ['This conversation · saved', 'Your private notes · saved', '3 free queries · resets every 24 hours', 'Cancel nothing · ever'];
+    desc.textContent = 'Create or sign in to your account to save an independent copy of this inquiry and continue it as your own.';
+    perkLines = ['Independent inquiry fork · saved', 'Source provenance · preserved', '1 Explorer Query · rolling 24 hours', 'No Query charged for saving'];
   } else {
-    desc.textContent = '3 queries every 24 hours, always. Your session history saved for 30 days. Need more? Purchase query bundles any time — no plan required.';
-    perkLines = ['3 free queries · resets every 24 hours', 'Session history saved · 30 days', 'Query bundles available · no subscription', 'Cancel nothing · ever'];
+    desc.textContent = 'One successful Explorer Query every rolling 24 hours. Create an account to preserve your inquiry and return to it later.';
+    perkLines = ['1 Explorer Query · rolling 24 hours', 'Inquiry history · saved', 'Query banks · never expire', 'Account creation · no Query charge'];
   }
   perkLines.forEach(function(t) {
     var li = document.createElement('li'); li.textContent = t; perks.appendChild(li);
@@ -8556,11 +8544,24 @@ function restoreResumeSnapshot() {
 function handlePurchaseLinkClick(event, anchorEl) {
   saveResumeSnapshot(); // preserve the in-progress conversation either way
 
-  var email = userEmail();
-  if (email) return true; // already registered — proceed to Stripe as normal
-
+  var product = anchorEl.dataset.product;
+  var configuredUrl = product && window._prismProduct && window._prismProduct.checkoutUrls
+    ? window._prismProduct.checkoutUrls[product]
+    : null;
   event.preventDefault();
-  window._limitPendingHref = anchorEl.getAttribute('href');
+  if (!configuredUrl) {
+    showQueryActionConfirm && showQueryActionConfirm('Checkout is not configured yet.');
+    return false;
+  }
+  anchorEl.href = configuredUrl;
+
+  var email = userEmail();
+  if (email) {
+    window.location.href = configuredUrl + (configuredUrl.indexOf('?') === -1 ? '?' : '&') + 'prefilled_email=' + encodeURIComponent(email);
+    return false;
+  }
+
+  window._limitPendingHref = configuredUrl;
   window._limitPendingIsStripe = anchorEl.classList.contains('signal-bank-link');
   showFreeAccountModal();
   return false;
@@ -8570,7 +8571,11 @@ function applyLimitEmailToOptions(email) {
   // Carry the email into Stripe Checkout so it already knows the buyer,
   // and into the Subscribe link for the same reason.
   document.querySelectorAll('.signal-bank-link').forEach(function(a) {
-    var base = a.dataset.baseHref || a.getAttribute('href');
+    var product = a.dataset.product;
+    var configured = product && window._prismProduct && window._prismProduct.checkoutUrls
+      ? window._prismProduct.checkoutUrls[product]
+      : null;
+    var base = configured || a.dataset.baseHref || a.getAttribute('href');
     a.dataset.baseHref = base;
     var sep = base.indexOf('?') === -1 ? '?' : '&';
     a.href = base + sep + 'prefilled_email=' + encodeURIComponent(email);
@@ -8613,22 +8618,31 @@ async function submitFreeAccount() {
     // created but there's no real account behind it: no login, no password
     // reset, nothing in Supabase Auth to actually authenticate against.
     var client = getSupabaseClient();
-    var signUpResult = await client.auth.signUp({ email: email, password: password });
-    if (signUpResult.error) {
-      if (statusEl) { statusEl.textContent = signUpResult.error.message; statusEl.style.display = 'block'; }
-      return;
+    if (window._freeAcctContext === 'save-session' && window._sharedViewToken) {
+      sessionStorage.setItem('prism_return_share', window._sharedViewToken);
     }
+    var signUpResult = await client.auth.signUp({ email: email, password: password });
+    var identity = await hydrateVerifiedAuthState();
+    // Supabase may intentionally obscure whether an address already exists.
+    // If signup did not yield a verified session, the same form doubles as
+    // the existing-account sign-in path without creating a duplicate account.
+    if (!identity.authenticated) {
+      var signInResult = await client.auth.signInWithPassword({ email: email, password: password });
+      if (signInResult.error) {
+        if (statusEl) {
+          statusEl.textContent = signUpResult.error
+            ? 'Sign in failed. Check your password, or verify the new account from your email.'
+            : 'Verify your email, then return to this shared inquiry to save it.';
+          statusEl.style.display = 'block';
+        }
+        return;
+      }
+      identity = await hydrateVerifiedAuthState();
+    }
+    if (!identity.authenticated) return;
 
-    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-    await fetch(sbUrl + '/rest/v1/subscribers', {
-      method: 'POST',
-      headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates' },
-      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
-    });
-    await hydrateVerifiedAuthState();
-
-    // Send welcome email + credit 3 bonus queries via API
+    // Send the identity/persistence welcome email. Account creation does not
+    // grant or consume a Query.
     try {
       await authenticatedFetch('/api/welcome', {
         method: 'POST',
@@ -8637,21 +8651,20 @@ async function submitFreeAccount() {
       });
     } catch(e) {}
 
-    // Claim this browser's anonymous session — re-keys notes and follow-up
-    // questions from anon_session_id onto the new account, and adds them
-    // as a thread_participant so this thread actually shows up in their
-    // sidebar afterward. Only relevant coming from a loaded shared thread;
-    // a no-op call for the ordinary query-limit path would just find
-    // nothing to migrate, but skipping it entirely when there's genuinely
-    // nothing to claim keeps this from firing on every free-account signup.
     if (window._freeAcctContext === 'save-session' && window._sharedViewToken && activeThreadId) {
       try {
-        await authenticatedFetch('/api/followups?action=claim-anon-session', {
+        var forkRes = await authenticatedFetch('/api/share', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ anonId: getAnonSessionId(), userEmail: email, threadId: activeThreadId })
+          body: JSON.stringify({ action: 'fork', shareId: window._sharedViewShareId, token: window._sharedViewToken })
         });
-      } catch (e) { console.error('claim-anon-session request failed:', e); }
+        var forkData = await forkRes.json();
+        if (!forkRes.ok || !forkData.threadId) throw new Error(forkData.error || 'save failed');
+        activeThreadId = forkData.threadId;
+        localStorage.setItem('qt_last_thread_id', forkData.threadId);
+      } catch (e) {
+        console.error('Save to My Prism failed:', e.message);
+      }
     }
 
     // If this modal was opened from a purchase click, continue straight on
@@ -8675,7 +8688,7 @@ async function submitFreeAccount() {
       var t3 = document.createElement('div'); t3.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:19px;color:var(--text-dim);line-height:1.7;margin-bottom:24px;';
       t3.textContent = window._freeAcctContext === 'save-session'
         ? 'This conversation and your notes are saved to your account. Come back any time — it will be here.'
-        : 'Your session is saved and 3 bonus queries have been added. Come back any time — your history will be here.';
+        : 'Your inquiry is saved. Come back any time — your history will be here.';
       var btn2 = document.createElement('button'); btn2.textContent = 'Continue →'; btn2.style.cssText = 'font-family:var(--mono);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;padding:10px 24px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold-pale);cursor:pointer;';
       btn2.onclick = function() {
         modal.style.display = 'none';
@@ -8719,7 +8732,7 @@ async function runPreflightCheck() {
     if (!previewTestAccess && data.locked) {
       var hrs  = data.hoursRemaining || 0;
       var secs = data.secondsRemaining || hrs * 3600;
-      var msg  = "You've used your " + (data.queriesUsed || 3) + " free queries. Access resets in " + hrs + " hour" + (hrs !== 1 ? "s" : "") + ".";
+      var msg  = "You've used your Explorer Query. Access resets in " + hrs + " hour" + (hrs !== 1 ? "s" : "") + ".";
       applyQueryLock(msg, hrs, secs);
     }
   } catch(e) {}
@@ -8748,43 +8761,33 @@ async function handleCreditsAdded() {
   statusEl.textContent = 'Confirming your purchase…';
   document.body.appendChild(statusEl);
 
-  // Poll Supabase up to 8 times (every 1.5s) waiting for the webhook to land.
-  // This covers two distinct outcomes: a Signal Bank purchase (purchased_credits
-  // goes up) or a subscription purchase (tier changes away from 'free'/prior
-  // tier). Either one on its own counts as a confirmed purchase.
-  const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-
-  const priorTier = localStorage.getItem('qt_user_tier') || 'free';
-  let credits = 0;
-  let latestTier = priorTier;
+  // Poll the server-authoritative entitlement endpoint while the Stripe
+  // webhook lands. Browser-readable subscriber fields are never accounting
+  // authority and cannot unlock the composer.
+  let remaining = 0;
+  let entitlementSource = null;
   let confirmed = false;
 
   for (let i = 0; i < 8; i++) {
     await new Promise(r => setTimeout(r, 1500));
     try {
-      const res = await fetch(
-        `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=purchased_credits,tier&limit=1`,
-        {
-          headers: {
-            'apikey': sbAnon,
-            'Authorization': `Bearer ${sbAnon}`
-          },
-          cache: 'no-store'
-        }
-      );
+      const res = await fetch((window.API_BASE || '') + '/api/interpret', {
+        headers: await getInterpretRequestHeaders(),
+        cache: 'no-store'
+      });
+      if (!res.ok) continue;
       const data = await res.json();
-      credits = data?.[0]?.purchased_credits || 0;
-      latestTier = data?.[0]?.tier || priorTier;
-      const tierChanged = latestTier !== priorTier && latestTier !== 'free';
-      if (credits > 0 || tierChanged) { confirmed = true; break; }
+      remaining = Number(data.remaining || 0);
+      entitlementSource = data.entitlementSource || null;
+      if (!data.locked && (entitlementSource === 'bank' || entitlementSource === 'subscription')) {
+        confirmed = true;
+        break;
+      }
     } catch {}
   }
 
   // Dismiss status
   statusEl.remove();
-
-  const tierActuallyChanged = latestTier !== priorTier && latestTier !== 'free';
 
   if (confirmed) {
     // Dismiss quota wall, restore submit button
@@ -8797,25 +8800,6 @@ async function handleCreditsAdded() {
     const newSubjectBtn = document.getElementById('newSubjectTopBtn');
     if (newSubjectBtn) newSubjectBtn.style.display = '';
 
-    // If a subscription just activated, the page's notion of the current
-    // tier (set once, early in page load, from localStorage/URL) is now
-    // stale — nothing else would ever notice the upgrade. Update it here:
-    // localStorage, the in-memory CURRENT_TIER, and the visible tier label.
-    if (tierActuallyChanged) {
-      localStorage.setItem('qt_user_tier', latestTier);
-      if (typeof CURRENT_TIER !== 'undefined') CURRENT_TIER = latestTier;
-      const tierLabels = {
-        refraction: 'Examiner',
-        full_spectrum: 'Full Spectrum',
-        scholar: 'Examiner',
-        theologian: 'Full Spectrum',
-        companion: 'Full Spectrum',
-        free: 'Observer · Free Access'
-      };
-      const labelEl = document.getElementById('sidebarTierLabel');
-      if (labelEl) labelEl.textContent = tierLabels[latestTier] || tierLabels['free'];
-    }
-
     // Refresh the sidebar's query count / Signal Bank display — it was
     // fetched once early in page load, likely before the webhook had even
     // landed, and nothing else re-triggers it once the purchase lands.
@@ -8824,13 +8808,9 @@ async function handleCreditsAdded() {
     // Show a confirmation toast matching what actually happened
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999; transition:opacity 0.5s;';
-    if (tierActuallyChanged && credits > 0) {
-      toast.textContent = `Subscription active — ${latestTier} · ${credits} quer${credits === 1 ? 'y' : 'ies'} available`;
-    } else if (tierActuallyChanged) {
-      toast.textContent = `Subscription active — welcome to ${latestTier}`;
-    } else {
-      toast.textContent = `Signal Bank confirmed — ${credits} quer${credits === 1 ? 'y' : 'ies'} available`;
-    }
+    toast.textContent = entitlementSource === 'subscription'
+      ? `Subscription active — ${remaining} quer${remaining === 1 ? 'y' : 'ies'} available`
+      : `Query Bank confirmed — ${remaining} quer${remaining === 1 ? 'y' : 'ies'} available`;
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 4000);
   } else {
@@ -9039,20 +9019,15 @@ window.addEventListener('appinstalled', function() {
     <div id="shareStep1">
       <div style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">How would you like to share?</div>
       <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
-        <button onclick="selectShareMode('read_only')" id="shareModeReadOnly"
+        <button onclick="selectShareMode('viewer')" id="shareModeReadOnly"
           style="text-align:left; padding:16px 20px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.04); cursor:pointer; transition:all 0.2s;">
-          <div style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:4px;">Read Only</div>
-          <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); font-style:italic;">Recipient reads the interpretation. No follow-up input. Your session is unchanged.</div>
+          <div style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:4px;">Viewer</div>
+          <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); font-style:italic;">May read this inquiry. Your other inquiries remain private.</div>
         </button>
-        <button onclick="selectShareMode('asymmetrical')" id="shareModeAsymmetrical"
+        <button onclick="selectShareMode('contributor')" id="shareModeBidirectional"
           style="text-align:left; padding:16px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s;">
-          <div style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Read + Explore</div>
-          <div style="font-family:var(--crimson); font-size:17px; color:var(--text-muted); font-style:italic;">Recipient can open their own thread seeded from this interpretation. Your session is unchanged.</div>
-        </button>
-        <button onclick="selectShareMode('bidirectional')" id="shareModeBidirectional"
-          style="text-align:left; padding:16px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s;">
-          <div style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Collaborate</div>
-          <div style="font-family:var(--crimson); font-size:17px; color:var(--text-muted); font-style:italic;">Recipient contributes follow-ups to this shared thread. You control the flow — close it at any time.</div>
+          <div style="font-family:var(--cinzel); font-size:15px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Contributor</div>
+          <div style="font-family:var(--crimson); font-size:17px; color:var(--text-muted); font-style:italic;">May read and comment. Prism turns require an independent saved fork.</div>
         </button>
       </div>
       <div style="display:flex; gap:10px; justify-content:flex-end;">
@@ -9111,15 +9086,20 @@ window.addEventListener('appinstalled', function() {
           <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text); margin-bottom:3px;">Recipient Flow</div>
           <div style="font-family:var(--crimson); font-size:16px; color:var(--text-muted); font-style:italic; margin-bottom:12px;">Control how recipients engage with this share</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="modeReadOnlyBtn" onclick="setShareMode('read_only')"
-              style="font-family:var(--mono); font-size:12px; letter-spacing:0.14em; text-transform:uppercase; padding:7px 12px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.04); color:var(--gold-pale); cursor:pointer; transition:all 0.2s; white-space:nowrap;">Read Only</button>
-            <button id="modeAsymmetricalBtn" onclick="setShareMode('asymmetrical')"
-              style="font-family:var(--mono); font-size:12px; letter-spacing:0.14em; text-transform:uppercase; padding:7px 12px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s; white-space:nowrap;">Read + Explore</button>
-            <button id="modeBidirectionalBtn" onclick="setShareMode('bidirectional')"
-              style="font-family:var(--mono); font-size:12px; letter-spacing:0.14em; text-transform:uppercase; padding:7px 12px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s; white-space:nowrap;">Collaborate</button>
+            <button id="modeViewerBtn" onclick="setShareMode('viewer')"
+              style="font-family:var(--mono); font-size:12px; letter-spacing:0.14em; text-transform:uppercase; padding:7px 12px; border:1px solid var(--gold-dim); background:rgba(201,168,76,0.04); color:var(--gold-pale); cursor:pointer; transition:all 0.2s; white-space:nowrap;">Viewer</button>
+            <button id="modeContributorBtn" onclick="setShareMode('contributor')"
+              style="font-family:var(--mono); font-size:12px; letter-spacing:0.14em; text-transform:uppercase; padding:7px 12px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s; white-space:nowrap;">Contributor</button>
           </div>
           <div id="shareModeStatus" style="margin-top:10px; font-family:var(--mono); font-size:12px; letter-spacing:0.12em; color:var(--text-muted);"></div>
         </div>
+
+        <details id="trustCircleMembers" style="padding:14px 16px; border:1px solid var(--border); background:var(--surface);">
+          <summary style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text); cursor:pointer;">Who joined</summary>
+          <div id="trustCircleMemberList" style="margin-top:10px; color:var(--text-muted);">No one has joined yet.</div>
+        </details>
+
+        <div style="font-family:var(--crimson); font-size:15px; color:var(--text-muted); font-style:italic; line-height:1.5;">Only this inquiry and its Trust Circle discussion are shared. Your other Prism inquiries remain private.</div>
 
       </div>
 

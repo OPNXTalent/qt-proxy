@@ -82,7 +82,7 @@ export default async function handler(req, res) {
           emailWrapper(`
             <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your Prism subscription is no longer active.</p>
             <p style="font-size:16px; line-height:1.8; color:#7a7890;">
-              You still have access to 3 free queries every 24 hours. If there was a payment issue, 
+              Explorer access still includes one successful Query per rolling 24 hours. If there was a payment issue,
               updating your method takes less than a minute — and your access restores immediately.
             </p>
             <div style="text-align:center; margin:40px 0;">

@@ -15,6 +15,7 @@
 // thread for other participants — see the DELETE handler below.
 
 import { verifySupabaseIdentity } from '../lib/server-auth.js';
+import { verifyGuestIdentity } from '../lib/guest-identity.js';
 
 const SUPABASE_URL              = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY         = process.env.SUPABASE_ANON_KEY;
@@ -126,22 +127,26 @@ export default async function handler(req, res) {
   }
   const userEmail = auth.identity?.email || null;
   const verifiedUserId = auth.identity?.userId || null;
-
-  if (!userEmail) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const guest = verifiedUserId ? null : await verifyGuestIdentity({
+    cookieHeader: req.headers.cookie,
+    supabaseUrl: SUPABASE_URL,
+    serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+  });
+  if (!verifiedUserId && !guest) return res.status(401).json({ error: 'Unauthorized' });
 
   // ── GET — fetch thread list (owned + Trust Circle threads joined) ─────────
   if (req.method === 'GET') {
     try {
-      const subscriber = await getSubscriberProfile(userEmail);
+      const subscriber = userEmail ? await getSubscriberProfile(userEmail) : null;
       const userId = verifiedUserId;
       const tier = subscriber?.tier || 'free';
       const display_name = subscriber?.display_name || null;
 
       // Threads this person owns — unchanged query, now also pulling visibility.
       const ownedRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/threads?user_id=eq.${userId}&order=created_at.desc&limit=100&select=*`,
+        `${SUPABASE_URL}/rest/v1/threads?${userId
+          ? `user_id=eq.${userId}`
+          : `guest_id=eq.${guest.guestId}`}&order=created_at.desc&limit=100&select=*`,
         { headers: sbHeaders() }
       );
       const owned = await ownedRes.json();
@@ -150,12 +155,11 @@ export default async function handler(req, res) {
       // Threads this person has joined as a participant (their own or someone
       // else's Trust Circle thread). Owned Trust Circle threads will ALSO
       // appear here, via the trigger-created participant row — deduped below.
-      const participantRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/thread_participants?user_id=eq.${userId}&select=thread_id,active,last_seen_at,threads(*)`,
-        { headers: sbHeaders() }
-      );
-      const participantRows = await participantRes.json();
-      const participantList = Array.isArray(participantRows) ? participantRows : [];
+      // Trust Circle access remains attached to an active share credential.
+      // Recipients persist an independent inquiry only through Save to My
+      // Prism; legacy participant rows never add the owner's thread to a
+      // recipient Archive.
+      const participantList = [];
 
       // Merge, deduping by thread id. Owned threads take priority for the
       // base record; participant rows layer in participation-specific fields.
@@ -172,7 +176,7 @@ export default async function handler(req, res) {
         } else {
           byId.set(row.thread_id, {
             thread: row.threads,
-            isOwner: row.threads.user_id === userId,
+            isOwner: Boolean(userId && row.threads.user_id === userId),
             active: row.active,
             lastSeenAt: row.last_seen_at
           });
@@ -314,7 +318,13 @@ export default async function handler(req, res) {
 
       mapped.sort((a, b) => b.createdAt - a.createdAt);
 
-      return res.status(200).json({ threads: mapped, tier, userId, display_name: display_name || null });
+      return res.status(200).json({
+        threads: mapped,
+        tier,
+        userId,
+        guestId: guest?.guestId || null,
+        display_name: display_name || null,
+      });
     } catch (err) {
       console.error('threads GET error:', err.message);
       return res.status(500).json({ error: 'Internal server error' });
@@ -331,6 +341,7 @@ export default async function handler(req, res) {
   // only actually gets deleted once literally no one remains — i.e. this
   // was the last participant standing.
   if (req.method === 'DELETE') {
+    if (!verifiedUserId) return res.status(401).json({ error: 'Verified account required' });
     try {
       const { threadId } = req.body || {};
       if (!threadId) return res.status(400).json({ error: 'threadId required' });
@@ -387,6 +398,7 @@ export default async function handler(req, res) {
 
   // ── PATCH — rename, reset expiry, or Trust Circle actions ──────────────────
   if (req.method === 'PATCH') {
+    if (!verifiedUserId) return res.status(401).json({ error: 'Verified account required' });
     try {
       const { threadId, title, action, targetUserId } = req.body || {};
       if (!threadId) return res.status(400).json({ error: 'threadId required' });
@@ -396,23 +408,18 @@ export default async function handler(req, res) {
       const tier = subscriber?.tier || 'free';
 
       // ── Toggle thread-level visibility ──────────────────────────────────
-      // No special privileges for the creator here, same as everywhere
-      // else — any owner or participant can flip this.
+      // Visibility is an owner authority boundary. Participation never
+      // grants permission to mutate the owner's canonical inquiry.
       if (action === 'set_visibility') {
         const { visibility } = req.body || {};
         if (!['private', 'trust_circle'].includes(visibility)) {
           return res.status(400).json({ error: 'visibility must be private or trust_circle' });
         }
-        const [threadRes, partRes] = await Promise.all([
-          fetch(`${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&select=id,user_id&limit=1`, { headers: sbHeaders() }),
-          fetch(`${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&user_id=eq.${userId}&select=id&limit=1`, { headers: sbHeaders() })
-        ]);
+        const threadRes = await fetch(`${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&select=id,user_id&limit=1`, { headers: sbHeaders() });
         const threadRows = await threadRes.json();
-        const partRows = await partRes.json();
         const isOwner = threadRows?.[0]?.user_id === userId;
-        const isParticipant = Array.isArray(partRows) && partRows.length > 0;
-        if (!threadRows?.length || (!isOwner && !isParticipant)) {
-          return res.status(403).json({ error: 'Must own or participate in this thread to change its visibility' });
+        if (!threadRows?.length || !isOwner) {
+          return res.status(403).json({ error: 'Only the inquiry owner may change its visibility' });
         }
 
         await fetch(
@@ -428,19 +435,7 @@ export default async function handler(req, res) {
 
       // ── Join a Trust Circle thread into my own Archive ──────────────────
       if (action === 'join') {
-        const threadRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&visibility=eq.trust_circle&select=id&limit=1`,
-          { headers: sbHeaders() }
-        );
-        const threadRows = await threadRes.json();
-        if (!threadRows?.length) return res.status(404).json({ error: 'Thread not found or not shareable' });
-
-        await fetch(`${SUPABASE_URL}/rest/v1/thread_participants`, {
-          method: 'POST',
-          headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }),
-          body: JSON.stringify({ thread_id: threadId, user_id: userId, active: true })
-        });
-        return res.status(200).json({ success: true });
+        return res.status(409).json({ error: 'Use Save to My Prism to create an independent fork', code: 'TRUST_CIRCLE_FORK_REQUIRED' });
       }
 
       // ── Silent step-back toggle — on/off, reversible, no announcement ───
@@ -499,22 +494,8 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true });
       }
 
-      // ── Reset expiry clock (costs 1 query) — unchanged from before ──────
+      // ── Reset expiry clock — Archive maintenance is not a Prism Query ──
       if (action === 'reset_expiry') {
-        const drawRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_query`, {
-          method: 'POST',
-          headers: sbHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ p_user_id: userId, p_cost: 1 })
-        });
-
-        if (!drawRes.ok) {
-          const err = await drawRes.text();
-          if (err.includes('INSUFFICIENT_QUERIES')) {
-            return res.status(402).json({ error: 'INSUFFICIENT_QUERIES' });
-          }
-          return res.status(500).json({ error: 'Failed to draw query' });
-        }
-
         const retentionDays = { scholar: 90, theologian: 180, trial: 30, free: 1 }[tier] || 90;
         const now = new Date();
         const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);

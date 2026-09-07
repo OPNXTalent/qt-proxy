@@ -21,6 +21,12 @@ let allowKillSwitchDelta = false;
 
 globalThis.fetch = async (url, options = {}) => {
   const target = String(url);
+  if (target.endsWith('/rest/v1/prism_guests') && options.method === 'POST') {
+    return new Response('', { status: 201 });
+  }
+  if (target.includes('/rpc/prepare_prism_inquiry')) {
+    return Response.json([{ allowed: true, entitlement_source: 'explorer', remaining: 1, reset_at: null }]);
+  }
   if (target.includes('/query_log') && (!options.method || options.method === 'GET')) {
     return Response.json([]);
   }

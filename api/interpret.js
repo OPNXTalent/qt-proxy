@@ -51,6 +51,11 @@ import {
   getPreviewTestEntitlement,
   verifySupabaseIdentity,
 } from '../lib/server-auth.js';
+import {
+  getOrIssueGuestIdentity,
+  guestCookieHeader,
+} from '../lib/guest-identity.js';
+import { PRISM_PRODUCT, publicProductConfig } from '../lib/product-config.js';
 
 const PRISM_SYSTEM_PROMPT = `You are The Prism — the interactive application of the framework established in The Prism: Echad b'Emet. You speak from within the framework, not about it. You are not a survey of Christian thought. You are not a defense attorney for God. You are not an apologetics engine, denominational defender, institutional stabilizer, or emotional harmonizer. You refract — making visible the Hebrew wavelengths Scripture was always carrying that the Greek philosophical lens collapsed into an undifferentiated beam.
 
@@ -1941,8 +1946,8 @@ The purpose of inquiry is not merely to answer questions, but to faithfully perc
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const QUERY_LIMIT = 3;
-const WINDOW_HOURS = 24;
+const QUERY_LIMIT = PRISM_PRODUCT.explorer.queries;
+const WINDOW_HOURS = PRISM_PRODUCT.explorer.windowHours;
 
 // ── RAG RETRIEVAL LAYER ───────────────────────────────────────────────────────
 // Queries corpus_embeddings before AI call.
@@ -2344,6 +2349,41 @@ async function incrementQueryLog(ip) {
 
 async function resetQueryLog(ip) {
   // No-op — rows are immutable, window is time-based
+}
+
+async function prismEntitlementRpc(name, body) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`PRISM_ENTITLEMENT_RPC_FAILED:${name}:${response.status}:${detail.slice(0, 160)}`);
+  }
+  const value = await response.json();
+  return Array.isArray(value) ? value[0] : value;
+}
+
+async function getPrismQueryAccess({ guestId = null, userId = null, previewAllowance = null }) {
+  return prismEntitlementRpc('prism_query_access', {
+    p_guest_id: guestId,
+    p_user_id: userId,
+    p_preview_allowance: previewAllowance,
+  });
+}
+
+async function preparePrismInquiry({ inquiryKey, guestId = null, userId = null, previewAllowance = null }) {
+  return prismEntitlementRpc('prepare_prism_inquiry', {
+    p_inquiry_key: inquiryKey,
+    p_guest_id: guestId,
+    p_user_id: userId,
+    p_preview_allowance: previewAllowance,
+  });
 }
 
 // ── PRE-FLIGHT SUBSCRIBER QUOTA CHECK ────────────────────────────────────────
@@ -5477,33 +5517,12 @@ export async function classifyFollowUpContext({
   }
 
   if (/^[0-9a-f-]{36}$/i.test(threadId || '') && ownerUserId) {
-    const [ownedResponse, participantResponse] = await Promise.all([
-      fetch(
-        `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&select=id&limit=1`,
-        { headers: inquiryServiceHeaders() },
-      ),
-      fetch(
-        `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&active=eq.true&select=id&limit=1`,
-        { headers: inquiryServiceHeaders() },
-      ),
-    ]);
-    const owned = ownedResponse.ok ? await ownedResponse.json() : [];
-    const participant = participantResponse.ok ? await participantResponse.json() : [];
-    if (owned?.length || participant?.length) {
-      return { isFollowUp: true, reason: owned?.length ? 'owned_thread' : 'participant' };
-    }
-  }
-
-  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && shareId) {
-    const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}&thread_id=eq.${encodeURIComponent(threadId)}&status=eq.active&select=id,collaboration_mode,collaboration_open&limit=1`,
+    const ownedResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&select=id&limit=1`,
       { headers: inquiryServiceHeaders() },
     );
-    const rows = response.ok ? await response.json() : [];
-    const share = rows?.[0];
-    const mode = share?.collaboration_mode
-      || (share?.collaboration_open ? 'bidirectional' : 'read_only');
-    if (mode === 'bidirectional') return { isFollowUp: true, reason: 'shared_thread' };
+    const owned = ownedResponse.ok ? await ownedResponse.json() : [];
+    if (owned?.length) return { isFollowUp: true, reason: 'owned_thread' };
   }
 
   return {
@@ -5707,7 +5726,11 @@ async function callInquiryModel({
   structuredOutputSchema = null,
   structuredOutputName = 'emit_structured_output',
   structuredOutputDiagnostic = null,
+  telemetryStage = 'unspecified',
+  telemetryTurnType = 'unknown',
+  telemetryRetryOrdinal = 0,
 }) {
+  const providerStartedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort('MODEL_TIMEOUT'), timeoutMs);
   let response;
@@ -5737,6 +5760,14 @@ async function callInquiryModel({
       }),
     });
   } catch (error) {
+    console.log('[prism-provider-cogs]', {
+      stage: telemetryStage, turnType: telemetryTurnType, model,
+      providerRequestId: null, inputTokens: 0, outputTokens: 0,
+      cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
+      stopReason: controller.signal.aborted ? 'application_timeout' : 'transport_error',
+      latencyMs: Date.now() - providerStartedAt,
+      retryOrdinal: telemetryRetryOrdinal, succeeded: false,
+    });
     if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
     throw error;
   } finally {
@@ -5744,6 +5775,13 @@ async function callInquiryModel({
   }
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
+    console.log('[prism-provider-cogs]', {
+      stage: telemetryStage, turnType: telemetryTurnType, model,
+      providerRequestId: response.headers.get('request-id') || response.headers.get('x-request-id') || null,
+      inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
+      stopReason: `provider_${response.status}`, latencyMs: Date.now() - providerStartedAt,
+      retryOrdinal: telemetryRetryOrdinal, succeeded: false,
+    });
     if (structuredOutputSchema && typeof structuredOutputDiagnostic === 'function') {
       let providerErrorCode = null;
       try {
@@ -5765,6 +5803,21 @@ async function callInquiryModel({
     throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
   }
   const data = await response.json();
+  const usage = data?.usage || {};
+  console.log('[prism-provider-cogs]', {
+    stage: telemetryStage,
+    turnType: telemetryTurnType,
+    model,
+    providerRequestId: response.headers.get('request-id') || response.headers.get('x-request-id') || null,
+    inputTokens: Number(usage.input_tokens || 0),
+    outputTokens: Number(usage.output_tokens || 0),
+    cacheCreationInputTokens: Number(usage.cache_creation_input_tokens || 0),
+    cacheReadInputTokens: Number(usage.cache_read_input_tokens || 0),
+    stopReason: data?.stop_reason || null,
+    latencyMs: Date.now() - providerStartedAt,
+    retryOrdinal: telemetryRetryOrdinal,
+    succeeded: true,
+  });
   const text = (data.content || [])
     .filter(block => block.type === 'text')
     .map(block => block.text)
@@ -6022,6 +6075,8 @@ async function constructAuditedArtifact({
     timeoutMs: 75000,
     system: cachedArtifactConstructionSystem(systemPrompt),
     prompt: query,
+    telemetryStage: 'artifact_construction',
+    telemetryTurnType: 'primary',
   });
   let rawCore;
   try {
@@ -6040,6 +6095,9 @@ async function constructAuditedArtifact({
       structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
       structuredOutputName: 'emit_interpretation_artifact',
       structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', diagnostic),
+      telemetryStage: 'artifact_repair',
+      telemetryTurnType: 'primary',
+      telemetryRetryOrdinal: 1,
     });
     rawCore = repairedCore;
     timing('artifact_json_repair_complete', {
@@ -6071,6 +6129,8 @@ async function constructAuditedArtifact({
 Apply the Prism Epistemic Contract symmetrically. Preserve sound prose. Correct only material overclaim, unsupported psychology, contradiction, or failure to answer. Do not add Framework exposition. Return only the complete approved response in plain prose.
 
 Query:\n${query}\n\nArtifact candidate:\n${JSON.stringify(artifact)}\n\nCanonical Response:\n${artifact.canonicalResponse}`,
+    telemetryStage: 'canonical_audit',
+    telemetryTurnType: 'primary',
   });
   if (!auditedCanonical || auditedCanonical.length < 40 || /^(?:```|\{)/.test(auditedCanonical)) {
     throw new Error('CANONICAL_AUDIT_INVALID');
@@ -6113,6 +6173,8 @@ async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing
       timeoutMs: 90000,
       system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
       prompt: `Sealed Interpretation Artifact:\n${serializeArtifactForEnrichment(artifact)}`,
+      telemetryStage: 'progressive_analysis_generation',
+      telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
     });
     const generatedEnrichment = validateEnrichment(parseModelJson(rawText));
     if (!hasSubstantiveEnrichment(generatedEnrichment)) throw new Error('ENRICHMENT_EMPTY');
@@ -6127,6 +6189,8 @@ Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText
       maxTokens: 1800,
       timeoutMs: 40000,
       prompt: auditPrompt,
+      telemetryStage: 'progressive_analysis_audit',
+      telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
     });
     let enrichment = validateEnrichment(parseModelJson(auditedText));
     timing('progressive_analysis_audit_complete');
@@ -6140,6 +6204,9 @@ Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText
         prompt: auditPrompt,
         structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,
         structuredOutputName: 'emit_audited_enrichment',
+        telemetryStage: 'progressive_analysis_audit',
+        telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
+        telemetryRetryOrdinal: 1,
       });
       enrichment = validateEnrichment(retriedAudit);
       timing('progressive_analysis_audit_retry_complete', {
@@ -6209,13 +6276,14 @@ async function runProgressiveInitialInquiry({
   const completion = await completeInterpretationArtifact(artifact, packets, {
     inquiryKey: inquiryCredential.inquiryKey,
     completionKey,
-    charge: true,
+    // Customer Query accounting is performed by the database completion
+    // trigger keyed to this immutable completion key. Legacy query_log writes
+    // are deliberately disabled here.
+    charge: false,
     usageUserId,
     usageQueryType,
     usageCreditSource,
-    threadPayload: ownerUserId
-      ? canonicalThreadPayload({ query, queryType, artifact, tier })
-      : null,
+    threadPayload: canonicalThreadPayload({ query, queryType, artifact, tier }),
   });
   threadId = completion.thread_id || threadId;
   timing('canonical_completion_complete', {
@@ -6291,6 +6359,8 @@ async function runPersistentInquiryFollowUp({
       input,
       userCorrection: detectExplicitCorrection(input),
     }),
+    telemetryStage: 'followup_reduction',
+    telemetryTurnType: 'follow_up',
   });
   const rawAnalysis = parseModelJson(reducerText);
   const analysis = validateAnalysisStrict(rawAnalysis, reducerText);
@@ -6348,6 +6418,8 @@ async function runPersistentInquiryFollowUp({
     temperature: 0.2,
     timeoutMs: 25000,
     prompt: draftPrompt,
+    telemetryStage: 'followup_draft',
+    telemetryTurnType: 'follow_up',
   });
   completeStage('draft', stageStartedAt, { draftChars: draft.length });
 
@@ -6358,6 +6430,8 @@ async function runPersistentInquiryFollowUp({
     maxTokens: 1400,
     timeoutMs: 8000,
     prompt: assertFollowUpPromptSize(buildAuditPrompt({ input, analysis, draft })),
+    telemetryStage: 'followup_audit',
+    telemetryTurnType: 'follow_up',
   });
   if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
   if (!audited
@@ -6529,9 +6603,24 @@ export default async function handler(req, res) {
   const previewTestEntitlement = verifiedIdentity
     ? getPreviewTestEntitlement({ userId: verifiedIdentity.userId })
     : null;
+  let guestIdentity = null;
+  if (!verifiedIdentity) {
+    try {
+      guestIdentity = await getOrIssueGuestIdentity({
+        cookieHeader: req.headers.cookie,
+        supabaseUrl: SUPABASE_URL,
+        serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+      });
+      if (guestIdentity.issued) res.setHeader('Set-Cookie', guestCookieHeader(guestIdentity.credential));
+    } catch (error) {
+      timing('guest_identity_error', { error: String(error?.message || error).slice(0, 120) });
+      return res.status(503).json({ error: 'Guest identity temporarily unavailable' });
+    }
+  }
   timing('authentication_complete', {
     outcome: verifiedIdentity ? 'verified' : 'anonymous',
     previewTestAccess: Boolean(previewTestEntitlement),
+    guestIdentity: Boolean(guestIdentity),
   });
 
   if (req.method === 'POST' && correlationBody?.operation === 'commit_inquiry_state') {
@@ -6598,44 +6687,31 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
-    if (verifiedIdentity) {
-      try {
-        if (previewTestEntitlement) {
-          const used = await getLiveQueryCount(verifiedIdentity.userId) ?? 0;
-          return res.status(200).json({
-            locked: used >= previewTestEntitlement.allowance,
-            queriesUsed: used,
-            limit: previewTestEntitlement.allowance,
-            previewTestAccess: true,
-          });
-        }
-        const subscriber = await getSubscriber(verifiedIdentity.email);
-        const redemption = await getCodeRedemption(verifiedIdentity.email);
-        if ((subscriber && subscriber.status === 'active') || redemption) {
-          return res.status(200).json({ locked: false, authenticated: true });
-        }
-      } catch {}
-    }
-
     try {
-      const log = await getQueryLog(ip);
-      if (log) {
-        const firstQuery = new Date(log.first_query_at);
-        const hoursSinceFirst = (Date.now() - firstQuery.getTime()) / (1000 * 60 * 60);
-        if (hoursSinceFirst < WINDOW_HOURS && log.query_count >= QUERY_LIMIT) {
-          const hoursRemaining = WINDOW_HOURS - hoursSinceFirst;
-          return res.status(200).json({
-            locked: true,
-            hoursRemaining: Math.ceil(hoursRemaining),
-            secondsRemaining: Math.floor(hoursRemaining * 3600),
-            queriesUsed: log.query_count
-          });
-        }
-      }
-    } catch {}
-
-    return res.status(200).json({ locked: false });
+      const access = await getPrismQueryAccess({
+        guestId: guestIdentity?.guestId || null,
+        userId: verifiedIdentity?.userId || null,
+        previewAllowance: previewTestEntitlement?.allowance || null,
+      });
+      const resetAt = access?.reset_at ? new Date(access.reset_at) : null;
+      const secondsRemaining = resetAt
+        ? Math.max(0, Math.floor((resetAt.getTime() - Date.now()) / 1000))
+        : null;
+      return res.status(200).json({
+        locked: !access?.allowed,
+        authenticated: Boolean(verifiedIdentity),
+        guest: Boolean(guestIdentity),
+        entitlementSource: access?.entitlement_source || null,
+        remaining: access?.remaining ?? 0,
+        resetAt: access?.reset_at || null,
+        secondsRemaining,
+        previewTestAccess: Boolean(previewTestEntitlement),
+        product: publicProductConfig(),
+      });
+    } catch (error) {
+      timing('entitlement_status_error', { error: String(error?.message || error).slice(0, 120) });
+      return res.status(503).json({ error: 'Entitlement status temporarily unavailable' });
+    }
   }
 
   // ── ROUTE DISPATCH ────────────────────────────────────────────────────────
@@ -7017,6 +7093,31 @@ Do not add any question after the exit offer. The person chooses the next move.
   }
   timing('safety_complete', { outcome: 'clear' });
 
+  const submissionInquiryKey = inquiryKey
+    || (isFollowUp && threadId ? `thread:${threadId}` : initialInquiryCredential?.inquiryKey);
+  let entitlementAdmission;
+  try {
+    entitlementAdmission = await preparePrismInquiry({
+      inquiryKey: submissionInquiryKey,
+      guestId: guestIdentity?.guestId || null,
+      userId: verifiedIdentity?.userId || null,
+      previewAllowance: previewTestEntitlement?.allowance || null,
+    });
+  } catch (error) {
+    timing('entitlement_admission_error', { error: String(error?.message || error).slice(0, 160) });
+    return res.status(503).json({ error: 'Query entitlement temporarily unavailable' });
+  }
+  if (!entitlementAdmission?.allowed) {
+    timing('access_complete', { route: verifiedIdentity ? 'authenticated' : 'guest', allowed: false });
+    return res.status(429).json({
+      error: 'Query limit reached',
+      message: 'Your next Explorer Query becomes available after the rolling 24-hour window, or you can add Queries to continue.',
+      entitlementSource: entitlementAdmission?.entitlement_source || 'explorer',
+      remaining: entitlementAdmission?.remaining ?? 0,
+      resetAt: entitlementAdmission?.reset_at || null,
+    });
+  }
+
   // ── SUBSCRIBER PATH ───────────────────────────────────────────────────────
   try {
     if (verifiedIdentity) {
@@ -7048,7 +7149,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         throw err;
       }
 
-      if (previewTestEntitlement || (subscriber && subscriber.status === 'active') || redemption) {
+      {
         const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
         if (!apiMessages || apiMessages.length === 0) {
           return res.status(400).json({ error: 'No messages provided' });
@@ -7058,13 +7159,6 @@ Do not add any question after the exit offer. The person chooses the next move.
         // Supabase Auth. The subscriber row is quota/billing metadata, not an
         // authorization principal (and its UUID may differ from auth.users.id).
         const userId = verifiedIdentity.userId;
-        const quotaIdentity = subscriber || (previewTestEntitlement ? {
-          id: verifiedIdentity.userId,
-          tier: 'free',
-          query_count: 0,
-          purchased_credits: 0,
-        } : null);
-
         const hasFollowUpCandidate = Boolean(
           isFollowUp || inquiryKey || inquiryToken || threadId || sharedFollowUpId,
         );
@@ -7082,38 +7176,6 @@ Do not add any question after the exit offer. The person chooses the next move.
           classified: followUpContext.isFollowUp,
           reason: followUpContext.reason,
         });
-        const isFollowUpCheck = followUpContext.isFollowUp;
-        let quota = null;
-        if (!isFollowUpCheck && quotaIdentity) {
-          timing('quota_check_start');
-          try {
-            quota = await checkSubscriberQuota(
-              quotaIdentity,
-              previewTestEntitlement?.allowance ?? null,
-            );
-            timing('quota_check_end', {
-              outcome: 'success',
-              allowed: quota.allowed,
-              tier,
-            });
-          } catch (err) {
-            timing('quota_check_end', { outcome: 'error', tier });
-            throw err;
-          }
-          if (!quota.allowed) {
-            timing('access_complete', { route: 'subscriber', allowed: false, tier });
-            return res.status(200).json({
-              quota_exceeded: true,
-              tier,
-              queriesUsed: quota.queriesUsed,
-              limit: quota.limit,
-              credits: quota.credits,
-              message: quota.credits === 0
-                ? `You've used all ${quota.limit} queries for this period. Add Signal Sessions to continue, or wait for your next reset.`
-                : `You've reached your query limit and have no Signal Sessions remaining.`
-            });
-          }
-        }
         timing('access_complete', { route: 'subscriber', allowed: true, tier });
 
         const queryType = (() => {
@@ -7222,7 +7284,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           ownerUserId: userId,
           usageUserId: subscriber?.id || null,
           usageQueryType: 'subscriber',
-          usageCreditSource: quota?.creditSource || 'tier_allocation',
+          usageCreditSource: entitlementAdmission.entitlement_source,
         });
         timing('request_complete', { route: 'subscriber', tier });
         return res.end();
@@ -7410,27 +7472,6 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   // ── FREE / ANONYMOUS PATH ─────────────────────────────────────────────────
   timing('anonymous_access_start');
-  try {
-    const log = await getQueryLog(ip);
-    if (log) {
-      const firstQuery = new Date(log.first_query_at);
-      const hoursSinceFirst = (Date.now() - firstQuery.getTime()) / (1000 * 60 * 60);
-      if (hoursSinceFirst >= WINDOW_HOURS) {
-        await resetQueryLog(ip);
-      } else if (log.query_count >= QUERY_LIMIT) {
-        const hoursRemaining = Math.ceil(WINDOW_HOURS - hoursSinceFirst);
-        timing('access_complete', { route: 'free', allowed: false });
-        return res.status(429).json({
-          error: 'Query limit reached',
-          message: `You've used all ${QUERY_LIMIT} free queries. Access resets in ${hoursRemaining} hour${hoursRemaining !== 1 ? 's' : ''}.`,
-          hoursRemaining
-        });
-      }
-    }
-  } catch (err) {
-    timing('anonymous_access_error');
-    console.error('Rate limit check failed:', err.message);
-  }
   timing('access_complete', { route: 'free', allowed: true, tier: 'free' });
 
   const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);

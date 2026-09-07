@@ -103,6 +103,19 @@ let queryLogReads = 0;
 let acknowledgedOwner = null;
 globalThis.fetch = async (url, options = {}) => {
   const target = String(url);
+  if (target.endsWith('/rest/v1/prism_guests') && options.method === 'POST') {
+    return new Response('', { status: 201 });
+  }
+  if (target.includes('/rpc/prism_query_access')) {
+    const body = JSON.parse(options.body);
+    if (body.p_preview_allowance) {
+      return Response.json([{ allowed: true, entitlement_source: 'preview', remaining: 40, reset_at: null }]);
+    }
+    return Response.json([{ allowed: Boolean(body.p_user_id), entitlement_source: 'explorer', remaining: body.p_user_id ? 1 : 0, reset_at: null }]);
+  }
+  if (target.includes('/rpc/prepare_prism_inquiry')) {
+    return Response.json([{ allowed: false, entitlement_source: 'explorer', remaining: 0, reset_at: null }]);
+  }
   if (target.endsWith('/auth/v1/user')) {
     if (options.headers.Authorization === 'Bearer valid-token') {
       return Response.json({ id: TEST_USER_ID, email: 'actual.user@example.com' });
@@ -218,23 +231,19 @@ await handler(request({
   url: '/api/interpret?email=paid.customer%40example.com',
 }), res);
 assert.equal(res.statusCode, 200);
-assert.equal(requestedSubscriberEmail, 'actual.user@example.com');
-assert.deepEqual(JSON.parse(res.output), {
-  locked: false,
-  authenticated: true,
-});
+assert.equal(requestedSubscriberEmail, null, 'Entitlement status must not depend on legacy subscriber identity');
+assert.equal(JSON.parse(res.output).locked, false);
+assert.equal(JSON.parse(res.output).authenticated, true);
+assert.equal(JSON.parse(res.output).entitlementSource, 'explorer');
 
 res = new MockResponse();
 requestedSubscriberEmail = null;
 await handler(request({ token: 'preview-only-token' }), res);
 assert.equal(res.statusCode, 200);
 assert.equal(requestedSubscriberEmail, null, 'Preview entitlement must not require a billing subscriber row');
-assert.deepEqual(JSON.parse(res.output), {
-  locked: false,
-  queriesUsed: 0,
-  limit: 40,
-  previewTestAccess: true,
-});
+assert.equal(JSON.parse(res.output).locked, false);
+assert.equal(JSON.parse(res.output).remaining, 40);
+assert.equal(JSON.parse(res.output).previewTestAccess, true);
 
 res = new MockResponse();
 requestedSubscriberEmail = null;
@@ -243,8 +252,8 @@ await handler(request({
   url: '/api/interpret?email=paid.customer%40example.com',
 }), res);
 assert.equal(res.statusCode, 200);
-assert.equal(requestedSubscriberEmail, 'non.subscriber@example.com');
-assert.equal(JSON.parse(res.output).locked, true);
+assert.equal(requestedSubscriberEmail, null, 'Explorer access must not depend on a subscriber row');
+assert.equal(JSON.parse(res.output).locked, false, 'Verified non-subscribers retain Explorer access');
 
 res = new MockResponse();
 requestedSubscriberEmail = null;
@@ -263,7 +272,7 @@ await handler(request({
 }), res);
 assert.equal(res.statusCode, 429);
 assert.equal(requestedSubscriberEmail, null);
-assert.ok(queryLogReads > 0);
+assert.equal(queryLogReads, 0, 'Legacy IP query_log accounting must not authorize requests');
 
 const ownedPendingCommit = issuePendingInquiryCommit({
   inquiryKey: 'thread:authorization-test',

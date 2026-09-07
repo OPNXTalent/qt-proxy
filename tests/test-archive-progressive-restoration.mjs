@@ -10,7 +10,7 @@ const threadsApi = fs.readFileSync(new URL('../api/threads.js', import.meta.url)
 assert.match(threadsApi, /setHeader\('Cache-Control', 'private, no-store'\)/);
 assert.match(
   client,
-  /authenticatedFetch\(API_BASE \+ '\/api\/threads', \{\s*cache: 'no-store',\s*headers: \{ 'Content-Type': 'application\/json', 'x-user-email': email \}/,
+  /authenticatedFetch\(API_BASE \+ '\/api\/threads', \{\s*cache: 'no-store',\s*credentials: 'same-origin',\s*headers: \{ 'Content-Type': 'application\/json'/,
   'The registered Archive fetch must bypass browser response caching',
 );
 

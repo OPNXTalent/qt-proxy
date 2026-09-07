@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { PRISM_PRODUCT, queryBankCreditsForAmount } from '../lib/product-config.js';
 
 export const config = {
   api: {
@@ -16,28 +17,16 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Maps Stripe price amounts (in cents) to internal tier keys
 // and their monthly query limits
 const TIER_CONFIG = {
-  // Refraction Monthly  $9.99
-  999:  { tier: 'scholar',    limit: 100 },
-  // Refraction Annual   $99/yr → billed as $9900 cents
-  9900: { tier: 'scholar',    limit: 100 },
-  // Full Spectrum Monthly $24.99
-  2499: { tier: 'theologian', limit: 250 },
-  // Full Spectrum Annual $249/yr → billed as $24900 cents
-  24900:{ tier: 'theologian', limit: 250 },
-};
-
-// Signal Sessions — one-time purchase query credits
-const SIGNAL_CREDITS = {
-  299:  10,
-  699:  25,
-  1299: 50,
-  1999: 100,
+  [PRISM_PRODUCT.subscription.monthlyPriceCents]: {
+    tier: 'prism',
+    limit: PRISM_PRODUCT.subscription.monthlyQueries,
+  },
 };
 
 // ── Stripe payment link product IDs → Signal Sessions ──────────────
 // Used to distinguish one-time Signal purchases from subscriptions
 // in payment_intent.succeeded events
-const SIGNAL_AMOUNTS = new Set([299, 699, 1299, 1999]);
+const SIGNAL_AMOUNTS = new Set(Object.keys(PRISM_PRODUCT.queryBanks).map(Number));
 
 async function buffer(readable) {
   const chunks = [];
@@ -85,11 +74,19 @@ function supabaseHeaders() {
   };
 }
 
+async function prismRpc(name, body) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    headers: supabaseHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`${name} failed: ${response.status}`);
+  return response.json();
+}
+
 // Upsert subscriber on new subscription — sets tier, limit, reset date
-async function upsertSubscriber(email, customerId, subscriptionId, tier, limit, status) {
+async function upsertSubscriber(email, customerId, subscriptionId, tier, status) {
   if (!email) return;
-  const resetAt = new Date();
-  resetAt.setMonth(resetAt.getMonth() + 1);
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers?on_conflict=email`, {
     method: 'POST',
@@ -103,12 +100,20 @@ async function upsertSubscriber(email, customerId, subscriptionId, tier, limit, 
       stripe_subscription_id: subscriptionId,
       tier,
       status,
-      query_count: 0,
-      query_reset_at: resetAt.toISOString(),
       updated_at: new Date().toISOString()
     })
   });
   if (!res.ok) console.error('Supabase upsert error:', await res.text());
+}
+
+async function applyPrismSubscription(email, status, periodStart, periodEnd) {
+  if (!email) return;
+  await prismRpc('apply_prism_subscription_by_email', {
+    p_email: email,
+    p_status: status,
+    p_period_start: periodStart,
+    p_period_end: periodEnd,
+  });
 }
 
 // Update tier/status on subscription change
@@ -124,68 +129,15 @@ async function updateSubscription(subscriptionId, tier, limit, status) {
   if (!res.ok) console.error('Supabase update error:', await res.text());
 }
 
-// Reset monthly query count on successful invoice payment
-async function resetMonthlyQueries(subscriptionId) {
-  const resetAt = new Date();
-  resetAt.setMonth(resetAt.getMonth() + 1);
-
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/subscribers?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}`,
-    {
-      method: 'PATCH',
-      headers: { ...supabaseHeaders(), 'Prefer': 'return=minimal' },
-      body: JSON.stringify({
-        query_count: 0,
-        query_reset_at: resetAt.toISOString(),
-        status: 'active',
-        updated_at: new Date().toISOString()
-      })
-    }
-  );
-  if (!res.ok) console.error('Supabase reset error:', await res.text());
-}
-
-// Credit Signal Sessions purchased_credits by email
-async function creditSignalSessions(email, credits) {
+// Customer Query balances live only in prism_entitlements. The subscribers
+// row remains profile/subscription metadata and is not an accounting ledger.
+async function creditQueryBank(email, credits, fulfillmentKey) {
   if (!email || !credits) return;
-
-  // First get current purchased_credits
-  const getRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=purchased_credits`,
-    { headers: supabaseHeaders() }
-  );
-  const rows = await getRes.json();
-
-  if (!rows || rows.length === 0) {
-    // No subscriber record yet — create one with credits
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers?on_conflict=email`, {
-      method: 'POST',
-      headers: { ...supabaseHeaders(), 'Prefer': 'resolution=merge-duplicates' },
-      body: JSON.stringify({
-        email,
-        tier: 'free',
-        status: 'active',
-        purchased_credits: credits,
-        updated_at: new Date().toISOString()
-      })
-    });
-    if (!res.ok) console.error('Signal Sessions create error:', await res.text());
-    return;
-  }
-
-  const current = rows[0].purchased_credits || 0;
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}`,
-    {
-      method: 'PATCH',
-      headers: { ...supabaseHeaders(), 'Prefer': 'return=minimal' },
-      body: JSON.stringify({
-        purchased_credits: current + credits,
-        updated_at: new Date().toISOString()
-      })
-    }
-  );
-  if (!res.ok) console.error('Signal Sessions credit error:', await res.text());
+  await prismRpc('credit_prism_bank_by_email', {
+    p_email: email,
+    p_queries: credits,
+    p_fulfillment_key: fulfillmentKey,
+  });
 }
 
 async function updateSubscriberStatus(subscriptionId, status) {
@@ -233,13 +185,11 @@ function emailWrapper(content) {
 }
 
 const TIER_DISPLAY = {
-  scholar:    'Refraction',
-  theologian: 'Full Spectrum',
+  prism: 'Prism',
 };
 
 const TIER_DESC = {
-  scholar:    '100 queries per month to The Prism.',
-  theologian: '250 queries per month to The Prism.',
+  prism: '35 Queries per month to The Prism.',
 };
 
 export default async function handler(req, res) {
@@ -268,11 +218,16 @@ export default async function handler(req, res) {
         const subscriptionId = sub.id;
         const status = sub.status === 'active' ? 'active' : 'inactive';
         const amount = sub.items?.data?.[0]?.price?.unit_amount || 0;
-        const config = TIER_CONFIG[amount] || { tier: 'scholar', limit: 100 };
+        const config = TIER_CONFIG[amount];
+        if (!config) throw new Error(`Unrecognized Prism subscription amount: ${amount}`);
         const email = await getCustomerEmail(customerId);
+        const periodStart = new Date(sub.current_period_start * 1000).toISOString();
+        const periodEnd = new Date(sub.current_period_end * 1000).toISOString();
+
+        await applyPrismSubscription(email, status, periodStart, periodEnd);
 
         if (event.type === 'customer.subscription.created') {
-          await upsertSubscriber(email, customerId, subscriptionId, config.tier, config.limit, status);
+          await upsertSubscriber(email, customerId, subscriptionId, config.tier, status);
 
           if (email && status === 'active') {
             const tierName = TIER_DISPLAY[config.tier] || 'Refraction';
@@ -306,6 +261,12 @@ export default async function handler(req, res) {
         const sub = event.data.object;
         await updateSubscriberStatus(sub.id, 'inactive');
         const email = await getCustomerEmail(sub.customer);
+        await applyPrismSubscription(
+          email,
+          'canceled',
+          new Date(sub.current_period_start * 1000).toISOString(),
+          new Date(sub.current_period_end * 1000).toISOString(),
+        );
         if (email) {
           try {
             await sendEmail(
@@ -313,7 +274,7 @@ export default async function handler(req, res) {
               'Your Prism Subscription Has Been Cancelled',
               emailWrapper(`
                 <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your subscription has been cancelled.</p>
-                <p style="font-size:16px; line-height:1.8; color:#7a7890;">We hope The Prism served you well. You still have access to 3 free queries every 24 hours. If you ever want to return, your subscription is one step away.</p>
+                <p style="font-size:16px; line-height:1.8; color:#7a7890;">We hope The Prism served you well. Explorer access includes one successful Query per rolling 24 hours. If you ever want to return, your subscription is one step away.</p>
                 <div style="text-align:center; margin:40px 0;">
                   <a href="https://quantumtheology.app/#interpreter" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Resubscribe</a>
                 </div>
@@ -330,7 +291,16 @@ export default async function handler(req, res) {
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
         if (invoice.subscription) {
-          await resetMonthlyQueries(invoice.subscription);
+          const email = invoice.customer_email || (invoice.customer ? await getCustomerEmail(invoice.customer) : null);
+          const period = invoice.lines?.data?.[0]?.period;
+          if (email && period?.start && period?.end) {
+            await applyPrismSubscription(
+              email,
+              'active',
+              new Date(period.start * 1000).toISOString(),
+              new Date(period.end * 1000).toISOString(),
+            );
+          }
         }
         break;
       }
@@ -365,11 +335,11 @@ export default async function handler(req, res) {
         const amount = pi.amount;
 
         if (SIGNAL_AMOUNTS.has(amount)) {
-          const credits = SIGNAL_CREDITS[amount];
+          const credits = queryBankCreditsForAmount(amount);
           const email = pi.receipt_email || (pi.customer ? await getCustomerEmail(pi.customer) : null);
 
           if (email && credits) {
-            await creditSignalSessions(email, credits);
+            await creditQueryBank(email, credits, event.id);
             try {
               await sendEmail(
                 email,
