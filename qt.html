@@ -2781,7 +2781,9 @@ async function runInterpretation() {
   conversationHistory.push({ role: 'user', content: input });
 
   try {
-    const apiRawText = await callProxy(conversationHistory, input, requestId);
+    const apiResponse = await callProxy(conversationHistory, input, requestId);
+    const isProgressiveResponse = apiResponse && typeof apiResponse === 'object';
+    const apiRawText = isProgressiveResponse ? JSON.stringify(apiResponse) : String(apiResponse || '');
   
   // Store a condensed version in history to prevent payload bloat on follow-ups
   const condensed = apiRawText.length > 1000 
@@ -2789,8 +2791,8 @@ async function runInterpretation() {
     : apiRawText;
   conversationHistory.push({ role: 'assistant', content: condensed });
 
-    let parsed;
-    try {
+    let parsed = isProgressiveResponse ? apiResponse : null;
+    if (!isProgressiveResponse) try {
       let cleaned = apiRawText.trim();
       cleaned = cleaned.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
       const firstBrace = cleaned.indexOf('{');
@@ -3534,6 +3536,7 @@ async function callProxy(messages, rawQuery, requestId) {
                 firstDeltaSeen = true;
                 markPrismBrowserTiming(requestId, 'first_delta_received');
               }
+              showResult(true);
               renderProvisionalResponse(fullText, requestId);
             } else if (parsed.type === 'provisional_orientation' && parsed.text) {
               appendProvisionalOrientation(parsed.text, requestId);
@@ -3561,8 +3564,8 @@ async function callProxy(messages, rawQuery, requestId) {
               progressiveResult._artifactId = parsed.artifactId;
               progressiveResult._artifactRevision = parsed.artifactRevision;
               window._lastParsedResult = progressiveResult;
-              renderResult(progressiveResult);
               showResult(true);
+              renderResult(progressiveResult);
               tierFromStream = parsed.tier || tierFromStream;
               acceptInquiryCredential(parsed);
               if (parsed.threadId) activeThreadId = parsed.threadId;
@@ -3578,6 +3581,7 @@ async function callProxy(messages, rawQuery, requestId) {
               progressiveResult.interpretive_context = parsed.text || '';
               if (parsed.packet) progressiveResult = applyProgressivePacket(progressiveResult, parsed.packet);
               window._lastParsedResult = progressiveResult;
+              showResult(true);
               renderResult(progressiveResult);
               markPrismBrowserTiming(requestId, 'interpretive_context_visible');
             } else if (parsed.type === 'explore_context') {
@@ -3586,6 +3590,7 @@ async function callProxy(messages, rawQuery, requestId) {
               progressiveResult._artifactId = parsed.packet?.artifactId || progressiveResult._artifactId;
               progressiveResult._artifactRevision = parsed.packet?.artifactRevision || progressiveResult._artifactRevision;
               window._lastParsedResult = progressiveResult;
+              showResult(true);
               renderResult(progressiveResult);
               markPrismBrowserTiming(requestId, 'explore_context_visible');
             } else if (parsed.type === 'analysis_status' && parsed.status === 'incomplete') {
@@ -3612,7 +3617,14 @@ async function callProxy(messages, rawQuery, requestId) {
               tierFromStream = parsed.tier;
               acceptInquiryCredential(parsed);
             } else if (parsed.type === 'error') {
-              throw new Error('Stream error: ' + parsed.error);
+              if (canonicalAvailable) {
+                progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
+                progressiveResult._contextError = parsed.error || 'OPTIONAL_CONTEXT_FAILED';
+                window._lastParsedResult = progressiveResult;
+                renderResult(progressiveResult);
+              } else {
+                throw new Error('Stream error: ' + parsed.error);
+              }
             }
           } catch(e) {
             if (e.message && e.message.startsWith('Stream error')) throw e;
@@ -3630,6 +3642,7 @@ async function callProxy(messages, rawQuery, requestId) {
             const parsed = JSON.parse(data);
             if (parsed.type === 'response_delta' && parsed.text) {
               fullText += parsed.text;
+              showResult(true);
               renderProvisionalResponse(fullText, requestId);
             } else if (parsed.type === 'provisional_orientation' && parsed.text) {
               appendProvisionalOrientation(parsed.text, requestId);
@@ -3646,6 +3659,7 @@ async function callProxy(messages, rawQuery, requestId) {
               progressiveResult._artifactId = parsed.artifactId;
               progressiveResult._artifactRevision = parsed.artifactRevision;
               window._lastParsedResult = progressiveResult;
+              showResult(true);
               renderResult(progressiveResult);
               tierFromStream = parsed.tier || tierFromStream;
               acceptInquiryCredential(parsed);
@@ -3693,7 +3707,7 @@ async function callProxy(messages, rawQuery, requestId) {
   if (progressiveResult) {
     progressiveResult._canonicalAvailable = canonicalAvailable;
     window._lastParsedResult = progressiveResult;
-    return JSON.stringify(progressiveResult);
+    return progressiveResult;
   }
   return fullText;
 }
