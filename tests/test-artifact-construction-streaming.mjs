@@ -19,13 +19,24 @@ function anthropicStream(events, intervalMs = 0) {
 }
 
 try {
-  const deltas = ['{"orientation":"A real', ' orientation.","canonical_response":"Answer."}'];
+  const toolJsonDeltas = ['{"orientation":"A real', ' orientation.","canonical_response":"Answer."}'];
   global.fetch = async (_url, options) => {
     const request = JSON.parse(options.body);
-    assert.equal(request.stream, true, 'artifact construction requests Anthropic streaming');
+    assert.equal(request.stream, true, 'forced structured output requests Anthropic streaming');
+    assert.equal(request.tool_choice.name, 'emit_interpretation_artifact');
     return new Response(anthropicStream([
       { type: 'message_start', message: { id: 'msg_test', usage: { input_tokens: 12 } } },
-      ...deltas.map(text => ({ type: 'content_block_delta', delta: { type: 'text_delta', text } })),
+      {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'tool_use', id: 'tool_test', name: 'emit_interpretation_artifact', input: {} },
+      },
+      ...toolJsonDeltas.map(partial_json => ({
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'input_json_delta', partial_json },
+      })),
+      { type: 'content_block_stop', index: 0 },
       { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 8 } },
       { type: 'message_stop' },
     ], 8), { status: 200, headers: { 'request-id': 'req_test' } });
@@ -40,9 +51,38 @@ try {
     timeoutMs: 20,
     maxTotalMs: 200,
     onTextDelta: delta => received.push(delta),
+    structuredOutputSchema: { type: 'object' },
+    structuredOutputName: 'emit_interpretation_artifact',
   });
-  assert.equal(result, deltas.join(''));
-  assert.deepEqual(received, deltas, 'provider deltas are forwarded before completion');
+  assert.deepEqual(result, {
+    orientation: 'A real orientation.',
+    canonical_response: 'Answer.',
+  });
+  assert.deepEqual(received, toolJsonDeltas, 'tool JSON deltas are forwarded before completion');
+
+  const textDeltas = ['plain ', 'stream'];
+  global.fetch = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    assert.equal(request.stream, true);
+    assert.equal(request.tools, undefined, 'plain streaming does not add structured-output tools');
+    return new Response(anthropicStream([
+      { type: 'message_start', message: { id: 'msg_text', usage: { input_tokens: 4 } } },
+      ...textDeltas.map(text => ({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } })),
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } },
+      { type: 'message_stop' },
+    ], 8), { status: 200 });
+  };
+  const receivedText = [];
+  const textResult = await callInquiryModel({
+    model: 'claude-sonnet-4-6',
+    maxTokens: 100,
+    prompt: 'plain request',
+    timeoutMs: 20,
+    maxTotalMs: 200,
+    onTextDelta: delta => receivedText.push(delta),
+  });
+  assert.equal(textResult, textDeltas.join(''));
+  assert.deepEqual(receivedText, textDeltas, 'plain text deltas remain supported');
 
   global.fetch = async (_url, options) => new Response(new ReadableStream({
     start(controller) {

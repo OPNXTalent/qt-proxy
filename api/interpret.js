@@ -5868,6 +5868,7 @@ export async function callInquiryModel({
     let cacheCreationInputTokens = 0;
     let cacheReadInputTokens = 0;
     let stopReason = null;
+    const toolBlocks = new Map();
 
     const consumeLine = line => {
       if (!line.startsWith('data: ')) return;
@@ -5883,12 +5884,27 @@ export async function callInquiryModel({
         outputTokens = Number(usage.output_tokens || 0);
         cacheCreationInputTokens = Number(usage.cache_creation_input_tokens || 0);
         cacheReadInputTokens = Number(usage.cache_read_input_tokens || 0);
+      } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+        armTimeout();
+        toolBlocks.set(event.index, {
+          name: event.content_block.name,
+          input: event.content_block.input,
+          partialJson: '',
+        });
       } else if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
         armTimeout();
         const delta = String(event.delta.text || '');
         if (delta) {
           text += delta;
           onTextDelta(delta);
+        }
+      } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
+        armTimeout();
+        const partialJson = String(event.delta.partial_json || '');
+        const toolBlock = toolBlocks.get(event.index);
+        if (toolBlock && partialJson) {
+          toolBlock.partialJson += partialJson;
+          onTextDelta(partialJson);
         }
       } else if (event.type === 'message_delta') {
         armTimeout();
@@ -5935,6 +5951,40 @@ export async function callInquiryModel({
       retryOrdinal: telemetryRetryOrdinal, succeeded: true,
     });
     if (stopReason === 'max_tokens') throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
+    if (structuredOutputSchema) {
+      const structuredBlock = [...toolBlocks.values()].find(
+        block => block.name === structuredOutputName,
+      );
+      let structuredInput = structuredBlock?.input;
+      if (structuredBlock?.partialJson) {
+        try {
+          structuredInput = JSON.parse(structuredBlock.partialJson);
+        } catch {
+          structuredInput = null;
+        }
+      }
+      if (!structuredInput || typeof structuredInput !== 'object' || Array.isArray(structuredInput)) {
+        if (typeof structuredOutputDiagnostic === 'function') {
+          structuredOutputDiagnostic({
+            outcome: 'tool_use_missing',
+            providerStatus: response.status,
+            providerErrorCode: null,
+            toolUseReturned: Boolean(structuredBlock),
+            errorCode: 'INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING',
+          });
+        }
+        throw new Error('INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING');
+      }
+      if (typeof structuredOutputDiagnostic === 'function') {
+        structuredOutputDiagnostic({
+          outcome: 'tool_use_returned',
+          providerStatus: response.status,
+          providerErrorCode: null,
+          toolUseReturned: true,
+        });
+      }
+      return structuredInput;
+    }
     return text.trim();
   }
 
@@ -6213,6 +6263,9 @@ async function constructAuditedArtifact({
     timeoutMs: 75000,
     system: cachedArtifactConstructionSystem(systemPrompt),
     prompt: query,
+    structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
+    structuredOutputName: 'emit_interpretation_artifact',
+    structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', diagnostic),
     telemetryStage: 'artifact_construction',
     telemetryTurnType: 'primary',
     onTextDelta: delta => {
@@ -6225,12 +6278,14 @@ async function constructAuditedArtifact({
     maxTotalMs: 240000,
   });
   let rawCore;
-  try {
+  if (rawCoreText && typeof rawCoreText === 'object' && !Array.isArray(rawCoreText)) {
+    rawCore = rawCoreText;
+  } else try {
     rawCore = parseModelJson(rawCoreText);
   } catch (error) {
     timing('artifact_json_repair_start', {
       reason: error?.message || 'MODEL_JSON_INVALID',
-      candidateChars: rawCoreText.length,
+      candidateChars: String(rawCoreText || '').length,
     });
     const repairedCore = await callInquiryModel({
       model: 'claude-haiku-4-5-20251001',

@@ -43,6 +43,8 @@ assert.match(artifactCall, /maxTokens: 2400/);
 assert.match(artifactCall, /timeoutMs: 75000/);
 assert.match(artifactCall, /system: cachedArtifactConstructionSystem\(systemPrompt\)/);
 assert.match(artifactCall, /prompt: query/);
+assert.match(artifactCall, /structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA/);
+assert.match(artifactCall, /structuredOutputName: 'emit_interpretation_artifact'/);
 assert.doesNotMatch(
   artifactCall,
   /cache_control/,
