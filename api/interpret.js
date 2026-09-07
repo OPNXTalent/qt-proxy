@@ -5747,7 +5747,7 @@ async function commitCanonicalInquiryState({
   };
 }
 
-async function callInquiryModel({
+export async function callInquiryModel({
   model,
   maxTokens,
   prompt,
@@ -5760,10 +5760,25 @@ async function callInquiryModel({
   telemetryStage = 'unspecified',
   telemetryTurnType = 'unknown',
   telemetryRetryOrdinal = 0,
+  onTextDelta = null,
+  maxTotalMs = null,
 }) {
   const providerStartedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort('MODEL_TIMEOUT'), timeoutMs);
+  let timeout;
+  let totalTimeout;
+  const streaming = typeof onTextDelta === 'function';
+  const armTimeout = () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(
+      () => controller.abort(streaming ? 'MODEL_STREAM_STALLED' : 'MODEL_TIMEOUT'),
+      timeoutMs,
+    );
+  };
+  armTimeout();
+  if (streaming && Number.isFinite(maxTotalMs) && maxTotalMs > 0) {
+    totalTimeout = setTimeout(() => controller.abort('MODEL_STREAM_TOTAL_TIMEOUT'), maxTotalMs);
+  }
   let response;
   try {
     response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -5787,6 +5802,7 @@ async function callInquiryModel({
           }],
           tool_choice: { type: 'tool', name: structuredOutputName },
         } : {}),
+        ...(streaming ? { stream: true } : {}),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -5802,7 +5818,10 @@ async function callInquiryModel({
     if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
     throw error;
   } finally {
-    clearTimeout(timeout);
+    if (!streaming || !response?.ok) {
+      clearTimeout(timeout);
+      clearTimeout(totalTimeout);
+    }
   }
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
@@ -5833,6 +5852,92 @@ async function callInquiryModel({
     }
     throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
   }
+  if (streaming) {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      clearTimeout(timeout);
+      clearTimeout(totalTimeout);
+      throw new Error('INQUIRY_MODEL_STREAM_UNAVAILABLE');
+    }
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let text = '';
+    let providerRequestId = response.headers.get('request-id') || response.headers.get('x-request-id') || null;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheCreationInputTokens = 0;
+    let cacheReadInputTokens = 0;
+    let stopReason = null;
+
+    const consumeLine = line => {
+      if (!line.startsWith('data: ')) return;
+      const payload = line.slice(6).trim();
+      if (!payload || payload === '[DONE]') return;
+      let event;
+      try { event = JSON.parse(payload); } catch { return; }
+      if (event.type === 'message_start') {
+        armTimeout();
+        providerRequestId = event.message?.id || providerRequestId;
+        const usage = event.message?.usage || {};
+        inputTokens = Number(usage.input_tokens || 0);
+        outputTokens = Number(usage.output_tokens || 0);
+        cacheCreationInputTokens = Number(usage.cache_creation_input_tokens || 0);
+        cacheReadInputTokens = Number(usage.cache_read_input_tokens || 0);
+      } else if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        armTimeout();
+        const delta = String(event.delta.text || '');
+        if (delta) {
+          text += delta;
+          onTextDelta(delta);
+        }
+      } else if (event.type === 'message_delta') {
+        armTimeout();
+        stopReason = event.delta?.stop_reason || stopReason;
+        outputTokens = Number(event.usage?.output_tokens || outputTokens);
+      } else if (event.type === 'error') {
+        throw new Error(`INQUIRY_MODEL_STREAM_ERROR:${String(event.error?.type || 'provider_error')}`);
+      }
+    };
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) consumeLine(line);
+      }
+      buffer += decoder.decode();
+      for (const line of buffer.split('\n')) consumeLine(line);
+    } catch (error) {
+      console.log('[prism-provider-cogs]', {
+        stage: telemetryStage, turnType: telemetryTurnType, model,
+        providerRequestId, inputTokens, outputTokens,
+        cacheCreationInputTokens, cacheReadInputTokens,
+        stopReason: controller.signal.aborted
+          ? String(controller.signal.reason || 'application_timeout').toLowerCase()
+          : 'stream_error',
+        latencyMs: Date.now() - providerStartedAt,
+        retryOrdinal: telemetryRetryOrdinal, succeeded: false,
+      });
+      if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      clearTimeout(totalTimeout);
+    }
+    console.log('[prism-provider-cogs]', {
+      stage: telemetryStage, turnType: telemetryTurnType, model,
+      providerRequestId, inputTokens, outputTokens,
+      cacheCreationInputTokens, cacheReadInputTokens, stopReason,
+      latencyMs: Date.now() - providerStartedAt,
+      retryOrdinal: telemetryRetryOrdinal, succeeded: true,
+    });
+    if (stopReason === 'max_tokens') throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
+    return text.trim();
+  }
+
   const data = await response.json();
   const usage = data?.usage || {};
   console.log('[prism-provider-cogs]', {
@@ -6096,8 +6201,10 @@ async function constructAuditedArtifact({
   systemPrompt,
   ownerUserId,
   threadId,
+  sse,
 }) {
   let started = Date.now();
+  let firstProvisionalDelta = true;
   timing('artifact_construction_start');
   const rawCoreText = await callInquiryModel({
     model: 'claude-sonnet-4-6',
@@ -6108,6 +6215,14 @@ async function constructAuditedArtifact({
     prompt: query,
     telemetryStage: 'artifact_construction',
     telemetryTurnType: 'primary',
+    onTextDelta: delta => {
+      if (firstProvisionalDelta) {
+        firstProvisionalDelta = false;
+        timing('artifact_provisional_stream_start');
+      }
+      sse?.write({ type: 'delta', text: delta, provisional: true });
+    },
+    maxTotalMs: 240000,
   });
   let rawCore;
   try {
@@ -6297,6 +6412,7 @@ async function runProgressiveInitialInquiry({
     revision: 1,
     systemPrompt,
     ownerUserId,
+    sse,
   });
 
   let threadId = null;

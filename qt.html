@@ -3521,7 +3521,7 @@ async function callProxy(messages, rawQuery, requestId) {
 
     let extraction;
     try {
-      extraction = extractor(fullText, 'recognition');
+      extraction = extractor(fullText, 'orientation');
     } catch {
       extraction = { status: 'invalid' };
     }
