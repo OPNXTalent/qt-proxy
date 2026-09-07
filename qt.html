@@ -2531,23 +2531,26 @@ function markPrismBrowserTiming(requestId, event, details) {
   });
 }
 
-function showEarlyRecognition(recognition, requestId) {
-  if (typeof recognition !== 'string' || !recognition.trim()) return false;
-  if (prismEarlyRecognitionRequests.has(requestId)) return false;
+const prismProvisionalOrientations = new Map();
 
-  prismEarlyRecognitionRequests.add(requestId);
+function appendProvisionalOrientation(fragment, requestId) {
+  if (typeof fragment !== 'string' || !fragment) return;
+  const orientation = (prismProvisionalOrientations.get(requestId) || '') + fragment;
+  prismProvisionalOrientations.set(requestId, orientation);
   document.getElementById('resultContent').innerHTML =
     '<div id="earlyRecognition" aria-live="polite">' +
-      '<div class="orientation-block"><p>' + escHtml(recognition.trim()) + '</p></div>' +
+      '<div class="orientation-block"><p>' + escHtml(orientation) + '</p></div>' +
       '<div class="early-recognition-progress">Continuing the interpretation<span id="streamDots">...</span></div>' +
     '</div>';
 
-  requestAnimationFrame(function() {
+  if (!prismEarlyRecognitionRequests.has(requestId)) {
+    prismEarlyRecognitionRequests.add(requestId);
     requestAnimationFrame(function() {
-      markPrismBrowserTiming(requestId, 'first_recognition_visible', { source: 'incremental' });
+      requestAnimationFrame(function() {
+        markPrismBrowserTiming(requestId, 'first_recognition_visible', { source: 'provisional_orientation' });
+      });
     });
-  });
-  return true;
+  }
 }
 
 function setType(type, el) {
@@ -3508,31 +3511,9 @@ async function callProxy(messages, rawQuery, requestId) {
   let tierFromStream = null;
   let streamTruncated = false;
   let firstDeltaSeen = false;
-  let earlyRecognitionShown = false;
-  let earlyRecognitionDisabled = false;
   let progressiveResult = null;
   let canonicalAvailable = false;
   window._streamTruncated = false;
-
-  function considerEarlyRecognition() {
-    if (earlyRecognitionShown || earlyRecognitionDisabled) return;
-    const extractor = window.PrismStreamJson?.extractCompleteJsonString;
-    if (typeof extractor !== 'function') return;
-
-    let extraction;
-    try {
-      extraction = extractor(fullText, 'orientation');
-    } catch {
-      extraction = { status: 'invalid' };
-    }
-
-    if (extraction.status === 'complete') {
-      earlyRecognitionShown = showEarlyRecognition(extraction.value, requestId);
-    } else if (extraction.status === 'invalid') {
-      earlyRecognitionDisabled = true;
-      markPrismBrowserTiming(requestId, 'recognition_extraction_invalid');
-    }
-  }
 
   // Show streaming indicator
   document.getElementById('loadingBlock').classList.remove('visible');
@@ -3560,7 +3541,12 @@ async function callProxy(messages, rawQuery, requestId) {
           const data = line.slice(6).trim();
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type === 'packet' && parsed.packet) {
+            if (parsed.type === 'provisional_orientation' && parsed.text) {
+              appendProvisionalOrientation(parsed.text, requestId);
+            } else if (parsed.type === 'packet' && parsed.packet) {
+              if (parsed.packet.packetType === 'inquiry_orientation') {
+                prismProvisionalOrientations.delete(requestId);
+              }
               progressiveResult = applyProgressivePacket(progressiveResult, parsed.packet);
               window._lastParsedResult = progressiveResult;
               renderResult(progressiveResult);
@@ -3600,7 +3586,6 @@ async function callProxy(messages, rawQuery, requestId) {
                 markPrismBrowserTiming(requestId, 'first_delta_received');
               }
               fullText += parsed.text;
-              considerEarlyRecognition();
             } else if (parsed.type === 'corrected') {
               // Coherence check trimmed a momentum question — replace accumulated text
               fullText = parsed.text;
@@ -3627,7 +3612,12 @@ async function callProxy(messages, rawQuery, requestId) {
           const data = line.slice(6).trim();
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type === 'packet' && parsed.packet) {
+            if (parsed.type === 'provisional_orientation' && parsed.text) {
+              appendProvisionalOrientation(parsed.text, requestId);
+            } else if (parsed.type === 'packet' && parsed.packet) {
+              if (parsed.packet.packetType === 'inquiry_orientation') {
+                prismProvisionalOrientations.delete(requestId);
+              }
               progressiveResult = applyProgressivePacket(progressiveResult, parsed.packet);
               renderResult(progressiveResult);
             } else if (parsed.type === 'canonical_complete') {
@@ -3640,7 +3630,6 @@ async function callProxy(messages, rawQuery, requestId) {
                 markPrismBrowserTiming(requestId, 'first_delta_received');
               }
               fullText += parsed.text;
-              considerEarlyRecognition();
             } else if (parsed.type === 'done') {
               tierFromStream = parsed.tier;
               acceptInquiryCredential(parsed);

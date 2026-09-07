@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {
   callInquiryModel,
+  extractProvisionalJsonStringValue,
   runArtifactConstructionWithRetry,
 } from '../api/interpret.js';
 
@@ -45,7 +46,8 @@ try {
     ], 8), { status: 200, headers: { 'request-id': 'req_test' } });
   };
 
-  const received = [];
+  const receivedText = [];
+  const receivedStructured = [];
   const result = await callInquiryModel({
     model: 'claude-sonnet-4-6',
     maxTokens: 2400,
@@ -53,7 +55,8 @@ try {
     system: [{ type: 'text', text: 'static framework', cache_control: { type: 'ephemeral' } }],
     timeoutMs: 20,
     maxTotalMs: 200,
-    onTextDelta: delta => received.push(delta),
+    onTextDelta: delta => receivedText.push(delta),
+    onStructuredInputProgress: progress => receivedStructured.push(progress),
     structuredOutputSchema: { type: 'object' },
     structuredOutputName: 'emit_interpretation_artifact',
   });
@@ -61,7 +64,24 @@ try {
     orientation: 'A real orientation.',
     canonical_response: 'Answer.',
   });
-  assert.deepEqual(received, toolJsonDeltas, 'tool JSON deltas are forwarded before completion');
+  assert.deepEqual(receivedText, [], 'raw tool JSON is never forwarded as prose');
+  assert.equal(receivedStructured.length, 2);
+  assert.deepEqual(
+    receivedStructured.map(({ name, partialJson }) => ({ name, partialJson })),
+    [
+      { name: 'emit_interpretation_artifact', partialJson: toolJsonDeltas[0] },
+      { name: 'emit_interpretation_artifact', partialJson: toolJsonDeltas.join('') },
+    ],
+    'structured progress exposes accumulated tool input only to the server boundary',
+  );
+  assert.deepEqual(
+    receivedStructured.map(({ partialJson }) => extractProvisionalJsonStringValue(partialJson, 'orientation')),
+    [
+      { found: true, complete: false, value: 'A real' },
+      { found: true, complete: true, value: 'A real orientation.' },
+    ],
+    'orientation prose can be emitted incrementally without exposing raw JSON',
+  );
 
   const textDeltas = ['plain ', 'stream'];
   global.fetch = async (_url, options) => {
@@ -75,17 +95,17 @@ try {
       { type: 'message_stop' },
     ], 8), { status: 200 });
   };
-  const receivedText = [];
+  const receivedPlainText = [];
   const textResult = await callInquiryModel({
     model: 'claude-sonnet-4-6',
     maxTokens: 100,
     prompt: 'plain request',
     timeoutMs: 20,
     maxTotalMs: 200,
-    onTextDelta: delta => receivedText.push(delta),
+    onTextDelta: delta => receivedPlainText.push(delta),
   });
   assert.equal(textResult, textDeltas.join(''));
-  assert.deepEqual(receivedText, textDeltas, 'plain text deltas remain supported');
+  assert.deepEqual(receivedPlainText, textDeltas, 'plain text deltas remain supported');
 
   global.fetch = async (_url, options) => new Response(new ReadableStream({
     start(controller) {
@@ -146,8 +166,10 @@ try {
     maxTotalMs: 500,
     structuredOutputSchema: { type: 'object' },
     structuredOutputName: 'emit_interpretation_artifact',
-    onTextDelta: delta => {
-      if (options.forwardProvisional) retryProvisional.push(delta);
+    onStructuredInputProgress: ({ partialJson }) => {
+      if (options.forwardProvisional) {
+        retryProvisional.push(extractProvisionalJsonStringValue(partialJson, 'orientation').value);
+      }
     },
     telemetryRetryOrdinal: options.retryOrdinal,
   }));
@@ -162,7 +184,7 @@ assert.deepEqual(retryAttempts, [
   { maxTokens: 2400, retryOrdinal: 0 },
   { maxTokens: 3600, retryOrdinal: 1 },
 ]);
-assert.equal(retryProvisional.length, 1, 'the retry does not replay provisional orientation JSON');
+assert.deepEqual(retryProvisional, ['First provisional orientation.'], 'the retry does not replay provisional prose');
 
 let durableCompletionCalls = 0;
 await assert.rejects(
@@ -183,13 +205,16 @@ assert.equal(
 const api = fs.readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
 const client = fs.readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 
-assert.match(api, /onTextDelta: delta => \{[\s\S]*?sse\?\.write\(\{ type: 'delta', text: delta, provisional: true \}\);[\s\S]*?\}/);
+assert.match(api, /onStructuredInputProgress: \(\{ name, partialJson \}\) => \{[\s\S]*?type: 'provisional_orientation', text/);
 assert.match(api, /const rawCoreText = await runArtifactConstructionWithRetry\([\s\S]*?await completeInterpretationArtifact\(/);
 assert.ok(
   api.indexOf('const rawCoreText = await runArtifactConstructionWithRetry(') < api.indexOf('await completeInterpretationArtifact('),
   'provisional streaming remains upstream of durable completion and charging',
 );
-assert.match(client, /extractor\(fullText, 'orientation'\)/);
+assert.doesNotMatch(client, /extractor\(fullText, 'orientation'\)/);
+assert.match(client, /parsed\.type === 'provisional_orientation'[\s\S]*?appendProvisionalOrientation\(parsed\.text, requestId\)/);
+assert.match(client, /packetType === 'inquiry_orientation'[\s\S]*?prismProvisionalOrientations\.delete\(requestId\)/,
+  'the canonical orientation replaces and releases provisional presentation state');
 
 const scriptBodies = [...client.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
   .map(match => match[1])

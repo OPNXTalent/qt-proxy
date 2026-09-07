@@ -5761,13 +5761,15 @@ export async function callInquiryModel({
   telemetryTurnType = 'unknown',
   telemetryRetryOrdinal = 0,
   onTextDelta = null,
+  onStructuredInputProgress = null,
   maxTotalMs = null,
 }) {
   const providerStartedAt = Date.now();
   const controller = new AbortController();
   let timeout;
   let totalTimeout;
-  const streaming = typeof onTextDelta === 'function';
+  const streaming = typeof onTextDelta === 'function'
+    || typeof onStructuredInputProgress === 'function';
   const armTimeout = () => {
     clearTimeout(timeout);
     timeout = setTimeout(
@@ -5896,7 +5898,7 @@ export async function callInquiryModel({
         const delta = String(event.delta.text || '');
         if (delta) {
           text += delta;
-          onTextDelta(delta);
+          onTextDelta?.(delta);
         }
       } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
         armTimeout();
@@ -5904,7 +5906,11 @@ export async function callInquiryModel({
         const toolBlock = toolBlocks.get(event.index);
         if (toolBlock && partialJson) {
           toolBlock.partialJson += partialJson;
-          onTextDelta(partialJson);
+          onStructuredInputProgress?.({
+            index: event.index,
+            name: toolBlock.name,
+            partialJson: toolBlock.partialJson,
+          });
         }
       } else if (event.type === 'message_delta') {
         armTimeout();
@@ -6047,6 +6053,48 @@ export async function runArtifactConstructionWithRetry(attempt) {
   } catch (error) {
     if (error?.message !== 'INQUIRY_MODEL_OUTPUT_TRUNCATED') throw error;
     return attempt({ maxTokens: 3600, retryOrdinal: 1, forwardProvisional: false });
+  }
+}
+
+export function extractProvisionalJsonStringValue(source, targetKey) {
+  if (typeof source !== 'string' || typeof targetKey !== 'string' || !targetKey) {
+    return { found: false, complete: false, value: '' };
+  }
+  const keyPattern = new RegExp(`(?:^|[,\\{]\\s*)"${targetKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s*:\\s*"`);
+  const match = keyPattern.exec(source);
+  if (!match) return { found: false, complete: false, value: '' };
+  let cursor = match.index + match[0].length;
+  let value = '';
+  while (cursor < source.length) {
+    const char = source[cursor++];
+    if (char === '"') return { found: true, complete: true, value };
+    if (char !== '\\') {
+      if (char.charCodeAt(0) < 0x20) return { found: true, complete: false, value };
+      value += char;
+      continue;
+    }
+    if (cursor >= source.length) break;
+    const escaped = source[cursor++];
+    if (escaped === 'u') {
+      const hex = source.slice(cursor, cursor + 4);
+      if (!/^[0-9a-fA-F]{4}$/.test(hex)) break;
+      value += String.fromCharCode(parseInt(hex, 16));
+      cursor += 4;
+    } else {
+      const escapes = { '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t' };
+      if (!(escaped in escapes)) return { found: true, complete: false, value };
+      value += escapes[escaped];
+    }
+  }
+  return { found: true, complete: false, value };
+}
+
+export async function runProgressiveAnalysisAuditWithRetry(attempt) {
+  try {
+    return { value: await attempt({ maxTokens: 1800, retryOrdinal: 0 }), retried: false };
+  } catch (error) {
+    if (error?.message !== 'INQUIRY_MODEL_OUTPUT_TRUNCATED') throw error;
+    return { value: await attempt({ maxTokens: 3000, retryOrdinal: 1 }), retried: true };
   }
 }
 
@@ -6264,6 +6312,7 @@ async function constructAuditedArtifact({
 }) {
   let started = Date.now();
   let firstProvisionalDelta = true;
+  let provisionalOrientationLength = 0;
   timing('artifact_construction_start');
   const rawCoreText = await runArtifactConstructionWithRetry(async ({
     maxTokens,
@@ -6284,13 +6333,18 @@ async function constructAuditedArtifact({
       telemetryStage: 'artifact_construction',
       telemetryTurnType: 'primary',
       telemetryRetryOrdinal: retryOrdinal,
-      onTextDelta: delta => {
+      onStructuredInputProgress: ({ name, partialJson }) => {
         if (!forwardProvisional) return;
-        if (firstProvisionalDelta) {
+        if (name !== 'emit_interpretation_artifact') return;
+        const orientation = extractProvisionalJsonStringValue(partialJson, 'orientation');
+        if (!orientation.found || orientation.value.length <= provisionalOrientationLength) return;
+        const text = orientation.value.slice(provisionalOrientationLength);
+        provisionalOrientationLength = orientation.value.length;
+        if (firstProvisionalDelta && text.trim()) {
           firstProvisionalDelta = false;
           timing('artifact_provisional_stream_start');
         }
-        sse?.write({ type: 'delta', text: delta, provisional: true });
+        sse?.write({ type: 'provisional_orientation', text });
       },
       maxTotalMs: 240000,
     });
@@ -6405,18 +6459,26 @@ Remove or localize any contradiction, unsupported expansion, invented source, or
 
 Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText}`;
     timing('progressive_analysis_audit_start');
-    const auditedText = await callInquiryModel({
-      model: 'claude-haiku-4-5-20251001',
-      maxTokens: 1800,
-      timeoutMs: 40000,
-      prompt: auditPrompt,
-      telemetryStage: 'progressive_analysis_audit',
-      telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
+    const auditResult = await runProgressiveAnalysisAuditWithRetry(async ({ maxTokens, retryOrdinal }) => {
+      if (retryOrdinal > 0) timing('progressive_analysis_audit_truncation_retry_start', { maxTokens });
+      const value = await callInquiryModel({
+        model: 'claude-haiku-4-5-20251001',
+        maxTokens,
+        timeoutMs: 40000,
+        prompt: auditPrompt,
+        telemetryStage: 'progressive_analysis_audit',
+        telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
+        telemetryRetryOrdinal: retryOrdinal,
+      });
+      if (retryOrdinal > 0) timing('progressive_analysis_audit_truncation_retry_complete', { maxTokens });
+      return value;
     });
+    const auditedText = auditResult.value;
     let enrichment = validateEnrichment(parseModelJson(auditedText));
     timing('progressive_analysis_audit_complete');
     if (!hasSubstantiveEnrichment(enrichment)) {
       timing('progressive_analysis_audit_empty', { error: 'ENRICHMENT_AUDIT_EMPTY' });
+      if (auditResult.retried) throw new Error('ENRICHMENT_AUDIT_EMPTY');
       timing('progressive_analysis_audit_retry_start');
       const retriedAudit = await callInquiryModel({
         model: 'claude-haiku-4-5-20251001',
