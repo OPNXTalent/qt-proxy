@@ -423,40 +423,15 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
-
-    const ownerUserId = authenticatedUserId;
-
-    const threadRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${ownerUserId}&select=id&limit=1`,
-      { headers: sbHeaders() }
-    );
-    const threads = await threadRes.json();
-    if (!threads?.length) return res.status(403).json({ error: 'Thread not found or not owned by user' });
-
-    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/follow_ups`, {
-      method: 'POST',
-      headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-      body: JSON.stringify({
-        thread_id:    threadId,
-        user_id:      ownerUserId,
-        query:        question,
-        response:     typeof response === 'string' ? { text: response } : (response || {}),
-        query_cost:   1,
-        submitted_in: 'solo',
-        source:       'owner',
-        share_id:     null
-      })
+    // Canonical completion in /api/interpret owns durable follow-up
+    // persistence, lineage, revisioning, and accounting. This endpoint is
+    // intentionally read-only for the historical follow_ups collection;
+    // retaining an owner dual-write would create a second, non-authoritative
+    // persistence record across incompatible identity domains.
+    return res.status(410).json({
+      error: 'Legacy follow-up writes are retired; canonical artifact persistence is authoritative',
+      code: 'LEGACY_FOLLOWUP_WRITE_RETIRED'
     });
-
-    if (!insertRes.ok) {
-      const err = await insertRes.text();
-      console.error('owner follow-up insert failed:', err);
-      return res.status(500).json({ error: 'Failed to save follow-up' });
-    }
-
-    const saved = await insertRes.json();
-    return res.status(200).json({ success: true, id: saved?.[0]?.id });
   }
 
   // ── DELETE — remove my own contribution ──────────────────────────────────

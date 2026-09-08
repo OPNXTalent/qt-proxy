@@ -2973,7 +2973,9 @@ async function runFollowUp() {
     sessionQueryCount++;
     loadSidebarCredits();
 
-    // Save follow-up via unified saveFollowUp
+    // Keep the local compatibility history for the current browser. The
+    // canonical artifact revision written by /api/interpret is the only
+    // authoritative server-side persistence path for owner follow-ups.
     if (activeThreadId) {
       saveFollowUp(activeThreadId, input, responseText);
     }
@@ -5563,14 +5565,11 @@ function saveFollowUp(threadId, question, response) {
 
   if (threadId.startsWith('pending-')) return;
 
-  if (canActAsThreadMember()) {
-    authenticatedFetch(API_BASE + '/api/followups', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail() },
-      body: JSON.stringify({ threadId: threadId, question: question, response: response })
-    }).catch(function() {});
-    return;
-  }
+  // Owner follow-ups are already persisted durably by canonical completion
+  // as a new Interpretation Artifact revision. Do not duplicate that write
+  // through the legacy follow_ups table. GET /api/followups remains available
+  // for historical rows and shared-recipient history.
+  if (canActAsThreadMember()) return;
 
   // Anonymous-style recipient — either genuinely anonymous, or signed in
   // but hasn't joined this thread's Trust Circle yet. Uses the same
