@@ -4442,6 +4442,18 @@ function reapplyOpenDots() {
 function renderThreads(threads) {
   var list = document.getElementById('sidebarThreads');
   if (!list) return;
+  // Archive rows are rebuilt whenever active/share state changes. Bind the
+  // selection action once to the stable list container so reconstructed rows
+  // retain a working durable-thread handoff across every re-render.
+  if (!list.dataset.threadSelectionBound) {
+    list.addEventListener('click', function(e) {
+      if (e.target.closest('.thread-action-btns, .thread-rename-input')) return;
+      var item = e.target.closest('.thread-item[data-thread-id]');
+      if (!item || !list.contains(item)) return;
+      selectThread(item.dataset.threadId);
+    });
+    list.dataset.threadSelectionBound = '1';
+  }
   while (list.firstChild) list.removeChild(list.firstChild);
   // Re-inject shared thread entry at top if present
   if (window._sharedThreadUrl) injectSharedThreadEntry();
@@ -4468,8 +4480,8 @@ function renderThreads(threads) {
     var collabClass = collabOpen ? ' collab-open' : '';
     item.className = 'thread-item' + (isActive ? ' active' : '') + (isLocked ? ' locked' : '') + collabClass;
     item.id = 'ti-' + thread.id;
+    item.dataset.threadId = thread.id;
     item.title = 'Double-click to rename';
-    item.addEventListener('click', (function(id) { return function() { selectThread(id); }; })(thread.id));
     item.addEventListener('dblclick', (function(id) { return function(e) { e.stopPropagation(); startRename(id); }; })(thread.id));
 
     if (isLocked) {
