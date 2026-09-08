@@ -4439,6 +4439,42 @@ function reapplyOpenDots() {
   });
 }
 
+var PRISM_ARCHIVE_DIAG_THREAD = 'c78f3628-cfd0-4ab8-b5c5-29d23e86621c';
+var prismArchiveDiagEvents = [];
+function prismArchiveDiag(eventName, detail) {
+  var event = Object.assign({
+    event: eventName,
+    timestamp: new Date().toISOString()
+  }, detail || {});
+  prismArchiveDiagEvents.push(event);
+  console.info('[PRISM_ARCHIVE_DIAG]', event);
+  var sink = document.getElementById('prismArchiveDiagLog');
+  if (!sink) {
+    sink = document.createElement('script');
+    sink.type = 'application/json';
+    sink.id = 'prismArchiveDiagLog';
+    document.documentElement.appendChild(sink);
+  }
+  sink.textContent = JSON.stringify(prismArchiveDiagEvents);
+}
+
+document.addEventListener('click', function(e) {
+  var path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+  var inArchive = path.some(function(node) {
+    return node && node.nodeType === 1 && (node.id === 'sidebarThreads' || (node.dataset && node.dataset.threadId));
+  });
+  if (!inArchive) return;
+  prismArchiveDiag('document_capture_click', {
+    targetTag: e.target && e.target.tagName || '',
+    targetId: e.target && e.target.id || '',
+    targetClass: String(e.target && e.target.className || ''),
+    defaultPrevented: Boolean(e.defaultPrevented),
+    path: path.slice(0, 6).map(function(node) {
+      return node && node.nodeType === 1 ? (node.tagName + (node.id ? '#' + node.id : '') + (node.className ? '.' + String(node.className).replace(/\s+/g, '.') : '')) : String(node && node.nodeName || '');
+    })
+  });
+}, true);
+
 function renderThreads(threads) {
   var list = document.getElementById('sidebarThreads');
   if (!list) return;
@@ -4446,10 +4482,40 @@ function renderThreads(threads) {
   // selection action once to the stable list container so reconstructed rows
   // retain a working durable-thread handoff across every re-render.
   if (!list.dataset.threadSelectionBound) {
+    prismArchiveDiag('listener_attached', {
+      containerId: list.id,
+      timestamp: new Date().toISOString()
+    });
     list.addEventListener('click', function(e) {
-      if (e.target.closest('.thread-action-btns, .thread-rename-input')) return;
+      var nearestRow = e.target.closest('.thread-item[data-thread-id]');
+      prismArchiveDiag('archive_bubble_entry', {
+        targetTag: e.target.tagName || '',
+        targetClass: String(e.target.className || ''),
+        targetId: e.target.id || '',
+        nearestThreadId: nearestRow ? nearestRow.dataset.threadId : null,
+        defaultPrevented: Boolean(e.defaultPrevented),
+        clientX: e.clientX,
+        clientY: e.clientY,
+        path: typeof e.composedPath === 'function' ? e.composedPath().slice(0, 6).map(function(node) {
+          return node && node.nodeType === 1 ? (node.tagName + (node.id ? '#' + node.id : '') + (node.className ? '.' + String(node.className).replace(/\s+/g, '.') : '')) : String(node && node.nodeName || '');
+        }) : []
+      });
+      var excluded = e.target.closest('.thread-action-btns, .thread-rename-input');
+      if (excluded) {
+        prismArchiveDiag('archive_click_ignored', { reason: 'action_or_rename_control' });
+        return;
+      }
       var item = e.target.closest('.thread-item[data-thread-id]');
-      if (!item || !list.contains(item)) return;
+      if (!item || !list.contains(item)) {
+        prismArchiveDiag('archive_click_ignored', { reason: item ? 'row_outside_container' : 'no_thread_row' });
+        return;
+      }
+      prismArchiveDiag('archive_row_resolved', {
+        rowId: item.id,
+        threadId: item.dataset.threadId,
+        targetMatch: item.dataset.threadId === 'c78f3628-cfd0-4ab8-b5c5-29d23e86621c'
+      });
+      prismArchiveDiag('select_thread_invoking', { threadId: item.dataset.threadId });
       selectThread(item.dataset.threadId);
     });
     list.dataset.threadSelectionBound = '1';
@@ -4587,6 +4653,34 @@ function renderThreads(threads) {
     }
 
     list.appendChild(item);
+    if (thread.id === PRISM_ARCHIVE_DIAG_THREAD) {
+      var rect = item.getBoundingClientRect();
+      var style = window.getComputedStyle(item);
+      var centerX = rect.left + rect.width / 2;
+      var centerY = rect.top + rect.height / 2;
+      var hit = document.elementFromPoint(centerX, centerY);
+      var blockedAncestor = null;
+      for (var ancestor = item; ancestor; ancestor = ancestor.parentElement) {
+        var ancestorStyle = window.getComputedStyle(ancestor);
+        if (ancestorStyle.pointerEvents === 'none' || ancestor.inert) {
+          blockedAncestor = ancestor.id || ancestor.className || ancestor.tagName;
+          break;
+        }
+      }
+      prismArchiveDiag('target_row_pointer_state', {
+        threadId: thread.id,
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        pointerEvents: style.pointerEvents,
+        visibility: style.visibility,
+        display: style.display,
+        opacity: style.opacity,
+        zIndex: style.zIndex,
+        hitTag: hit && hit.tagName || null,
+        hitId: hit && hit.id || null,
+        hitClass: String(hit && hit.className || ''),
+        blockedAncestor: blockedAncestor
+      });
+    }
   });
 
   if (renameOpenId) {
@@ -4872,8 +4966,17 @@ function showShareGateway(senderName, token, onExplore) {
 }
 
 function selectThread(id) {
+  prismArchiveDiag('select_thread_entered', {
+    threadId: id,
+    activeThreadId: activeThreadId,
+    sidebarOpen: sidebarOpen,
+    threadCount: Array.isArray(allThreads) ? allThreads.length : null
+  });
   var thread = allThreads.find(function(t) { return t.id === id; });
-  if (!thread) return;
+  if (!thread) {
+    prismArchiveDiag('select_thread_early_return', { reason: 'thread_not_found', threadId: id });
+    return;
+  }
   closeSidebarOverlay();
   console.log('[selectThread]', id, {
     inOpenThreadIds: _openThreadIds.has(id),
@@ -4905,6 +5008,14 @@ function selectThread(id) {
   // have been written at canonical completion, before progressive packets
   // attached, so it must not mask the complete persisted artifact revision.
   var responseData = archiveResponseForRender(supaResp, localParsed);
+  prismArchiveDiag('archive_state_mapped', {
+    threadId: id,
+    artifactId: responseData && responseData._artifactId || null,
+    artifactRevision: responseData && responseData._artifactRevision || null,
+    canonicalLength: responseData && String(responseData.core_insight || '').length || 0,
+    hasInterpretiveContext: Boolean(responseData && responseData.interpretive_context),
+    hasExploreContext: Boolean(responseData && Array.isArray(responseData.explore_context) && responseData.explore_context.length)
+  });
 
   if (responseData) {
     // Set _lastParsedResult so Share button works on sidebar-loaded threads
@@ -4915,6 +5026,7 @@ function selectThread(id) {
       rawApiThreads: _archiveRawResponseDiagnostics.get(id) || archiveDiagnosticShape(supaResp),
       beforeRenderResult: archiveDiagnosticShape(responseData)
     }));
+    prismArchiveDiag('render_invoking', { functionName: 'renderResult', targetId: 'resultContent' });
     renderResult(responseData);
     showResult();
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
@@ -5079,7 +5191,17 @@ function selectThread(id) {
     var discRow = document.getElementById('discussionRow');
     if (discRow) discRow.style.display = 'none';
     if (!window._shareHandlingFollowUps) restoreFollowUps(id);
+    setTimeout(function() {
+      var resultContent = document.getElementById('resultContent');
+      var activeItem = document.getElementById('ti-' + id);
+      prismArchiveDiag('post_render_dom', {
+        resultExists: Boolean(resultContent),
+        resultNonEmpty: Boolean(resultContent && resultContent.textContent.trim()),
+        activeClass: Boolean(activeItem && activeItem.classList.contains('active'))
+      });
+    }, 0);
   } else {
+    prismArchiveDiag('select_thread_early_return', { reason: 'no_response_data', threadId: id });
     currentSubject = '';
     showOpeningComposer();
     var rb = document.getElementById('resultBlock');      if (rb)  rb.classList.remove('visible');
@@ -6061,12 +6183,16 @@ function initSidebar() {
     sidebarHasAppeared = true;
   }
 
+  prismArchiveDiag('hydration_request_start', { url: API_BASE + '/api/threads' });
   authenticatedFetch(API_BASE + '/api/threads', {
     cache: 'no-store',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(email ? { 'x-user-email': email } : {}) }
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) {
+    prismArchiveDiag('hydration_http_response', { status: r.status });
+    return r.json();
+  })
   .then(function(data) {
     if (!data.threads) return;
     _archiveRawResponseDiagnostics.clear();
@@ -6074,6 +6200,16 @@ function initSidebar() {
       _archiveRawResponseDiagnostics.set(thread.id, archiveDiagnosticShape(thread.response));
     });
     allThreads = data.threads;
+    var diagnosticThread = allThreads.find(function(thread) { return thread.id === 'c78f3628-cfd0-4ab8-b5c5-29d23e86621c'; });
+    var diagnosticResponse = diagnosticThread && diagnosticThread.response;
+    prismArchiveDiag('hydration_state_assigned', {
+      threadFound: Boolean(diagnosticThread),
+      artifactId: diagnosticResponse && diagnosticResponse._artifactId || null,
+      artifactRevision: diagnosticResponse && diagnosticResponse._artifactRevision || null,
+      canonicalPresent: Boolean(diagnosticResponse && diagnosticResponse.core_insight),
+      interpretiveContextPresent: Boolean(diagnosticResponse && diagnosticResponse.interpretive_context),
+      exploreContextPresent: Boolean(diagnosticResponse && Array.isArray(diagnosticResponse.explore_context) && diagnosticResponse.explore_context.length)
+    });
     // Cache display_name for chat attribution
     if (data.display_name) {
       localStorage.setItem('qt_display_name', data.display_name);
