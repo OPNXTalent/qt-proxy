@@ -5407,6 +5407,7 @@ async function restoreCanonicalInquiryState({
   artifactId,
   artifactRevision,
   ownerUserId,
+  guestId,
 }) {
   const fallback = createInitialInquiryState(subject);
   const fallbackResult = {
@@ -5422,14 +5423,16 @@ async function restoreCanonicalInquiryState({
     && Number.isInteger(artifactRevision)
     && artifactRevision >= 1) {
     const artifactResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact_id,artifact_revision,inquiry_key,thread_id,owner_user_id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact_id,artifact_revision,inquiry_key,thread_id,owner_user_id,guest_id&limit=1`,
       { headers: inquiryServiceHeaders() },
     );
     const artifactRows = artifactResponse.ok ? await artifactResponse.json() : [];
     const candidate = artifactRows?.[0];
     const threadMatches = !candidate?.thread_id || candidate.thread_id === threadId;
-    const ownerMatches = Boolean(ownerUserId) && candidate?.owner_user_id === ownerUserId;
-    if (!candidate || !threadMatches || !ownerMatches) {
+    const principalMatches = ownerUserId
+      ? candidate?.owner_user_id === ownerUserId && !candidate?.guest_id
+      : Boolean(guestId) && candidate?.guest_id === guestId && !candidate?.owner_user_id;
+    if (!candidate || !threadMatches || !principalMatches) {
       throw new Error('FOLLOWUP_ARTIFACT_LINEAGE_INVALID');
     }
     lineageArtifact = candidate;
@@ -6221,6 +6224,7 @@ async function runPersistentInquiryFollowUp({
   inquiryKey,
   threadId,
   ownerUserId,
+  guestId = null,
   tier,
   artifactId,
   artifactRevision,
@@ -6246,6 +6250,7 @@ async function runPersistentInquiryFollowUp({
     artifactId,
     artifactRevision,
     ownerUserId,
+    guestId,
   });
   const previousState = restored.state;
   const canonicalInquiryKey = restored.inquiryKey || inquiryKey;
@@ -7058,6 +7063,7 @@ Do not add any question after the exit offer. The person chooses the next move.
                 inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
                 threadId,
                 ownerUserId: userId,
+                guestId: null,
                 tier,
                 artifactId,
                 artifactRevision,
@@ -7214,6 +7220,7 @@ Do not add any question after the exit offer. The person chooses the next move.
             inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
             threadId,
             ownerUserId: null,
+            guestId: guestIdentity?.guestId || null,
             tier: 'free',
             artifactId,
             artifactRevision,
