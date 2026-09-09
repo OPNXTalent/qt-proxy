@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const migration = fs.readFileSync(new URL('../docs/migrations/2026-09-06-pre-release-product-construct.sql', import.meta.url), 'utf8');
+const commercialMigration = fs.readFileSync(new URL('../docs/migrations/2026-09-08-commercial-credit-model.sql', import.meta.url), 'utf8');
 const interpret = fs.readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
 const share = fs.readFileSync(new URL('../api/share.js', import.meta.url), 'utf8');
 const followups = fs.readFileSync(new URL('../api/followups.js', import.meta.url), 'utf8');
@@ -11,10 +12,13 @@ const webhook = fs.readFileSync(new URL('../api/webhook.js', import.meta.url), '
 const client = fs.readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 const { PRISM_PRODUCT, queryBankCreditsForAmount } = await import('../lib/product-config.js');
 
-assert.deepEqual(PRISM_PRODUCT.explorer, { queries: 1, windowHours: 24 });
-assert.deepEqual(PRISM_PRODUCT.subscription, { monthlyQueries: 35, monthlyPriceCents: 1999 });
-assert.equal(queryBankCreditsForAmount(999), 10);
-assert.equal(queryBankCreditsForAmount(1999), 25);
+assert.deepEqual(PRISM_PRODUCT.explorer, { credits: 5, windowHours: 24 });
+assert.equal(PRISM_PRODUCT.primaryCost, 2);
+assert.equal(PRISM_PRODUCT.followUpCost, 1);
+assert.deepEqual(PRISM_PRODUCT.registration, { finalTrialCredits: 5, welcomeCredits: 3 });
+assert.deepEqual(PRISM_PRODUCT.subscription, { monthlyCredits: 350, monthlyPriceCents: 4999 });
+assert.equal(queryBankCreditsForAmount(1999), 125);
+assert.equal(queryBankCreditsForAmount(999), 0);
 assert.equal(queryBankCreditsForAmount(1299), 0);
 
 assert.match(migration, /completion_key text not null unique/);
@@ -32,6 +36,20 @@ assert.match(migration, /prism_fulfillment_events/);
 assert.match(migration, /on conflict \(fulfillment_key\) do nothing;[\s\S]*if not found then return false/);
 assert.match(migration, /customer_query_cost = 0 then return new/);
 assert.match(migration, /after insert on public\.interpretation_artifacts/);
+assert.match(commercialMigration, /query_cost in \(1, 2\)/);
+assert.match(commercialMigration, /customer_query_cost in \(0, 1, 2\)/);
+assert.match(commercialMigration, /p_submission_type = 'primary' then 2 else 1/);
+assert.match(commercialMigration, /sum\(l\.query_cost\)/);
+assert.match(commercialMigration, /greatest\(5 - v_used, 0\)/);
+assert.match(commercialMigration, /if p_user_id is not null then[\s\S]*'bank'::text/);
+assert.match(commercialMigration, /'guest_remainder'/);
+assert.match(commercialMigration, /'final_trial'/);
+assert.match(commercialMigration, /'welcome'/);
+assert.match(commercialMigration, /v_added := v_added \+ 8/);
+assert.match(commercialMigration, /p_queries <> 125/);
+assert.match(commercialMigration, /p_credits not in \(0, 350\)/);
+assert.match(commercialMigration, /'membership:' \|\| p_fulfillment_key/);
+assert.match(commercialMigration, /legacy_subscription_opening/);
 
 assert.match(interpret, /preparePrismInquiry\(/);
 assert.match(interpret, /charge: false/);
@@ -47,8 +65,9 @@ assert.match(followups, /TRUST_CIRCLE_FORK_REQUIRED/);
 
 assert.doesNotMatch(welcome, /purchased_credits\s*:/);
 assert.doesNotMatch(welcome, /bonus queries/i);
-assert.match(purchase, /1 Query \/ rolling 24 hrs/);
-assert.match(purchase, /per month · 35 Queries/);
+assert.match(purchase, /5 credits \/ rolling 24 hrs/);
+assert.match(purchase, /per month · 350 credits/);
+assert.match(purchase, /125 permanent credits/);
 assert.match(purchase, /interceptConfiguredPurchase/);
 assert.doesNotMatch(purchase, /buy\.stripe\.com/);
 assert.match(webhook, /p_fulfillment_key: fulfillmentKey/);
@@ -62,8 +81,12 @@ assert.match(client, /sessionStorage\.setItem\('prism_return_share', window\._sh
 assert.match(client, /fetch\(API_BASE \+ '\/api\/threads'/);
 assert.match(client, /action: 'claim_guest'/);
 assert.match(client, /x-share-token/);
-assert.match(client, /entitlementSource === 'bank' \|\| entitlementSource === 'subscription'/);
+assert.match(client, /entitlementSource === 'bank'/);
+assert.doesNotMatch(client, /entitlementSource === 'bank' \|\| entitlementSource === 'subscription'/);
 assert.match(interpret, /\[prism-provider-cogs\]/);
+assert.match(interpret, /p_query_cost: queryCost/);
+assert.doesNotMatch(interpret, /async function updateQueryCount/);
+assert.doesNotMatch(interpret, /async function drawSignalSessionCredit/);
 assert.doesNotMatch(interpret, /measurement_id/);
 
 console.log('Issue #13 product construct contract checks passed');

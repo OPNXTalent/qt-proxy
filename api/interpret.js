@@ -2298,55 +2298,6 @@ async function getCodeRedemption(email) {
   return null;
 }
 
-// ── ANONYMOUS IP RATE LIMITING ────────────────────────────────────────────────
-async function getQueryLog(ip) {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/query_log?select=id,query_type,cost,created_at&user_id=is.null&order=created_at.desc&limit=200`,
-    {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    }
-  );
-  const data = await res.json();
-  const ipEntries = (data || []).filter(r => r.query_type === `ip:${ip}`);
-  const windowStart = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
-  const recent = ipEntries.filter(r => new Date(r.created_at) > windowStart);
-  if (recent.length === 0) return null;
-  return {
-    query_count: recent.length,
-    first_query_at: recent[recent.length - 1].created_at
-  };
-}
-
-async function insertQueryLog(ip) {
-  await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal'
-    },
-    body: JSON.stringify({
-      query_type: `ip:${ip}`,
-      credit_source: 'free_tier',
-      cost: 1,
-      channel_context: 'solo'
-    })
-  });
-}
-
-async function incrementQueryLog(ip) {
-  await insertQueryLog(ip);
-}
-
-async function resetQueryLog(ip) {
-  // No-op — rows are immutable, window is time-based
-}
-
 async function prismEntitlementRpc(name, body) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: 'POST',
@@ -2373,103 +2324,14 @@ async function getPrismQueryAccess({ guestId = null, userId = null, previewAllow
   });
 }
 
-async function preparePrismInquiry({ inquiryKey, guestId = null, userId = null, previewAllowance = null }) {
+async function preparePrismInquiry({ inquiryKey, guestId = null, userId = null, previewAllowance = null, queryCost = 2 }) {
   return prismEntitlementRpc('prepare_prism_inquiry', {
     p_inquiry_key: inquiryKey,
     p_guest_id: guestId,
     p_user_id: userId,
     p_preview_allowance: previewAllowance,
+    p_query_cost: queryCost,
   });
-}
-
-// ── PRE-FLIGHT SUBSCRIBER QUOTA CHECK ────────────────────────────────────────
-async function getLiveQueryCount(userId) {
-  // Read live query count directly from query_log rather than the
-  // stale cached value on the subscriber record.
-  try {
-    const now = new Date();
-    const cycleStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/query_log?user_id=eq.${encodeURIComponent(userId)}&created_at=gte.${encodeURIComponent(cycleStart)}&select=id`,
-      {
-        headers: {
-          'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          'Prefer':        'count=exact',
-          'Range-Unit':    'items',
-          'Range':         '0-0'
-        }
-      }
-    );
-    const countHeader = res.headers.get('content-range');
-    // content-range: 0-0/N  — extract N
-    if (countHeader) {
-      const match = countHeader.match(/\/(\d+)$/);
-      if (match) return parseInt(match[1], 10);
-    }
-    const data = await res.json();
-    return Array.isArray(data) ? data.length : 0;
-  } catch {
-    // Fallback to stale value if live count fails
-    return null;
-  }
-}
-
-async function checkSubscriberQuota(subscriber, limitOverride = null) {
-  const tier = normalizeTier(subscriber.tier);
-  const limit = limitOverride ?? TIER_LIMITS[tier];
-
-  // No limit defined for this tier — allow
-  if (limit === null || limit === undefined) return { allowed: true };
-
-  // Prefer live count from query_log over stale subscriber.query_count
-  const liveCount = await getLiveQueryCount(subscriber.id);
-  const used = liveCount !== null ? liveCount : (subscriber.query_count || 0);
-
-  if (used < limit) return { allowed: true, queriesUsed: used };
-
-  // Over limit — check purchased_credits / banked queries
-  const credits = subscriber.purchased_credits || 0;
-  if (credits > 0) {
-    // Admission never spends a credit. The artifact-completion transaction
-    // performs the bounded draw only after the Canonical Response is durable.
-    return { allowed: true, creditSource: 'signal_credit', queriesUsed: used };
-  }
-
-  return {
-    allowed: false,
-    reason: 'quota_exceeded',
-    queriesUsed: used,
-    limit,
-    credits
-  };
-}
-
-// ── SIGNAL SESSION CREDIT DRAWDOWN ───────────────────────────────────────────
-async function drawSignalSessionCredit(userId) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_signal_credit`, {
-      method: 'POST',
-      headers: {
-        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json'
-      },
-      body: JSON.stringify({ p_user_id: userId })
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error('draw_signal_credit failed:', err);
-      return false;
-    }
-
-    const data = await res.json();
-    return data === true;
-  } catch (err) {
-    console.error('drawSignalSessionCredit error:', err.message);
-    return false;
-  }
 }
 
 // ── THREAD PERSISTENCE ────────────────────────────────────────────────────────
@@ -2556,53 +2418,6 @@ async function saveThread({ userId, query, queryType, response, tier }) {
   } catch (err) {
     console.error('saveThread error:', err.message);
     return null;
-  }
-}
-
-// ── SUBSCRIBER QUERY COUNT ────────────────────────────────────────────────────
-async function updateQueryCount({ userId, tier, threadId }) {
-  try {
-    // 1. Write to query_log — the authoritative usage record
-    await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
-      method: 'POST',
-      headers: {
-        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal'
-      },
-      body: JSON.stringify({
-        user_id:        userId,
-        thread_id:      threadId || null,
-        query_type:     'subscriber',
-        credit_source:  'tier_allocation',
-        cost:           1,
-        channel_context:'solo'
-      })
-    });
-
-    // 2. Also attempt draw_query RPC to keep subscriber.query_count in sync
-    //    Non-blocking — query_log is the source of truth for quota checks
-    const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_query`, {
-      method: 'POST',
-      headers: {
-        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json'
-      },
-      body: JSON.stringify({ p_user_id: userId, p_cost: 1 })
-    });
-
-    if (!rpcRes.ok) {
-      const err = await rpcRes.text();
-      // Log but don't fail — query_log already recorded the usage
-      if (!err.includes('INSUFFICIENT_QUERIES')) {
-        console.error('draw_query RPC failed (non-blocking):', err);
-      }
-    }
-
-  } catch (err) {
-    console.error('updateQueryCount error:', err.message);
   }
 }
 
@@ -2750,7 +2565,7 @@ async function saveSharedFollowUp({ shareId, question, response, userEmail }) {
       response:     typeof response === 'string' ? { text: response } : (response || null),
       submitted_in: 'share',
       source:       'recipient',
-      query_cost:   1,
+      query_cost:   0,
       created_at:   new Date().toISOString()
     })
   });
@@ -7137,6 +6952,7 @@ Do not add any question after the exit offer. The person chooses the next move.
       guestId: guestIdentity?.guestId || null,
       userId: verifiedIdentity?.userId || null,
       previewAllowance: previewTestEntitlement?.allowance || null,
+      queryCost: isFollowUp ? PRISM_PRODUCT.followUpCost : PRISM_PRODUCT.primaryCost,
     });
   } catch (error) {
     timing('entitlement_admission_error', { error: String(error?.message || error).slice(0, 160) });
@@ -7146,7 +6962,7 @@ Do not add any question after the exit offer. The person chooses the next move.
     timing('access_complete', { route: verifiedIdentity ? 'authenticated' : 'guest', allowed: false });
     return res.status(429).json({
       error: 'Query limit reached',
-      message: 'Your next Explorer Query becomes available after the rolling 24-hour window, or you can add Queries to continue.',
+      message: 'You need more Prism credits for this inquiry. Guest credits replenish to 5 across the rolling 24-hour window, or you can add credits to continue.',
       entitlementSource: entitlementAdmission?.entitlement_source || 'explorer',
       remaining: entitlementAdmission?.remaining ?? 0,
       resetAt: entitlementAdmission?.reset_at || null,

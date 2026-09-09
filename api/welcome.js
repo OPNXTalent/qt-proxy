@@ -70,7 +70,7 @@ export default async function handler(req, res) {
                 Welcome. You have brought a question — and the Prism is ready to work.
               </p>
               <p style="font-family:'Arial',sans-serif;font-size:15px;color:#9090a8;line-height:1.8;margin:0 0 20px;">
-                Your free account is active. Your inquiry history is saved so you can return and continue where you left off. Explorer access includes one successful Query per rolling 24 hours.
+                Your account is active. Your inquiry history is saved, your remaining guest credits were preserved, and your one-time final trial and welcome credits have been added.
               </p>
 
               <p style="font-family:'Arial',sans-serif;font-size:15px;color:#9090a8;line-height:1.8;margin:0 0 32px;">

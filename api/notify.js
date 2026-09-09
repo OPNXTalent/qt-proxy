@@ -82,8 +82,8 @@ export default async function handler(req, res) {
           emailWrapper(`
             <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your Prism subscription is no longer active.</p>
             <p style="font-size:16px; line-height:1.8; color:#7a7890;">
-              Explorer access still includes one successful Query per rolling 24 hours. If there was a payment issue,
-              updating your method takes less than a minute — and your access restores immediately.
+              Every credit already banked remains yours. If there was a payment issue,
+              updating your method takes less than a minute — and future membership allocations resume after successful payment.
             </p>
             <div style="text-align:center; margin:40px 0;">
               <a href="https://billing.stripe.com" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Update Payment Method</a>

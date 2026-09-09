@@ -2025,7 +2025,7 @@
     <div id="sidebarCredits" style="display:none; margin-top:6px; font-family:var(--mono); font-size:13px; letter-spacing:0.14em; display:flex; flex-direction:column; gap:3px;">
       <span id="sidebarQueryCountText" style="transition:color 0.4s;">— / — Queries</span>
       <span id="sidebarRefillDate" style="display:none; color:rgba(201,168,76,0.45); font-size:12px; letter-spacing:0.12em;"></span>
-      <span id="sidebarQueryCreditsText" style="display:none; color:var(--gold-dim);">— Signal Bank</span>
+      <span id="sidebarQueryCreditsText" style="display:none; color:var(--gold-dim);">— Credits</span>
     </div>
   </div>
 
@@ -2135,8 +2135,8 @@
   </div>
 
     <div id="limitPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
-      <div style="font-family:var(--cinzel); font-size:16px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Free Query Limit Reached</div>
-      <div class="limit-message" style="font-family:var(--crimson); font-size:22px; color:var(--text); line-height:1.8; margin-bottom:32px;">You've used your Explorer Query for this rolling 24-hour window.</div>
+      <div style="font-family:var(--cinzel); font-size:16px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">More Credits Needed</div>
+      <div class="limit-message" style="font-family:var(--crimson); font-size:22px; color:var(--text); line-height:1.8; margin-bottom:32px;">Your guest credit balance is not enough for this inquiry.</div>
 
       <!-- Disclaimer -->
       <div style="font-family:var(--crimson); font-style:italic; font-size:19px; color:var(--text-muted); line-height:1.8; text-align:left; border-top:1px solid var(--border); padding-top:24px; margin-bottom:28px;">
@@ -2146,17 +2146,13 @@
       <!-- Four-option wall — visible immediately; account creation only interrupts on actual purchase click, via the existing "Create Your Free Account" modal -->
       <div id="limitPromptOptions" style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
 
-        <!-- Signal Bank bundles -->
+        <!-- Credit bank -->
         <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface);">
-          <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Query Bundles</div>
+          <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Credit Bank</div>
           <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.6; margin-bottom:16px;">No subscription required. Credits never expire.</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <a href="#" data-product="bank10" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
-              <span style="font-family:var(--crimson); font-size:17px; color:var(--text);">10 queries</span>
-              <span style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--gold-dim);">$9.99 →</span>
-            </a>
-            <a href="#" data-product="bank25" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
-              <span style="font-family:var(--crimson); font-size:17px; color:var(--text);">25 queries</span>
+            <a href="#" data-product="bank125" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
+              <span style="font-family:var(--crimson); font-size:17px; color:var(--text);">125 credits</span>
               <span style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--gold-dim);">$19.99 →</span>
             </a>
           </div>
@@ -2169,8 +2165,8 @@
           <div style="border:1px solid var(--gold-dim); padding:20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative; flex:1;">
             <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Recommended</div>
             <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Subscribe</div>
-            <div style="font-family:var(--cinzel); font-size:23px; color:var(--gold-pale); margin-bottom:4px;">$19.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
-            <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">35 Queries each month. Subscription allowance is used before banked Queries.</div>
+            <div style="font-family:var(--cinzel); font-size:23px; color:var(--gold-pale); margin-bottom:4px;">$49.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
+            <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">350 credits each month. Unused credits remain banked permanently.</div>
             <a href="/purchase.html" id="subscribeSeePlansLink" style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">See Plans →</a>
           </div>
 
@@ -2178,7 +2174,7 @@
           <div style="border:1px solid var(--gold-dim); padding:20px; background:var(--surface); position:relative;">
             <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--void);padding:0 10px;font-family:var(--mono);font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);">Always Free</div>
             <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:4px;">Free Account</div>
-              <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:16px; color:var(--text-dim); line-height:1.5; margin-bottom:10px;">1 successful Query per rolling 24 hours. Create an account to keep your inquiry history.</div>
+              <div id="returnTomorrowBody" style="font-family:var(--crimson); font-size:16px; color:var(--text-dim); line-height:1.5; margin-bottom:10px;">Guests receive 5 credits per rolling 24 hours. Register to save your Prism, keep the remainder, and receive 8 additional credits once.</div>
             <div id="resetTicker" style="font-family:var(--mono); font-size:21px; letter-spacing:0.18em; color:var(--gold-dim); margin-bottom:10px; display:none;">--:--:--</div>
             <div id="freeAccountAlreadyActive" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.1em; color:rgba(80,180,120,0.8); margin-bottom:6px;">✓ Account active</div>
             <button id="createFreeAccountBtn" onclick="showFreeAccountModal()" style="font-family:var(--mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); border:1px solid var(--gold-dim); background:var(--gold-dim); padding:9px 16px; width:100%; text-align:center; cursor:pointer; transition:all 0.25s; margin-bottom:6px;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Create Free Account →</button>
@@ -2193,26 +2189,26 @@
 
   <!-- PAID QUOTA WALL — shown when subscriber exhausts monthly limit -->
   <div id="quotaPrompt" style="display:none; margin-top:32px; border:1px solid var(--border); padding:36px 40px; text-align:center; background:rgba(180,140,60,0.04);">
-    <div style="font-family:var(--cinzel); font-size:16px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">Monthly Limit Reached</div>
-    <div id="quotaMessage" style="font-family:var(--crimson); font-size:22px; color:var(--text); line-height:1.8; margin-bottom:32px;">You've used all your queries for this period.</div>
+    <div style="font-family:var(--cinzel); font-size:16px; letter-spacing:0.22em; color:var(--gold); margin-bottom:16px; text-transform:uppercase;">More Credits Needed</div>
+    <div id="quotaMessage" style="font-family:var(--crimson); font-size:22px; color:var(--text); line-height:1.8; margin-bottom:32px;">Your credit balance is not enough for this inquiry.</div>
 
     <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px; text-align:left;">
 
-      <!-- Add Signal Bank -->
+      <!-- Add credits -->
       <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
         <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Continue Now</div>
-        <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Signal Bank</div>
-        <div style="font-family:var(--cinzel); font-size:25px; color:var(--gold-pale); margin-bottom:4px;">$9.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);"> / 10 queries</span></div>
+        <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Credit Bank</div>
+        <div style="font-family:var(--cinzel); font-size:25px; color:var(--gold-pale); margin-bottom:4px;">$19.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);"> / 125 credits</span></div>
         <div style="font-family:var(--crimson); font-size:18px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">One-time top-up.<br>No plan change required.</div>
-        <a href="#" data-product="bank10" onclick="return handlePurchaseLinkClick(event, this)" style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Query Bank →</a>
+        <a href="#" data-product="bank125" onclick="return handlePurchaseLinkClick(event, this)" style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Credits →</a>
       </div>
 
       <!-- Wait for reset -->
       <div style="border:1px solid var(--border); padding:24px 20px; background:var(--surface); display:flex; flex-direction:column; justify-content:space-between;">
         <div>
           <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Your Plan</div>
-          <div id="quotaResetLabel" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Resets Next Month</div>
-          <div style="font-family:var(--crimson); font-size:18px; color:var(--text-muted); line-height:1.6; margin-bottom:12px;">Your query count resets at the start of your next billing cycle.</div>
+          <div id="quotaResetLabel" style="font-family:var(--cinzel); font-size:17px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Credits Stay Yours</div>
+          <div style="font-family:var(--crimson); font-size:18px; color:var(--text-muted); line-height:1.6; margin-bottom:12px;">Membership allocations add to your permanent bank each paid month.</div>
         </div>
         <a href="/" style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim); text-decoration:none; border:1px solid var(--border); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.borderColor='var(--border-lit)';" onmouseout="this.style.borderColor='var(--border)';">← Back</a>
       </div>
@@ -2631,7 +2627,7 @@ function applyQueryLock(customMessage, hoursRemaining, secondsRemaining) {
       const returnLabel = document.getElementById('returnTomorrowLabel');
       const returnBody = document.getElementById('returnTomorrowBody');
       if (returnLabel) returnLabel.textContent = hoursRemaining <= 1 ? 'Resets Soon' : 'Return in ' + hoursRemaining + ' Hour' + (hoursRemaining !== 1 ? 's' : '');
-      if (returnBody) returnBody.textContent = 'Your Explorer Query resets in ' + hoursRemaining + ' hour' + (hoursRemaining !== 1 ? 's' : '') + '.';
+      if (returnBody) returnBody.textContent = 'Your next guest credit returns in ' + hoursRemaining + ' hour' + (hoursRemaining !== 1 ? 's' : '') + '.';
     }
     // Start live countdown ticker
     if (secondsRemaining != null) {
@@ -2873,7 +2869,7 @@ async function runInterpretation() {
 
     sessionQueryCount++;
     // Live refresh from the server — this is what actually reflects a
-    // subscription or Query Bank draw-down from the authoritative ledger.
+    // durable completion draw-down from the authoritative credit ledger.
     loadSidebarCredits();
 
     // Show sidebar after first successful query
@@ -4581,7 +4577,7 @@ function renderThreads(threads) {
 
       var resetBtn = document.createElement('button');
       resetBtn.className = 'thread-reset-btn';
-      resetBtn.title = 'Reset expiry clock (costs 1 query)';
+      resetBtn.title = 'Reset expiry clock';
       resetBtn.textContent = '↺';
       resetBtn.addEventListener('click', (function(id) {
         return function(e) { e.stopPropagation(); resetThreadExpiry(id); };
@@ -5633,7 +5629,7 @@ function resetThreadExpiry(id) {
   });
   renderThreads(allThreads);
 
-  // Call server to reset expiry and draw 1 query
+  // Archive maintenance is never a customer credit charge.
   authenticatedFetch(API_BASE + '/api/threads', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'x-user-email': email },
@@ -5645,8 +5641,6 @@ function resetThreadExpiry(id) {
       console.error('Reset failed:', data.error);
       // Revert optimistic update on failure
       initSidebar();
-    } else {
-      decrementSidebarCounter();
     }
   })
   .catch(function() { initSidebar(); });
@@ -5892,9 +5886,9 @@ function setQueryCount(el, remaining, limit) {
   if (!el) return;
   var cap = (limit !== undefined && limit !== null) ? limit : null;
   if (cap !== null) {
-    el.textContent = remaining + ' / ' + cap + ' Queries';
+    el.textContent = remaining + ' / ' + cap + ' Credits';
   } else {
-    el.textContent = remaining + ' Queries';
+    el.textContent = remaining + ' Credits';
   }
   el.style.color = 'rgba(201,168,76,0.85)';
 }
@@ -5941,7 +5935,7 @@ function setQueryCredits(n) {
   var sub = document.getElementById('sidebarQueryCreditsSubText');
   if (!el) return;
   var count = n || 0;
-  el.textContent  = count + ' Signal Bank';
+  el.textContent  = count + ' Credits';
   el.style.display = 'inline';
   if (sub) sub.style.display = 'inline';
 }
@@ -5964,8 +5958,8 @@ async function loadSidebarCreditsAnon() {
     const countEl = document.getElementById('sidebarQueryCountText');
     const wrapEl  = document.getElementById('sidebarCredits');
     if (!countEl || !wrapEl) return;
-    const limit = 1;
-    const remaining = data.locked ? 0 : Math.max(0, Number(data.remaining ?? 1));
+    const limit = 5;
+    const remaining = data.locked ? 0 : Math.max(0, Number(data.remaining ?? 5));
     setQueryCount(countEl, remaining, limit);
     // No refill date for anonymous/free users
     var refillEl = document.getElementById('sidebarRefillDate');
@@ -5987,14 +5981,8 @@ async function loadSidebarCredits() {
     if (!countEl || !wrapEl) return;
     const remaining = Math.max(0, Number(data.remaining || 0));
     const source = data.entitlementSource || 'explorer';
-    if (source === 'bank') {
-      setQueryCount(countEl, remaining, null);
-      setQueryCredits(remaining);
-    } else {
-      const limit = source === 'subscription' ? 35 : (data.previewTestAccess ? Math.max(remaining, 1) : 1);
-      setQueryCount(countEl, remaining, limit);
-      if (source === 'subscription') setRefillDate(data.resetAt || null);
-    }
+    setQueryCount(countEl, remaining, null);
+    setQueryCredits(remaining);
     wrapEl.style.display = 'flex';
     var kqBox = document.getElementById('keepQuestioningBox');
     if (kqBox) kqBox.style.display = 'block';
@@ -8447,10 +8435,10 @@ function showFreeAccountModal(context) {
   var perkLines;
   if (window._freeAcctContext === 'save-session') {
     desc.textContent = 'Create or sign in to your account to save an independent copy of this inquiry and continue it as your own.';
-    perkLines = ['Independent inquiry fork · saved', 'Source provenance · preserved', '1 Explorer Query · rolling 24 hours', 'No Query charged for saving'];
+    perkLines = ['Independent inquiry fork · saved', 'Source provenance · preserved', '5 guest credits · rolling 24 hours', 'No credit charged for saving'];
   } else {
-    desc.textContent = 'One successful Explorer Query every rolling 24 hours. Create an account to preserve your inquiry and return to it later.';
-    perkLines = ['1 Explorer Query · rolling 24 hours', 'Inquiry history · saved', 'Query banks · never expire', 'Account creation · no Query charge'];
+    desc.textContent = 'Save your Prism, keep your remaining guest credits, and receive 8 additional credits once when you register.';
+    perkLines = ['Remaining guest credits · preserved', '5 final trial credits · once', '3 welcome credits · once', 'Paid credits · never expire'];
   }
   perkLines.forEach(function(t) {
     var li = document.createElement('li'); li.textContent = t; perks.appendChild(li);
@@ -8790,7 +8778,7 @@ async function runPreflightCheck() {
     if (!previewTestAccess && data.locked) {
       var hrs  = data.hoursRemaining || 0;
       var secs = data.secondsRemaining || hrs * 3600;
-      var msg  = "You've used your Explorer Query. Access resets in " + hrs + " hour" + (hrs !== 1 ? "s" : "") + ".";
+      var msg  = "You need more credits. Guest credits replenish across the rolling 24-hour window; the next credit returns in " + hrs + " hour" + (hrs !== 1 ? "s" : "") + ".";
       applyQueryLock(msg, hrs, secs);
     }
   } catch(e) {}
@@ -8837,7 +8825,7 @@ async function handleCreditsAdded() {
       const data = await res.json();
       remaining = Number(data.remaining || 0);
       entitlementSource = data.entitlementSource || null;
-      if (!data.locked && (entitlementSource === 'bank' || entitlementSource === 'subscription')) {
+      if (!data.locked && entitlementSource === 'bank') {
         confirmed = true;
         break;
       }
@@ -8866,9 +8854,7 @@ async function handleCreditsAdded() {
     // Show a confirmation toast matching what actually happened
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:var(--surface-2); border:1px solid var(--gold-dim); padding:14px 28px; font-family:var(--mono); font-size:14px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); z-index:999; transition:opacity 0.5s;';
-    toast.textContent = entitlementSource === 'subscription'
-      ? `Subscription active — ${remaining} quer${remaining === 1 ? 'y' : 'ies'} available`
-      : `Query Bank confirmed — ${remaining} quer${remaining === 1 ? 'y' : 'ies'} available`;
+    toast.textContent = `Credit balance confirmed — ${remaining} credit${remaining === 1 ? '' : 's'} available`;
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 4000);
   } else {

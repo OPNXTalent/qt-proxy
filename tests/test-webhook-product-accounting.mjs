@@ -31,7 +31,7 @@ function reply() {
   };
 }
 
-for (const [amount, expectedQueries] of [[999, 10], [1999, 25]]) {
+for (const [amount, expectedQueries] of [[1999, 125]]) {
   const calls = [];
   global.fetch = async (url, options = {}) => {
     calls.push({ url: String(url), options });
@@ -57,4 +57,46 @@ for (const [amount, expectedQueries] of [[999, 10], [1999, 25]]) {
   assert.equal(calls.some(call => call.url.includes('/subscribers?') && /purchased_credits/.test(call.options.body || '')), false);
 }
 
-console.log('Webhook Query Bank product and idempotency-key checks passed');
+{
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+  const event = {
+    id: 'evt_subscription_payment_intent',
+    type: 'payment_intent.succeeded',
+    data: { object: { id: 'pi_subscription', amount: 1999, invoice: 'in_legacy_subscription', receipt_email: 'member@example.test' } },
+  };
+  const res = reply();
+  await handler(signedRequest(event), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(calls.length, 0, 'Subscription PaymentIntent must not fulfill the one-time credit bank');
+}
+
+{
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (String(url).includes('/rpc/apply_prism_subscription_by_email')) return Response.json(true);
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+  const event = {
+    id: 'evt_membership_period_1',
+    type: 'invoice.payment_succeeded',
+    data: { object: {
+      id: 'in_period_1', subscription: 'sub_1', customer_email: 'member@example.test',
+      lines: { data: [{ period: { start: 1770000000, end: 1772678400 } }] },
+    } },
+  };
+  const res = reply();
+  await handler(signedRequest(event), res);
+  assert.equal(res.statusCode, 200);
+  const rpc = calls.find(call => call.url.includes('/rpc/apply_prism_subscription_by_email'));
+  assert.ok(rpc, 'Missing membership allocation RPC');
+  const body = JSON.parse(rpc.options.body);
+  assert.equal(body.p_fulfillment_key, event.id);
+  assert.equal(body.p_credits, 350);
+}
+
+console.log('Webhook credit bank and membership idempotency-key checks passed');

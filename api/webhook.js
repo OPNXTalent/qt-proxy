@@ -15,11 +15,11 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 // ── Tier configuration ──────────────────────────────────────────────
 // Maps Stripe price amounts (in cents) to internal tier keys
-// and their monthly query limits
+// and their permanent monthly credit allocations
 const TIER_CONFIG = {
   [PRISM_PRODUCT.subscription.monthlyPriceCents]: {
     tier: 'prism',
-    limit: PRISM_PRODUCT.subscription.monthlyQueries,
+    limit: PRISM_PRODUCT.subscription.monthlyCredits,
   },
 };
 
@@ -106,13 +106,15 @@ async function upsertSubscriber(email, customerId, subscriptionId, tier, status)
   if (!res.ok) console.error('Supabase upsert error:', await res.text());
 }
 
-async function applyPrismSubscription(email, status, periodStart, periodEnd) {
+async function applyPrismSubscription(email, status, periodStart, periodEnd, fulfillmentKey = null, credits = 0) {
   if (!email) return;
   await prismRpc('apply_prism_subscription_by_email', {
     p_email: email,
     p_status: status,
     p_period_start: periodStart,
     p_period_end: periodEnd,
+    p_fulfillment_key: fulfillmentKey,
+    p_credits: credits,
   });
 }
 
@@ -189,7 +191,7 @@ const TIER_DISPLAY = {
 };
 
 const TIER_DESC = {
-  prism: '35 Queries per month to The Prism.',
+  prism: '350 bankable credits each month for The Prism.',
 };
 
 export default async function handler(req, res) {
@@ -274,7 +276,7 @@ export default async function handler(req, res) {
               'Your Prism Subscription Has Been Cancelled',
               emailWrapper(`
                 <p style="font-size:18px; line-height:1.8; color:#d8d4e8;">Your subscription has been cancelled.</p>
-                <p style="font-size:16px; line-height:1.8; color:#7a7890;">We hope The Prism served you well. Explorer access includes one successful Query per rolling 24 hours. If you ever want to return, your subscription is one step away.</p>
+                <p style="font-size:16px; line-height:1.8; color:#7a7890;">We hope The Prism served you well. Every credit already in your account remains yours and never expires. If you ever want to return, your membership is one step away.</p>
                 <div style="text-align:center; margin:40px 0;">
                   <a href="https://quantumtheology.app/#interpreter" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Resubscribe</a>
                 </div>
@@ -287,7 +289,7 @@ export default async function handler(req, res) {
         break;
       }
 
-      // ── Successful invoice — reset monthly query count ───────────
+      // ── Successful invoice — bank one idempotent monthly allocation ──
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
         if (invoice.subscription) {
@@ -299,6 +301,8 @@ export default async function handler(req, res) {
               'active',
               new Date(period.start * 1000).toISOString(),
               new Date(period.end * 1000).toISOString(),
+              event.id,
+              PRISM_PRODUCT.subscription.monthlyCredits,
             );
           }
         }
@@ -334,7 +338,9 @@ export default async function handler(req, res) {
         const pi = event.data.object;
         const amount = pi.amount;
 
-        if (SIGNAL_AMOUNTS.has(amount)) {
+        // Subscription invoice PaymentIntents must never be mistaken for an
+        // identically-priced one-time credit purchase.
+        if (!pi.invoice && SIGNAL_AMOUNTS.has(amount)) {
           const credits = queryBankCreditsForAmount(amount);
           const email = pi.receipt_email || (pi.customer ? await getCustomerEmail(pi.customer) : null);
 
@@ -343,10 +349,10 @@ export default async function handler(req, res) {
             try {
               await sendEmail(
                 email,
-                `Your Signal Sessions — ${credits} Queries Added`,
+                `Your Prism Credits — ${credits} Added`,
                 emailWrapper(`
-                  <p style="font-size:18px; line-height:1.8; color:#d8d4e8;"><strong style="color:#e8d5a0;">${credits} queries</strong> have been added to your Prism account.</p>
-                  <p style="font-size:16px; line-height:1.8; color:#7a7890;">Your Signal Sessions never expire and stack with any existing credits. Use them at your own pace.</p>
+                  <p style="font-size:18px; line-height:1.8; color:#d8d4e8;"><strong style="color:#e8d5a0;">${credits} credits</strong> have been added to your Prism account.</p>
+                  <p style="font-size:16px; line-height:1.8; color:#7a7890;">Your Prism credits never expire and add to your existing balance. Use them at your own pace.</p>
                   <div style="text-align:center; margin:40px 0;">
                     <a href="https://quantumtheology.app/qt-gateway.html?flow=setpassword&email=${encodeURIComponent(email)}" style="font-family:monospace; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:#e8d5a0; text-decoration:none; border:1px solid #7a6230; padding:14px 32px;">Enter the Prism</a>
                   </div>
