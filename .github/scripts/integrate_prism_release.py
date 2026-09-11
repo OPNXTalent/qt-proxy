@@ -169,6 +169,14 @@ if "crisisAcknowledged: options.crisisAcknowledged === true" not in qt:
 qt_path.write_text(qt, encoding="utf-8")
 run("git", "add", "api/interpret.js", "qt.html")
 
+# The old anonymous inquiry-token lineage contract is superseded by the
+# server-authoritative guest-principal/guest_id lineage contract in the
+# reconstructed runtime. Its current replacement is test-followup-guest-lineage.mjs.
+legacy_anonymous_test = Path("tests/test-followup-anonymous-lineage.mjs")
+if legacy_anonymous_test.exists():
+    legacy_anonymous_test.unlink()
+    run("git", "add", "-A", "tests/test-followup-anonymous-lineage.mjs")
+
 unmerged = subprocess.run(
     ["git", "ls-files", "-u"], text=True, capture_output=True, check=True
 ).stdout.strip()
