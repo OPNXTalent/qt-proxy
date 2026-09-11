@@ -38,12 +38,21 @@ writeFileSync('lib/persistent-inquiry-runtime.js', runtime);
 
 let qt = readFileSync('qt.html', 'utf8');
 
-qt = replaceExact(
-  qt,
-  `  if (d.core_insight) {\n    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';\n  }`,
-  `  if (d.core_insight) {\n    var coreParagraphs = String(d.core_insight).split(/\\n\\s*\\n/).map(function(p) { return p.trim(); }).filter(Boolean);\n    html += '<div class="qt-core-insight">' + coreParagraphs.map(function(p) {\n      return '<p>' + escHtml(p.replace(/\\n/g, ' ')) + '</p>';\n    }).join('') + '</div>';\n  }`,
-  'var coreParagraphs = String(d.core_insight).split',
-);
+// The reconstructed renderer already centralizes escaping/emphasis through
+// formatPrismProse(). Split only on semantic blank-line boundaries and retain
+// that formatter rather than reverting to the historical escHtml-only path.
+if (!qt.includes('var coreParagraphs = String(d.core_insight).split')) {
+  const oldModern = `  if (d.core_insight) {\n    html += '<div class="qt-core-insight"><p>' + formatPrismProse(d.core_insight) + '</p></div>';\n  }`;
+  const oldLegacy = `  if (d.core_insight) {\n    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';\n  }`;
+  const replacement = `  if (d.core_insight) {\n    var coreParagraphs = String(d.core_insight).split(/\\n\\s*\\n/).map(function(p) { return p.trim(); }).filter(Boolean);\n    html += '<div class="qt-core-insight">' + coreParagraphs.map(function(p) {\n      return '<p>' + formatPrismProse(p.replace(/\\n/g, ' ')) + '</p>';\n    }).join('') + '</div>';\n  }`;
+  if (qt.includes(oldModern)) {
+    qt = qt.replace(oldModern, replacement);
+  } else if (qt.includes(oldLegacy)) {
+    qt = qt.replace(oldLegacy, replacement.replace('formatPrismProse', 'escHtml'));
+  } else {
+    throw new Error('semantic paragraphing: reconstructed core response renderer not found');
+  }
+}
 
 qt = replaceExact(
   qt,
@@ -75,12 +84,14 @@ for (const marker of requiredRuntime) {
 
 const requiredQt = [
   'var coreParagraphs = String(d.core_insight).split',
-  "escHtml(p.replace(/\\n/g, ' '))",
   '.qt-core-insight p + p',
   'margin-top: 1.05em;',
 ];
 for (const marker of requiredQt) {
   if (!qt.includes(marker)) throw new Error(`Missing semantic paragraphing presentation marker: ${marker}`);
+}
+if (!qt.includes("formatPrismProse(p.replace(/\\n/g, ' '))") && !qt.includes("escHtml(p.replace(/\\n/g, ' '))")) {
+  throw new Error('Missing semantic paragraph formatter');
 }
 
 console.log('Semantic paragraphing applied to reconstructed initial, follow-up, and presentation contracts.');
