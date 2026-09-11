@@ -7,6 +7,17 @@ function replaceExact(source, before, after, marker) {
   throw new Error(`${marker}: expected one source match, found ${count}`);
 }
 
+// Preserve semantic paragraph guidance on the reconstructed initial-response
+// contract without restoring the retired structured Framework artifact.
+let progressive = readFileSync('lib/prompt-modules/progressive-inquiry.js', 'utf8');
+progressive = replaceExact(
+  progressive,
+  `Respond to the inquiry in polished plain prose as The Prism. Preserve the governing epistemic discipline and answer the user's actual question directly. Distinguish what the evidence establishes from inference and uncertainty. Do not expose internal analysis, JSON, schemas, cards, or framework labels. Do not append a routine engagement question, summary, or invitation. End where the inquiry naturally reaches its proper terminus.`,
+  `Respond to the inquiry in polished plain prose as The Prism. Preserve the governing epistemic discipline and answer the user's actual question directly. Distinguish what the evidence establishes from inference and uncertainty. Use semantic paragraphing whenever the response develops more than one material thought: begin a new paragraph when the reasoning moves between premise, evidence, qualification, complication, implication, or conclusion. Most paragraphs should be roughly 2–5 sentences. Do not manufacture arbitrary one-sentence fragments or excessive headings, and never collapse a long response into one contiguous block. Separate natural paragraphs with a blank line so the renderer preserves the intended breathing room. Do not expose internal analysis, JSON, schemas, cards, or framework labels. Do not append a routine engagement question, summary, or invitation. End where the inquiry naturally reaches its proper terminus.`,
+  'Use semantic paragraphing whenever the response develops more than one material thought',
+);
+writeFileSync('lib/prompt-modules/progressive-inquiry.js', progressive);
+
 let runtime = readFileSync('lib/persistent-inquiry-runtime.js', 'utf8');
 
 runtime = replaceExact(
@@ -43,6 +54,15 @@ qt = replaceExact(
 
 writeFileSync('qt.html', qt);
 
+const requiredProgressive = [
+  'Use semantic paragraphing whenever the response develops more than one material thought',
+  'Most paragraphs should be roughly 2–5 sentences',
+  'never collapse a long response into one contiguous block',
+];
+for (const marker of requiredProgressive) {
+  if (!progressive.includes(marker)) throw new Error(`Missing semantic paragraphing initial-response marker: ${marker}`);
+}
+
 const requiredRuntime = [
   'Use semantic paragraphing whenever the response carries more than one material thought',
   'roughly 2–5 sentences',
@@ -63,4 +83,4 @@ for (const marker of requiredQt) {
   if (!qt.includes(marker)) throw new Error(`Missing semantic paragraphing presentation marker: ${marker}`);
 }
 
-console.log('Semantic paragraphing applied and source assertions passed.');
+console.log('Semantic paragraphing applied to reconstructed initial, follow-up, and presentation contracts.');
