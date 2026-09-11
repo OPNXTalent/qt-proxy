@@ -39,16 +39,18 @@ writeFileSync('lib/persistent-inquiry-runtime.js', runtime);
 let qt = readFileSync('qt.html', 'utf8');
 
 // The reconstructed renderer already centralizes escaping/emphasis through
-// formatPrismProse(). Split only on semantic blank-line boundaries and retain
-// that formatter rather than reverting to the historical escHtml-only path.
+// formatPrismProse(). Split only on semantic blank-line boundaries. For the
+// common one-paragraph case preserve the direct formatter path as well.
 if (!qt.includes('var coreParagraphs = String(d.core_insight).split')) {
   const oldModern = `  if (d.core_insight) {\n    html += '<div class="qt-core-insight"><p>' + formatPrismProse(d.core_insight) + '</p></div>';\n  }`;
   const oldLegacy = `  if (d.core_insight) {\n    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';\n  }`;
-  const replacement = `  if (d.core_insight) {\n    var coreParagraphs = String(d.core_insight).split(/\\n\\s*\\n/).map(function(p) { return p.trim(); }).filter(Boolean);\n    html += '<div class="qt-core-insight">' + coreParagraphs.map(function(p) {\n      return '<p>' + formatPrismProse(p.replace(/\\n/g, ' ')) + '</p>';\n    }).join('') + '</div>';\n  }`;
+  const modernReplacement = `  if (d.core_insight) {\n    var coreParagraphs = String(d.core_insight).split(/\\n\\s*\\n/).map(function(p) { return p.trim(); }).filter(Boolean);\n    if (coreParagraphs.length <= 1) {\n      html += '<div class="qt-core-insight"><p>' + formatPrismProse(d.core_insight) + '</p></div>';\n    } else {\n      html += '<div class="qt-core-insight">' + coreParagraphs.map(function(p) {\n        return '<p>' + formatPrismProse(p.replace(/\\n/g, ' ')) + '</p>';\n      }).join('') + '</div>';\n    }\n  }`;
+  const legacyReplacement = modernReplacement
+    .replaceAll('formatPrismProse', 'escHtml');
   if (qt.includes(oldModern)) {
-    qt = qt.replace(oldModern, replacement);
+    qt = qt.replace(oldModern, modernReplacement);
   } else if (qt.includes(oldLegacy)) {
-    qt = qt.replace(oldLegacy, replacement.replace('formatPrismProse', 'escHtml'));
+    qt = qt.replace(oldLegacy, legacyReplacement);
   } else {
     throw new Error('semantic paragraphing: reconstructed core response renderer not found');
   }
