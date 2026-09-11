@@ -19,4 +19,4 @@ jobs:
       - name: Integrate and verify
         run: python .github/scripts/integrate_prism_release.py
 
-# Triggered after each integration-driver refinement until the release branch is sealed.
+# Release integration driver: reconcile, preserve production-safe deltas, verify, then commit.
