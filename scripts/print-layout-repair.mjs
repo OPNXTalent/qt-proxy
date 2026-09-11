@@ -45,3 +45,9 @@ if (source.includes('onclick="window.print()"')) {
 
 writeFileSync(path, source);
 console.log('Print layout repair applied: repeated page gutters, readable Print action, and non-blocking print dispatch.');
+
+// The release integration calls this script after selecting the reconstructed
+// qt.html. Apply the compatible semantic-paragraphing presentation/runtime
+// repair immediately afterward so current production readability is retained
+// without restoring the retired seven-card Framework orchestration.
+await import('./semantic-paragraphing.mjs');
