@@ -183,6 +183,11 @@ unmerged = subprocess.run(
 if unmerged:
     raise SystemExit("unresolved merge entries remain:\n" + unmerged)
 
+# Preserve current production print behavior on the reconstructed qt.html.
+# This repair is presentation-only and its own regression test remains active.
+run("node", "scripts/print-layout-repair.mjs")
+run("git", "add", "qt.html")
+
 # Deterministic verification only; no provider calls.
 run("git", "diff", "--check")
 for file in ("api/interpret.js", "api/webhook.js", "api/threads.js", "api/share.js", "api/followups.js"):
