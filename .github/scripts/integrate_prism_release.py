@@ -16,7 +16,7 @@ run("git", "fetch", "origin", "main", "agent/persistent-inquiry-runtime")
 run("git", "config", "user.name", "github-actions[bot]")
 run("git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
 
-run("git", "merge", "--no-ff", "--no-commit", SOURCE, check=False)
+merge = run("git", "merge", "--no-ff", "--no-commit", SOURCE, check=False)
 
 for file in (
     "api/interpret.js",
@@ -197,5 +197,30 @@ for test in sorted(Path("tests").glob("*.mjs")):
     run("node", str(test))
 
 run("git", "add", "-A")
-run("git", "commit", "-m", "release: integrate verified Prism commercial runtime")
-run("git", "push", "origin", f"HEAD:{BRANCH}")
+
+# A clean/no-op integration is success, not an error. This matters once the
+# release branch already contains the source tip and all deterministic
+# production-preservation transforms. `git commit` exits 1 when there is
+# nothing to commit, which previously made CI report a false failure.
+staged = subprocess.run(
+    ["git", "diff", "--cached", "--quiet"],
+    text=True,
+    check=False,
+).returncode
+if staged == 1:
+    run("git", "commit", "-m", "release: integrate verified Prism commercial runtime")
+elif staged != 0:
+    raise SystemExit("unable to determine staged integration state")
+
+# Push only when HEAD is ahead of the remote release branch. A zero-row/no-op
+# state therefore completes cleanly without manufacturing a commit.
+ahead = subprocess.run(
+    ["git", "rev-list", "--count", f"origin/{BRANCH}..HEAD"],
+    text=True,
+    capture_output=True,
+    check=True,
+).stdout.strip()
+if int(ahead or "0") > 0:
+    run("git", "push", "origin", f"HEAD:{BRANCH}")
+else:
+    print("Release integration already current; no commit or push required.")
