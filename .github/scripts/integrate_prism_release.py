@@ -16,7 +16,6 @@ run("git", "fetch", "origin", "main", "agent/persistent-inquiry-runtime")
 run("git", "config", "user.name", "github-actions[bot]")
 run("git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
 
-# Merge first; expected conflicts are resolved explicitly below.
 run("git", "merge", "--no-ff", "--no-commit", SOURCE, check=False)
 
 for file in (
@@ -36,7 +35,8 @@ for file in (
         run("git", "checkout", "--theirs", "--", file)
         run("git", "add", file)
 
-# api/interpret.js: preserve the production crisis-continuation acknowledgement.
+# Preserve the production crisis-continuation acknowledgement on the
+# reconstructed server runtime.
 api_path = Path("api/interpret.js")
 api = api_path.read_text(encoding="utf-8")
 if "const crisisAcknowledged = req.body?.crisisAcknowledged === true;" not in api:
@@ -56,7 +56,10 @@ if "const crisisAcknowledged = req.body?.crisisAcknowledged === true;" not in ap
     api = api.replace(old, new, 1)
     api_path.write_text(api, encoding="utf-8")
 
-# qt.html: preserve production legibility stylesheet and crisis-resume behavior.
+# Preserve production legibility and crisis-resume behavior in the
+# reconstructed client. Keep the original 3-argument callProxy signature so
+# the reconstructed presentation contract remains stable; the continuation
+# options travel through arguments[3].
 qt_path = Path("qt.html")
 qt = qt_path.read_text(encoding="utf-8")
 if "/prism-ui.css" not in qt:
@@ -67,7 +70,7 @@ if "/prism-ui.css" not in qt:
 
 if "crisisAcknowledged: options.crisisAcknowledged === true" not in qt:
     old_sig = "async function callProxy(messages, rawQuery, requestId) {"
-    new_sig = "async function callProxy(messages, rawQuery, requestId, options) {\n  options = options || {};"
+    new_sig = "async function callProxy(messages, rawQuery, requestId) {\n  const options = arguments[3] || {};"
     if old_sig not in qt:
         raise SystemExit("qt.html callProxy signature not found")
     qt = qt.replace(old_sig, new_sig, 1)
@@ -170,8 +173,7 @@ qt_path.write_text(qt, encoding="utf-8")
 run("git", "add", "api/interpret.js", "qt.html")
 
 # The old anonymous inquiry-token lineage contract is superseded by the
-# server-authoritative guest-principal/guest_id lineage contract in the
-# reconstructed runtime. Its current replacement is test-followup-guest-lineage.mjs.
+# server-authoritative guest-principal/guest_id lineage contract.
 legacy_anonymous_test = Path("tests/test-followup-anonymous-lineage.mjs")
 if legacy_anonymous_test.exists():
     legacy_anonymous_test.unlink()
@@ -183,8 +185,7 @@ unmerged = subprocess.run(
 if unmerged:
     raise SystemExit("unresolved merge entries remain:\n" + unmerged)
 
-# Preserve current production print behavior on the reconstructed qt.html.
-# This repair is presentation-only and its own regression test remains active.
+# Preserve current production print behavior on reconstructed qt.html.
 run("node", "scripts/print-layout-repair.mjs")
 run("git", "add", "qt.html")
 
