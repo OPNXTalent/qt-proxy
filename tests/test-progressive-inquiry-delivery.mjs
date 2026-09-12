@@ -3,12 +3,9 @@ import {
   PACKET_TYPES,
   createCanonicalPackets,
   createCompletionKey,
-  createContextPackets,
   stableArtifactId,
   validateArtifactCore,
-  validateContextCompanion,
 } from '../lib/interpretation-artifact.js';
-import { conceptNodes } from '../lib/concept-nodes-v1.js';
 
 const inquiryKey = 'server:constitutional-test-inquiry';
 const artifact = validateArtifactCore({
@@ -24,15 +21,7 @@ const canonical = createCanonicalPackets(artifact);
 assert.deepEqual(canonical.map(packet => packet.packetType), [PACKET_TYPES.ORIENTATION, PACKET_TYPES.CANONICAL]);
 assert.deepEqual(canonical.map(packet => packet.sequence), [1, 2]);
 
-const companion = validateContextCompanion({
-  interpretive_context: 'The observation supplies less than the conclusion requires.',
-  concept_node_ids: ['emet', 'not-approved'],
-}, new Set(Object.keys(conceptNodes)));
-const contextPackets = createContextPackets(artifact, companion, conceptNodes);
-assert.deepEqual(contextPackets.map(packet => packet.packetType), [PACKET_TYPES.CONTEXT, PACKET_TYPES.EXPLORE]);
-assert.deepEqual(contextPackets.map(packet => packet.sequence), [3, 4]);
-assert.deepEqual(companion.conceptNodeIds, ['emet']);
-assert.equal(createContextPackets(artifact, validateContextCompanion({}, new Set()), conceptNodes).length, 0);
+assert.deepEqual(Object.values(PACKET_TYPES), ['inquiry_orientation', 'canonical_response', 'prism_analysis']);
 
 const completionKey = createCompletionKey({ inquiryId: artifact.inquiryId, revision: 1 });
 assert.equal(completionKey, createCompletionKey({ inquiryId: artifact.inquiryId, revision: 1 }));
