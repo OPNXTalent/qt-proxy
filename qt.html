@@ -2300,56 +2300,6 @@
     </div>
 
 
-    <!-- DOWNLOAD -->
-    <div id="downloadRow" style="display:none; margin-top:36px; padding:20px 0; border-top:1px solid var(--border);">
-
-      <!-- Minimal utility cluster -->
-      <div style="display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap;">
-
-        <!-- Save -->
-        <button onclick="printPrism()"
-            style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.2s;"
-            onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border-lit)'"
-            title="Print this interpretation">↓ Print</button>
-
-        <!-- Share -->
-        <div style="position:relative; display:inline-flex; align-items:center; gap:6px;">
-          <button id="shareBtn" onclick="handleShareBtn()"
-            style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 16px; border:1px solid var(--border-lit); background:transparent; color:var(--text); cursor:pointer; transition:all 0.25s;"
-            onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-pale)'"
-            onmouseout="if(!window._shareActive){this.style.borderColor='var(--border-lit)';this.style.color='var(--text)'}">
-            Share
-          </button>
-          <div id="presenceDot" style="display:none; width:7px; height:7px; border-radius:50%; background:rgba(80,180,120,0.5); transition:background 0.5s;" title="Live"></div>
-        </div>
-
-        <!-- Discussion trigger — only visible when shared -->
-        <button id="collabToggleBtn" onclick="toggleCollaboration()"
-          style="display:none; font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.2s;"
-          onmouseover="this.style.borderColor='rgba(80,180,120,0.5)';this.style.color='rgba(80,180,120,0.9)'"
-          onmouseout="if(!_collabOpen){this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'}">
-          Discussion
-        </button>
-
-      </div>
-
-      <!-- Share URL row — minimal, collapsed by default -->
-      <div id="shareUrlRow" style="display:none; margin-top:12px; justify-content:center; align-items:center; gap:8px;">
-        <div id="shareUrlDisplay" style="font-family:var(--mono); font-size:13px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px;"></div>
-        <button onclick="shareViaCopy()"
-          style="font-family:var(--mono); font-size:12px; letter-spacing:0.14em; text-transform:uppercase; padding:6px 12px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s; flex-shrink:0;"
-          onmouseover="this.style.color='var(--text-dim)'" onmouseout="this.style.color='var(--text-muted)'">Copy</button>
-        <button id="liveSyncBtn" onclick="startLiveSync()"
-          style="font-family:var(--mono); font-size:12px; letter-spacing:0.14em; text-transform:uppercase; padding:6px 12px; border:1px solid rgba(80,180,120,0.3); background:transparent; color:rgba(80,180,120,0.6); cursor:pointer; transition:all 0.2s; flex-shrink:0;">Sync</button>
-      </div>
-
-      <!-- Hidden legacy elements — kept for JS compatibility -->
-      <div id="discussionRow" style="display:none;"></div>
-      <div id="collabToggleRow" style="display:none;"></div>
-      <div id="chatPanel" style="display:none;"></div>
-
-    </div>
-
     <!-- THREAD SEED BANNER — shown when continuing from a completed thread -->
     <div id="qt-seed-banner" style="display:none; font-family:var(--crimson); font-size:18px; font-style:italic; line-height:1.6; color:var(--text-muted); border-left:2px solid var(--gold-dim); padding:10px 16px; margin-bottom:24px; margin-top:40px;"></div>
 
@@ -2909,12 +2859,10 @@ async function runInterpretation() {
       });
     });
 
-    // Show subject banner, follow-up, and download button
+    // Show subject banner, follow-up field, and the primary action row.
     document.getElementById('subjectText').textContent = input;
     document.getElementById('subjectBanner').style.display = 'block';
     showFollowUpComposer();
-    // downloadRow hidden — controls rendered per-node
-    document.getElementById('downloadRow').style.display = 'none';
     // Show session governance bar
     var govBar = document.getElementById('sessionGovernance');
     if (govBar) govBar.style.display = 'block';
@@ -4076,7 +4024,6 @@ function resetForm() {
   closeSidebarOverlay();
   document.getElementById('resultBlock').classList.remove('visible');
   showOpeningComposer();
-  document.getElementById('downloadRow').style.display = 'none';
   document.getElementById('followUpSection').style.display = 'none';
   document.getElementById('subjectBanner').style.display = 'none';
   document.getElementById('resultContent').innerHTML = '';
@@ -5043,7 +4990,6 @@ function selectThread(id) {
     var govBar = document.getElementById('sessionGovernance'); if (govBar) govBar.style.display = 'block';
     showFollowUpComposer();
     if (inputEl) inputEl.value = savedInput;
-    var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     window._shareHandlingFollowUps = false;
     // Reset to root node when a new interpretation loads
     _activeNodeId = 'root';
@@ -5206,7 +5152,6 @@ function selectThread(id) {
     var rb = document.getElementById('resultBlock');      if (rb)  rb.classList.remove('visible');
     var sb = document.getElementById('subjectBanner');    if (sb)  sb.style.display = 'none';
     var fs = document.getElementById('followUpSection'); if (fs)  fs.style.display = 'none';
-    var dr = document.getElementById('downloadRow');      if (dr)  dr.style.display = 'none';
   }
   // Page scrolls on window — scroll window to top after render
   requestAnimationFrame(function() {
@@ -8268,7 +8213,7 @@ function updateShareManageUI() {
     }
   }
 
-  // Also update the downloadRow collab toggle
+  // Keep any remaining legacy collaboration trigger synchronized.
   updateCollabToggleUI();
   loadTrustCircleMembers();
 }
@@ -10467,7 +10412,6 @@ document.addEventListener('DOMContentLoaded', function() {
     #inputArea,
     #governanceRow,
     #sessionGovernance,
-    #downloadRow,
     #followUpSection,
     #highlightSheet,
     #discussionPanel,
