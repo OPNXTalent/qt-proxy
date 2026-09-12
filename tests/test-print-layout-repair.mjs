@@ -9,7 +9,10 @@ assert.match(qt, /padding-top:\s*0\.28in !important;/, 'print shell should add a
 assert.match(qt, /padding-bottom:\s*0\.32in !important;/, 'print shell should add an internal bottom gutter to each fragmented page');
 assert.match(qt, /box-decoration-break:\s*clone;/, 'print shell gutters should be cloned across page fragments');
 assert.match(qt, /#queryPrintBtn\s*\{[\s\S]*?font-size:\s*12px;[\s\S]*?letter-spacing:\s*0\.18em;[\s\S]*?color:\s*var\(--gold-pale\);/, 'Print action should match Share This scale and Ask/Interpret color');
-assert.match(qt, /requestAnimationFrame\(\(\) => setTimeout\(\(\) => window\.print\(\), 0\)\)/, 'print dialog should be dispatched after the click handler returns');
+assert.match(qt, /onclick="printPrism\(\)"/, 'print actions should use the timestamp-aware print path');
+assert.match(qt, /function printPrism\(\)[\s\S]*document\.title = 'The Prism - ' \+ prismPrintTimestamp\(new Date\(\)\)[\s\S]*window\.print\(\)/, 'print dialog should receive a unique timestamped filename');
+assert.match(qt, /function prismPrintTimestamp\(date\)[\s\S]*getFullYear\(\)[\s\S]*getSeconds\(\)/, 'print filenames should include a filesystem-safe local date and time');
+assert.match(qt, /#sessionGovernance,[\s\S]*#followUpSection,[\s\S]*#discussionPanel,[\s\S]*display:\s*none !important;/, 'empty interactive containers must not leak rules or blank pages into print');
 assert.doesNotMatch(qt, /onclick="window\.print\(\)"/, 'blocking inline print handler should be removed');
 
 console.log('Print layout, page gutters, Print action styling, and deferred interaction regression passed.');
