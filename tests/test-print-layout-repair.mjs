@@ -8,7 +8,7 @@ assert.match(qt, /size:\s*auto;/, 'print page should honor the selected physical
 assert.match(qt, /padding-top:\s*0\.28in !important;/, 'print shell should add an internal top gutter to each fragmented page');
 assert.match(qt, /padding-bottom:\s*0\.32in !important;/, 'print shell should add an internal bottom gutter to each fragmented page');
 assert.match(qt, /box-decoration-break:\s*clone;/, 'print shell gutters should be cloned across page fragments');
-assert.match(qt, /#queryPrintBtn\s*\{[\s\S]*?font-size:\s*12px;[\s\S]*?letter-spacing:\s*0\.18em;[\s\S]*?color:\s*var\(--gold-pale\);/, 'Print action should match Share This scale and Ask/Interpret color');
+assert.match(qt, /\.query-action-btn\s*\{[\s\S]*?font-size:\s*12px;[\s\S]*?letter-spacing:\s*0\.18em;/, 'Print, Share, and Notes should share one readable action style');
 assert.match(qt, /onclick="printPrism\(\)"/, 'print actions should use the timestamp-aware print path');
 assert.match(qt, /function printPrism\(\)[\s\S]*document\.title = 'The Prism - ' \+ prismPrintTimestamp\(new Date\(\)\)[\s\S]*window\.print\(\)/, 'print dialog should receive a unique timestamped filename');
 assert.match(qt, /function prismPrintTimestamp\(date\)[\s\S]*getFullYear\(\)[\s\S]*getSeconds\(\)/, 'print filenames should include a filesystem-safe local date and time');
