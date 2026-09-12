@@ -12,7 +12,13 @@ def run(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, text=True, check=check)
 
 
-run("git", "fetch", "origin", "main", "agent/persistent-inquiry-runtime")
+run(
+    "git",
+    "fetch",
+    "origin",
+    "+refs/heads/main:refs/remotes/origin/main",
+    "+refs/heads/agent/persistent-inquiry-runtime:refs/remotes/origin/agent/persistent-inquiry-runtime",
+)
 run("git", "config", "user.name", "github-actions[bot]")
 run("git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
 
@@ -57,9 +63,8 @@ if "const crisisAcknowledged = req.body?.crisisAcknowledged === true;" not in ap
     api_path.write_text(api, encoding="utf-8")
 
 # Preserve production legibility and crisis-resume behavior in the
-# reconstructed client. Keep the original 3-argument callProxy signature so
-# the reconstructed presentation contract remains stable; the continuation
-# options travel through arguments[3].
+# reconstructed client. Keep the continuation options explicit in the
+# function contract while preserving three-argument callers.
 qt_path = Path("qt.html")
 qt = qt_path.read_text(encoding="utf-8")
 if "/prism-ui.css" not in qt:
@@ -70,7 +75,7 @@ if "/prism-ui.css" not in qt:
 
 if "crisisAcknowledged: options.crisisAcknowledged === true" not in qt:
     old_sig = "async function callProxy(messages, rawQuery, requestId) {"
-    new_sig = "async function callProxy(messages, rawQuery, requestId) {\n  const options = arguments[3] || {};"
+    new_sig = "async function callProxy(messages, rawQuery, requestId, options) {\n  options = options || {};"
     if old_sig not in qt:
         raise SystemExit("qt.html callProxy signature not found")
     qt = qt.replace(old_sig, new_sig, 1)

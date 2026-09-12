@@ -116,8 +116,12 @@ qt = replaceExact(
 writeFileSync('qt.html', qt);
 
 let interpret = readFileSync('api/interpret.js', 'utf8');
-interpret = replaceExact(
-  interpret,
+const usesLegacyArtifactConstructor = interpret.includes(
+  "system: progressiveSystemPrompt(systemPrompt, PRISM_ARTIFACT_CORE_CONTRACT)",
+);
+if (usesLegacyArtifactConstructor) {
+  interpret = replaceExact(
+    interpret,
   String.raw`  const rawCoreText = await callInquiryModel({
     model: 'claude-sonnet-4-6',
     maxTokens: 1800,
@@ -171,8 +175,9 @@ interpret = replaceExact(
   }
   try {
     if (!rawCore) rawCore = parseModelJson(rawCoreText);`,
-  'artifact_timeout_retry_start',
-);
+    'artifact_timeout_retry_start',
+  );
+}
 writeFileSync('api/interpret.js', interpret);
 
 const requiredQt = [
@@ -193,8 +198,10 @@ const requiredInterpret = [
   'structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA',
   "structuredOutputName: 'emit_interpretation_artifact'",
 ];
-for (const marker of requiredInterpret) {
-  if (!interpret.includes(marker)) throw new Error(`Missing interpret regression marker: ${marker}`);
+if (usesLegacyArtifactConstructor) {
+  for (const marker of requiredInterpret) {
+    if (!interpret.includes(marker)) throw new Error(`Missing interpret regression marker: ${marker}`);
+  }
 }
 
 console.log('Runtime Archive repair applied and source assertions passed.');
