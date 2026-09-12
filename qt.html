@@ -3792,6 +3792,14 @@ function findLastContextQuestion(text) {
   return source.slice(previousBoundary + 1, end + 1).trim();
 }
 
+function containsEquivalentProse(source, candidate) {
+  const normalize = function(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('en-US');
+  };
+  const normalizedCandidate = normalize(candidate);
+  return Boolean(normalizedCandidate) && normalize(source).includes(normalizedCandidate);
+}
+
 function renderResult(d) {
   const sections = [
     { num: '00', title: 'Echad b\'Emet', hebrew: 'אֶחָד בֶאֱמֶת', content: d.prism_summary },
@@ -3804,18 +3812,22 @@ function renderResult(d) {
 
   let html = '';
   let recognitionText = d.recognition || '';
+  let coreInsightText = String(d.core_insight || '').trim();
   let openDoorQuestion = String(d.open_door_question || '').trim();
-  if (!openDoorQuestion) {
-    openDoorQuestion = findLastContextQuestion(d.core_insight);
-  }
-  if (!openDoorQuestion) {
+  const embeddedCoreQuestion = coreInsightText.endsWith('?')
+    ? findLastContextQuestion(coreInsightText)
+    : '';
+  if (!openDoorQuestion && !embeddedCoreQuestion) {
     openDoorQuestion = findLastContextQuestion(recognitionText);
     if (openDoorQuestion) {
       recognitionText = recognitionText.replace(openDoorQuestion, '').replace(/\s{2,}/g, ' ').trim();
     }
   }
-  if (!openDoorQuestion) {
+  if (!openDoorQuestion && !embeddedCoreQuestion) {
     openDoorQuestion = String(d.orientation_question || '').trim();
+  }
+  if (openDoorQuestion && !containsEquivalentProse(coreInsightText, openDoorQuestion)) {
+    coreInsightText = [coreInsightText, openDoorQuestion].filter(Boolean).join('\n\n');
   }
 
   // ── 1. FRAMEWORK FOR INTERPRETATION (collapsed, top of response) ─────────────
@@ -3850,18 +3862,15 @@ function renderResult(d) {
   }
 
   // ── 3. PRISM RESPONSE ─────────────────────────────────────────────────────────
-  if (d.core_insight) {
-    var coreParagraphs = String(d.core_insight).split(/\n\s*\n/).map(function(p) { return p.trim(); }).filter(Boolean);
+  if (coreInsightText) {
+    var coreParagraphs = coreInsightText.split(/\n\s*\n/).map(function(p) { return p.trim(); }).filter(Boolean);
     if (coreParagraphs.length <= 1) {
-      html += '<div class="qt-core-insight"><p>' + formatPrismProse(d.core_insight) + '</p></div>';
+      html += '<div class="qt-core-insight"><p>' + formatPrismProse(coreInsightText) + '</p></div>';
     } else {
       html += '<div class="qt-core-insight">' + coreParagraphs.map(function(p) {
         return '<p>' + formatPrismProse(p.replace(/\n/g, ' ')) + '</p>';
       }).join('') + '</div>';
     }
-  }
-  if (openDoorQuestion) {
-    html += '<div class="qt-core-insight qt-open-door"><p>' + formatPrismProse(openDoorQuestion) + '</p></div>';
   }
 
   if (d.interpretive_context) {
