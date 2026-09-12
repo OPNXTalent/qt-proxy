@@ -116,25 +116,25 @@ assert.match(
 );
 
 const qtSource = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
-assert.match(
-  qtSource,
-  /coreInsightText = \[coreInsightText, openDoorQuestion\][\s\S]*coreParagraphs = coreInsightText/,
-  'A separate open-door field must be folded into the core prose',
-);
 assert.doesNotMatch(
   qtSource,
   /qt-core-insight qt-open-door/,
   'The open-door question must not render as a separate callout',
 );
-assert.match(
+assert.doesNotMatch(
   qtSource,
-  /function findLastContextQuestion[\s\S]*embeddedCoreQuestion[\s\S]*findLastContextQuestion\(recognitionText\)/,
-  'A context-derived Recognition question must provide a non-generic rendering fallback',
+  /findLastContextQuestion|containsEquivalentProse|openDoorQuestion\s*=/,
+  'The browser must not derive or append a second question from compatibility fields',
+);
+assert.doesNotMatch(
+  qtSource,
+  /d\.open_door_question|d\.orientation_question/,
+  'Only canonical core prose may determine the visible conclusion',
 );
 assert.match(
   qtSource,
-  /recognitionText = recognitionText\.replace\(openDoorQuestion/,
-  'A fallback question moved to the conclusion must not be duplicated in Recognition',
+  /coreInsightText = String\(d\.core_insight \|\| ''\)\.trim\(\)[\s\S]*coreParagraphs = coreInsightText/,
+  'The canonical response must render directly from core_insight',
 );
 assert.match(
   progressiveContract,
