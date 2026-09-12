@@ -7,6 +7,6 @@ assert.match(followup, /applyInquiryPatch/);
 assert.match(followup, /onTextDelta: text => sse\.write\(\{ type: 'response_delta', text \}\)/);
 assert.match(followup, /completeFollowUpArtifact/);
 assert.ok(followup.indexOf('completeFollowUpArtifact') < followup.indexOf("type: 'canonical_complete'"));
-assert.ok(followup.indexOf("type: 'canonical_complete'") < followup.indexOf('generateAndAttachContext'));
+assert.doesNotMatch(followup, /generateAndAttachContext|context_companion|emit_context_companion/);
 assert.doesNotMatch(followup, /generateAndAttachEnrichment|constructAuditedArtifact/);
 console.log('Reconstructed follow-up execution contract checks passed.');
