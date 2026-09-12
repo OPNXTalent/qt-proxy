@@ -13,6 +13,16 @@ assert.doesNotMatch(
   /id="downloadRow"|id="shareBtn"|id="presenceDot"|id="collabToggleBtn"|id="liveSyncBtn"/,
   'The legacy Print, Shared, Discussion, Copy, and Sync strip must not return',
 );
+assert.match(
+  frontend,
+  /\.site-footer\s*\{[\s\S]*?width:\s*calc\(100% - 80px\);[\s\S]*?max-width:\s*780px;[\s\S]*?margin:\s*0 auto;/,
+  'The footer must share the desktop width and centered edges of the question box',
+);
+assert.match(
+  frontend,
+  /@media \(max-width: 600px\)\s*\{\s*\.site-footer\s*\{\s*width:\s*calc\(100% - 40px\);/,
+  'The footer must share the mobile width of the question box',
+);
 
 assert.equal(
   (frontend.match(/<textarea\b[^>]*class="input-field"/g) || []).length,
