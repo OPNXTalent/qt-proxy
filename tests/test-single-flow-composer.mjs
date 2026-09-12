@@ -8,6 +8,11 @@ assert.match(
   /\.query-action-row\s*\{[\s\S]*?justify-content:\s*space-between;[\s\S]*?width:\s*100%;[\s\S]*?\}/,
   'Print, Share, and Notes must span the response width',
 );
+assert.doesNotMatch(
+  frontend,
+  /id="downloadRow"|id="shareBtn"|id="presenceDot"|id="collabToggleBtn"|id="liveSyncBtn"/,
+  'The legacy Print, Shared, Discussion, Copy, and Sync strip must not return',
+);
 
 assert.equal(
   (frontend.match(/<textarea\b[^>]*class="input-field"/g) || []).length,
