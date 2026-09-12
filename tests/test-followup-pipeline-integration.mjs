@@ -7,6 +7,6 @@ assert.match(followup, /telemetryStage: 'followup_reduction'/);
 assert.match(followup, /telemetryStage: 'followup_draft'/);
 assert.match(followup, /telemetryStage: 'followup_audit'/);
 assert.match(followup, /revision: Math\.max\(previousState\.version \+ 1, restored\.artifactRevision \+ 1\)/);
-assert.match(followup, /generateAndAttachContext/);
-for (const type of ['response_delta', 'canonical_complete', 'interpretive_context', 'explore_context']) assert.match(client, new RegExp(`parsed\\.type === '${type}'`));
+assert.doesNotMatch(followup, /generateAndAttachContext|context_companion|emit_context_companion/);
+for (const type of ['response_delta', 'canonical_complete']) assert.match(client, new RegExp(`parsed\\.type === '${type}'`));
 console.log('Reconstructed follow-up pipeline integration checks passed.');
