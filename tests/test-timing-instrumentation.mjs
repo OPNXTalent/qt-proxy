@@ -23,8 +23,6 @@ const serverEvents = [
   'canonical_completion_start',
   'canonical_completion_complete',
   'canonical_response_available',
-  'context_companion_start',
-  'context_companion_complete',
   'done_sent',
   'response_closed',
 ];
