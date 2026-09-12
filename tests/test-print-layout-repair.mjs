@@ -13,6 +13,7 @@ assert.match(qt, /onclick="printPrism\(\)"/, 'print actions should use the times
 assert.match(qt, /function printPrism\(\)[\s\S]*document\.title = 'The Prism - ' \+ prismPrintTimestamp\(new Date\(\)\)[\s\S]*window\.print\(\)/, 'print dialog should receive a unique timestamped filename');
 assert.match(qt, /function prismPrintTimestamp\(date\)[\s\S]*getFullYear\(\)[\s\S]*getSeconds\(\)/, 'print filenames should include a filesystem-safe local date and time');
 assert.match(qt, /#sessionGovernance,[\s\S]*#followUpSection,[\s\S]*#discussionPanel,[\s\S]*display:\s*none !important;/, 'empty interactive containers must not leak rules or blank pages into print');
+assert.match(qt, /\.disclaimer\s*\{[\s\S]*?text-align:\s*left;/, 'the prose disclaimer should remain left-aligned on screen and in print');
 assert.doesNotMatch(qt, /onclick="window\.print\(\)"/, 'blocking inline print handler should be removed');
 
 console.log('Print layout, page gutters, Print action styling, and deferred interaction regression passed.');
