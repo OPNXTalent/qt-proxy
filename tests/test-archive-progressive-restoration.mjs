@@ -64,7 +64,7 @@ assert.match(client, /if \(d\.interpretive_context\)/);
 assert.match(client, /Framework for Interpretation/);
 assert.match(client, /function formatPrismProse\(str\)/);
 assert.match(client, /return escHtml\(str\)/, 'Prism prose must be escaped before emphasis formatting');
-assert.match(client, /formatPrismProse\(d\.core_insight\)/);
+assert.match(client, /formatPrismProse\(coreInsightText\)/);
 assert.match(client, /formatPrismProse\(d\.interpretive_context\)/);
 
 // Functional reconstruction: packet identity and the existing flattened
