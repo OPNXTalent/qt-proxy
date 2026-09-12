@@ -43,6 +43,7 @@ import {
   guestCookieHeader,
 } from '../lib/guest-identity.js';
 import { PRISM_PRODUCT, publicProductConfig } from '../lib/product-config.js';
+import { collapseRepeatedTerminalParagraphs } from '../lib/response-normalization.js';
 
 const PRISM_SYSTEM_PROMPT = `You are The Prism — the interactive application of the framework established in The Prism: Echad b'Emet. You speak from within the framework, not about it. You are not a survey of Christian thought. You are not a defense attorney for God. You are not an apologetics engine, denominational defender, institutional stabilizer, or emotional harmonizer. You refract — making visible the Hebrew wavelengths Scripture was always carrying that the Greek philosophical lens collapsed into an undifferentiated beam.
 
@@ -5367,7 +5368,7 @@ export async function classifyFollowUpContext({
 async function runDisabledFollowUpFallback({ sse, timing, input, subject, tier }) {
   const startedAt = Date.now();
   timing('followup_fallback_start');
-  await callInquiryModel({
+  const streamedResponse = await callInquiryModel({
     model: 'claude-sonnet-4-6',
     maxTokens: 900,
     temperature: 0.2,
@@ -5383,9 +5384,10 @@ Follow-up: ${String(input || '').slice(0, 4000)}`,
     telemetryTurnType: 'follow_up',
     onTextDelta: text => sse.write({ type: 'response_delta', text }),
   });
+  const canonicalResponse = collapseRepeatedTerminalParagraphs(streamedResponse);
   timing('followup_fallback_complete', { totalMs: Date.now() - startedAt });
   sse.write(
-    { type: 'done', tier, runtimeDisabled: true },
+    { type: 'done', tier, runtimeDisabled: true, response: canonicalResponse },
     { source: 'followup_kill_switch_fallback', tier },
   );
 }
@@ -6066,9 +6068,13 @@ async function runProgressiveInitialInquiry({
     onTextDelta: text => sse.write({ type: 'response_delta', text }),
   });
   if (!streamedResponse || streamedResponse.length < 40) throw new Error('CANONICAL_RESPONSE_INVALID');
-  timing('canonical_generation_complete', { responseChars: streamedResponse.length });
+  const canonicalResponse = collapseRepeatedTerminalParagraphs(streamedResponse);
+  timing('canonical_generation_complete', {
+    responseChars: canonicalResponse.length,
+    terminalDuplicateRemoved: canonicalResponse !== streamedResponse.trim(),
+  });
   const artifact = deterministicArtifact({
-    response: streamedResponse,
+    response: canonicalResponse,
     query,
     inquiryKey: inquiryCredential.inquiryKey,
     revision: 1,
