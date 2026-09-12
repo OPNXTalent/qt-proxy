@@ -78,19 +78,19 @@ assert.match(
   'The browser must load the tested extractor module',
 );
 assert.equal(
-  (qtSource.match(/fullText \+= parsed\.text;\s+considerEarlyRecognition\(\);/g) || []).length,
+  (qtSource.match(/parsed\.type === 'provisional_orientation' && parsed\.text/g) || []).length,
   2,
-  'Both initial-query SSE parsing paths must consider early Recognition',
+  'Both initial-query SSE parsing paths must consume provisional orientation prose',
 );
 assert.match(
   qtSource,
-  /escHtml\(recognition\.trim\(\)\)/,
-  'Early Recognition must be HTML escaped before rendering',
+  /escHtml\(orientation\)/,
+  'Provisional orientation must be HTML escaped before rendering',
 );
-assert.match(
+assert.doesNotMatch(
   qtSource,
-  /recognition_extraction_invalid/,
-  'Extraction failure must be observable while retaining the safe fallback',
+  /extractor\(fullText, 'orientation'\)/,
+  'The browser must not reverse-parse raw artifact JSON for progressive presentation',
 );
 
 console.log('Streaming Recognition extraction checks passed.');

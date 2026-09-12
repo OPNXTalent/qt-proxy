@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/build.mjs",
+  "buildCommand": "for test in tests/*.mjs; do node \"$test\"; done",
   "outputDirectory": ".",
   "functions": {
     "api/interpret.js": {

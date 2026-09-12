@@ -10,7 +10,7 @@ const threadsApi = fs.readFileSync(new URL('../api/threads.js', import.meta.url)
 assert.match(threadsApi, /setHeader\('Cache-Control', 'private, no-store'\)/);
 assert.match(
   client,
-  /authenticatedFetch\(API_BASE \+ '\/api\/threads', \{\s*cache: 'no-store',\s*headers: \{ 'Content-Type': 'application\/json', 'x-user-email': email \}/,
+  /authenticatedFetch\(API_BASE \+ '\/api\/threads', \{\s*cache: 'no-store',\s*credentials: 'same-origin',\s*headers: \{ 'Content-Type': 'application\/json'/,
   'The registered Archive fetch must bypass browser response caching',
 );
 
@@ -21,6 +21,14 @@ assert.match(
   /var responseData = archiveResponseForRender\(supaResp, localParsed\);/,
   'Archive restoration must prefer the server-authoritative response over a stale local snapshot',
 );
+
+// Re-rendering the Archive must not discard row click handlers. Selection is
+// delegated from the stable list container and carries the durable thread ID.
+assert.match(client, /if \(!list\.dataset\.threadSelectionBound\)/);
+assert.match(client, /list\.addEventListener\('click', function\(e\)/);
+assert.match(client, /\.closest\('\.thread-item\[data-thread-id\]'\)/);
+assert.match(client, /selectThread\(item\.dataset\.threadId\)/);
+assert.match(client, /item\.dataset\.threadId = thread\.id/);
 
 // The server reconstruction must select the newest artifact revision and retain
 // current or inherited enrichment packets from the same artifact lineage.
@@ -33,6 +41,8 @@ assert.match(threadsApi, /packet\.packet_type === 'interpretive_context'/);
 assert.match(threadsApi, /response\.interpretive_context = content\.text \|\| ''/);
 assert.match(threadsApi, /packet\.packet_type === 'prism_analysis'/);
 assert.match(threadsApi, /response\.prism_analysis = content/);
+assert.match(threadsApi, /packet\.packet_type === 'explore_context'/);
+assert.match(threadsApi, /response\.explore_context = Array\.isArray\(content\.nodes\)/);
 assert.match(threadsApi, /response\.prism_summary = framework\.prismSummary \|\| ''/);
 assert.match(threadsApi, /response\.key_terms = \(content\.keyTerms \|\| \[\]\)/);
 assert.match(threadsApi, /_artifactId: artifact\.artifactId/);
@@ -52,6 +62,10 @@ assert.doesNotMatch(selectThreadSource, /\/api\/interpret|charge|complete_inquir
 assert.match(client, /const hasFramework = sections\.some/);
 assert.match(client, /if \(d\.interpretive_context\)/);
 assert.match(client, /Framework for Interpretation/);
+assert.match(client, /function formatPrismProse\(str\)/);
+assert.match(client, /return escHtml\(str\)/, 'Prism prose must be escaped before emphasis formatting');
+assert.match(client, /formatPrismProse\(d\.core_insight\)/);
+assert.match(client, /formatPrismProse\(d\.interpretive_context\)/);
 
 // Functional reconstruction: packet identity and the existing flattened
 // renderer contract must coexist in the serialized response object.
@@ -95,6 +109,26 @@ assert.equal(restored.prism_summary, 'Summary');
 assert.equal(restored.entanglement, 'Entanglement');
 assert.equal(restored.key_terms[0].term, 'Tov');
 assert.notEqual(restored._analysisIncomplete, true);
+
+const reconstructed = responseFromArtifact({
+  artifact_id: '9c5b557f-6d6a-4fcd-a4ed-7ec8b4bc3ac8',
+  artifact_revision: 1,
+  artifact: {
+    artifactId: '9c5b557f-6d6a-4fcd-a4ed-7ec8b4bc3ac8',
+    revision: 1,
+    responseMode: 'reflective',
+    orientation: 'Persisted orientation',
+    canonicalResponse: 'Persisted canonical response',
+    openDoorQuestion: 'Persisted open door?',
+  },
+}, [
+  { packet_type: 'interpretive_context', content: { text: 'Reconstructed context' } },
+  { packet_type: 'explore_context', content: { nodes: [{ id: 'emet', title: 'Emet' }] } },
+]);
+assert.equal(reconstructed.core_insight, 'Persisted canonical response');
+assert.equal(reconstructed.interpretive_context, 'Reconstructed context');
+assert.deepEqual(reconstructed.explore_context, [{ id: 'emet', title: 'Emet' }]);
+assert.equal(reconstructed.prism_analysis, undefined, 'Reconstructed Archive hydration must not require legacy analysis');
 
 const authoritativeByThread = selectAuthoritativeArtifacts([
   {

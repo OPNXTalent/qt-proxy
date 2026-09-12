@@ -97,6 +97,7 @@ async function handleClaimAnonSession(req, res) {
   if (!anonId || !userId || !threadId) {
     return res.status(400).json({ error: 'anonId, authenticated user, and threadId are required' });
   }
+  return res.status(410).json({ error: 'Guest claims are handled by the verified guest-identity boundary' });
 
   const results = { followUps: false, notes: false, participant: false };
 
@@ -159,6 +160,7 @@ async function handleJoinCircle(req, res) {
   }
   const { threadId } = body || {};
   if (!threadId) return res.status(400).json({ error: 'threadId required' });
+  return res.status(410).json({ error: 'Trust Circle access requires an active share credential; save an independent fork to continue' });
 
   const partRes = await fetch(`${SUPABASE_URL}/rest/v1/thread_participants`, {
     method: 'POST',
@@ -313,7 +315,7 @@ async function handleNoteRequest(req, res) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-share-id');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-share-id, x-share-token');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const auth = await verifySupabaseIdentity({
@@ -344,6 +346,7 @@ export default async function handler(req, res) {
   const userEmail = req.verifiedIdentity?.email || null;
   const authenticatedUserId = req.verifiedIdentity?.userId || null;
   const shareId   = req.headers['x-share-id']   || null;
+  const shareToken = req.headers['x-share-token'] || null;
 
   // ── GET — fetch follow-ups for a thread ──────────────────────────────────
   if (req.method === 'GET') {
@@ -351,9 +354,10 @@ export default async function handler(req, res) {
     if (!threadId) return res.status(400).json({ error: 'threadId required' });
 
     // Share page context — untouched, separate from Trust Circle entirely.
-    if (shareId) {
+    if (shareId && shareToken) {
       const shareRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}&thread_id=eq.${encodeURIComponent(threadId)}&select=id&limit=1`,
+        `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}&token=eq.${encodeURIComponent(shareToken)}` +
+        `&thread_id=eq.${encodeURIComponent(threadId)}&status=eq.active&revoked_at=is.null&select=id&limit=1`,
         { headers: sbHeaders() }
       );
       const shares = await shareRes.json();
@@ -371,16 +375,11 @@ export default async function handler(req, res) {
 
     const viewerUserId = authenticatedUserId;
 
-    const [threadRes, participantRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&select=id,user_id&limit=1`, { headers: sbHeaders() }),
-      fetch(`${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&user_id=eq.${viewerUserId}&select=id&limit=1`, { headers: sbHeaders() })
-    ]);
+    const threadRes = await fetch(`${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&select=id,user_id&limit=1`, { headers: sbHeaders() });
     const threadRows = await threadRes.json();
-    const participantRows = await participantRes.json();
     const isOwner = threadRows?.[0]?.user_id === viewerUserId;
-    const isParticipant = Array.isArray(participantRows) && participantRows.length > 0;
 
-    if (!isOwner && !isParticipant) {
+    if (!isOwner) {
       return res.status(403).json({ error: 'Not authorized to view this thread' });
     }
 
@@ -411,122 +410,28 @@ export default async function handler(req, res) {
     const postShareId = bodyShareId || shareId || null;
 
     if (postSource === 'recipient' && postShareId) {
-      const shareRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(postShareId)}&thread_id=eq.${encodeURIComponent(threadId)}&status=eq.active&select=id&limit=1`,
-        { headers: sbHeaders() }
-      );
-      const shares = await shareRes.json();
-      if (!shares?.length) {
-        return res.status(403).json({ error: 'Share not found, inactive, or does not match thread' });
-      }
-
-      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/follow_ups`, {
-        method: 'POST',
-        headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-        body: JSON.stringify({
-          thread_id:       threadId,
-          user_id:         null,
-          query:           question,
-          response:        typeof response === 'string' ? { text: response } : (response || {}),
-          query_cost:      0,
-          submitted_in:    'share',
-          source:          'recipient',
-          share_id:        postShareId,
-          anon_session_id: anonSessionId || null
-        })
+      return res.status(409).json({
+        error: 'Save this inquiry to My Prism before asking The Prism a follow-up',
+        code: 'TRUST_CIRCLE_FORK_REQUIRED',
       });
-
-      if (!insertRes.ok) {
-        const err = await insertRes.text();
-        console.error('recipient follow-up insert failed:', err);
-        return res.status(500).json({ error: 'Failed to save follow-up' });
-      }
-
-      const saved = await insertRes.json();
-      return res.status(200).json({ success: true, id: saved?.[0]?.id });
     }
 
     if (postSource === 'participant') {
-      if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
-      const participantUserId = authenticatedUserId;
-
-      const partRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&user_id=eq.${participantUserId}&active=eq.true&select=id&limit=1`,
-        { headers: sbHeaders() }
-      );
-      const partRows = await partRes.json();
-      if (!partRows?.length) {
-        return res.status(403).json({ error: 'Must be an active participant on this thread to contribute' });
-      }
-
-      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/follow_ups`, {
-        method: 'POST',
-        headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-        body: JSON.stringify({
-          thread_id:    threadId,
-          user_id:      participantUserId,
-          query:        question,
-          response:     typeof response === 'string' ? { text: response } : (response || {}),
-          query_cost:   1,
-          submitted_in: 'participant',
-          source:       'participant',
-          share_id:     null
-        })
+      return res.status(409).json({
+        error: 'Trust Circle members may comment, but must fork before asking The Prism a follow-up',
+        code: 'TRUST_CIRCLE_FORK_REQUIRED',
       });
-
-      if (!insertRes.ok) {
-        const err = await insertRes.text();
-        console.error('participant follow-up insert failed:', err);
-        return res.status(500).json({ error: 'Failed to save follow-up' });
-      }
-
-      await fetch(
-        `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${threadId}&user_id=eq.${participantUserId}`,
-        {
-          method: 'PATCH',
-          headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
-          body: JSON.stringify({ last_seen_at: new Date().toISOString() })
-        }
-      );
-
-      const saved = await insertRes.json();
-      return res.status(200).json({ success: true, id: saved?.[0]?.id });
     }
 
-    if (!userEmail) return res.status(401).json({ error: 'Unauthorized' });
-
-    const ownerUserId = authenticatedUserId;
-
-    const threadRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/threads?id=eq.${threadId}&user_id=eq.${ownerUserId}&select=id&limit=1`,
-      { headers: sbHeaders() }
-    );
-    const threads = await threadRes.json();
-    if (!threads?.length) return res.status(403).json({ error: 'Thread not found or not owned by user' });
-
-    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/follow_ups`, {
-      method: 'POST',
-      headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-      body: JSON.stringify({
-        thread_id:    threadId,
-        user_id:      ownerUserId,
-        query:        question,
-        response:     typeof response === 'string' ? { text: response } : (response || {}),
-        query_cost:   1,
-        submitted_in: 'solo',
-        source:       'owner',
-        share_id:     null
-      })
+    // Canonical completion in /api/interpret owns durable follow-up
+    // persistence, lineage, revisioning, and accounting. This endpoint is
+    // intentionally read-only for the historical follow_ups collection;
+    // retaining an owner dual-write would create a second, non-authoritative
+    // persistence record across incompatible identity domains.
+    return res.status(410).json({
+      error: 'Legacy follow-up writes are retired; canonical artifact persistence is authoritative',
+      code: 'LEGACY_FOLLOWUP_WRITE_RETIRED'
     });
-
-    if (!insertRes.ok) {
-      const err = await insertRes.text();
-      console.error('owner follow-up insert failed:', err);
-      return res.status(500).json({ error: 'Failed to save follow-up' });
-    }
-
-    const saved = await insertRes.json();
-    return res.status(200).json({ success: true, id: saved?.[0]?.id });
   }
 
   // ── DELETE — remove my own contribution ──────────────────────────────────

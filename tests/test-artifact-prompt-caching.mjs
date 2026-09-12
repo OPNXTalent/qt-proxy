@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const api = fs.readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
+const fn = api.slice(api.indexOf('function cachedCanonicalResponseSystem'), api.indexOf('function deterministicArtifact'));
+assert.match(fn, /PRISM_SYSTEM_PROMPT/);
+assert.match(fn, /PRISM_CANONICAL_RESPONSE_CONTRACT/);
+assert.match(fn, /cache_control: \{ type: 'ephemeral' \}/);
+assert.match(fn, /source\.slice\(PRISM_SYSTEM_PROMPT\.length\)/);
+const runtime = api.slice(api.indexOf('async function runProgressiveInitialInquiry'), api.indexOf('async function runPersistentInquiryFollowUp'));
+assert.match(runtime, /system: cachedCanonicalResponseSystem\(systemPrompt\)/);
+assert.doesNotMatch(runtime, /structuredOutputSchema/);
+console.log('Canonical response prompt-cache boundary checks passed.');

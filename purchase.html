@@ -456,7 +456,7 @@
   </div>
 
   <!-- Billing toggle -->
-  <div class="toggle-row">
+  <div class="toggle-row" style="display:none;">
     <span class="toggle-label" id="monthly-label" style="color:var(--gold);">Monthly</span>
     <div class="toggle-track" onclick="toggleBilling()" id="toggle-track">
       <div class="toggle-knob" id="toggle-knob"></div>
@@ -469,9 +469,9 @@
 
     <!-- Observer -->
     <div class="tier">
-      <span class="tier-name">Observer</span>
+      <span class="tier-name">Explorer</span>
       <div class="tier-price">Free</div>
-      <span class="tier-cadence">3 queries / 24 hrs</span>
+      <span class="tier-cadence">5 credits / rolling 24 hrs</span>
       <ul class="tier-features">
         <li>Full framework access</li>
         <li>All five lenses</li>
@@ -483,71 +483,51 @@
 
     <!-- Examiner -->
     <div class="tier featured">
-      <span class="tier-name">Examiner</span>
-      <div class="tier-price"><sup>$</sup><span id="refraction-price">9<span style="font-size:20px;">.99</span></span></div>
-      <span id="refraction-cadence" class="tier-cadence">per month · 100 queries</span>
+      <span class="tier-name">Prism Power</span>
+      <div class="tier-price"><sup>$</sup><span id="refraction-price">49<span style="font-size:20px;">.99</span></span></div>
+      <span id="refraction-cadence" class="tier-cadence">per month · 350 credits</span>
       <ul class="tier-features">
-        <li>100 queries per month</li>
+        <li>350 bankable credits per month</li>
+        <li>Unused credits never expire</li>
         <li>Session history saved</li>
         <li>90-day archive</li>
         <li>Follow-up exploration</li>
       </ul>
-      <a id="refraction-btn" href="#" onclick="interceptPurchase('https://buy.stripe.com/8x214n9j88qY09P6aJ18c04'); return false;" class="tier-btn">Subscribe →</a>
+      <a id="refraction-btn" href="#" onclick="interceptConfiguredPurchase('subscription'); return false;" class="tier-btn">Subscribe →</a>
     </div>
 
     <!-- Full Spectrum -->
     <div class="tier">
-      <span class="tier-name">Full Spectrum</span>
-      <div class="tier-price"><sup>$</sup><span id="fullspectrum-price">24<span style="font-size:20px;">.99</span></span></div>
-      <span id="fullspectrum-cadence" class="tier-cadence">per month · 250 queries</span>
+      <span class="tier-name">Standard Credit Bank</span>
+      <div class="tier-price"><sup>$</sup><span id="fullspectrum-price">19<span style="font-size:20px;">.99</span></span></div>
+      <span id="fullspectrum-cadence" class="tier-cadence">one time · never expires</span>
       <ul class="tier-features">
-        <li>250 queries per month</li>
+        <li>125 permanent credits</li>
         <li>Session history saved</li>
         <li>180-day archive</li>
         <li>Follow-up exploration</li>
       </ul>
-      <a id="fullspectrum-btn" href="#" onclick="interceptPurchase('https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05'); return false;" class="tier-btn">Subscribe →</a>
+      <a id="fullspectrum-btn" href="#" onclick="interceptConfiguredPurchase('bank125'); return false;" class="tier-btn">Buy Credits →</a>
     </div>
 
   </div>
 
-  <!-- Signal Bank divider -->
+  <!-- Credit Bank divider -->
   <div class="section-divider">
     <span>No subscription required</span>
   </div>
 
-  <!-- Signal Bank -->
+  <!-- Credit Bank -->
   <div class="signal-header">
-    <div class="signal-title">Signal Bank</div>
-    <p class="signal-sub">Buy exactly what you need. No commitment. Queries never expire.</p>
+    <div class="signal-title">Credit Bank</div>
+    <p class="signal-sub">Buy exactly what you need. No commitment. Credits never expire.</p>
   </div>
 
   <div class="signal-grid">
 
-    <a href="#" onclick="interceptPurchase('https://buy.stripe.com/00wcN5dzoaz69Kpcz718c0b'); return false;" class="signal-card">
-      <span class="signal-qty">Signal 10</span>
-      <span class="signal-count">10</span>
-      <span class="signal-price">$2.99</span>
-      <span class="signal-buy">Buy →</span>
-    </a>
-
-    <a href="#" onclick="interceptPurchase('https://buy.stripe.com/aFa14n2UKgXu4q56aJ18c09'); return false;" class="signal-card">
-      <span class="signal-qty">Signal 25</span>
-      <span class="signal-count">25</span>
-      <span class="signal-price">$6.99</span>
-      <span class="signal-buy">Buy →</span>
-    </a>
-
-    <a href="#" onclick="interceptPurchase('https://buy.stripe.com/cNidR9ancdLiaOt0Qp18c08'); return false;" class="signal-card featured-signal">
-      <span class="signal-qty">Signal 50</span>
-      <span class="signal-count">50</span>
-      <span class="signal-price">$12.99</span>
-      <span class="signal-buy">Buy →</span>
-    </a>
-
-    <a href="#" onclick="interceptPurchase('https://buy.stripe.com/fZu9ATfHw5eM4q5cz718c07'); return false;" class="signal-card">
-      <span class="signal-qty">Signal 100</span>
-      <span class="signal-count">100</span>
+    <a href="#" onclick="interceptConfiguredPurchase('bank125'); return false;" class="signal-card featured-signal">
+      <span class="signal-qty">Credit Bank</span>
+      <span class="signal-count">125</span>
       <span class="signal-price">$19.99</span>
       <span class="signal-buy">Buy →</span>
     </a>
@@ -575,9 +555,21 @@
 </div>
 
 <script>
-var _billingAnnual = false;
 var _pendingStripeUrl  = null;
 var _returnUrl         = null;
+var _checkoutUrls      = {};
+
+function interceptConfiguredPurchase(product) {
+  var url = _checkoutUrls[product];
+  if (!url) {
+    var copy = document.getElementById('prePurchaseCopy');
+    if (copy) copy.textContent = 'Checkout is not configured yet. Please try again later.';
+    var modal = document.getElementById('prePurchaseModal');
+    if (modal) modal.style.display = 'flex';
+    return;
+  }
+  interceptPurchase(url);
+}
 
 // If arriving from share.html, capture the return destination
 (function() {
@@ -631,59 +623,14 @@ async function handlePrePurchaseContinue() {
     return;
   }
   localStorage.setItem('qt_user_email', email);
-  try {
-    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-    await fetch(sbUrl + '/rest/v1/subscribers', {
-      method: 'POST',
-      headers: {
-        'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon,
-        'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates'
-      },
-      body: JSON.stringify({ email: email, tier: 'free', status: 'active' })
-    });
-  } catch(e) {}
+  // Checkout email is used only for Stripe fulfillment. It does not create
+  // account or entitlement state through the public database API.
   var modal = document.getElementById('prePurchaseModal');
   if (modal) modal.style.display = 'none';
   if (_pendingStripeUrl) {
     var dest = _pendingStripeUrl;
     dest += (dest.indexOf('?') === -1 ? '?' : '&') + 'prefilled_email=' + encodeURIComponent(email);
     window.location.href = dest;
-  }
-}
-
-function toggleBilling() {
-  _billingAnnual = !_billingAnnual;
-  var knob     = document.getElementById('toggle-knob');
-  var mLabel   = document.getElementById('monthly-label');
-  var aLabel   = document.getElementById('annual-label');
-  var rPrice   = document.getElementById('refraction-price');
-  var rCad     = document.getElementById('refraction-cadence');
-  var rBtn     = document.getElementById('refraction-btn');
-  var fsPrice  = document.getElementById('fullspectrum-price');
-  var fsCad    = document.getElementById('fullspectrum-cadence');
-  var fsBtn    = document.getElementById('fullspectrum-btn');
-
-  if (_billingAnnual) {
-    knob.style.left   = '23px';
-    mLabel.style.color = 'var(--text-muted)';
-    aLabel.style.color = 'var(--gold)';
-    rPrice.innerHTML  = '99<span style="font-size:20px;">/yr</span>';
-    rCad.textContent  = 'per year · 100 queries / mo';
-    rBtn.href         = 'https://buy.stripe.com/dRm3cv2UKcHeg8N1Ut18c0d';
-    fsPrice.innerHTML = '249<span style="font-size:20px;">/yr</span>';
-    fsCad.textContent = 'per year · 250 queries';
-    fsBtn.href        = 'https://buy.stripe.com/28EaEX66WdLie0Fcz718c0c';
-  } else {
-    knob.style.left   = '3px';
-    mLabel.style.color = 'var(--gold)';
-    aLabel.style.color = 'var(--text-muted)';
-    rPrice.innerHTML  = '9<span style="font-size:20px;">.99</span>';
-    rCad.textContent  = 'per month · 100 queries';
-    rBtn.href         = 'https://buy.stripe.com/8x214n9j88qY09P6aJ18c04';
-    fsPrice.innerHTML = '24<span style="font-size:20px;">.99</span>';
-    fsCad.textContent = 'per month · 250 queries';
-    fsBtn.href        = 'https://buy.stripe.com/cNi14n1QG6iQf4JgPn18c05';
   }
 }
 
@@ -710,6 +657,10 @@ function toggleBilling() {
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
+  fetch('/api/interpret', { cache: 'no-store', credentials: 'same-origin' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { _checkoutUrls = (data.product && data.product.checkoutUrls) || {}; })
+    .catch(function() { _checkoutUrls = {}; });
   var modal = document.getElementById('prePurchaseModal');
   if (modal) {
     modal.addEventListener('click', function(e) {

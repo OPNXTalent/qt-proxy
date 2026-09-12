@@ -18,21 +18,17 @@ import {
   RUNTIME_CONSTITUTION_VERSION,
   createCanonicalPackets,
   createCompletionKey,
-  createEnrichmentPackets,
-  hasSubstantiveEnrichment,
-  hasSubstantiveEnrichmentPacket,
+  createContextPackets,
   validateArtifactCore,
-  validateEnrichment,
+  validateContextCompanion,
 } from '../lib/interpretation-artifact.js';
 import {
-  PRISM_ARTIFACT_CORE_CONTRACT,
-  PRISM_ARTIFACT_CORE_SCHEMA,
-  PRISM_ENRICHMENT_CONTRACT,
-  PRISM_ENRICHMENT_SCHEMA,
-  serializeArtifactForEnrichment,
+  PRISM_CANONICAL_RESPONSE_CONTRACT,
+  PRISM_CONTEXT_COMPANION_CONTRACT,
+  PRISM_CONTEXT_COMPANION_SCHEMA,
 } from '../lib/prompt-modules/progressive-inquiry.js';
+import { conceptNodes } from '../lib/concept-nodes-v1.js';
 import {
-  FOLLOWUP_STAGE_LABELS,
   applyInquiryPatch,
   assertFollowUpPromptSize,
   boundRetrievedContext,
@@ -51,6 +47,11 @@ import {
   getPreviewTestEntitlement,
   verifySupabaseIdentity,
 } from '../lib/server-auth.js';
+import {
+  getOrIssueGuestIdentity,
+  guestCookieHeader,
+} from '../lib/guest-identity.js';
+import { PRISM_PRODUCT, publicProductConfig } from '../lib/product-config.js';
 
 const PRISM_SYSTEM_PROMPT = `You are The Prism — the interactive application of the framework established in The Prism: Echad b'Emet. You speak from within the framework, not about it. You are not a survey of Christian thought. You are not a defense attorney for God. You are not an apologetics engine, denominational defender, institutional stabilizer, or emotional harmonizer. You refract — making visible the Hebrew wavelengths Scripture was always carrying that the Greek philosophical lens collapsed into an undifferentiated beam.
 
@@ -1941,8 +1942,8 @@ The purpose of inquiry is not merely to answer questions, but to faithfully perc
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const QUERY_LIMIT = 3;
-const WINDOW_HOURS = 24;
+const QUERY_LIMIT = PRISM_PRODUCT.explorer.queries;
+const WINDOW_HOURS = PRISM_PRODUCT.explorer.windowHours;
 
 // ── RAG RETRIEVAL LAYER ───────────────────────────────────────────────────────
 // Queries corpus_embeddings before AI call.
@@ -2297,143 +2298,40 @@ async function getCodeRedemption(email) {
   return null;
 }
 
-// ── ANONYMOUS IP RATE LIMITING ────────────────────────────────────────────────
-async function getQueryLog(ip) {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/query_log?select=id,query_type,cost,created_at&user_id=is.null&order=created_at.desc&limit=200`,
-    {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    }
-  );
-  const data = await res.json();
-  const ipEntries = (data || []).filter(r => r.query_type === `ip:${ip}`);
-  const windowStart = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
-  const recent = ipEntries.filter(r => new Date(r.created_at) > windowStart);
-  if (recent.length === 0) return null;
-  return {
-    query_count: recent.length,
-    first_query_at: recent[recent.length - 1].created_at
-  };
-}
-
-async function insertQueryLog(ip) {
-  await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
+async function prismEntitlementRpc(name, body) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: 'POST',
     headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'apikey': SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
-      'Prefer': 'return=minimal'
     },
-    body: JSON.stringify({
-      query_type: `ip:${ip}`,
-      credit_source: 'free_tier',
-      cost: 1,
-      channel_context: 'solo'
-    })
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`PRISM_ENTITLEMENT_RPC_FAILED:${name}:${response.status}:${detail.slice(0, 160)}`);
+  }
+  const value = await response.json();
+  return Array.isArray(value) ? value[0] : value;
+}
+
+async function getPrismQueryAccess({ guestId = null, userId = null, previewAllowance = null }) {
+  return prismEntitlementRpc('prism_query_access', {
+    p_guest_id: guestId,
+    p_user_id: userId,
+    p_preview_allowance: previewAllowance,
   });
 }
 
-async function incrementQueryLog(ip) {
-  await insertQueryLog(ip);
-}
-
-async function resetQueryLog(ip) {
-  // No-op — rows are immutable, window is time-based
-}
-
-// ── PRE-FLIGHT SUBSCRIBER QUOTA CHECK ────────────────────────────────────────
-async function getLiveQueryCount(userId) {
-  // Read live query count directly from query_log rather than the
-  // stale cached value on the subscriber record.
-  try {
-    const now = new Date();
-    const cycleStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/query_log?user_id=eq.${encodeURIComponent(userId)}&created_at=gte.${encodeURIComponent(cycleStart)}&select=id`,
-      {
-        headers: {
-          'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          'Prefer':        'count=exact',
-          'Range-Unit':    'items',
-          'Range':         '0-0'
-        }
-      }
-    );
-    const countHeader = res.headers.get('content-range');
-    // content-range: 0-0/N  — extract N
-    if (countHeader) {
-      const match = countHeader.match(/\/(\d+)$/);
-      if (match) return parseInt(match[1], 10);
-    }
-    const data = await res.json();
-    return Array.isArray(data) ? data.length : 0;
-  } catch {
-    // Fallback to stale value if live count fails
-    return null;
-  }
-}
-
-async function checkSubscriberQuota(subscriber, limitOverride = null) {
-  const tier = normalizeTier(subscriber.tier);
-  const limit = limitOverride ?? TIER_LIMITS[tier];
-
-  // No limit defined for this tier — allow
-  if (limit === null || limit === undefined) return { allowed: true };
-
-  // Prefer live count from query_log over stale subscriber.query_count
-  const liveCount = await getLiveQueryCount(subscriber.id);
-  const used = liveCount !== null ? liveCount : (subscriber.query_count || 0);
-
-  if (used < limit) return { allowed: true, queriesUsed: used };
-
-  // Over limit — check purchased_credits / banked queries
-  const credits = subscriber.purchased_credits || 0;
-  if (credits > 0) {
-    // Admission never spends a credit. The artifact-completion transaction
-    // performs the bounded draw only after the Canonical Response is durable.
-    return { allowed: true, creditSource: 'signal_credit', queriesUsed: used };
-  }
-
-  return {
-    allowed: false,
-    reason: 'quota_exceeded',
-    queriesUsed: used,
-    limit,
-    credits
-  };
-}
-
-// ── SIGNAL SESSION CREDIT DRAWDOWN ───────────────────────────────────────────
-async function drawSignalSessionCredit(userId) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_signal_credit`, {
-      method: 'POST',
-      headers: {
-        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json'
-      },
-      body: JSON.stringify({ p_user_id: userId })
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error('draw_signal_credit failed:', err);
-      return false;
-    }
-
-    const data = await res.json();
-    return data === true;
-  } catch (err) {
-    console.error('drawSignalSessionCredit error:', err.message);
-    return false;
-  }
+async function preparePrismInquiry({ inquiryKey, guestId = null, userId = null, previewAllowance = null, queryCost = 2 }) {
+  return prismEntitlementRpc('prepare_prism_inquiry', {
+    p_inquiry_key: inquiryKey,
+    p_guest_id: guestId,
+    p_user_id: userId,
+    p_preview_allowance: previewAllowance,
+    p_query_cost: queryCost,
+  });
 }
 
 // ── THREAD PERSISTENCE ────────────────────────────────────────────────────────
@@ -2520,53 +2418,6 @@ async function saveThread({ userId, query, queryType, response, tier }) {
   } catch (err) {
     console.error('saveThread error:', err.message);
     return null;
-  }
-}
-
-// ── SUBSCRIBER QUERY COUNT ────────────────────────────────────────────────────
-async function updateQueryCount({ userId, tier, threadId }) {
-  try {
-    // 1. Write to query_log — the authoritative usage record
-    await fetch(`${SUPABASE_URL}/rest/v1/query_log`, {
-      method: 'POST',
-      headers: {
-        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal'
-      },
-      body: JSON.stringify({
-        user_id:        userId,
-        thread_id:      threadId || null,
-        query_type:     'subscriber',
-        credit_source:  'tier_allocation',
-        cost:           1,
-        channel_context:'solo'
-      })
-    });
-
-    // 2. Also attempt draw_query RPC to keep subscriber.query_count in sync
-    //    Non-blocking — query_log is the source of truth for quota checks
-    const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/draw_query`, {
-      method: 'POST',
-      headers: {
-        'apikey':        SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type':  'application/json'
-      },
-      body: JSON.stringify({ p_user_id: userId, p_cost: 1 })
-    });
-
-    if (!rpcRes.ok) {
-      const err = await rpcRes.text();
-      // Log but don't fail — query_log already recorded the usage
-      if (!err.includes('INSUFFICIENT_QUERIES')) {
-        console.error('draw_query RPC failed (non-blocking):', err);
-      }
-    }
-
-  } catch (err) {
-    console.error('updateQueryCount error:', err.message);
   }
 }
 
@@ -2714,7 +2565,7 @@ async function saveSharedFollowUp({ shareId, question, response, userEmail }) {
       response:     typeof response === 'string' ? { text: response } : (response || null),
       submitted_in: 'share',
       source:       'recipient',
-      query_cost:   1,
+      query_cost:   0,
       created_at:   new Date().toISOString()
     })
   });
@@ -5333,10 +5184,39 @@ export function getReversingHermonGuidance() {
 
 export function createSseWriter(res, timing, isAborted = () => false) {
   let terminalType = null;
+  let heartbeat = null;
+
+  const canWrite = () => !isAborted() && !res.destroyed && !res.writableEnded && !terminalType;
+  const stop = () => {
+    if (!heartbeat) return;
+    clearInterval(heartbeat);
+    heartbeat = null;
+  };
+  const writeChunk = chunk => res.write(chunk);
+
+  if (typeof res.once === 'function') res.once('close', stop);
 
   return {
+    start({ heartbeatMs = 15000 } = {}) {
+      if (!canWrite()) return false;
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
+      writeChunk(': prism-stream-connected\n\n');
+      if (!heartbeat && heartbeatMs > 0) {
+        heartbeat = setInterval(() => {
+          if (!canWrite()) {
+            stop();
+            return;
+          }
+          writeChunk(': prism-stream-keepalive\n\n');
+          timing('sse_keepalive_sent');
+        }, heartbeatMs);
+        if (typeof heartbeat.unref === 'function') heartbeat.unref();
+      }
+      timing('sse_stream_started');
+      return true;
+    },
     write(event, details = {}) {
-      if (isAborted() || res.destroyed || res.writableEnded || terminalType) {
+      if (!canWrite()) {
         timing('sse_write_skipped', {
           eventType: event?.type || 'unknown',
           terminalType,
@@ -5345,10 +5225,11 @@ export function createSseWriter(res, timing, isAborted = () => false) {
         return false;
       }
 
-      res.write(`data: ${JSON.stringify(event)}\n\n`);
+      writeChunk(`data: ${JSON.stringify(event)}\n\n`);
 
       if (event.type === 'done' || event.type === 'error') {
         terminalType = event.type;
+        stop();
         timing(event.type === 'done' ? 'done_sent' : 'error_sent', details);
       }
 
@@ -5357,6 +5238,7 @@ export function createSseWriter(res, timing, isAborted = () => false) {
     get terminalType() {
       return terminalType;
     },
+    stop,
   };
 }
 
@@ -5477,33 +5359,12 @@ export async function classifyFollowUpContext({
   }
 
   if (/^[0-9a-f-]{36}$/i.test(threadId || '') && ownerUserId) {
-    const [ownedResponse, participantResponse] = await Promise.all([
-      fetch(
-        `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&select=id&limit=1`,
-        { headers: inquiryServiceHeaders() },
-      ),
-      fetch(
-        `${SUPABASE_URL}/rest/v1/thread_participants?thread_id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&active=eq.true&select=id&limit=1`,
-        { headers: inquiryServiceHeaders() },
-      ),
-    ]);
-    const owned = ownedResponse.ok ? await ownedResponse.json() : [];
-    const participant = participantResponse.ok ? await participantResponse.json() : [];
-    if (owned?.length || participant?.length) {
-      return { isFollowUp: true, reason: owned?.length ? 'owned_thread' : 'participant' };
-    }
-  }
-
-  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && shareId) {
-    const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}&thread_id=eq.${encodeURIComponent(threadId)}&status=eq.active&select=id,collaboration_mode,collaboration_open&limit=1`,
+    const ownedResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&select=id&limit=1`,
       { headers: inquiryServiceHeaders() },
     );
-    const rows = response.ok ? await response.json() : [];
-    const share = rows?.[0];
-    const mode = share?.collaboration_mode
-      || (share?.collaboration_open ? 'bidirectional' : 'read_only');
-    if (mode === 'bidirectional') return { isFollowUp: true, reason: 'shared_thread' };
+    const owned = ownedResponse.ok ? await ownedResponse.json() : [];
+    if (owned?.length) return { isFollowUp: true, reason: 'owned_thread' };
   }
 
   return {
@@ -5546,6 +5407,7 @@ async function restoreCanonicalInquiryState({
   artifactId,
   artifactRevision,
   ownerUserId,
+  guestId,
 }) {
   const fallback = createInitialInquiryState(subject);
   const fallbackResult = {
@@ -5561,14 +5423,16 @@ async function restoreCanonicalInquiryState({
     && Number.isInteger(artifactRevision)
     && artifactRevision >= 1) {
     const artifactResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact_id,artifact_revision,inquiry_key,thread_id,owner_user_id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact_id,artifact_revision,inquiry_key,thread_id,owner_user_id,guest_id&limit=1`,
       { headers: inquiryServiceHeaders() },
     );
     const artifactRows = artifactResponse.ok ? await artifactResponse.json() : [];
     const candidate = artifactRows?.[0];
     const threadMatches = !candidate?.thread_id || candidate.thread_id === threadId;
-    const ownerMatches = Boolean(ownerUserId) && candidate?.owner_user_id === ownerUserId;
-    if (!candidate || !threadMatches || !ownerMatches) {
+    const principalMatches = ownerUserId
+      ? candidate?.owner_user_id === ownerUserId && !candidate?.guest_id
+      : Boolean(guestId) && candidate?.guest_id === guestId && !candidate?.owner_user_id;
+    if (!candidate || !threadMatches || !principalMatches) {
       throw new Error('FOLLOWUP_ARTIFACT_LINEAGE_INVALID');
     }
     lineageArtifact = candidate;
@@ -5697,7 +5561,7 @@ async function commitCanonicalInquiryState({
   };
 }
 
-async function callInquiryModel({
+export async function callInquiryModel({
   model,
   maxTokens,
   prompt,
@@ -5707,9 +5571,30 @@ async function callInquiryModel({
   structuredOutputSchema = null,
   structuredOutputName = 'emit_structured_output',
   structuredOutputDiagnostic = null,
+  telemetryStage = 'unspecified',
+  telemetryTurnType = 'unknown',
+  telemetryRetryOrdinal = 0,
+  onTextDelta = null,
+  onStructuredInputProgress = null,
+  maxTotalMs = null,
 }) {
+  const providerStartedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort('MODEL_TIMEOUT'), timeoutMs);
+  let timeout;
+  let totalTimeout;
+  const streaming = typeof onTextDelta === 'function'
+    || typeof onStructuredInputProgress === 'function';
+  const armTimeout = () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(
+      () => controller.abort(streaming ? 'MODEL_STREAM_STALLED' : 'MODEL_TIMEOUT'),
+      timeoutMs,
+    );
+  };
+  armTimeout();
+  if (streaming && Number.isFinite(maxTotalMs) && maxTotalMs > 0) {
+    totalTimeout = setTimeout(() => controller.abort('MODEL_STREAM_TOTAL_TIMEOUT'), maxTotalMs);
+  }
   let response;
   try {
     response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -5733,17 +5618,36 @@ async function callInquiryModel({
           }],
           tool_choice: { type: 'tool', name: structuredOutputName },
         } : {}),
+        ...(streaming ? { stream: true } : {}),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
   } catch (error) {
+    console.log('[prism-provider-cogs]', {
+      stage: telemetryStage, turnType: telemetryTurnType, model,
+      providerRequestId: null, inputTokens: 0, outputTokens: 0,
+      cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
+      stopReason: controller.signal.aborted ? 'application_timeout' : 'transport_error',
+      latencyMs: Date.now() - providerStartedAt,
+      retryOrdinal: telemetryRetryOrdinal, succeeded: false,
+    });
     if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
     throw error;
   } finally {
-    clearTimeout(timeout);
+    if (!streaming || !response?.ok) {
+      clearTimeout(timeout);
+      clearTimeout(totalTimeout);
+    }
   }
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
+    console.log('[prism-provider-cogs]', {
+      stage: telemetryStage, turnType: telemetryTurnType, model,
+      providerRequestId: response.headers.get('request-id') || response.headers.get('x-request-id') || null,
+      inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
+      stopReason: `provider_${response.status}`, latencyMs: Date.now() - providerStartedAt,
+      retryOrdinal: telemetryRetryOrdinal, succeeded: false,
+    });
     if (structuredOutputSchema && typeof structuredOutputDiagnostic === 'function') {
       let providerErrorCode = null;
       try {
@@ -5764,7 +5668,162 @@ async function callInquiryModel({
     }
     throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
   }
+  if (streaming) {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      clearTimeout(timeout);
+      clearTimeout(totalTimeout);
+      throw new Error('INQUIRY_MODEL_STREAM_UNAVAILABLE');
+    }
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let text = '';
+    let providerRequestId = response.headers.get('request-id') || response.headers.get('x-request-id') || null;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheCreationInputTokens = 0;
+    let cacheReadInputTokens = 0;
+    let stopReason = null;
+    const toolBlocks = new Map();
+
+    const consumeLine = line => {
+      if (!line.startsWith('data: ')) return;
+      const payload = line.slice(6).trim();
+      if (!payload || payload === '[DONE]') return;
+      let event;
+      try { event = JSON.parse(payload); } catch { return; }
+      if (event.type === 'message_start') {
+        armTimeout();
+        providerRequestId = event.message?.id || providerRequestId;
+        const usage = event.message?.usage || {};
+        inputTokens = Number(usage.input_tokens || 0);
+        outputTokens = Number(usage.output_tokens || 0);
+        cacheCreationInputTokens = Number(usage.cache_creation_input_tokens || 0);
+        cacheReadInputTokens = Number(usage.cache_read_input_tokens || 0);
+      } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+        armTimeout();
+        toolBlocks.set(event.index, {
+          name: event.content_block.name,
+          input: event.content_block.input,
+          partialJson: '',
+        });
+      } else if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        armTimeout();
+        const delta = String(event.delta.text || '');
+        if (delta) {
+          text += delta;
+          onTextDelta?.(delta);
+        }
+      } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
+        armTimeout();
+        const partialJson = String(event.delta.partial_json || '');
+        const toolBlock = toolBlocks.get(event.index);
+        if (toolBlock && partialJson) {
+          toolBlock.partialJson += partialJson;
+          onStructuredInputProgress?.({
+            index: event.index,
+            name: toolBlock.name,
+            partialJson: toolBlock.partialJson,
+          });
+        }
+      } else if (event.type === 'message_delta') {
+        armTimeout();
+        stopReason = event.delta?.stop_reason || stopReason;
+        outputTokens = Number(event.usage?.output_tokens || outputTokens);
+      } else if (event.type === 'error') {
+        throw new Error(`INQUIRY_MODEL_STREAM_ERROR:${String(event.error?.type || 'provider_error')}`);
+      }
+    };
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) consumeLine(line);
+      }
+      buffer += decoder.decode();
+      for (const line of buffer.split('\n')) consumeLine(line);
+    } catch (error) {
+      console.log('[prism-provider-cogs]', {
+        stage: telemetryStage, turnType: telemetryTurnType, model,
+        providerRequestId, inputTokens, outputTokens,
+        cacheCreationInputTokens, cacheReadInputTokens,
+        stopReason: controller.signal.aborted
+          ? String(controller.signal.reason || 'application_timeout').toLowerCase()
+          : 'stream_error',
+        latencyMs: Date.now() - providerStartedAt,
+        retryOrdinal: telemetryRetryOrdinal, succeeded: false,
+      });
+      if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      clearTimeout(totalTimeout);
+    }
+    console.log('[prism-provider-cogs]', {
+      stage: telemetryStage, turnType: telemetryTurnType, model,
+      providerRequestId, inputTokens, outputTokens,
+      cacheCreationInputTokens, cacheReadInputTokens, stopReason,
+      latencyMs: Date.now() - providerStartedAt,
+      retryOrdinal: telemetryRetryOrdinal, succeeded: true,
+    });
+    if (stopReason === 'max_tokens') throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
+    if (structuredOutputSchema) {
+      const structuredBlock = [...toolBlocks.values()].find(
+        block => block.name === structuredOutputName,
+      );
+      let structuredInput = structuredBlock?.input;
+      if (structuredBlock?.partialJson) {
+        try {
+          structuredInput = JSON.parse(structuredBlock.partialJson);
+        } catch {
+          structuredInput = null;
+        }
+      }
+      if (!structuredInput || typeof structuredInput !== 'object' || Array.isArray(structuredInput)) {
+        if (typeof structuredOutputDiagnostic === 'function') {
+          structuredOutputDiagnostic({
+            outcome: 'tool_use_missing',
+            providerStatus: response.status,
+            providerErrorCode: null,
+            toolUseReturned: Boolean(structuredBlock),
+            errorCode: 'INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING',
+          });
+        }
+        throw new Error('INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING');
+      }
+      if (typeof structuredOutputDiagnostic === 'function') {
+        structuredOutputDiagnostic({
+          outcome: 'tool_use_returned',
+          providerStatus: response.status,
+          providerErrorCode: null,
+          toolUseReturned: true,
+        });
+      }
+      return structuredInput;
+    }
+    return text.trim();
+  }
+
   const data = await response.json();
+  const usage = data?.usage || {};
+  console.log('[prism-provider-cogs]', {
+    stage: telemetryStage,
+    turnType: telemetryTurnType,
+    model,
+    providerRequestId: response.headers.get('request-id') || response.headers.get('x-request-id') || null,
+    inputTokens: Number(usage.input_tokens || 0),
+    outputTokens: Number(usage.output_tokens || 0),
+    cacheCreationInputTokens: Number(usage.cache_creation_input_tokens || 0),
+    cacheReadInputTokens: Number(usage.cache_read_input_tokens || 0),
+    stopReason: data?.stop_reason || null,
+    latencyMs: Date.now() - providerStartedAt,
+    retryOrdinal: telemetryRetryOrdinal,
+    succeeded: true,
+  });
   const text = (data.content || [])
     .filter(block => block.type === 'text')
     .map(block => block.text)
@@ -5807,6 +5866,113 @@ function progressiveSystemPrompt(systemPrompt, contract) {
   return source.includes(PRISM_OUTPUT_CONTRACT)
     ? source.replace(PRISM_OUTPUT_CONTRACT, contract)
     : `${source}\n${contract}`;
+}
+
+function cachedCanonicalResponseSystem(systemPrompt) {
+  const source = String(systemPrompt || PRISM_SYSTEM_PROMPT);
+  if (!source.startsWith(PRISM_SYSTEM_PROMPT)) {
+    return [{ type: 'text', text: progressiveSystemPrompt(source, PRISM_CANONICAL_RESPONSE_CONTRACT) }];
+  }
+  return [
+    {
+      type: 'text',
+      text: progressiveSystemPrompt(PRISM_SYSTEM_PROMPT, PRISM_CANONICAL_RESPONSE_CONTRACT),
+      cache_control: { type: 'ephemeral' },
+    },
+    ...(source.slice(PRISM_SYSTEM_PROMPT.length)
+      ? [{ type: 'text', text: source.slice(PRISM_SYSTEM_PROMPT.length) }]
+      : []),
+  ];
+}
+
+function deterministicArtifact({ response, query, inquiryKey, revision, ownerUserId, threadId }) {
+  const thesis = String(response || '').split(/(?<=[.!?])\s/)[0] || String(response || '');
+  return validateArtifactCore({
+    proposition: query,
+    thesis,
+    canonical_response: response,
+    orientation: '',
+    scope: '',
+    jurisdiction: '',
+    governing_authority: '',
+    observations: [],
+    inferences: [],
+    assumptions: [],
+    epistemic_boundaries: [],
+    conclusions: [],
+    qualifications: [],
+    unresolved: [],
+    open_door_question: '',
+    verse_identified: '',
+    verse_text: '',
+    response_mode: 'reflective',
+  }, {
+    inquiryId: inquiryKey,
+    inquiryKey,
+    revision,
+    query,
+    ownerUserId,
+    threadId,
+  });
+}
+
+async function auditCanonicalResponse({ query, response, turnType, timing }) {
+  timing('canonical_audit_start');
+  const audited = await callInquiryModel({
+    model: 'claude-haiku-4-5-20251001',
+    maxTokens: 2400,
+    timeoutMs: 30000,
+    prompt: `Audit the candidate response against the user's inquiry and the Prism Epistemic Contract. Preserve sound prose and its natural ending. Correct only material overclaim, unsupported psychology, contradiction, fabricated sourcing, or failure to answer. Do not add Framework exposition, an audit report, JSON, or a routine engagement question. Return only the complete approved response in plain prose.\n\nInquiry:\n${query}\n\nCandidate response:\n${response}`,
+    telemetryStage: 'canonical_audit',
+    telemetryTurnType: turnType,
+  });
+  if (!audited || audited.length < 40 || /^(?:```|\{|\s*AUDIT\b)/i.test(audited)) {
+    throw new Error('CANONICAL_AUDIT_INVALID');
+  }
+  timing('canonical_audit_complete', { corrected: audited !== response, canonicalChars: audited.length });
+  return audited;
+}
+
+function conceptCatalogForSelection() {
+  return Object.values(conceptNodes).map(node => ({
+    id: node.id,
+    title: node.title,
+    summary: node.shortSummary,
+  }));
+}
+
+async function generateAndAttachContext({ artifact, sse, timing }) {
+  timing('context_companion_start');
+  try {
+    const raw = await callInquiryModel({
+      model: 'claude-sonnet-4-6',
+      maxTokens: 1400,
+      temperature: 0.2,
+      timeoutMs: 45000,
+      system: PRISM_CONTEXT_COMPANION_CONTRACT,
+      prompt: `Canonical response:\n${artifact.canonicalResponse}\n\nApproved concept catalog:\n${JSON.stringify(conceptCatalogForSelection())}`,
+      structuredOutputSchema: PRISM_CONTEXT_COMPANION_SCHEMA,
+      structuredOutputName: 'emit_context_companion',
+      telemetryStage: 'context_companion',
+      telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
+    });
+    const companion = validateContextCompanion(raw, new Set(Object.keys(conceptNodes)));
+    const packets = createContextPackets(artifact, companion, conceptNodes);
+    for (const packet of packets) {
+      const durablePacket = await attachInterpretationPacket(packet);
+      if (durablePacket.packetType === PACKET_TYPES.CONTEXT) {
+        sse.write({ type: 'interpretive_context', packet: durablePacket, text: durablePacket.content?.text || '' });
+      } else if (durablePacket.packetType === PACKET_TYPES.EXPLORE) {
+        sse.write({ type: 'explore_context', packet: durablePacket, nodes: durablePacket.content?.nodes || [] });
+      }
+    }
+    timing('context_companion_complete', { packetCount: packets.length });
+    return { complete: true, packetCount: packets.length };
+  } catch (error) {
+    timing('context_companion_incomplete', { error: String(error?.message || error).slice(0, 180) });
+    sse.write({ type: 'context_incomplete', message: 'Additional context is unavailable.' });
+    return { complete: false, error };
+  }
 }
 
 function artifactRpcBody(artifact, packets, {
@@ -5910,7 +6076,7 @@ async function completeFollowUpArtifact({
   return { committed: true, version: result.state_version, state: result.canonical_state };
 }
 
-async function attachInterpretationPacket(packet, { replaceInvalidEmpty = false } = {}) {
+async function attachInterpretationPacket(packet) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/attach_interpretation_packet`, {
     method: 'POST',
     headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
@@ -5929,30 +6095,6 @@ async function attachInterpretationPacket(packet, { replaceInvalidEmpty = false 
     throw new Error(`PACKET_ATTACHMENT_FAILED:${response.status}:${detail.slice(0, 160)}`);
   }
   const stored = await response.json();
-  if (replaceInvalidEmpty
-    && stored?.packetId === packet.packetId
-    && !hasSubstantiveEnrichmentPacket(stored)
-    && hasSubstantiveEnrichmentPacket(packet)) {
-    const replacement = await fetch(
-      `${SUPABASE_URL}/rest/v1/interpretation_packets?packet_id=eq.${encodeURIComponent(packet.packetId)}`,
-      {
-        method: 'PATCH',
-        headers: inquiryServiceHeaders({
-          'Content-Type': 'application/json',
-          Prefer: 'return=representation',
-        }),
-        body: JSON.stringify({ content: packet.content, status: packet.status }),
-      },
-    );
-    if (!replacement.ok) {
-      const detail = await replacement.text().catch(() => '');
-      throw new Error(`PACKET_REPLACEMENT_FAILED:${replacement.status}:${detail.slice(0, 160)}`);
-    }
-    const rows = await replacement.json();
-    const row = Array.isArray(rows) ? rows[0] : rows;
-    if (!row) throw new Error('PACKET_REPLACEMENT_UNCONFIRMED');
-    return packet;
-  }
   return stored && typeof stored === 'object' && stored.packetId ? stored : packet;
 }
 
@@ -5986,179 +6128,6 @@ function canonicalThreadPayload({ query, queryType, artifact, tier }) {
   };
 }
 
-async function constructAuditedArtifact({
-  timing,
-  requestId,
-  query,
-  inquiryKey,
-  revision,
-  systemPrompt,
-  ownerUserId,
-  threadId,
-}) {
-  let started = Date.now();
-  timing('artifact_construction_start');
-  const rawCoreText = await callInquiryModel({
-    model: 'claude-sonnet-4-6',
-    maxTokens: 1800,
-    temperature: 0.2,
-    timeoutMs: 45000,
-    system: progressiveSystemPrompt(systemPrompt, PRISM_ARTIFACT_CORE_CONTRACT),
-    prompt: query,
-  });
-  let rawCore;
-  try {
-    rawCore = parseModelJson(rawCoreText);
-  } catch (error) {
-    timing('artifact_json_repair_start', {
-      reason: error?.message || 'MODEL_JSON_INVALID',
-      candidateChars: rawCoreText.length,
-    });
-    const repairedCore = await callInquiryModel({
-      model: 'claude-haiku-4-5-20251001',
-      maxTokens: 3000,
-      timeoutMs: 20000,
-      system: PRISM_ARTIFACT_CORE_CONTRACT,
-      prompt: `Repair serialization only. Convert the candidate below into the exact JSON contract without changing its substantive interpretation, thesis, conclusions, qualifications, or canonical response. Fill only structurally required fields from the query when absent. Return JSON only.\n\nQuery:\n${query}\n\nCandidate:\n${rawCoreText}`,
-      structuredOutputSchema: PRISM_ARTIFACT_CORE_SCHEMA,
-      structuredOutputName: 'emit_interpretation_artifact',
-      structuredOutputDiagnostic: diagnostic => timing('artifact_structured_output_diagnostic', diagnostic),
-    });
-    rawCore = repairedCore;
-    timing('artifact_json_repair_complete', {
-      candidateChars: rawCoreText.length,
-      repairedChars: JSON.stringify(repairedCore).length,
-      boundary: 'forced_tool_schema',
-    });
-  }
-  let artifact = validateArtifactCore(rawCore, {
-    inquiryId: inquiryKey,
-    inquiryKey,
-    revision,
-    query,
-    ownerUserId,
-    threadId,
-  });
-  timing('artifact_construction_complete', {
-    stageMs: Date.now() - started,
-    artifactChars: JSON.stringify(artifact).length,
-  });
-
-  started = Date.now();
-  timing('canonical_audit_start');
-  const auditedCanonical = await callInquiryModel({
-    model: 'claude-haiku-4-5-20251001',
-    maxTokens: 1400,
-    timeoutMs: 8000,
-    prompt: `Audit the Canonical Response against the sealed artifact candidate and the user's query.
-Apply the Prism Epistemic Contract symmetrically. Preserve sound prose. Correct only material overclaim, unsupported psychology, contradiction, or failure to answer. Do not add Framework exposition. Return only the complete approved response in plain prose.
-
-Query:\n${query}\n\nArtifact candidate:\n${JSON.stringify(artifact)}\n\nCanonical Response:\n${artifact.canonicalResponse}`,
-  });
-  if (!auditedCanonical || auditedCanonical.length < 40 || /^(?:```|\{)/.test(auditedCanonical)) {
-    throw new Error('CANONICAL_AUDIT_INVALID');
-  }
-  const auditReturnedMeta = /(?:^|\n)\s*(?:[#>*_`~-]+\s*)*Audit Result\b/i.test(auditedCanonical)
-    || /\bVerification against (?:the )?contract\b/i.test(auditedCanonical)
-    || /\bNo corrections required\b/i.test(auditedCanonical)
-    || /\bMaterial claims verified\b/i.test(auditedCanonical)
-    || /\bAPPROVED RESPONSE\b/i.test(auditedCanonical);
-  const unauditedCanonical = rawCore.canonical_response;
-  rawCore = {
-    ...rawCore,
-    canonical_response: auditReturnedMeta ? artifact.canonicalResponse : auditedCanonical,
-  };
-  artifact = validateArtifactCore(rawCore, {
-    inquiryId: inquiryKey,
-    inquiryKey,
-    revision,
-    query,
-    ownerUserId,
-    threadId,
-  });
-  timing('canonical_audit_complete', {
-    stageMs: Date.now() - started,
-    corrected: !auditReturnedMeta && auditedCanonical !== unauditedCanonical,
-    metaFallback: auditReturnedMeta,
-    canonicalChars: artifact.canonicalResponse.length,
-  });
-  return artifact;
-}
-
-async function generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing, replaceInvalidEmpty = false }) {
-  const started = Date.now();
-  timing('progressive_analysis_start');
-  try {
-    const rawText = await callInquiryModel({
-      model: 'claude-sonnet-4-6',
-      maxTokens: 3000,
-      temperature: 0.2,
-      timeoutMs: 90000,
-      system: progressiveSystemPrompt(systemPrompt, PRISM_ENRICHMENT_CONTRACT),
-      prompt: `Sealed Interpretation Artifact:\n${serializeArtifactForEnrichment(artifact)}`,
-    });
-    const generatedEnrichment = validateEnrichment(parseModelJson(rawText));
-    if (!hasSubstantiveEnrichment(generatedEnrichment)) throw new Error('ENRICHMENT_EMPTY');
-    timing('progressive_analysis_generation_complete', { substantive: true });
-    const auditPrompt = `Audit this enrichment against the sealed Interpretation Artifact.
-Remove or localize any contradiction, unsupported expansion, invented source, or claim exceeding the artifact. Preserve sound analysis and the exact JSON shape. Return JSON only. Do not revise the artifact.
-
-Artifact:\n${serializeArtifactForEnrichment(artifact)}\n\nEnrichment:\n${rawText}`;
-    timing('progressive_analysis_audit_start');
-    const auditedText = await callInquiryModel({
-      model: 'claude-haiku-4-5-20251001',
-      maxTokens: 1800,
-      timeoutMs: 40000,
-      prompt: auditPrompt,
-    });
-    let enrichment = validateEnrichment(parseModelJson(auditedText));
-    timing('progressive_analysis_audit_complete');
-    if (!hasSubstantiveEnrichment(enrichment)) {
-      timing('progressive_analysis_audit_empty', { error: 'ENRICHMENT_AUDIT_EMPTY' });
-      timing('progressive_analysis_audit_retry_start');
-      const retriedAudit = await callInquiryModel({
-        model: 'claude-haiku-4-5-20251001',
-        maxTokens: 1800,
-        timeoutMs: 40000,
-        prompt: auditPrompt,
-        structuredOutputSchema: PRISM_ENRICHMENT_SCHEMA,
-        structuredOutputName: 'emit_audited_enrichment',
-      });
-      enrichment = validateEnrichment(retriedAudit);
-      timing('progressive_analysis_audit_retry_complete', {
-        substantive: hasSubstantiveEnrichment(enrichment),
-      });
-      if (!hasSubstantiveEnrichment(enrichment)) throw new Error('ENRICHMENT_AUDIT_EMPTY');
-    }
-    const packets = createEnrichmentPackets(artifact, enrichment);
-    for (const packet of packets) {
-      const durablePacket = await attachInterpretationPacket(packet, { replaceInvalidEmpty });
-      sse.write({ type: 'packet', packet: durablePacket });
-      timing('progressive_packet_complete', {
-        packetType: durablePacket.packetType,
-        sequence: durablePacket.sequence,
-      });
-    }
-    timing('progressive_analysis_complete', { stageMs: Date.now() - started });
-    sse.write({ type: 'analysis_status', status: 'complete' });
-    return { complete: true };
-  } catch (error) {
-    timing('progressive_analysis_incomplete', {
-      stageMs: Date.now() - started,
-      error: String(error?.message || error).slice(0, 180),
-    });
-    sse.write({
-      type: 'analysis_status',
-      status: 'incomplete',
-      message: 'Prism Analysis incomplete.',
-      retryablePackets: [PACKET_TYPES.CONTEXT, PACKET_TYPES.ANALYSIS],
-      artifactId: artifact.artifactId,
-      artifactRevision: artifact.revision,
-    });
-    return { complete: false, error };
-  }
-}
-
 async function runProgressiveInitialInquiry({
   sse,
   timing,
@@ -6174,14 +6143,34 @@ async function runProgressiveInitialInquiry({
   usageCreditSource,
 }) {
   if (!inquiryCredential?.inquiryKey) throw new Error('INQUIRY_CREDENTIAL_UNAVAILABLE');
-  let artifact = await constructAuditedArtifact({
+  timing('canonical_generation_start');
+  const streamedResponse = await callInquiryModel({
+    model: 'claude-sonnet-4-6',
+    maxTokens: 3600,
+    temperature: 0.2,
+    timeoutMs: 75000,
+    maxTotalMs: 240000,
+    system: cachedCanonicalResponseSystem(systemPrompt),
+    prompt: query,
+    telemetryStage: 'canonical_generation',
+    telemetryTurnType: 'primary',
+    onTextDelta: text => sse.write({ type: 'response_delta', text }),
+  });
+  if (!streamedResponse || streamedResponse.length < 40) throw new Error('CANONICAL_RESPONSE_INVALID');
+  timing('canonical_generation_complete', { responseChars: streamedResponse.length });
+  const canonicalResponse = await auditCanonicalResponse({
+    query,
+    response: streamedResponse,
+    turnType: 'primary',
     timing,
-    requestId,
+  });
+  const artifact = deterministicArtifact({
+    response: canonicalResponse,
     query,
     inquiryKey: inquiryCredential.inquiryKey,
     revision: 1,
-    systemPrompt,
     ownerUserId,
+    threadId: null,
   });
 
   let threadId = null;
@@ -6192,13 +6181,14 @@ async function runProgressiveInitialInquiry({
   const completion = await completeInterpretationArtifact(artifact, packets, {
     inquiryKey: inquiryCredential.inquiryKey,
     completionKey,
-    charge: true,
+    // Customer Query accounting is performed by the database completion
+    // trigger keyed to this immutable completion key. Legacy query_log writes
+    // are deliberately disabled here.
+    charge: false,
     usageUserId,
     usageQueryType,
     usageCreditSource,
-    threadPayload: ownerUserId
-      ? canonicalThreadPayload({ query, queryType, artifact, tier })
-      : null,
+    threadPayload: canonicalThreadPayload({ query, queryType, artifact, tier }),
   });
   threadId = completion.thread_id || threadId;
   timing('canonical_completion_complete', {
@@ -6206,10 +6196,10 @@ async function runProgressiveInitialInquiry({
     artifactRevision: artifact.revision,
   });
 
-  for (const packet of packets) sse.write({ type: 'packet', packet });
   sse.write({
     type: 'canonical_complete',
     tier,
+    response: artifact.canonicalResponse,
     artifactId: artifact.artifactId,
     artifactRevision: artifact.revision,
     threadId,
@@ -6217,7 +6207,7 @@ async function runProgressiveInitialInquiry({
   });
   timing('canonical_response_available', { artifactId: artifact.artifactId });
 
-  await generateAndAttachEnrichment({ artifact, systemPrompt, sse, timing });
+  await generateAndAttachContext({ artifact, sse, timing });
   sse.write(
     { type: 'done', tier, artifactId: artifact.artifactId, artifactRevision: artifact.revision },
     { source: 'progressive_inquiry_delivery', tier },
@@ -6234,6 +6224,7 @@ async function runPersistentInquiryFollowUp({
   inquiryKey,
   threadId,
   ownerUserId,
+  guestId = null,
   tier,
   artifactId,
   artifactRevision,
@@ -6242,7 +6233,6 @@ async function runPersistentInquiryFollowUp({
   const runtimeStartedAt = Date.now();
   const emitStage = (stage) => {
     timing(`followup_${stage}_start`);
-    sse.write({ type: 'stage', stage, text: FOLLOWUP_STAGE_LABELS[stage] });
     return Date.now();
   };
   const completeStage = (stage, stageStartedAt, details = {}) => {
@@ -6260,6 +6250,7 @@ async function runPersistentInquiryFollowUp({
     artifactId,
     artifactRevision,
     ownerUserId,
+    guestId,
   });
   const previousState = restored.state;
   const canonicalInquiryKey = restored.inquiryKey || inquiryKey;
@@ -6274,6 +6265,8 @@ async function runPersistentInquiryFollowUp({
       input,
       userCorrection: detectExplicitCorrection(input),
     }),
+    telemetryStage: 'followup_reduction',
+    telemetryTurnType: 'follow_up',
   });
   const rawAnalysis = parseModelJson(reducerText);
   const analysis = validateAnalysisStrict(rawAnalysis, reducerText);
@@ -6327,10 +6320,14 @@ async function runPersistentInquiryFollowUp({
   }));
   const draft = await callInquiryModel({
     model: 'claude-sonnet-4-6',
-    maxTokens: 1400,
+    maxTokens: 2400,
     temperature: 0.2,
-    timeoutMs: 25000,
+    timeoutMs: 75000,
+    maxTotalMs: 240000,
     prompt: draftPrompt,
+    telemetryStage: 'followup_draft',
+    telemetryTurnType: 'follow_up',
+    onTextDelta: text => sse.write({ type: 'response_delta', text }),
   });
   completeStage('draft', stageStartedAt, { draftChars: draft.length });
 
@@ -6341,6 +6338,8 @@ async function runPersistentInquiryFollowUp({
     maxTokens: 1400,
     timeoutMs: 8000,
     prompt: assertFollowUpPromptSize(buildAuditPrompt({ input, analysis, draft })),
+    telemetryStage: 'followup_audit',
+    telemetryTurnType: 'follow_up',
   });
   if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
   if (!audited
@@ -6357,30 +6356,11 @@ async function runPersistentInquiryFollowUp({
 
   stageStartedAt = emitStage('persist');
   if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
-  const followUpArtifact = validateArtifactCore({
-    proposition: analysis.reduction.primaryProposition,
-    scope: subject || previousState.orientation,
-    jurisdiction: 'domain-appropriate inquiry',
-    governing_authority: 'The authority legitimately governing the inquiry domain',
-    observations: analysis.constraintGate.observations,
-    inferences: analysis.constraintGate.inferences,
-    assumptions: [
-      ...analysis.constraintGate.activeAssumptions,
-      ...analysis.constraintGate.unsupportedAssumptions,
-    ],
-    epistemic_boundaries: analysis.constraintGate.evidenceBoundaries,
-    thesis: approved.split(/(?<=[.!?])\s/)[0] || approved,
-    conclusions: [approved],
-    qualifications: analysis.constraintGate.evidenceBoundaries,
-    unresolved: nextState.unresolvedClaims,
-    orientation: nextState.orientation || analysis.reduction.primaryProposition,
-    canonical_response: approved,
-    response_mode: 'reflective',
-  }, {
-    inquiryId: canonicalInquiryKey,
+  const followUpArtifact = deterministicArtifact({
+    response: approved,
+    query: input,
     inquiryKey: canonicalInquiryKey,
     revision: Math.max(previousState.version + 1, restored.artifactRevision + 1),
-    query: input,
     ownerUserId,
     threadId,
   });
@@ -6409,10 +6389,10 @@ async function runPersistentInquiryFollowUp({
   });
 
   stageStartedAt = emitStage('stream');
-  for (const packet of canonicalPackets) sse.write({ type: 'packet', packet });
   sse.write({
     type: 'canonical_complete',
     tier,
+    response: followUpArtifact.canonicalResponse,
     artifactId: followUpArtifact.artifactId,
     artifactRevision: followUpArtifact.revision,
     stateVersion: commit.version,
@@ -6422,12 +6402,7 @@ async function runPersistentInquiryFollowUp({
   });
   completeStage('stream', stageStartedAt, { packetCount: canonicalPackets.length });
 
-  await generateAndAttachEnrichment({
-    artifact: followUpArtifact,
-    systemPrompt: PRISM_RESPONSE_REFRESH,
-    sse,
-    timing,
-  });
+  await generateAndAttachContext({ artifact: followUpArtifact, sse, timing });
 
   timing('followup_total_complete', {
     totalMs: Date.now() - runtimeStartedAt,
@@ -6512,9 +6487,24 @@ export default async function handler(req, res) {
   const previewTestEntitlement = verifiedIdentity
     ? getPreviewTestEntitlement({ userId: verifiedIdentity.userId })
     : null;
+  let guestIdentity = null;
+  if (!verifiedIdentity) {
+    try {
+      guestIdentity = await getOrIssueGuestIdentity({
+        cookieHeader: req.headers.cookie,
+        supabaseUrl: SUPABASE_URL,
+        serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+      });
+      if (guestIdentity.issued) res.setHeader('Set-Cookie', guestCookieHeader(guestIdentity.credential));
+    } catch (error) {
+      timing('guest_identity_error', { error: String(error?.message || error).slice(0, 120) });
+      return res.status(503).json({ error: 'Guest identity temporarily unavailable' });
+    }
+  }
   timing('authentication_complete', {
     outcome: verifiedIdentity ? 'verified' : 'anonymous',
     previewTestAccess: Boolean(previewTestEntitlement),
+    guestIdentity: Boolean(guestIdentity),
   });
 
   if (req.method === 'POST' && correlationBody?.operation === 'commit_inquiry_state') {
@@ -6545,80 +6535,38 @@ export default async function handler(req, res) {
 
   // ── GET — preflight status check ─────────────────────────────────────────
   if (req.method === 'POST' && correlationBody?.operation === 'retry_artifact_analysis') {
-    const artifactId = correlationBody.artifactId;
-    const artifactRevision = Number(correlationBody.artifactRevision);
-    if (!/^[0-9a-f-]{36}$/i.test(artifactId || '')
-      || !Number.isInteger(artifactRevision)
-      || artifactRevision < 1) {
-      return res.status(400).json({ error: 'Invalid artifact reference' });
-    }
-    const artifactResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/interpretation_artifacts?artifact_id=eq.${encodeURIComponent(artifactId)}&artifact_revision=eq.${artifactRevision}&select=artifact,inquiry_key,owner_user_id&limit=1`,
-      { headers: inquiryServiceHeaders() },
-    );
-    const rows = artifactResponse.ok ? await artifactResponse.json() : [];
-    const row = rows?.[0];
-    if (!row?.artifact) return res.status(404).json({ error: 'Artifact not found' });
-    if (row.owner_user_id) {
-      if (!verifiedIdentity) return res.status(401).json({ error: 'Authentication required' });
-      if (row.owner_user_id !== verifiedIdentity.userId) return res.status(403).json({ error: 'Forbidden' });
-    } else if (correlationBody.inquiryKey !== row.inquiry_key
-      || !verifyInquiryCredential(row.inquiry_key, correlationBody.inquiryToken)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    const packets = [];
-    const result = await generateAndAttachEnrichment({
-      artifact: Object.freeze(row.artifact),
-      systemPrompt: PRISM_SYSTEM_PROMPT,
-      sse: { write(event) { if (event?.type === 'packet') packets.push(event.packet); return true; } },
-      timing,
-      replaceInvalidEmpty: true,
+    return res.status(410).json({
+      error: 'Legacy Prism Analysis regeneration is retired for reconstructed inquiries.',
+      charged: false,
     });
-    if (!result.complete) {
-      return res.status(503).json({ error: 'Prism Analysis incomplete.', retryable: true });
-    }
-    return res.status(200).json({ packets, charged: false });
   }
 
   if (req.method === 'GET') {
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
-    if (verifiedIdentity) {
-      try {
-        if (previewTestEntitlement) {
-          const used = await getLiveQueryCount(verifiedIdentity.userId) ?? 0;
-          return res.status(200).json({
-            locked: used >= previewTestEntitlement.allowance,
-            queriesUsed: used,
-            limit: previewTestEntitlement.allowance,
-            previewTestAccess: true,
-          });
-        }
-        const subscriber = await getSubscriber(verifiedIdentity.email);
-        const redemption = await getCodeRedemption(verifiedIdentity.email);
-        if ((subscriber && subscriber.status === 'active') || redemption) {
-          return res.status(200).json({ locked: false, authenticated: true });
-        }
-      } catch {}
-    }
-
     try {
-      const log = await getQueryLog(ip);
-      if (log) {
-        const firstQuery = new Date(log.first_query_at);
-        const hoursSinceFirst = (Date.now() - firstQuery.getTime()) / (1000 * 60 * 60);
-        if (hoursSinceFirst < WINDOW_HOURS && log.query_count >= QUERY_LIMIT) {
-          const hoursRemaining = WINDOW_HOURS - hoursSinceFirst;
-          return res.status(200).json({
-            locked: true,
-            hoursRemaining: Math.ceil(hoursRemaining),
-            secondsRemaining: Math.floor(hoursRemaining * 3600),
-            queriesUsed: log.query_count
-          });
-        }
-      }
-    } catch {}
-
-    return res.status(200).json({ locked: false });
+      const access = await getPrismQueryAccess({
+        guestId: guestIdentity?.guestId || null,
+        userId: verifiedIdentity?.userId || null,
+        previewAllowance: previewTestEntitlement?.allowance || null,
+      });
+      const resetAt = access?.reset_at ? new Date(access.reset_at) : null;
+      const secondsRemaining = resetAt
+        ? Math.max(0, Math.floor((resetAt.getTime() - Date.now()) / 1000))
+        : null;
+      return res.status(200).json({
+        locked: !access?.allowed,
+        authenticated: Boolean(verifiedIdentity),
+        guest: Boolean(guestIdentity),
+        entitlementSource: access?.entitlement_source || null,
+        remaining: access?.remaining ?? 0,
+        resetAt: access?.reset_at || null,
+        secondsRemaining,
+        previewTestAccess: Boolean(previewTestEntitlement),
+        product: publicProductConfig(),
+      });
+    } catch (error) {
+      timing('entitlement_status_error', { error: String(error?.message || error).slice(0, 120) });
+      return res.status(503).json({ error: 'Entitlement status temporarily unavailable' });
+    }
   }
 
   // ── ROUTE DISPATCH ────────────────────────────────────────────────────────
@@ -7001,6 +6949,32 @@ Do not add any question after the exit offer. The person chooses the next move.
   }
   timing('safety_complete', { outcome: crisisAcknowledged ? 'crisis_acknowledged' : 'clear' });
 
+  const submissionInquiryKey = inquiryKey
+    || (isFollowUp && threadId ? `thread:${threadId}` : initialInquiryCredential?.inquiryKey);
+  let entitlementAdmission;
+  try {
+    entitlementAdmission = await preparePrismInquiry({
+      inquiryKey: submissionInquiryKey,
+      guestId: guestIdentity?.guestId || null,
+      userId: verifiedIdentity?.userId || null,
+      previewAllowance: previewTestEntitlement?.allowance || null,
+      queryCost: isFollowUp ? PRISM_PRODUCT.followUpCost : PRISM_PRODUCT.primaryCost,
+    });
+  } catch (error) {
+    timing('entitlement_admission_error', { error: String(error?.message || error).slice(0, 160) });
+    return res.status(503).json({ error: 'Query entitlement temporarily unavailable' });
+  }
+  if (!entitlementAdmission?.allowed) {
+    timing('access_complete', { route: verifiedIdentity ? 'authenticated' : 'guest', allowed: false });
+    return res.status(429).json({
+      error: 'Query limit reached',
+      message: 'You need more Prism credits for this inquiry. Guest credits replenish to 5 across the rolling 24-hour window, or you can add credits to continue.',
+      entitlementSource: entitlementAdmission?.entitlement_source || 'explorer',
+      remaining: entitlementAdmission?.remaining ?? 0,
+      resetAt: entitlementAdmission?.reset_at || null,
+    });
+  }
+
   // ── SUBSCRIBER PATH ───────────────────────────────────────────────────────
   try {
     if (verifiedIdentity) {
@@ -7032,7 +7006,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         throw err;
       }
 
-      if (previewTestEntitlement || (subscriber && subscriber.status === 'active') || redemption) {
+      {
         const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
         if (!apiMessages || apiMessages.length === 0) {
           return res.status(400).json({ error: 'No messages provided' });
@@ -7042,13 +7016,6 @@ Do not add any question after the exit offer. The person chooses the next move.
         // Supabase Auth. The subscriber row is quota/billing metadata, not an
         // authorization principal (and its UUID may differ from auth.users.id).
         const userId = verifiedIdentity.userId;
-        const quotaIdentity = subscriber || (previewTestEntitlement ? {
-          id: verifiedIdentity.userId,
-          tier: 'free',
-          query_count: 0,
-          purchased_credits: 0,
-        } : null);
-
         const hasFollowUpCandidate = Boolean(
           isFollowUp || inquiryKey || inquiryToken || threadId || sharedFollowUpId,
         );
@@ -7066,38 +7033,6 @@ Do not add any question after the exit offer. The person chooses the next move.
           classified: followUpContext.isFollowUp,
           reason: followUpContext.reason,
         });
-        const isFollowUpCheck = followUpContext.isFollowUp;
-        let quota = null;
-        if (!isFollowUpCheck && quotaIdentity) {
-          timing('quota_check_start');
-          try {
-            quota = await checkSubscriberQuota(
-              quotaIdentity,
-              previewTestEntitlement?.allowance ?? null,
-            );
-            timing('quota_check_end', {
-              outcome: 'success',
-              allowed: quota.allowed,
-              tier,
-            });
-          } catch (err) {
-            timing('quota_check_end', { outcome: 'error', tier });
-            throw err;
-          }
-          if (!quota.allowed) {
-            timing('access_complete', { route: 'subscriber', allowed: false, tier });
-            return res.status(200).json({
-              quota_exceeded: true,
-              tier,
-              queriesUsed: quota.queriesUsed,
-              limit: quota.limit,
-              credits: quota.credits,
-              message: quota.credits === 0
-                ? `You've used all ${quota.limit} queries for this period. Add Signal Sessions to continue, or wait for your next reset.`
-                : `You've reached your query limit and have no Signal Sessions remaining.`
-            });
-          }
-        }
         timing('access_complete', { route: 'subscriber', allowed: true, tier });
 
         const queryType = (() => {
@@ -7107,13 +7042,15 @@ Do not add any question after the exit offer. The person chooses the next move.
         })();
 
         res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
         res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
         res.setHeader('X-Prism-Tier', tier);
         res.setHeader('X-Prism-Subscriber', 'true');
         if (previewTestEntitlement) {
           res.setHeader('X-Prism-Preview-Test', 'true');
         }
+        sse.start();
 
         if (followUpContext.isFollowUp) {
           try {
@@ -7127,6 +7064,7 @@ Do not add any question after the exit offer. The person chooses the next move.
                 inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
                 threadId,
                 ownerUserId: userId,
+                guestId: null,
                 tier,
                 artifactId,
                 artifactRevision,
@@ -7206,168 +7144,11 @@ Do not add any question after the exit offer. The person chooses the next move.
           ownerUserId: userId,
           usageUserId: subscriber?.id || null,
           usageQueryType: 'subscriber',
-          usageCreditSource: quota?.creditSource || 'tier_allocation',
+          usageCreditSource: entitlementAdmission.entitlement_source,
         });
         timing('request_complete', { route: 'subscriber', tier });
         return res.end();
 
-        timing('anthropic_request_start');
-        const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 2500,
-            stream: true,
-            system: enhancedSystemPrompt,
-            messages: apiMessages
-          })
-        });
-
-        timing('anthropic_headers_received', {
-          status: anthropicRes.status,
-          ok: anthropicRes.ok,
-        });
-        console.log(`[interpret:${requestId}] anthropic-response`, {
-          status: anthropicRes.status,
-          ok: anthropicRes.ok,
-          elapsedMs: Date.now() - startedAt,
-        });
-
-        if (!anthropicRes.ok) {
-          const errText = await anthropicRes.text();
-          console.error(`[interpret:${requestId}] anthropic-error`, {
-            status: anthropicRes.status,
-            body: errText.slice(0, 500),
-          });
-          sse.write(
-            { type: 'error', error: errText },
-            { source: 'anthropic_response', status: anthropicRes.status },
-          );
-          return res.end();
-        }
-
-        const reader = anthropicRes.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let fullResponse = '';
-        let streamDone = false;
-        let firstUpstreamDeltaSeen = false;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                  if (!firstUpstreamDeltaSeen) {
-                    firstUpstreamDeltaSeen = true;
-                    timing('first_upstream_delta');
-                  }
-                  fullResponse += parsed.delta.text;
-                  sse.write({ type: 'delta', text: parsed.delta.text });
-                } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-                  sse.write({ type: 'truncated' });
-                } else if (parsed.type === 'message_stop') {
-                  streamDone = true;
-                  timing('anthropic_message_stop');
-                }
-              } catch {}
-            }
-          }
-        }
-
-        if (buffer.trim()) {
-          for (const line of buffer.split('\n')) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                  if (!firstUpstreamDeltaSeen) {
-                    firstUpstreamDeltaSeen = true;
-                    timing('first_upstream_delta');
-                  }
-                  fullResponse += parsed.delta.text;
-                  sse.write({ type: 'delta', text: parsed.delta.text });
-                } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-                  sse.write({ type: 'truncated' });
-                } else if (parsed.type === 'message_stop') {
-                  streamDone = true;
-                  timing('anthropic_message_stop');
-                }
-              } catch {}
-            }
-          }
-        }
-
-        // ── COHERENCE CHECK — post-generation landing detection ────────────
-        // Runs after full response is assembled. If the draft ends on a
-        // momentum question after a landing, trims it and sends a corrected
-        // event to the client before the done event fires.
-        if (streamDone) {
-          const userTurnCount = apiMessages.filter(m => m.role === 'user').length;
-          timing('coherence_start');
-          const checkedResponse = await buildCoherenceCheck(userTurnCount, fullResponse, lastUserText);
-          timing('coherence_complete', { corrected: checkedResponse !== fullResponse });
-          if (checkedResponse !== fullResponse) {
-            // Send corrected event — client replaces accumulated fullText
-            sse.write({ type: 'corrected', text: checkedResponse });
-            fullResponse = checkedResponse;
-          }
-          sse.write(
-            { type: 'done', tier, ...(initialInquiryCredential || {}) },
-            { source: 'post_coherence', tier },
-          );
-        } else {
-          sse.write(
-            { type: 'error', error: 'UPSTREAM_STREAM_INCOMPLETE' },
-            { source: 'upstream_stream_incomplete', tier },
-          );
-        }
-
-        if (streamDone && userId) {
-          timing('persistence_start', { followUp: Boolean(isFollowUp || (messages && messages.length > 1)) });
-          const isFollowUpQuery = isFollowUp || (messages && messages.length > 1);
-          if (!isFollowUpQuery) {
-            const threadId = await saveThread({
-              userId,
-              query:     lastUserText,
-              queryType,
-              response:  fullResponse,
-              tier
-            });
-            await updateQueryCount({ userId, tier, threadId });
-          } else {
-            await updateQueryCount({ userId, tier, threadId: null });
-          }
-          timing('persistence_complete');
-        }
-
-        console.log(`[interpret:${requestId}] complete`, {
-          streamDone,
-          responseLength: fullResponse.length,
-          durationMs: Date.now() - startedAt,
-        });
-        timing('request_complete', {
-          route: 'subscriber',
-          streamDone,
-          responseChars: fullResponse.length,
-          tier,
-        });
-        return res.end();
       }
     }
   } catch (err) {
@@ -7394,27 +7175,6 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   // ── FREE / ANONYMOUS PATH ─────────────────────────────────────────────────
   timing('anonymous_access_start');
-  try {
-    const log = await getQueryLog(ip);
-    if (log) {
-      const firstQuery = new Date(log.first_query_at);
-      const hoursSinceFirst = (Date.now() - firstQuery.getTime()) / (1000 * 60 * 60);
-      if (hoursSinceFirst >= WINDOW_HOURS) {
-        await resetQueryLog(ip);
-      } else if (log.query_count >= QUERY_LIMIT) {
-        const hoursRemaining = Math.ceil(WINDOW_HOURS - hoursSinceFirst);
-        timing('access_complete', { route: 'free', allowed: false });
-        return res.status(429).json({
-          error: 'Query limit reached',
-          message: `You've used all ${QUERY_LIMIT} free queries. Access resets in ${hoursRemaining} hour${hoursRemaining !== 1 ? 's' : ''}.`,
-          hoursRemaining
-        });
-      }
-    }
-  } catch (err) {
-    timing('anonymous_access_error');
-    console.error('Rate limit check failed:', err.message);
-  }
   timing('access_complete', { route: 'free', allowed: true, tier: 'free' });
 
   const apiMessages = messages || (prompt ? [{ role: 'user', content: prompt }] : null);
@@ -7424,10 +7184,12 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   try {
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('X-Prism-Tier', 'free');
     res.setHeader('X-Prism-Subscriber', 'false');
+    sse.start();
 
     const hasFollowUpCandidate = Boolean(
       isFollowUp || inquiryKey || inquiryToken || threadId || sharedFollowUpId,
@@ -7459,6 +7221,7 @@ Do not add any question after the exit offer. The person chooses the next move.
             inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
             threadId,
             ownerUserId: null,
+            guestId: guestIdentity?.guestId || null,
             tier: 'free',
             artifactId,
             artifactRevision,
@@ -7532,126 +7295,6 @@ Do not add any question after the exit offer. The person chooses the next move.
     timing('request_complete', { route: 'free', tier: 'free' });
     return res.end();
 
-    timing('anthropic_request_start');
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2500,
-        stream: true,
-        system: enhancedSystemPrompt,
-        messages: apiMessages
-      })
-    });
-
-    timing('anthropic_headers_received', {
-      status: anthropicRes.status,
-      ok: anthropicRes.ok,
-    });
-
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      sse.write(
-        { type: 'error', error: errText },
-        { source: 'anthropic_response', status: anthropicRes.status },
-      );
-      return res.end();
-    }
-
-    const reader = anthropicRes.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let fullResponseFree = '';
-    let streamDoneFree = false;
-    let firstUpstreamDeltaSeenFree = false;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-              if (!firstUpstreamDeltaSeenFree) {
-                firstUpstreamDeltaSeenFree = true;
-                timing('first_upstream_delta');
-              }
-              fullResponseFree += parsed.delta.text;
-              sse.write({ type: 'delta', text: parsed.delta.text });
-            } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-              sse.write({ type: 'truncated' });
-            } else if (parsed.type === 'message_stop') {
-              streamDoneFree = true;
-              timing('anthropic_message_stop');
-            }
-          } catch {}
-        }
-      }
-    }
-
-    if (buffer.trim()) {
-      for (const line of buffer.split('\n')) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-              if (!firstUpstreamDeltaSeenFree) {
-                firstUpstreamDeltaSeenFree = true;
-                timing('first_upstream_delta');
-              }
-              fullResponseFree += parsed.delta.text;
-              sse.write({ type: 'delta', text: parsed.delta.text });
-            } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason === 'max_tokens') {
-              sse.write({ type: 'truncated' });
-            } else if (parsed.type === 'message_stop') {
-              streamDoneFree = true;
-              timing('anthropic_message_stop');
-            }
-          } catch {}
-        }
-      }
-    }
-
-    // ── COHERENCE CHECK — post-generation landing detection ────────────
-    if (streamDoneFree) {
-      const userTurnCountFree = apiMessages.filter(m => m.role === 'user').length;
-      timing('coherence_start');
-      const checkedResponseFree = await buildCoherenceCheck(userTurnCountFree, fullResponseFree, lastUserText);
-      timing('coherence_complete', { corrected: checkedResponseFree !== fullResponseFree });
-      if (checkedResponseFree !== fullResponseFree) {
-        sse.write({ type: 'corrected', text: checkedResponseFree });
-      }
-      sse.write(
-        { type: 'done', tier: 'free', ...(initialInquiryCredential || {}) },
-        { source: 'post_coherence', tier: 'free' },
-      );
-    } else {
-      sse.write(
-        { type: 'error', error: 'UPSTREAM_STREAM_INCOMPLETE' },
-        { source: 'upstream_stream_incomplete', tier: 'free' },
-      );
-    }
-
-    timing('request_complete', {
-      route: 'free',
-      streamDone: streamDoneFree,
-      responseChars: fullResponseFree.length,
-      tier: 'free',
-    });
-    return res.end();
   } catch (err) {
     sse.write(
       { type: 'error', error: err.message },
