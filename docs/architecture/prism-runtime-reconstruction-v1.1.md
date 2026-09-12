@@ -10,8 +10,7 @@ This approved reconstruction supersedes the mandatory delivery strategy in Runti
 4. Perform one bounded canonical audit.
 5. Construct a deterministic compatibility artifact and atomically persist it.
 6. Emit `canonical_complete`; the client may now continue the inquiry.
-7. Optionally generate and persist Interpretive Context and select approved concept-library nodes.
-8. Emit `interpretive_context`, `explore_context`, then `done`.
+7. Emit `done` immediately after durable canonical completion.
 
 Provisional prose is neither canonical nor billable. The server-authoritative credit cost is consumed only by durable artifact completion. Context operations, restoration, sharing, and rendering never create an independent charge.
 
@@ -19,10 +18,10 @@ Provisional prose is neither canonical nor billable. The server-authoritative cr
 
 New inquiries do not generate the seven-card Prism Analysis, mandatory Key Terms, or their audit, repair, and retry ladders. Historical `prism_analysis` packets remain immutable and readable.
 
-## Context contract
+## Archived context compatibility
 
-Interpretive Context is optional, inquiry-specific material that adds understanding instead of restating the response. Explore Context contains only server-validated references to the approved static concept library; models may select identifiers but may not generate library content.
+Interpretive Context and Explore Context are retired for new inquiries. Previously stored context packets remain immutable and readable so existing archives continue to render correctly.
 
 ## Client event contract
 
-The active delivery events are `response_delta`, `canonical_complete`, `interpretive_context`, `explore_context`, and `done`, plus explicit terminal failure states. The browser renders server state and does not initiate generation during hydration, navigation, reconnect, or rendering.
+The active delivery events are `response_delta`, `canonical_complete`, and `done`, plus explicit terminal failure states. The browser retains backward-compatible rendering for context packets already stored in archived sessions, but new inquiries do not generate or attach them. The browser renders server state and does not initiate generation during hydration, navigation, reconnect, or rendering.
