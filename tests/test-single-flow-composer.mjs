@@ -35,23 +35,23 @@ assert.match(
 );
 assert.match(
   frontend,
-  /function stageComposerBelowResponse\(\)[\s\S]*section\.appendChild\(composer\)[\s\S]*async function runInterpretation\(\)[\s\S]*stageComposerBelowResponse\(\)[\s\S]*loadingBlock/,
+  /function stageComposerBelowResponse\(\)[\s\S]*positionResponseActions\(section, composer\)[\s\S]*section\.appendChild\(composer\)[\s\S]*async function runInterpretation\(\)[\s\S]*stageComposerBelowResponse\(\)[\s\S]*loadingBlock/,
   'The composer must move below the response as soon as interpretation begins',
 );
 assert.match(
   frontend,
-  /function positionSharingBelowComposer\(section\)[\s\S]*section\.appendChild\(governance\)/,
-  'Sharing controls must be positioned beneath the shared composer',
+  /function positionResponseActions\(section, composer\)[\s\S]*section\.insertBefore\(governance, composer/,
+  'The response actions must be positioned before the shared composer',
 );
 assert.match(
   frontend,
-  /function showFollowUpComposer\(\)[\s\S]*section\.appendChild\(composer\)[\s\S]*positionSharingBelowComposer\(section\)/,
-  'The composer and sharing controls must remain at the end of the progression',
+  /function showFollowUpComposer\(\)[\s\S]*positionResponseActions\(section, composer\)[\s\S]*section\.appendChild\(composer\)/,
+  'The action row and composer must remain at the end of the progression',
 );
 assert.match(
   frontend,
-  /id="queryPrintBtn"[\s\S]*onclick="printPrism\(\)"[\s\S]*>Print<\/button>/,
-  'Print must remain available beneath the composer through the timestamp-aware print path',
+  /class="query-action-row"[\s\S]*id="queryPrintBtn"[\s\S]*>Print<\/button>[\s\S]*id="queryShareActionBtn"[\s\S]*>Share<\/button>[\s\S]*id="queryNotesActionBtn"[\s\S]*>Notes<\/button>/,
+  'Print, Share, and Notes must appear as one intuitive action row',
 );
 
 const nodeControlsStart = frontend.indexOf('function buildNodeControls(nodeId, queryText) {');
@@ -61,6 +61,16 @@ assert.doesNotMatch(
   nodeControlsFlow,
   /node-share-btn|textContent = 'Share'|textContent = '↓ Print'/,
   'Per-response controls must omit redundant Share and Print actions',
+);
+assert.match(
+  nodeControlsFlow,
+  /textContent = _btnLabel === 'Query' \? 'Notes' : _btnLabel \+ ' Notes'/,
+  'Per-response note shortcuts must use plain Notes language',
+);
+assert.match(
+  frontend,
+  /function openNotesSurface\([\s\S]*openNodeSurface\([\s\S]*'private'[\s\S]*function openShareSurface\([\s\S]*openNodeSurface\([\s\S]*'trust_circle'/,
+  'Notes and Share must open their corresponding panel views directly',
 );
 assert.match(
   frontend,
