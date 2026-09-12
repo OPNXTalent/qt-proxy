@@ -5,7 +5,7 @@ const client = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 const runStart = client.indexOf('async function runInterpretation() {');
 const runEnd = client.indexOf('async function runFollowUp()', runStart);
 const run = client.slice(runStart, runEnd);
-const proxyStart = client.indexOf('async function callProxy(messages, rawQuery, requestId) {');
+const proxyStart = client.indexOf('async function callProxy(messages, rawQuery, requestId, options) {');
 const proxyEnd = client.indexOf('function getErrorMessage(err)', proxyStart);
 const proxy = client.slice(proxyStart, proxyEnd);
 
