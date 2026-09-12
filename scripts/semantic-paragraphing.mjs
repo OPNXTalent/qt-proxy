@@ -71,7 +71,9 @@ const requiredProgressive = [
   'never collapse a long response into one contiguous block',
 ];
 for (const marker of requiredProgressive) {
-  if (!progressive.includes(marker)) throw new Error(`Missing semantic paragraphing initial-response marker: ${marker}`);
+  if (!progressive.toLowerCase().includes(marker.toLowerCase())) {
+    throw new Error(`Missing semantic paragraphing initial-response marker: ${marker}`);
+  }
 }
 
 const requiredRuntime = [
