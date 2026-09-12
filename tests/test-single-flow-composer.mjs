@@ -3,25 +3,31 @@ import { readFileSync } from 'node:fs';
 
 const frontend = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 
+assert.match(
+  frontend,
+  /\.query-action-row\s*\{[\s\S]*?justify-content:\s*space-between;[\s\S]*?width:\s*100%;[\s\S]*?\}/,
+  'Print, Share, and Notes must span the response width',
+);
+
 assert.equal(
   (frontend.match(/<textarea\b[^>]*class="input-field"/g) || []).length,
-  1,
-  'The query experience must expose one input-field textarea',
+  2,
+  'The query experience must expose opening and follow-up textareas',
 );
 assert.match(
   frontend,
   /id="queryComposer"[\s\S]*id="userInput"[\s\S]*onclick="submitComposer\(\)"/,
-  'The opening query must use the shared composer',
-);
-assert.doesNotMatch(
-  frontend,
-  /id="followUpInput"|id="followUpBtn"|id="followUpMicBtn"/,
-  'A second follow-up composer must not return',
+  'The opening question must retain its own composer',
 );
 assert.match(
   frontend,
-  /function showFollowUpComposer\(\)[\s\S]*section\.appendChild\(composer\)/,
-  'The shared composer must move below the result flow',
+  /id="followUpComposer"[\s\S]*id="followUpInput"[\s\S]*placeholder="Ask a follow-up question…"[\s\S]*id="followUpMicBtn"/,
+  'A separate empty follow-up composer must sit at the end of a completed answer',
+);
+assert.match(
+  frontend,
+  /function showFollowUpComposer\(\)[\s\S]*positionResponseActions\(section, followUpComposer\)[\s\S]*followUpComposer\.style\.display = 'block'/,
+  'The completed answer must reveal its dedicated follow-up composer',
 );
 assert.match(
   frontend,
@@ -30,23 +36,28 @@ assert.match(
 );
 assert.match(
   frontend,
-  /function submitComposer\(\)[\s\S]*composer\.dataset\.mode === 'followUp'[\s\S]*runFollowUp\(\)[\s\S]*runInterpretation\(\)/,
-  'Submission behavior must follow the explicit composer mode',
+  /function submitComposer\(\) \{[\s\S]*return runInterpretation\(\)/,
+  'The opening composer must remain dedicated to initial interpretation',
 );
 assert.match(
   frontend,
-  /function stageComposerBelowResponse\(\)[\s\S]*positionResponseActions\(section, composer\)[\s\S]*section\.appendChild\(composer\)[\s\S]*async function runInterpretation\(\)[\s\S]*stageComposerBelowResponse\(\)[\s\S]*loadingBlock/,
-  'The composer must move below the response as soon as interpretation begins',
+  /function stageComposerBelowResponse\(\)[\s\S]*Keep the original question at the top[\s\S]*async function runInterpretation\(\)[\s\S]*stageComposerBelowResponse\(\)[\s\S]*loadingBlock/,
+  'The original question must remain at the top while interpretation runs',
 );
 assert.match(
   frontend,
-  /function positionResponseActions\(section, composer\)[\s\S]*section\.insertBefore\(governance, composer/,
-  'The response actions must be positioned before the shared composer',
+  /function positionResponseActions\(section, followUpComposer\)[\s\S]*section\.insertBefore\(governance, followUpComposer \|\| null\)/,
+  'The response actions must be positioned before the follow-up composer',
 );
 assert.match(
   frontend,
-  /function showFollowUpComposer\(\)[\s\S]*positionResponseActions\(section, composer\)[\s\S]*section\.appendChild\(composer\)/,
-  'The action row and composer must remain at the end of the progression',
+  /function showFollowUpComposer\(\)[\s\S]*openingInput\.readOnly = true[\s\S]*submitBtn'\)\.style\.display = 'none'/,
+  'A completed question must become read-only and hide the dead Interpret control',
+);
+assert.match(
+  frontend,
+  /followUpInput'\)\.addEventListener\('keydown'[\s\S]*runFollowUp\(this\)/,
+  'Enter in the empty follow-up field must submit the next question',
 );
 assert.match(
   frontend,
