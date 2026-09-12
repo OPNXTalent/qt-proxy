@@ -63,7 +63,7 @@ assert.doesNotMatch(
   'The initial request must not transmit local email as authorization identity',
 );
 assert.match(
-  qtSource.match(/async function runFollowUp\(\)[\s\S]*?\/\/ Experimental theodicy module switch/)?.[0] || '',
+  qtSource.match(/async function runFollowUp\([^)]*\)[\s\S]*?\/\/ Experimental theodicy module switch/)?.[0] || '',
   /catch \(err\) \{[\s\S]*?const errEl = document\.createElement\('div'\);[\s\S]*?errEl\.innerHTML = getErrorMessage\(err\)/,
   'Follow-up failures must render through an error element created inside the catch path',
 );
