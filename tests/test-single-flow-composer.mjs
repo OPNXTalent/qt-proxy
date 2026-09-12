@@ -50,8 +50,8 @@ assert.match(
 );
 assert.match(
   frontend,
-  /id="queryPrintBtn"[\s\S]*onclick="requestAnimationFrame\(\(\) => setTimeout\(\(\) => window\.print\(\), 0\)\)"[\s\S]*>Print<\/button>/,
-  'Print must remain available beneath the composer without blocking the click handler',
+  /id="queryPrintBtn"[\s\S]*onclick="printPrism\(\)"[\s\S]*>Print<\/button>/,
+  'Print must remain available beneath the composer through the timestamp-aware print path',
 );
 
 const nodeControlsStart = frontend.indexOf('function buildNodeControls(nodeId, queryText) {');
