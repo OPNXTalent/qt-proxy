@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const api = fs.readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
+const fallback = api.slice(api.indexOf('async function runDisabledFollowUpFallback'), api.indexOf('async function restoreCanonicalInquiryState'));
 const followup = api.slice(api.indexOf('async function runPersistentInquiryFollowUp'), api.indexOf('export default async function handler'));
+assert.match(fallback, /telemetryStage: 'followup_fallback'/);
+assert.match(fallback, /telemetryTurnType: 'follow_up'/);
+assert.match(fallback, /onTextDelta: text => sse\.write\(\{ type: 'response_delta', text \}\)/);
+assert.doesNotMatch(fallback, /splitApprovedResponse|type: 'delta'/);
 assert.match(followup, /restoreCanonicalInquiryState/);
 assert.match(followup, /applyInquiryPatch/);
 assert.match(followup, /onTextDelta: text => sse\.write\(\{ type: 'response_delta', text \}\)/);
