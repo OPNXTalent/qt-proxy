@@ -8,7 +8,7 @@
 // itself; this service worker exists to satisfy installability and speed
 // up shell loading, not to provide offline AI responses.
 
-const CACHE_NAME = 'prism-shell-v8';
+const CACHE_NAME = 'prism-shell-v9';
 
 // Keep this list small and static-only. Do not add qt.html here as a
 // blanket precache target beyond what's needed for install — it changes
