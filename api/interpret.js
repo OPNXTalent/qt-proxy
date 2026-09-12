@@ -5906,23 +5906,6 @@ function deterministicArtifact({ response, query, inquiryKey, revision, ownerUse
   });
 }
 
-async function auditCanonicalResponse({ query, response, turnType, timing }) {
-  timing('canonical_audit_start');
-  const audited = await callInquiryModel({
-    model: 'claude-haiku-4-5-20251001',
-    maxTokens: 2400,
-    timeoutMs: 30000,
-    prompt: `Audit the candidate response against the user's inquiry and the Prism Epistemic Contract. Preserve sound prose and its natural ending. Correct only material overclaim, unsupported psychology, contradiction, fabricated sourcing, or failure to answer. Do not add Framework exposition, an audit report, JSON, or a routine engagement question. Return only the complete approved response in plain prose.\n\nInquiry:\n${query}\n\nCandidate response:\n${response}`,
-    telemetryStage: 'canonical_audit',
-    telemetryTurnType: turnType,
-  });
-  if (!audited || audited.length < 40 || /^(?:```|\{|\s*AUDIT\b)/i.test(audited)) {
-    throw new Error('CANONICAL_AUDIT_INVALID');
-  }
-  timing('canonical_audit_complete', { corrected: audited !== response, canonicalChars: audited.length });
-  return audited;
-}
-
 function artifactRpcBody(artifact, packets, {
   inquiryKey,
   completionKey,
@@ -6084,14 +6067,8 @@ async function runProgressiveInitialInquiry({
   });
   if (!streamedResponse || streamedResponse.length < 40) throw new Error('CANONICAL_RESPONSE_INVALID');
   timing('canonical_generation_complete', { responseChars: streamedResponse.length });
-  const canonicalResponse = await auditCanonicalResponse({
-    query,
-    response: streamedResponse,
-    turnType: 'primary',
-    timing,
-  });
   const artifact = deterministicArtifact({
-    response: canonicalResponse,
+    response: streamedResponse,
     query,
     inquiryKey: inquiryCredential.inquiryKey,
     revision: 1,
