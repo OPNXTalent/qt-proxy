@@ -14,20 +14,12 @@ import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.j
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
 import {
   ARTIFACT_SCHEMA_VERSION,
-  PACKET_TYPES,
   RUNTIME_CONSTITUTION_VERSION,
   createCanonicalPackets,
   createCompletionKey,
-  createContextPackets,
   validateArtifactCore,
-  validateContextCompanion,
 } from '../lib/interpretation-artifact.js';
-import {
-  PRISM_CANONICAL_RESPONSE_CONTRACT,
-  PRISM_CONTEXT_COMPANION_CONTRACT,
-  PRISM_CONTEXT_COMPANION_SCHEMA,
-} from '../lib/prompt-modules/progressive-inquiry.js';
-import { conceptNodes } from '../lib/concept-nodes-v1.js';
+import { PRISM_CANONICAL_RESPONSE_CONTRACT } from '../lib/prompt-modules/progressive-inquiry.js';
 import {
   applyInquiryPatch,
   assertFollowUpPromptSize,
@@ -5933,48 +5925,6 @@ async function auditCanonicalResponse({ query, response, turnType, timing }) {
   return audited;
 }
 
-function conceptCatalogForSelection() {
-  return Object.values(conceptNodes).map(node => ({
-    id: node.id,
-    title: node.title,
-    summary: node.shortSummary,
-  }));
-}
-
-async function generateAndAttachContext({ artifact, sse, timing }) {
-  timing('context_companion_start');
-  try {
-    const raw = await callInquiryModel({
-      model: 'claude-sonnet-4-6',
-      maxTokens: 1400,
-      temperature: 0.2,
-      timeoutMs: 45000,
-      system: PRISM_CONTEXT_COMPANION_CONTRACT,
-      prompt: `Canonical response:\n${artifact.canonicalResponse}\n\nApproved concept catalog:\n${JSON.stringify(conceptCatalogForSelection())}`,
-      structuredOutputSchema: PRISM_CONTEXT_COMPANION_SCHEMA,
-      structuredOutputName: 'emit_context_companion',
-      telemetryStage: 'context_companion',
-      telemetryTurnType: artifact.revision > 1 ? 'follow_up' : 'primary',
-    });
-    const companion = validateContextCompanion(raw, new Set(Object.keys(conceptNodes)));
-    const packets = createContextPackets(artifact, companion, conceptNodes);
-    for (const packet of packets) {
-      const durablePacket = await attachInterpretationPacket(packet);
-      if (durablePacket.packetType === PACKET_TYPES.CONTEXT) {
-        sse.write({ type: 'interpretive_context', packet: durablePacket, text: durablePacket.content?.text || '' });
-      } else if (durablePacket.packetType === PACKET_TYPES.EXPLORE) {
-        sse.write({ type: 'explore_context', packet: durablePacket, nodes: durablePacket.content?.nodes || [] });
-      }
-    }
-    timing('context_companion_complete', { packetCount: packets.length });
-    return { complete: true, packetCount: packets.length };
-  } catch (error) {
-    timing('context_companion_incomplete', { error: String(error?.message || error).slice(0, 180) });
-    sse.write({ type: 'context_incomplete', message: 'Additional context is unavailable.' });
-    return { complete: false, error };
-  }
-}
-
 function artifactRpcBody(artifact, packets, {
   inquiryKey,
   completionKey,
@@ -6074,28 +6024,6 @@ async function completeFollowUpArtifact({
   if (result?.conflict) return { conflict: true, version: result.state_version, state: result.canonical_state };
   if (!result?.completed) throw new Error('FOLLOWUP_COMPLETION_UNCONFIRMED');
   return { committed: true, version: result.state_version, state: result.canonical_state };
-}
-
-async function attachInterpretationPacket(packet) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/attach_interpretation_packet`, {
-    method: 'POST',
-    headers: inquiryServiceHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({
-      p_packet_id: packet.packetId,
-      p_artifact_id: packet.artifactId,
-      p_artifact_revision: packet.artifactRevision,
-      p_packet_type: packet.packetType,
-      p_sequence: packet.sequence,
-      p_status: packet.status,
-      p_content: packet.content,
-    }),
-  });
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`PACKET_ATTACHMENT_FAILED:${response.status}:${detail.slice(0, 160)}`);
-  }
-  const stored = await response.json();
-  return stored && typeof stored === 'object' && stored.packetId ? stored : packet;
 }
 
 function legacyThreadResponse(artifact) {
@@ -6207,7 +6135,6 @@ async function runProgressiveInitialInquiry({
   });
   timing('canonical_response_available', { artifactId: artifact.artifactId });
 
-  await generateAndAttachContext({ artifact, sse, timing });
   sse.write(
     { type: 'done', tier, artifactId: artifact.artifactId, artifactRevision: artifact.revision },
     { source: 'progressive_inquiry_delivery', tier },
@@ -6401,8 +6328,6 @@ async function runPersistentInquiryFollowUp({
     canonicalState: true,
   });
   completeStage('stream', stageStartedAt, { packetCount: canonicalPackets.length });
-
-  await generateAndAttachContext({ artifact: followUpArtifact, sse, timing });
 
   timing('followup_total_complete', {
     totalMs: Date.now() - runtimeStartedAt,
