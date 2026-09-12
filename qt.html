@@ -483,13 +483,41 @@
   /* ── Query governance — two clean relational states ────────── */
   #sessionGovernance {
     display: none;
-    flex-direction: column;
-    gap: 0;
-    margin-top: 24px;
-    margin-bottom: 0;
-    padding-top: 20px;
-    padding-bottom: 0;
-    border-top: 1px solid rgba(42,42,64,0.18);
+    margin: 0 0 20px;
+    padding: 28px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .query-action-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: center;
+    gap: clamp(20px, 10vw, 120px);
+  }
+  .query-action-btn {
+    width: 100%;
+    min-height: 34px;
+    padding: 7px 14px;
+    border: 1px solid var(--border-lit);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  }
+  .query-action-btn:hover,
+  .query-action-btn:focus-visible {
+    color: var(--gold-pale);
+    border-color: var(--gold-dim);
+    outline: none;
+  }
+  .query-action-btn.active {
+    color: rgba(150,175,220,0.92);
+    border-color: rgba(122,150,201,0.55);
+    background: rgba(74,106,170,0.06);
   }
   /* Governance transitions — opacity only, no layout shift */
   .query-state-label,
@@ -574,7 +602,7 @@
   #queryPrintBtn {
     font-size:12px;
     letter-spacing: 0.18em;
-    color: var(--gold-pale);
+    color: var(--text-muted);
   }
   #queryPrintBtn:hover { color: var(--gold); }
 
@@ -1734,8 +1762,11 @@
     .shell { padding: 40px 20px 80px; }
     .header h1 { font-size:29px; }
     .input-selector { grid-template-columns: repeat(2, 1fr); }
+    .query-action-row { gap: 12px; }
+    .query-action-btn { padding-inline: 8px; }
+    #circleShareCreate { grid-template-columns: 1fr !important; }
 
-    /* Refractions panel — the 420px fixed width overflows any phone
+    /* Notes / Share panel — the fixed desktop width overflows any phone
        viewport (typically 360–430px CSS pixels). Full-screen takeover on
        small screens instead of a partial slide-over. */
     #discussionPanel {
@@ -2241,53 +2272,13 @@
 
   <!-- RESULT ---->
   <div class="result" id="resultBlock">
-    <!-- Query governance area — stewardship + URL bar -->
-    <!-- Query governance — two relational states -->
+    <!-- Familiar response actions: artifact, invitation, and private notes. -->
     <div id="sessionGovernance" style="display:none;">
-
-      <!-- Single governance row: [ Open Query ] ········ Archive | Print -->
-      <!-- State row — stable height, opacity-driven state swaps -->
-      <div class="query-state-row">
-        <!-- Left: Share This (private) XOR Shared + dot (open) — same space -->
-        <div style="position:relative;display:flex;align-items:center;gap:8px;flex:1;">
-          <button class="query-toggle-btn" id="queryOpenTrigger"
-            onclick="handleShareBtn()" style="opacity:1;transition:opacity 0.35s ease;">Share This</button>
-          <span class="query-state-label" id="sessionShareState"
-            style="position:absolute;left:0;opacity:0;transition:opacity 0.35s ease;white-space:nowrap;pointer-events:none;">Shared</span>
-          <span class="query-state-dot" id="queryStateDot"
-            style="position:absolute;left:calc(5.5em + 10px);"></span>
-        </div>
-        <!-- Right: the one persistent artifact action -->
-        <div style="display:flex;align-items:center;gap:0;flex-shrink:0;">
-          <button class="query-secondary-btn" id="queryPrintBtn"
-            onclick="printPrism()" title="Print this conversation">Print</button>
-        </div>
+      <div class="query-action-row" aria-label="Response actions">
+        <button class="query-action-btn" id="queryPrintBtn" onclick="printPrism()" title="Print this conversation">Print</button>
+        <button class="query-action-btn" id="queryShareActionBtn" onclick="openShareSurface()" title="Share this inquiry">Share</button>
+        <button class="query-action-btn" id="queryNotesActionBtn" onclick="openNotesSurface('root', currentSubject || '')" title="Open private notes">Notes</button>
       </div>
-
-      <!-- Address layer — always mounted, fades in/out -->
-      <div class="query-address-layer" id="queryUrlRow">
-        <div style="display:flex; align-items:center; flex:1; min-width:0;">
-          <!-- Quiet confirmation, not a permanent link display — a raw URL
-               sitting on screen looks technical and undercuts the whole
-               point of a warm invitation message. This only flashes
-               briefly after Share/Copy actually succeeds. -->
-          <span id="queryActionConfirm" style="font-family:var(--mono); font-size:12px; letter-spacing:0.1em; color:rgba(80,180,120,0.75); opacity:0; transition:opacity 0.3s ease;"></span>
-        </div>
-        <div style="display:flex;gap:16px;align-items:center;flex-shrink:0;">
-          <button class="query-share-btn" id="queryShareBtn" onclick="shareQueryNative()" title="Share via Messages, Mail, or any app on your device" style="display:none;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            Share
-          </button>
-          <button class="query-copy-btn" id="queryCopyBtn" onclick="copyQueryLink()">Copy Link</button>
-          <button class="query-close-btn" id="queryToggleBtn" onclick="handleShareBtn()">Stop Sharing</button>
-        </div>
-      </div>
-      <!-- Fallback raw link — hidden unless clipboard copy actually fails,
-           so there's still a way to grab the link manually if needed. -->
-      <div class="query-url-chip" id="queryUrlFallback" style="display:none; margin-top:10px;">
-        <span class="query-url-text active" id="queryUrlText" onclick="copyQueryLink()" title="Tap to copy">—</span>
-      </div>
-
     </div>
 
     <div id="subjectBanner" style="display:none; margin-bottom:28px;">
@@ -2335,7 +2326,7 @@
           style="display:none; font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.2s;"
           onmouseover="this.style.borderColor='rgba(80,180,120,0.5)';this.style.color='rgba(80,180,120,0.9)'"
           onmouseout="if(!_collabOpen){this.style.borderColor='var(--border-lit)';this.style.color='var(--text-dim)'}">
-          Refractions
+          Discussion
         </button>
 
       </div>
@@ -2361,7 +2352,7 @@
     <div id="qt-seed-banner" style="display:none; font-family:var(--crimson); font-size:18px; font-style:italic; line-height:1.6; color:var(--text-muted); border-left:2px solid var(--gold-dim); padding:10px 16px; margin-bottom:24px; margin-top:40px;"></div>
 
     <!-- The shared composer is moved here once a result is available. -->
-    <div id="followUpSection" style="display:none; margin-top:40px; border-top:1px solid var(--border); padding-top:32px;">
+    <div id="followUpSection" style="display:none; margin-top:40px;">
       <div id="followUpLoading" style="display:none; text-align:center; padding:32px 0;">
         <div style="font-family:var(--cinzel); font-size:27px; color:var(--gold-dim); animation: pulse 2s ease-in-out infinite;">✦</div>
         <div style="font-family:var(--mono); font-size:20px; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); margin-top:12px;">Reading the relational field…</div>
@@ -2375,9 +2366,9 @@
     <!-- Breadcrumb — future sprint -->
     <div class="disc-breadcrumb" id="discBreadcrumb"></div>
 
-    <!-- Top bar: REFRACTIONS label + count + close -->
-    <div class="disc-topbar" onclick="closeDiscussionPanel()" title="Close Refractions" style="cursor:pointer;">
-      <span class="disc-topbar-label">Refractions</span>
+    <!-- Top bar: current surface + count + close -->
+    <div class="disc-topbar" onclick="closeDiscussionPanel()" title="Close panel" style="cursor:pointer;">
+      <span class="disc-topbar-label" id="discTopbarLabel">Notes</span>
       <div class="disc-topbar-right">
         <span style="font-family:var(--mono);font-size:11px;color:rgba(120,118,140,0.25);" id="chatBarCount"></span>
         <button class="disc-close-btn" onclick="event.stopPropagation();closeDiscussionPanel()" title="Close">‹</button>
@@ -2385,10 +2376,10 @@
     </div>
 
     <!-- Chamber header: sigil + title — clickable to close -->
-    <div class="disc-chamber-header" id="discAnchor" onclick="closeDiscussionPanel()" title="Close Refractions" style="cursor:pointer;">
+    <div class="disc-chamber-header" id="discAnchor" onclick="closeDiscussionPanel()" title="Close panel" style="cursor:pointer;">
       <div class="disc-sigil" id="discSigil">Q</div>
       <div class="disc-chamber-divider"></div>
-      <div class="disc-chamber-title">Refractions</div>
+      <div class="disc-chamber-title" id="discChamberTitle">Notes</div>
     </div>
 
     <!-- Diamond ornament -->
@@ -2398,6 +2389,29 @@
     <div class="disc-attached-label">Attached to:</div>
     <div class="disc-anchor-text" id="discContextQuery">The original interpretation</div>
     <div class="disc-anchor-rule"></div>
+
+    <!-- Owner-only invitation controls shown when SHARE opens the Circle of Trust. -->
+    <div id="circleShareBox" style="display:none; margin:10px 16px 4px; padding:16px; border:1px solid var(--border); background:var(--surface); flex-shrink:0;">
+      <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text); margin-bottom:4px;">Share this inquiry</div>
+      <div style="font-family:var(--crimson); font-size:16px; color:var(--text-muted); line-height:1.45; margin-bottom:14px;">Invite someone into this Circle of Trust. Your other inquiries and private notes stay private.</div>
+      <div id="circleShareCreate" style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end;">
+        <label style="display:flex; flex-direction:column; gap:6px; font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted);">Access
+          <select id="circleShareAccess" style="min-height:38px; background:var(--deep); border:1px solid var(--border-lit); color:var(--text); font-family:var(--crimson); font-size:16px; padding:7px 10px;">
+            <option value="contributor">Contributor — may comment</option>
+            <option value="viewer">Viewer — may read</option>
+          </select>
+        </label>
+        <button id="circleCreateLinkBtn" onclick="createCircleShare()" style="min-height:38px; padding:7px 14px; border:1px solid var(--blue-lit); background:rgba(74,106,170,0.12); color:var(--blue-lit); font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer;">Create link</button>
+      </div>
+      <div id="circleShareActive" style="display:none;">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <div id="circleShareUrl" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:9px 10px; border:1px solid var(--border); color:var(--text-dim); font-family:var(--mono); font-size:12px;"></div>
+          <button onclick="copyQueryLink()" style="min-height:36px; padding:7px 12px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer;">Copy</button>
+          <button onclick="openShareModal()" style="min-height:36px; padding:7px 12px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer;">Manage</button>
+        </div>
+      </div>
+      <div id="circleShareStatus" role="status" style="display:none; margin-top:10px; font-family:var(--mono); font-size:11px; letter-spacing:0.08em; color:var(--text-muted);"></div>
+    </div>
 
     <!-- Save This Session — anonymous share-recipient context only.
          Visibility set/unset by updateSaveSessionVisibility(), called from
@@ -2444,7 +2458,7 @@
 
     <!-- Message stream -->
     <div class="chat-stream" id="chatStream" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
-      <div class="chat-empty" id="chatEmpty">No refractions yet.<br>Begin the conversation.</div>
+      <div class="chat-empty" id="chatEmpty">No shared messages yet.<br>Begin the conversation.</div>
     </div>
 
     <!-- View switcher — picks whether the panel shows your own notes or
@@ -2472,7 +2486,7 @@
           <path d="M 7.9 4.3 A 4 4 0 0 1 10 8.3" fill="none" stroke="currentColor" stroke-width="0.8"/>
           <path d="M 4.9 9.6 A 3.2 3.2 0 0 0 9.1 9.6" fill="none" stroke="currentColor" stroke-width="0.8"/>
         </svg>
-        <span id="entryVisibilityLabel">Private View</span>
+        <span id="entryVisibilityLabel">Notes</span>
       </button>
     </div>
 
@@ -2480,12 +2494,12 @@
     <div id="chatMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); padding:0 16px 8px; text-transform:uppercase;"></div>
 
     <div class="chat-compose" id="chatComposeBar" style="padding:12px 16px;border-top:1px solid rgba(42,42,64,0.5);display:flex;flex-direction:column;gap:8px;">
-      <textarea class="chat-input" id="chatInput" placeholder="Add your refraction…" rows="2"
+      <textarea class="chat-input" id="chatInput" placeholder="Add a message…" rows="2"
         style="width:100%;"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"></textarea>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button id="chatMicBtn" onclick="toggleChatMic()" title="Speak your refraction" style="display:none; flex-shrink:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:15px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+        <button id="chatMicBtn" onclick="toggleChatMic()" title="Speak your message" style="display:none; flex-shrink:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:15px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
         <button class="chat-send-btn" onclick="sendChatMessage()">Enter →</button>
       </div>
     </div>
@@ -2726,14 +2740,14 @@ function stageComposerBelowResponse() {
   const composer = document.getElementById('queryComposer');
   if (!section || !composer) return;
   section.style.display = 'block';
+  positionResponseActions(section, composer);
   section.appendChild(composer);
-  positionSharingBelowComposer(section);
 }
 
-function positionSharingBelowComposer(section) {
+function positionResponseActions(section, composer) {
   const governance = document.getElementById('sessionGovernance');
   if (section && governance) {
-    section.appendChild(governance);
+    section.insertBefore(governance, composer || section.firstChild);
   }
 }
 
@@ -2742,8 +2756,8 @@ function showFollowUpComposer() {
   const composer = document.getElementById('queryComposer');
   if (!section || !composer) return;
   section.style.display = 'block';
+  positionResponseActions(section, composer);
   section.appendChild(composer);
-  positionSharingBelowComposer(section);
   composer.dataset.mode = 'followUp';
   document.getElementById('userInput').placeholder =
     'Ask a follow-up question, test the response, or continue the dialogue…';
@@ -3001,7 +3015,7 @@ async function runFollowUp() {
     followUpEl.addEventListener('click', (function(nid, q) {
       return function(e) {
         if (e.target.closest('.node-controls')) return; // let controls handle their own clicks
-        focusRefractionNode(nid, q);
+        openNotesSurface(nid, q);
       };
     })(tempNodeId, input));
     followUpEl.appendChild(buildNodeControls(tempNodeId, input));
@@ -3916,9 +3930,6 @@ function renderResult(d) {
   }
 
   document.getElementById('resultContent').innerHTML = html;
-
-  var rootControls = buildNodeControls('root', currentSubject || '');
-  document.getElementById('resultContent').appendChild(rootControls);
 }
 
 
@@ -5115,7 +5126,7 @@ function selectThread(id) {
     if (typeof window.stopChatRealtime === 'function') window.stopChatRealtime();
     syncRefractionButtons(null);
     var stream = document.getElementById('chatStream');
-    if (stream) stream.innerHTML = '<div class="chat-empty">No refractions yet. Begin the conversation.</div>';
+    if (stream) stream.innerHTML = '<div class="chat-empty">No shared messages yet. Begin the conversation.</div>';
 
     _shareStatus = 'off';
     _collabOpen = false;
@@ -5170,11 +5181,11 @@ function restoreFollowUps(id) {
       var nodeId = fu.id || (id + '-local-' + idx);
       el.dataset.nodeId = nodeId;
       el.style.cursor = 'pointer';
-      el.title = 'Focus refractions for this response';
+      el.title = 'Open notes for this response';
       el.addEventListener('click', (function(nid, q) {
         return function(e) {
           if (e.target.closest('.node-controls')) return;
-          focusRefractionNode(nid, q);
+          openNotesSurface(nid, q);
         };
       })(nodeId, question));
 
@@ -5572,11 +5583,11 @@ function renderFUWithSource(list, shouldScroll) {
     el.dataset.nodeId = nodeId;
     // Subtle click affordance to focus this node's refractions
     el.style.cursor = 'pointer';
-    el.title = 'Focus refractions for this response';
+    el.title = 'Open notes for this response';
     el.addEventListener('click', (function(nid, query) {
       return function(e) {
         if (e.target.closest('.node-controls')) return;
-        focusRefractionNode(nid, query);
+        openNotesSurface(nid, query);
       };
     })(nodeId, fu.query || ''));
 
@@ -6279,7 +6290,14 @@ function updateSessionGovernanceUI() {
   var urlRow    = document.getElementById('queryUrlRow');
   var urlText   = document.getElementById('queryUrlText');
   var openTrig  = document.getElementById('queryOpenTrigger');
-  if (!stateEl) return;
+  if (!stateEl) {
+    var shareAction = document.getElementById('queryShareActionBtn');
+    if (shareAction) {
+      shareAction.title = window._shareActive ? 'Open this shared inquiry' : 'Share this inquiry';
+    }
+    updateCircleShareUI();
+    return;
+  }
 
   if (window._shareActive) {
     // Fade in Shared label, fade out Share This button
@@ -6381,6 +6399,11 @@ function copyQueryLink() {
 
   var doCopy = function() {
     showQueryActionConfirm('Copied ✓');
+    var circleStatus = document.getElementById('circleShareStatus');
+    if (circleStatus && _refractionView === 'trust_circle') {
+      circleStatus.textContent = 'Invitation copied.';
+      circleStatus.style.display = 'block';
+    }
   };
   var manualFallback = function() {
     try {
@@ -6907,6 +6930,10 @@ function openChatPanel() {
   highlightRefractionNode(_activeNodeId || 'root');
   panel.classList.add('open');
   _chatOpen = true;
+  var notesAction = document.getElementById('queryNotesActionBtn');
+  var shareAction = document.getElementById('queryShareActionBtn');
+  if (notesAction) notesAction.classList.toggle('active', _refractionView === 'private');
+  if (shareAction) shareAction.classList.toggle('active', _refractionView === 'trust_circle');
   var dot = document.getElementById('discHeaderDot');
   if (dot) dot.style.background = 'rgba(80,180,120,0.9)';
   updateChatBarUI();
@@ -6917,6 +6944,10 @@ function closeDiscussionPanel() {
   if (!panel) return;
   panel.classList.remove('open');
   _chatOpen = false;
+  var notesAction = document.getElementById('queryNotesActionBtn');
+  var shareAction = document.getElementById('queryShareActionBtn');
+  if (notesAction) notesAction.classList.remove('active');
+  if (shareAction) shareAction.classList.remove('active');
   syncRefractionButtons(null);
   // Fade out node highlight on close
   document.querySelectorAll('.fu-block.refraction-active').forEach(function(el) {
@@ -6963,25 +6994,35 @@ var _refractionView = 'private';
 var _refractionRenderGen = 0;
 
 function toggleEntryVisibility() {
+  setRefractionView(_refractionView === 'private' ? 'trust_circle' : 'private');
+}
+
+function setRefractionView(next, shouldRender) {
   var btn = document.getElementById('entryVisibilityToggle');
   var label = document.getElementById('entryVisibilityLabel');
   var iconPrivate = document.getElementById('iconPrivate');
   var iconTrustCircle = document.getElementById('iconTrustCircle');
   if (!btn || !label || !iconPrivate || !iconTrustCircle) return;
 
-  var next = _refractionView === 'private' ? 'trust_circle' : 'private';
+  next = next === 'trust_circle' ? 'trust_circle' : 'private';
   _refractionView = next;
   btn.dataset.visibility = next;
 
+  var panelTitle = next === 'trust_circle' ? 'Share' : 'Notes';
+  var topbarLabel = document.getElementById('discTopbarLabel');
+  var chamberTitle = document.getElementById('discChamberTitle');
+  if (topbarLabel) topbarLabel.textContent = panelTitle;
+  if (chamberTitle) chamberTitle.textContent = panelTitle;
+
   if (next === 'trust_circle') {
-    label.textContent = 'Trust Circle';
+    label.textContent = 'Share';
     iconPrivate.style.display = 'none';
     iconTrustCircle.style.display = '';
     btn.style.color = 'var(--blue-lit)';
     btn.style.background = 'rgba(74,106,170,0.08)';
     btn.style.borderColor = 'var(--blue-lit)';
   } else {
-    label.textContent = 'Private View';
+    label.textContent = 'Notes';
     iconTrustCircle.style.display = 'none';
     iconPrivate.style.display = '';
     btn.style.color = 'var(--gold-dim)';
@@ -6989,7 +7030,7 @@ function toggleEntryVisibility() {
     btn.style.borderColor = 'var(--gold-dim)';
   }
 
-  renderActiveRefractionView();
+  if (shouldRender !== false) renderActiveRefractionView();
 }
 
 // Renders whichever view is currently active — called on toggle switch,
@@ -7002,6 +7043,10 @@ function renderActiveRefractionView() {
   // quickly back to Private View, before the Trust Circle fetch resolves).
   _refractionRenderGen++;
   var composeBar = document.getElementById('chatComposeBar');
+  var shareBox = document.getElementById('circleShareBox');
+  if (shareBox) {
+    shareBox.style.display = _refractionView === 'trust_circle' && !window._sharedViewToken ? 'block' : 'none';
+  }
   if (_refractionView === 'private') {
     // Notes are edited directly in place, with their own "+ New section"
     // control at the bottom of the stream — no separate compose bar needed.
@@ -7017,9 +7062,14 @@ function renderActiveRefractionView() {
     _notesLastCount = -1;
     renderNotesView();
   } else {
-    if (composeBar) composeBar.style.visibility = 'visible';
+    if (composeBar) {
+      composeBar.style.visibility = _currentSharedSessionId && _shareMode === 'contributor'
+        ? 'visible'
+        : 'hidden';
+    }
     var input = document.getElementById('chatInput');
-    if (input) input.placeholder = 'Add your refraction…';
+    if (input) input.placeholder = 'Add a message…';
+    updateCircleShareUI();
     _chatLastCount = -1;
     renderDiscussionView();
   }
@@ -7490,7 +7540,7 @@ async function renderDiscussionView() {
 
     stream.innerHTML = '';
     if (filtered.length === 0) {
-      stream.innerHTML = '<div class="chat-empty">No refractions yet.<br>Begin the conversation.</div>';
+      stream.innerHTML = '<div class="chat-empty">No shared messages yet.<br>Begin the conversation.</div>';
       return;
     }
     var myEmail = userEmail();
@@ -7556,18 +7606,58 @@ function buildNodeControls(nodeId, queryText) {
   wrap.className = 'node-controls';
   wrap.dataset.nodeId = nodeId;
 
-  // Refractions
+  // A contextual shortcut into the private notebook for this response.
   var refBtn = document.createElement('button');
   refBtn.className = 'node-ctrl-btn node-refraction-btn';
   var _btnLabel = getNodeLabel(nodeId);
-  refBtn.textContent = _btnLabel === 'Query' ? 'Refractions' : _btnLabel + ' Refractions';
+  refBtn.textContent = _btnLabel === 'Query' ? 'Notes' : _btnLabel + ' Notes';
   refBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    focusRefractionNode(nodeId, queryText);
+    openNotesSurface(nodeId, queryText);
   });
   wrap.appendChild(refBtn);
 
   return wrap;
+}
+
+function openNodeSurface(nodeId, queryText, view) {
+  setRefractionView(view, false);
+  var panel = document.getElementById('discussionPanel');
+  var isOpen = panel && panel.classList.contains('open');
+  if (isOpen && _activeNodeId === nodeId) {
+    renderActiveRefractionView();
+    return;
+  }
+  focusRefractionNode(nodeId, queryText);
+}
+
+function openNotesSurface(nodeId, queryText) {
+  openNodeSurface(nodeId || 'root', queryText || currentSubject || '', 'private');
+}
+
+function openShareSurface() {
+  openNodeSurface('root', currentSubject || '', 'trust_circle');
+}
+
+function updateCircleShareUI() {
+  var create = document.getElementById('circleShareCreate');
+  var active = document.getElementById('circleShareActive');
+  var url = document.getElementById('circleShareUrl');
+  if (!create || !active) return;
+  var hasShare = !!(_currentSharedSessionId && window._currentShareUrl && _shareStatus !== 'off');
+  create.style.display = hasShare ? 'none' : 'grid';
+  active.style.display = hasShare ? 'block' : 'none';
+  if (url) url.textContent = hasShare ? window._currentShareUrl : '';
+  var composeBar = document.getElementById('chatComposeBar');
+  if (composeBar && _refractionView === 'trust_circle') {
+    composeBar.style.visibility = hasShare && _shareMode === 'contributor' ? 'visible' : 'hidden';
+  }
+}
+
+async function createCircleShare() {
+  var access = document.getElementById('circleShareAccess');
+  _shareMode = access && access.value === 'viewer' ? 'viewer' : 'contributor';
+  await proceedToShareDelivery('circle');
 }
 
 function focusRefractionNode(nodeId, queryText) {
@@ -7602,7 +7692,7 @@ function focusRefractionNode(nodeId, queryText) {
   // Clear stream only on actual node switch — preserve on same-node reopen
   if (changed) {
     var stream = document.getElementById('chatStream');
-    if (stream) stream.innerHTML = '<div class="chat-empty">No refractions yet. Begin the conversation.</div>';
+    if (stream) stream.innerHTML = '<div class="chat-empty">No shared messages yet. Begin the conversation.</div>';
     // Reset count so we force a reload for the new node
     _chatLastCount = 0;
     _notesLastCount = -1;
@@ -7908,9 +7998,10 @@ async function setShareMode(mode) {
   }
 }
 
-async function proceedToShareDelivery() {
+async function proceedToShareDelivery(source) {
   if (!window._lastParsedResult) return;
-  var statusEl = document.getElementById('shareModalStatus');
+  var inlineCircle = source === 'circle';
+  var statusEl = document.getElementById(inlineCircle ? 'circleShareStatus' : 'shareModalStatus');
   var senderEmail = userEmail();
   var threadId    = activeThreadId || null;
   var artifactId = window._lastParsedResult._artifactId || null;
@@ -7927,7 +8018,7 @@ async function proceedToShareDelivery() {
   }
 
   // Show loading state on button
-  var continueBtn = document.getElementById('shareContinueBtn');
+  var continueBtn = document.getElementById(inlineCircle ? 'circleCreateLinkBtn' : 'shareContinueBtn');
   if (continueBtn) { continueBtn.disabled = true; continueBtn.textContent = 'Creating…'; }
 
   try {
@@ -7946,12 +8037,17 @@ async function proceedToShareDelivery() {
     var data = await res.json();
     if (!res.ok || !data.shareId) {
       if (statusEl) { statusEl.textContent = 'Could not create share. Please try again.'; statusEl.style.display = 'block'; }
-      if (continueBtn) { continueBtn.disabled = false; continueBtn.textContent = 'Continue →'; }
+      if (continueBtn) {
+        continueBtn.disabled = false;
+        continueBtn.textContent = inlineCircle ? 'Create link' : 'Continue →';
+      }
       return;
     }
 
     _currentSharedSessionId = data.shareId;
+    _currentChannelId = data.channelId || data.shareId;
     _shareStatus = 'on';
+    window._shareActive = true;
     window._currentShareUrl = data.shareUrl;
 
     if (_shareMode === 'contributor') {
@@ -7969,17 +8065,35 @@ async function proceedToShareDelivery() {
       document.getElementById('shareNativeBtn').style.display = 'block';
     }
 
-    // Advance to delivery step
-    document.getElementById('shareStep1').style.display = 'none';
-    document.getElementById('shareStep2').style.display = 'block';
-    document.getElementById('shareStep3').style.display = 'none';
+    if (activeThreadId) {
+      _openThreadIds.add(activeThreadId);
+      updateSidebarSharedDot(activeThreadId, true);
+    }
+    updateSessionGovernanceUI();
+
+    // The Circle panel keeps creation and delivery in one compact surface.
+    // The legacy modal retains its staged path for older entry points.
+    if (inlineCircle) {
+      updateCircleShareUI();
+      if (statusEl) {
+        statusEl.textContent = 'Link ready to share.';
+        statusEl.style.display = 'block';
+      }
+    } else {
+      document.getElementById('shareStep1').style.display = 'none';
+      document.getElementById('shareStep2').style.display = 'block';
+      document.getElementById('shareStep3').style.display = 'none';
+    }
     updateShareManageUI();
 
   } catch (err) {
     console.error('Share error:', err);
     if (statusEl) { statusEl.textContent = 'Something went wrong. Please try again.'; statusEl.style.display = 'block'; }
   } finally {
-    if (continueBtn) { continueBtn.disabled = false; continueBtn.textContent = 'Continue →'; }
+    if (continueBtn) {
+      continueBtn.disabled = false;
+      continueBtn.textContent = inlineCircle ? 'Create link' : 'Continue →';
+    }
   }
 }
 
@@ -8092,7 +8206,7 @@ function updateShareManageUI() {
   var collabManageBtn = document.getElementById('collabManageBtn');
   if (collabManageBtn) {
     if (_collabOpen) {
-      collabManageBtn.textContent   = 'Refractions Open — Close';
+      collabManageBtn.textContent   = 'Discussion Open — Close';
       collabManageBtn.style.borderColor = 'rgba(80,180,120,0.6)';
       collabManageBtn.style.color   = 'rgba(80,180,120,0.9)';
     } else {
@@ -8213,7 +8327,7 @@ function updateCollabToggleUI() {
   if (row) row.style.display = 'none'; // legacy hidden
   if (!btn) return;
   if (_collabOpen) {
-    btn.textContent       = 'Refractions Open';
+    btn.textContent       = 'Discussion Open';
     btn.style.borderColor = 'rgba(80,180,120,0.6)';
     btn.style.color       = 'rgba(80,180,120,0.9)';
   } else {
@@ -8657,11 +8771,11 @@ function restoreResumeSnapshot() {
     var nodeId = fu.id || ('fu-' + Date.now());
     el.dataset.nodeId = nodeId;
     el.style.cursor = 'pointer';
-    el.title = 'Focus refractions for this response';
+    el.title = 'Open notes for this response';
     el.addEventListener('click', (function(nid, query) {
       return function(e) {
         if (e.target.closest('.node-controls')) return;
-        focusRefractionNode(nid, query);
+        openNotesSurface(nid, query);
       };
     })(nodeId, fu.question || ''));
 
@@ -9152,7 +9266,7 @@ window.addEventListener('appinstalled', function() {
 <div id="shareModal" style="display:none; position:fixed; inset:0; background:rgba(6,6,10,0.85); z-index:1000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
   <div style="background:var(--deep); border:1px solid var(--border); padding:40px; max-width:480px; width:90%; position:relative;">
     <button onclick="closeShareModal()" style="position:absolute; top:16px; right:16px; background:transparent; border:none; color:var(--text-muted); font-size:21px; cursor:pointer; line-height:1;">✕</button>
-    <div style="font-family:var(--cinzel); font-size:18px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:24px;">Share This Reflection</div>
+    <div style="font-family:var(--cinzel); font-size:18px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-pale); margin-bottom:24px;">Share</div>
 
     <!-- Step 1: How to share -->
     <div id="shareStep1">
