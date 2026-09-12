@@ -2260,7 +2260,7 @@
         <!-- Right: the one persistent artifact action -->
         <div style="display:flex;align-items:center;gap:0;flex-shrink:0;">
           <button class="query-secondary-btn" id="queryPrintBtn"
-            onclick="requestAnimationFrame(() => setTimeout(() => window.print(), 0))" title="Print this conversation">Print</button>
+            onclick="printPrism()" title="Print this conversation">Print</button>
         </div>
       </div>
 
@@ -2314,7 +2314,7 @@
       <div style="display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap;">
 
         <!-- Save -->
-        <button onclick="requestAnimationFrame(() => setTimeout(() => window.print(), 0))"
+        <button onclick="printPrism()"
             style="font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:8px 14px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.2s;"
             onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border-lit)'"
             title="Print this interpretation">↓ Print</button>
@@ -3778,6 +3778,39 @@ function showResult(preserveScroll) {
   if (!preserveScroll) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+}
+
+function prismPrintTimestamp(date) {
+  const pad = function(value) { return String(value).padStart(2, '0'); };
+  return date.getFullYear() + '-' +
+    pad(date.getMonth() + 1) + '-' +
+    pad(date.getDate()) + '_' +
+    pad(date.getHours()) + '-' +
+    pad(date.getMinutes()) + '-' +
+    pad(date.getSeconds());
+}
+
+function printPrism() {
+  const originalTitle = document.title;
+  let titleRestored = false;
+  const restoreTitle = function() {
+    if (titleRestored) return;
+    titleRestored = true;
+    document.title = originalTitle;
+  };
+
+  // Browsers use document.title as the suggested Save as PDF filename.
+  // A local, filesystem-safe timestamp prevents later exports from silently
+  // replacing an earlier Prism printout.
+  document.title = 'The Prism - ' + prismPrintTimestamp(new Date());
+  window.addEventListener('afterprint', restoreTitle, { once: true });
+  requestAnimationFrame(function() {
+    setTimeout(function() {
+      window.print();
+      // afterprint is not implemented consistently in every browser.
+      setTimeout(restoreTitle, 1000);
+    }, 0);
+  });
 }
 
 function renderResult(d) {
@@ -10267,6 +10300,12 @@ document.addEventListener('DOMContentLoaded', function() {
     #mainHeader,
     #inputArea,
     #governanceRow,
+    #sessionGovernance,
+    #downloadRow,
+    #followUpSection,
+    #highlightSheet,
+    #discussionPanel,
+    #cookieConsent,
     #saveSessionPanel,
     #joinCirclePanel,
     #keepQuestioningBar,
