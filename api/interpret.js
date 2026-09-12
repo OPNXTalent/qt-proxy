@@ -31,7 +31,6 @@ import {
   createInitialInquiryState,
   detectExplicitCorrection,
   parseModelJson,
-  splitApprovedResponse,
   validateAnalysisStrict,
   validateInquiryState,
 } from '../lib/persistent-inquiry-runtime.js';
@@ -5368,7 +5367,7 @@ export async function classifyFollowUpContext({
 async function runDisabledFollowUpFallback({ sse, timing, input, subject, tier }) {
   const startedAt = Date.now();
   timing('followup_fallback_start');
-  const response = await callInquiryModel({
+  await callInquiryModel({
     model: 'claude-sonnet-4-6',
     maxTokens: 900,
     temperature: 0.2,
@@ -5380,11 +5379,10 @@ Ask a question only if ambiguity prevents a responsible answer.
 Original inquiry: ${String(subject || '').slice(0, 2000)}
 Follow-up: ${String(input || '').slice(0, 4000)}`,
     system: PRISM_RESPONSE_REFRESH,
+    telemetryStage: 'followup_fallback',
+    telemetryTurnType: 'follow_up',
+    onTextDelta: text => sse.write({ type: 'response_delta', text }),
   });
-  for (const text of splitApprovedResponse(response)) {
-    sse.write({ type: 'delta', text });
-    await new Promise(resolve => setImmediate(resolve));
-  }
   timing('followup_fallback_complete', { totalMs: Date.now() - startedAt });
   sse.write(
     { type: 'done', tier, runtimeDisabled: true },
