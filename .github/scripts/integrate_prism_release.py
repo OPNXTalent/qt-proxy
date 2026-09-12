@@ -192,7 +192,12 @@ if unmerged:
 
 # Preserve current production print behavior on reconstructed qt.html.
 run("node", "scripts/print-layout-repair.mjs")
-run("git", "add", "qt.html")
+
+# Reconcile the reconstructed runtime with the durable Archive handoff and
+# semantic paragraphing contracts before the full test suite inspects it.
+run("node", "scripts/runtime-archive-repair.mjs")
+run("node", "scripts/semantic-paragraphing.mjs")
+run("git", "add", "api/interpret.js", "lib/prompt-modules/progressive-inquiry.js", "qt.html")
 
 # Deterministic verification only; no provider calls.
 run("git", "diff", "--check")
