@@ -28,6 +28,12 @@ try {
 const api = fs.readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
 const client = fs.readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 assert.match(api, /onTextDelta: text => sse\.write\(\{ type: 'response_delta', text \}\)/);
+const initialInquiry = api.slice(
+  api.indexOf('async function runProgressiveInitialInquiry'),
+  api.indexOf('async function runPersistentInquiryFollowUp'),
+);
+assert.match(initialInquiry, /response: streamedResponse/);
+assert.doesNotMatch(initialInquiry, /auditCanonicalResponse|canonical_audit/);
 assert.match(client, /parsed\.type === 'response_delta'/);
 assert.match(client, /renderProvisionalResponse\(fullText, requestId/);
 assert.doesNotMatch(api, /onStructuredInputProgress:[\s\S]*provisional_orientation/);
