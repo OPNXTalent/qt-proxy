@@ -483,19 +483,21 @@
   /* ── Query governance — two clean relational states ────────── */
   #sessionGovernance {
     display: none;
+    width: 100%;
     margin: 0 0 20px;
     padding: 28px 0;
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
   }
   .query-action-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
     align-items: center;
-    gap: clamp(20px, 10vw, 120px);
+    justify-content: space-between;
+    gap: 20px;
+    width: 100%;
   }
   .query-action-btn {
-    width: 100%;
+    width: clamp(96px, 16%, 126px);
     min-height: 34px;
     padding: 7px 14px;
     border: 1px solid var(--border-lit);
@@ -1763,7 +1765,7 @@
     .header h1 { font-size:29px; }
     .input-selector { grid-template-columns: repeat(2, 1fr); }
     .query-action-row { gap: 12px; }
-    .query-action-btn { padding-inline: 8px; }
+    .query-action-btn { width: calc((100% - 24px) / 3); padding-inline: 8px; }
     #circleShareCreate { grid-template-columns: 1fr !important; }
 
     /* Notes / Share panel — the fixed desktop width overflows any phone
@@ -2357,6 +2359,15 @@
         <div style="font-family:var(--cinzel); font-size:27px; color:var(--gold-dim); animation: pulse 2s ease-in-out infinite;">✦</div>
         <div style="font-family:var(--mono); font-size:20px; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); margin-top:12px;">Reading the relational field…</div>
       </div>
+      <div id="followUpComposer" style="display:none;">
+        <div class="input-wrap">
+          <div style="position:relative;">
+            <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question…" rows="3" maxlength="600" style="padding-right:52px;"></textarea>
+            <button id="followUpMicBtn" onclick="toggleFollowUpMic()" title="Speak your follow-up" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
+          </div>
+          <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2729,39 +2740,40 @@ function applyQuotaLock(message) {
   }
 
 function submitComposer() {
-  const composer = document.getElementById('queryComposer');
-  return composer && composer.dataset.mode === 'followUp'
-    ? runFollowUp()
-    : runInterpretation();
+  return runInterpretation();
 }
 
 function stageComposerBelowResponse() {
-  const section = document.getElementById('followUpSection');
-  const composer = document.getElementById('queryComposer');
-  if (!section || !composer) return;
-  section.style.display = 'block';
-  positionResponseActions(section, composer);
-  section.appendChild(composer);
+  // Keep the original question at the top while its answer is being built.
+  // The empty follow-up composer is revealed only once an answer exists.
 }
 
-function positionResponseActions(section, composer) {
+function positionResponseActions(section, followUpComposer) {
   const governance = document.getElementById('sessionGovernance');
   if (section && governance) {
-    section.insertBefore(governance, composer || section.firstChild);
+    section.insertBefore(governance, followUpComposer || null);
   }
 }
 
 function showFollowUpComposer() {
   const section = document.getElementById('followUpSection');
+  const followUpComposer = document.getElementById('followUpComposer');
+  const followUpInput = document.getElementById('followUpInput');
+  const openingInput = document.getElementById('userInput');
   const composer = document.getElementById('queryComposer');
-  if (!section || !composer) return;
+  if (!section || !followUpComposer || !followUpInput || !openingInput || !composer) return;
+  const wasHidden = section.style.display === 'none';
   section.style.display = 'block';
-  positionResponseActions(section, composer);
-  section.appendChild(composer);
-  composer.dataset.mode = 'followUp';
-  document.getElementById('userInput').placeholder =
-    'Ask a follow-up question, test the response, or continue the dialogue…';
-  document.getElementById('submitBtn').textContent = 'Ask →';
+  positionResponseActions(section, followUpComposer);
+  followUpComposer.style.display = 'block';
+  if (wasHidden) followUpInput.value = '';
+  composer.dataset.mode = 'completed';
+  openingInput.value = currentSubject || openingInput.value;
+  openingInput.readOnly = true;
+  openingInput.setAttribute('aria-label', 'Current question');
+  document.getElementById('submitBtn').style.display = 'none';
+  var micBtn = document.getElementById('micBtn');
+  if (micBtn) micBtn.style.display = 'none';
   document.getElementById('newSubjectTopBtn').style.display = 'block';
 }
 
@@ -2769,11 +2781,21 @@ function showOpeningComposer() {
   const slot = document.getElementById('initialComposerSlot');
   const composer = document.getElementById('queryComposer');
   if (!slot || !composer) return;
+  var followUpComposer = document.getElementById('followUpComposer');
+  var followUpInput = document.getElementById('followUpInput');
+  if (followUpComposer) followUpComposer.style.display = 'none';
+  if (followUpInput) followUpInput.value = '';
   slot.appendChild(composer);
   composer.dataset.mode = 'opening';
-  document.getElementById('userInput').placeholder =
-    'A verse, a question, or whatever is on your mind…';
-  document.getElementById('submitBtn').textContent = 'Interpret →';
+  var openingInput = document.getElementById('userInput');
+  openingInput.readOnly = false;
+  openingInput.removeAttribute('aria-label');
+  openingInput.placeholder = 'A verse, a question, or whatever is on your mind…';
+  var submitBtn = document.getElementById('submitBtn');
+  submitBtn.style.display = '';
+  submitBtn.textContent = 'Interpret →';
+  var micBtn = document.getElementById('micBtn');
+  if (micBtn) micBtn.style.display = window.toggleMic ? 'block' : 'none';
 }
 
 async function runInterpretation() {
@@ -2921,7 +2943,7 @@ async function runInterpretation() {
     } else {
       console.warn('Save skipped — activeThreadId:', activeThreadId, 'parsed:', !!parsed);
     }
-    document.getElementById('userInput').value = '';
+    document.getElementById('userInput').value = currentSubject;
     updateCharCount();
 
   } catch (err) {
@@ -2948,8 +2970,9 @@ async function runInterpretation() {
   }
 }
 
-async function runFollowUp() {
-  const input = document.getElementById('userInput').value.trim();
+async function runFollowUp(sourceInput) {
+  const inputEl = sourceInput || document.getElementById('followUpInput') || document.getElementById('userInput');
+  const input = inputEl.value.trim();
   if (!input) return;
 
   // Follow-ups consume the same server-authoritative Query unit as primaries.
@@ -2959,9 +2982,12 @@ async function runFollowUp() {
     followUp: true
   });
 
-  document.getElementById('submitBtn').disabled = true;
-  document.getElementById('inputSection').style.opacity = '0.4';
-  document.getElementById('inputSection').style.pointerEvents = 'none';
+  inputEl.disabled = true;
+  var followUpComposer = document.getElementById('followUpComposer');
+  if (followUpComposer) {
+    followUpComposer.style.opacity = '0.4';
+    followUpComposer.style.pointerEvents = 'none';
+  }
   document.getElementById('followUpLoading').style.display = 'block';
   document.getElementById('followUpLoading').scrollIntoView({ behavior: 'smooth', block: 'center' });
   markPrismBrowserTiming(requestId, 'wait_indicator_visible');
@@ -2993,8 +3019,7 @@ async function runFollowUp() {
     markPrismBrowserTiming(requestId, 'response_complete');
     prismBrowserTimelines.delete(requestId);
 
-    document.getElementById('userInput').value = '';
-    updateCharCount();
+    inputEl.value = '';
 
     // Local count is informational; the durable completion ledger is authoritative.
     sessionQueryCount++;
@@ -3035,9 +3060,12 @@ async function runFollowUp() {
     document.getElementById('resultContent').appendChild(errEl);
   } finally {
     document.getElementById('followUpLoading').style.display = 'none';
-    document.getElementById('inputSection').style.opacity = '';
-    document.getElementById('inputSection').style.pointerEvents = '';
-    document.getElementById('submitBtn').disabled = false;
+    inputEl.disabled = false;
+    if (followUpComposer) {
+      followUpComposer.style.opacity = '';
+      followUpComposer.style.pointerEvents = '';
+    }
+    inputEl.focus();
   }
 }
 
@@ -4057,11 +4085,20 @@ function resetForm() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Enter submits the one shared composer; Shift+Enter inserts a newline.
+// Enter submits the opening question; Shift+Enter inserts a newline.
 document.getElementById('userInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
-    submitComposer();
+    if (!this.readOnly) submitComposer();
+  }
+});
+
+// The completed answer gets its own empty follow-up field. Enter asks;
+// Shift+Enter keeps a newline, matching the opening question field.
+document.getElementById('followUpInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    runFollowUp(this);
   }
 });
 
@@ -4249,6 +4286,21 @@ document.getElementById('userInput').addEventListener('keydown', function(e) {
       onDone: function() { submitComposer(); }
     });
     window.toggleMic = function() { mainRecorder.toggle(); };
+  }
+
+  // ── Follow-up input mic ───────────────────────────────────────────────
+  const followUpMicBtn = document.getElementById('followUpMicBtn');
+  const followUpMicStatus = document.getElementById('followUpMicStatus');
+  const followUpTextarea = document.getElementById('followUpInput');
+  if (followUpMicBtn && followUpMicStatus && followUpTextarea) {
+    followUpMicBtn.style.display = 'block';
+    const followUpRecorder = createVoiceRecorder({
+      btn: followUpMicBtn,
+      statusEl: followUpMicStatus,
+      textarea: followUpTextarea,
+      onDone: function() { runFollowUp(followUpTextarea); }
+    });
+    window.toggleFollowUpMic = function() { followUpRecorder.toggle(); };
   }
 
   // ── Refractions (chat) mic ────────────────────────────────────────────
@@ -4988,9 +5040,9 @@ function selectThread(id) {
     showResult();
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
-    var govBar = document.getElementById('sessionGovernance'); if (govBar) govBar.style.display = 'flex';
+    var govBar = document.getElementById('sessionGovernance'); if (govBar) govBar.style.display = 'block';
     showFollowUpComposer();
-    if (inputEl) inputEl.value = '';
+    if (inputEl) inputEl.value = savedInput;
     var dlRow = document.getElementById('downloadRow');     if (dlRow)   dlRow.style.display = 'block';
     window._shareHandlingFollowUps = false;
     // Reset to root node when a new interpretation loads
@@ -8757,7 +8809,7 @@ function restoreResumeSnapshot() {
   if (sBan) sBan.style.display = 'block';
   showFollowUpComposer();
   var govBar = document.getElementById('sessionGovernance');
-  if (govBar) govBar.style.display = 'flex';
+  if (govBar) govBar.style.display = 'block';
 
   var container = document.getElementById('resultContent');
   (snap.followUps || []).forEach(function(fu) {
