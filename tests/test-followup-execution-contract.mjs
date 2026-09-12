@@ -6,6 +6,8 @@ const followup = api.slice(api.indexOf('async function runPersistentInquiryFollo
 assert.match(fallback, /telemetryStage: 'followup_fallback'/);
 assert.match(fallback, /telemetryTurnType: 'follow_up'/);
 assert.match(fallback, /onTextDelta: text => sse\.write\(\{ type: 'response_delta', text \}\)/);
+assert.match(fallback, /collapseRepeatedTerminalParagraphs\(streamedResponse\)/);
+assert.match(fallback, /type: 'done'[\s\S]*response: canonicalResponse/);
 assert.doesNotMatch(fallback, /splitApprovedResponse|type: 'delta'/);
 assert.match(followup, /restoreCanonicalInquiryState/);
 assert.match(followup, /applyInquiryPatch/);
