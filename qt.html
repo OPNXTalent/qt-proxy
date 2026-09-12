@@ -45,7 +45,10 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   .site-footer {
-    padding: 32px 60px;
+    width: calc(100% - 80px);
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 32px 0;
     border-top: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
@@ -69,7 +72,10 @@
   .footer-copy a:hover { color: var(--gold); }
   .sep { margin: 0 0.6rem; }
   @media (max-width: 768px) {
-    .site-footer { flex-direction: column; gap: 16px; text-align: center; padding: 28px; }
+    .site-footer { flex-direction: column; gap: 16px; text-align: center; padding: 28px 0; }
+  }
+  @media (max-width: 600px) {
+    .site-footer { width: calc(100% - 40px); }
   }
 
   #prism-starfield {
