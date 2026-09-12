@@ -18,8 +18,6 @@ const serverEvents = [
   'prompt_assembly_complete',
   'canonical_generation_start',
   'canonical_generation_complete',
-  'canonical_audit_start',
-  'canonical_audit_complete',
   'canonical_completion_start',
   'canonical_completion_complete',
   'canonical_response_available',
@@ -30,6 +28,11 @@ const serverEvents = [
 for (const event of serverEvents) {
   assert.ok(interpretSource.includes(`'${event}'`), `Missing server timing event: ${event}`);
 }
+
+assert.ok(
+  !interpretSource.includes("telemetryStage: 'canonical_audit'"),
+  'Primary completion must not make a synchronous canonical audit model call',
+);
 
 const browserEvents = [
   'submit',
