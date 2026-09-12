@@ -34,7 +34,7 @@ assert.match(
 
 assert.match(
   qt,
-  /var coreParagraphs = String\(d\.core_insight\)\.split\(\/\\n\\s\*\\n\/\)/,
+  /var coreParagraphs = coreInsightText\.split\(\/\\n\\s\*\\n\/\)/,
   'final canonical render should split model-provided blank-line paragraph boundaries',
 );
 assert.match(
