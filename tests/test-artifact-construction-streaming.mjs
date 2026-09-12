@@ -32,7 +32,8 @@ const initialInquiry = api.slice(
   api.indexOf('async function runProgressiveInitialInquiry'),
   api.indexOf('async function runPersistentInquiryFollowUp'),
 );
-assert.match(initialInquiry, /response: streamedResponse/);
+assert.match(initialInquiry, /collapseRepeatedTerminalParagraphs\(streamedResponse\)/);
+assert.match(initialInquiry, /response: canonicalResponse/);
 assert.doesNotMatch(initialInquiry, /auditCanonicalResponse|canonical_audit/);
 assert.match(client, /parsed\.type === 'response_delta'/);
 assert.match(client, /renderProvisionalResponse\(fullText, requestId/);
