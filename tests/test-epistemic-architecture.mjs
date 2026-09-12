@@ -6,6 +6,10 @@ const outputContract = readFileSync(
   new URL('../lib/prompt-modules/output-contract.js', import.meta.url),
   'utf8',
 );
+const progressiveContract = readFileSync(
+  new URL('../lib/prompt-modules/progressive-inquiry.js', import.meta.url),
+  'utf8',
+);
 
 const claimTypes = [
   'OBSERVATION',
@@ -97,8 +101,8 @@ assert.match(
 );
 assert.match(
   outputContract,
-  /"open_door_question": "REQUIRED on every response from this initial-query endpoint/,
-  'The initial response schema must carry a dedicated open-door field',
+  /"open_door_question": "REQUIRED on every response from this initial-query endpoint as a compatibility mirror/,
+  'The initial response schema must retain the open-door compatibility field',
 );
 assert.match(
   outputContract,
@@ -114,18 +118,33 @@ assert.match(
 const qtSource = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 assert.match(
   qtSource,
-  /openDoorQuestion[\s\S]*qt-open-door[\s\S]*openDoorQuestion/,
-  'The dedicated open-door question must render after the core insight',
+  /coreInsightText = \[coreInsightText, openDoorQuestion\][\s\S]*coreParagraphs = coreInsightText/,
+  'A separate open-door field must be folded into the core prose',
+);
+assert.doesNotMatch(
+  qtSource,
+  /qt-core-insight qt-open-door/,
+  'The open-door question must not render as a separate callout',
 );
 assert.match(
   qtSource,
-  /function findLastContextQuestion[\s\S]*findLastContextQuestion\(recognitionText\)/,
+  /function findLastContextQuestion[\s\S]*embeddedCoreQuestion[\s\S]*findLastContextQuestion\(recognitionText\)/,
   'A context-derived Recognition question must provide a non-generic rendering fallback',
 );
 assert.match(
   qtSource,
   /recognitionText = recognitionText\.replace\(openDoorQuestion/,
   'A fallback question moved to the conclusion must not be duplicated in Recognition',
+);
+assert.match(
+  progressiveContract,
+  /conclude with exactly one context-derived open-ended question[\s\S]*natural final sentence of the prose[\s\S]*Never repeat or paraphrase/,
+  'The plain-prose contract must require one integrated, non-repeated first-response handoff',
+);
+assert.doesNotMatch(
+  progressiveContract,
+  /Do not append a routine engagement question/,
+  'The plain-prose contract must not contradict the first-response open-door rule',
 );
 assert.match(
   interpretSource,
