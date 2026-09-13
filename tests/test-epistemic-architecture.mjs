@@ -77,6 +77,26 @@ assert.match(
   /Do not say a person is “not the passive recipient of a deterministic chain” unless determinism has first been independently refuted/,
   'The exact live determinism regression must be prohibited',
 );
+assert.match(
+  interpretSource,
+  /ANALOGY RESTRAINT — NON-NEGOTIABLE:[\s\S]*Analogy is optional, never a default response requirement/,
+  'The governing prompt must make analogies optional rather than expected',
+);
+assert.match(
+  interpretSource,
+  /The author, novelist, story, manuscript, script, and character analogy is prohibited in every response/,
+  'The recurring author-story analogy must be prohibited explicitly',
+);
+assert.match(
+  interpretSource,
+  /If an analogy paragraph can be removed without weakening the reasoning, omit it/,
+  'Decorative analogies must fail the removal test',
+);
+assert.doesNotMatch(
+  interpretSource,
+  /NARRATIVE BEFORE ONTOLOGY|Human beings metabolize story more naturally than conceptual architecture/,
+  'The former instruction that pressured every response toward narrative must remain removed',
+);
 
 assert.match(
   interpretSource,
