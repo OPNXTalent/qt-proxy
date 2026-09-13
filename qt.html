@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
 <title>The Prism — Framework Interpreter</title>
 
 <!-- PWA -->
@@ -507,51 +507,8 @@
   .sidebar-threads::-webkit-scrollbar { width: 3px; }
   .sidebar-threads::-webkit-scrollbar-thumb { background: var(--border); }
 
-  /* Open/shared query row — handled in main thread-item block below */
-  /* Session governance bar */
-  /* ── Query governance — two clean relational states ────────── */
-  #sessionGovernance {
-    display: none;
-    width: 100%;
-    margin: 0 0 20px;
-    padding: 28px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .query-action-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    width: 100%;
-  }
-  .query-action-btn {
-    width: clamp(96px, 16%, 126px);
-    min-height: 34px;
-    padding: 7px 14px;
-    border: 1px solid var(--border-lit);
-    background: transparent;
-    color: var(--text-muted);
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-  }
-  .query-action-btn:hover,
-  .query-action-btn:focus-visible {
-    color: var(--gold-pale);
-    border-color: var(--gold-dim);
-    outline: none;
-  }
-  .query-action-btn.active {
-    color: rgba(150,175,220,0.92);
-    border-color: rgba(122,150,201,0.55);
-    background: rgba(74,106,170,0.06);
-  }
   .response-new-subject {
     display: block;
-    margin: 16px 0 28px;
     padding: 14px 28px;
     border: 1px solid var(--gold-dim);
     background: transparent;
@@ -568,6 +525,13 @@
     color: var(--gold);
     border-color: var(--gold);
     outline: none;
+  }
+  .follow-up-submit-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin: 16px 0 28px;
   }
   /* Governance transitions — opacity only, no layout shift */
   .query-state-label,
@@ -645,16 +609,6 @@
     flex-shrink: 0;
   }
   .query-secondary-btn:hover { color: rgba(160,155,140,0.6); }
-
-  /* Print is the persistent artifact action opposite Share This. Keep it
-     visually quiet, but give it the same readable scale as Share This and
-     the same gold-pale foreground used by the Ask / Interpret action. */
-  #queryPrintBtn {
-    font-size:12px;
-    letter-spacing: 0.18em;
-    color: var(--text-muted);
-  }
-  #queryPrintBtn:hover { color: var(--gold); }
 
   /* URL address layer — always mounted, opacity-driven */
   .query-address-layer {
@@ -1812,10 +1766,13 @@
     .shell { padding: 40px 20px 80px; }
     .header h1 { font-size:29px; }
     .input-selector { grid-template-columns: repeat(2, 1fr); }
-    .query-action-row,
     .node-controls { gap: 12px; }
-    .query-action-btn,
     .node-ctrl-btn { width: calc((100% - 24px) / 3); padding-inline: 8px; }
+    textarea.input-field,
+    textarea.chat-input,
+    #discussionPanel input,
+    #discussionPanel select,
+    #discussionPanel textarea { font-size: 20px !important; }
     #circleShareCreate { grid-template-columns: 1fr !important; }
 
     /* Notes / Share panel — the fixed desktop width overflows any phone
@@ -2324,15 +2281,6 @@
 
   <!-- RESULT ---->
   <div class="result" id="resultBlock">
-    <!-- Familiar response actions: artifact, invitation, and private notes. -->
-    <div id="sessionGovernance" style="display:none;">
-      <div class="query-action-row" aria-label="Response actions">
-        <button class="query-action-btn" id="queryPrintBtn" onclick="printPrism()" title="Print this conversation">Print</button>
-        <button class="query-action-btn" id="queryShareActionBtn" onclick="openShareSurface()" title="Share this inquiry">Share</button>
-        <button class="query-action-btn" id="queryNotesActionBtn" onclick="openNotesSurface('root', currentSubject || '')" title="Open private notes">Notes</button>
-      </div>
-    </div>
-
     <div id="subjectBanner" style="display:none; margin-bottom:28px;">
       <div style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Current Subject</div>
       <div id="subjectText" style="font-size:20px; color:var(--text-dim); font-style:italic;"></div>
@@ -2367,7 +2315,10 @@
           </div>
           <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
         </div>
-        <button class="response-new-subject" id="newSubjectBottomBtn" onclick="resetForm()">↻ New Subject</button>
+        <div class="follow-up-submit-row">
+          <button class="response-new-subject" id="newSubjectBottomBtn" onclick="resetForm()">↻ New Subject</button>
+          <button class="response-new-subject" id="followUpSubmitBtn" onclick="runFollowUp(document.getElementById('followUpInput'))">Enter →</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2759,13 +2710,6 @@ function stageComposerBelowResponse() {
   // The empty follow-up composer is revealed only once an answer exists.
 }
 
-function positionResponseActions(section, followUpComposer) {
-  const governance = document.getElementById('sessionGovernance');
-  if (section && governance) {
-    section.insertBefore(governance, followUpComposer || null);
-  }
-}
-
 function showFollowUpComposer() {
   const section = document.getElementById('followUpSection');
   const followUpComposer = document.getElementById('followUpComposer');
@@ -2775,7 +2719,6 @@ function showFollowUpComposer() {
   if (!section || !followUpComposer || !followUpInput || !openingInput || !composer) return;
   const wasHidden = section.style.display === 'none';
   section.style.display = 'block';
-  positionResponseActions(section, followUpComposer);
   followUpComposer.style.display = 'block';
   if (wasHidden) followUpInput.value = '';
   composer.dataset.mode = 'completed';
@@ -2926,9 +2869,6 @@ async function runInterpretation() {
     document.getElementById('subjectText').textContent = input;
     document.getElementById('subjectBanner').style.display = 'block';
     showFollowUpComposer();
-    // Show session governance bar
-    var govBar = document.getElementById('sessionGovernance');
-    if (govBar) govBar.style.display = 'block';
     updateSessionGovernanceUI();
 
     sessionQueryCount++;
@@ -2995,6 +2935,8 @@ async function runFollowUp(sourceInput) {
   });
 
   inputEl.disabled = true;
+  var followUpSubmitBtn = document.getElementById('followUpSubmitBtn');
+  if (followUpSubmitBtn) followUpSubmitBtn.disabled = true;
   var followUpComposer = document.getElementById('followUpComposer');
   if (followUpComposer) {
     followUpComposer.style.opacity = '0.4';
@@ -3073,6 +3015,7 @@ async function runFollowUp(sourceInput) {
   } finally {
     document.getElementById('followUpLoading').style.display = 'none';
     inputEl.disabled = false;
+    if (followUpSubmitBtn) followUpSubmitBtn.disabled = false;
     if (followUpComposer) {
       followUpComposer.style.opacity = '';
       followUpComposer.style.pointerEvents = '';
@@ -3969,7 +3912,12 @@ function renderResult(d) {
       '<span>Historical Prism Analysis is incomplete.</span></div>';
   }
 
-  document.getElementById('resultContent').innerHTML = html;
+  var resultContent = document.getElementById('resultContent');
+  resultContent.innerHTML = html;
+  // The original Query owns its controls exactly as each later Refraction
+  // owns its controls. Keeping the row inside the response stream prevents
+  // it from travelling to the bottom when another response is appended.
+  if (coreInsightText) resultContent.appendChild(buildNodeControls('root', currentSubject || d._subject || ''));
 }
 
 
@@ -5051,7 +4999,6 @@ function selectThread(id) {
     showResult();
     var sText = document.getElementById('subjectText');     if (sText)   sText.textContent   = savedInput;
     var sBan  = document.getElementById('subjectBanner');   if (sBan)    sBan.style.display  = 'block';
-    var govBar = document.getElementById('sessionGovernance'); if (govBar) govBar.style.display = 'block';
     showFollowUpComposer();
     if (inputEl) inputEl.value = savedInput;
     window._shareHandlingFollowUps = false;
@@ -6352,10 +6299,6 @@ function updateSessionGovernanceUI() {
   var urlText   = document.getElementById('queryUrlText');
   var openTrig  = document.getElementById('queryOpenTrigger');
   if (!stateEl) {
-    var shareAction = document.getElementById('queryShareActionBtn');
-    if (shareAction) {
-      shareAction.title = window._shareActive ? 'Open this shared inquiry' : 'Share this inquiry';
-    }
     updateCircleShareUI();
     return;
   }
@@ -6991,11 +6934,7 @@ function openChatPanel() {
   highlightRefractionNode(_activeNodeId || 'root');
   panel.classList.add('open');
   _chatOpen = true;
-  var notesAction = document.getElementById('queryNotesActionBtn');
-  var shareAction = document.getElementById('queryShareActionBtn');
-  var rootIsActive = _activeNodeId === 'root';
-  if (notesAction) notesAction.classList.toggle('active', rootIsActive && _refractionView === 'private');
-  if (shareAction) shareAction.classList.toggle('active', rootIsActive && _refractionView === 'trust_circle');
+  syncRefractionButtons(_activeNodeId || 'root');
   var dot = document.getElementById('discHeaderDot');
   if (dot) dot.style.background = 'rgba(80,180,120,0.9)';
   updateChatBarUI();
@@ -7006,10 +6945,6 @@ function closeDiscussionPanel() {
   if (!panel) return;
   panel.classList.remove('open');
   _chatOpen = false;
-  var notesAction = document.getElementById('queryNotesActionBtn');
-  var shareAction = document.getElementById('queryShareActionBtn');
-  if (notesAction) notesAction.classList.remove('active');
-  if (shareAction) shareAction.classList.remove('active');
   syncRefractionButtons(null);
   // Fade out node highlight on close
   document.querySelectorAll('.fu-block.refraction-active').forEach(function(el) {
@@ -7092,14 +7027,8 @@ function setRefractionView(next, shouldRender) {
     btn.style.borderColor = 'var(--gold-dim)';
   }
 
-  // Keep both the root action row and every Refraction row honest about
-  // which response and surface are currently open.
+  // Keep every response node honest about which surface is currently open.
   if (_chatOpen) {
-    var rootIsActive = _activeNodeId === 'root';
-    var notesAction = document.getElementById('queryNotesActionBtn');
-    var shareAction = document.getElementById('queryShareActionBtn');
-    if (notesAction) notesAction.classList.toggle('active', rootIsActive && _refractionView === 'private');
-    if (shareAction) shareAction.classList.toggle('active', rootIsActive && _refractionView === 'trust_circle');
     syncRefractionButtons(_activeNodeId);
   }
 
@@ -8852,8 +8781,6 @@ function restoreResumeSnapshot() {
   var sBan = document.getElementById('subjectBanner');
   if (sBan) sBan.style.display = 'block';
   showFollowUpComposer();
-  var govBar = document.getElementById('sessionGovernance');
-  if (govBar) govBar.style.display = 'block';
 
   var container = document.getElementById('resultContent');
   (snap.followUps || []).forEach(function(fu) {
@@ -10510,7 +10437,6 @@ document.addEventListener('DOMContentLoaded', function() {
     #mainHeader,
     #inputArea,
     #governanceRow,
-    #sessionGovernance,
     #followUpSection,
     #highlightSheet,
     #discussionPanel,
