@@ -5,12 +5,17 @@ const frontend = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 
 assert.match(
   frontend,
-  /name="viewport" content="width=device-width, initial-scale=1\.0, maximum-scale=1\.0, user-scalable=no, interactive-widget=resizes-content"/,
-  'The Android in-app browser must be explicitly prevented from magnifying focused fields',
+  /name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover, interactive-widget=resizes-content"/,
+  'The mobile viewport must support safe areas and keyboard resizing without disabling user zoom',
+);
+assert.doesNotMatch(
+  frontend,
+  /user-scalable=no|maximum-scale=1\.0/,
+  'The browser experience must preserve user-controlled pinch zoom',
 );
 assert.match(
   frontend,
-  /@media \(max-width: 600px\)[\s\S]*?textarea\.input-field,[\s\S]*?font-size:\s*20px !important;/,
+  /@media \(max-width: 600px\)[\s\S]*?textarea\.input-field,[\s\S]*?font-size:\s*18px !important;/,
   'Mobile composers must stay safely above browser focus-zoom thresholds',
 );
 
