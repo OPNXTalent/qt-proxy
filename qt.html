@@ -7431,6 +7431,39 @@ function buildNoteBlock(n) {
   return div;
 }
 
+// ── Response copy attribution ─────────────────────────────────────────
+// Preserve ordinary browser copying everywhere except the rendered answer.
+// When response prose is copied, add a small stable source reference without
+// exposing a private thread or Circle of Trust URL.
+(function initResponseCopyAttribution() {
+  var resultContent = document.getElementById('resultContent');
+  if (!resultContent) return;
+
+  document.addEventListener('copy', function(event) {
+    var selection = window.getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount || !event.clipboardData) return;
+
+    var range = selection.getRangeAt(0);
+    if (!resultContent.contains(range.commonAncestorContainer)) return;
+
+    var selectedText = selection.toString().trim();
+    if (!selectedText) return;
+
+    var sourceUrl = 'https://theprism.io';
+    var sourceText = '— The Prism · ' + sourceUrl;
+    event.clipboardData.setData('text/plain', selectedText + '\n\n' + sourceText);
+
+    var html = document.createElement('div');
+    html.appendChild(range.cloneContents());
+    html.insertAdjacentHTML(
+      'beforeend',
+      '<p style="margin-top:1em;font-size:0.9em;color:#666;">— <a href="' + sourceUrl + '">The Prism</a></p>'
+    );
+    event.clipboardData.setData('text/html', html.innerHTML);
+    event.preventDefault();
+  });
+})();
+
 // ── Response highlighting ──────────────────────────────────────────────
 // Selecting text anywhere inside a response reveals a bottom sheet of
 // highlight colors (see #highlightSheet). Highlighting is visual only;
