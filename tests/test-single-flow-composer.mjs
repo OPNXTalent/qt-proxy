@@ -5,14 +5,8 @@ const frontend = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 
 assert.match(
   frontend,
-  /\.query-action-row\s*\{[\s\S]*?justify-content:\s*space-between;[\s\S]*?width:\s*100%;[\s\S]*?\}/,
-  'Print, Share, and Notes must span the response width',
-);
-const sessionGovernanceCss = frontend.match(/#sessionGovernance\s*\{([^}]*)\}/)?.[1] ?? '';
-assert.doesNotMatch(
-  sessionGovernanceCss,
-  /border-top:/,
-  'The response action row must not add a second divider above Print, Share, and Notes',
+  /\.node-controls\s*\{[\s\S]*?justify-content:\s*space-between;[\s\S]*?width:\s*100%;[\s\S]*?\}/,
+  'Print, Share, and Notes must span every response width',
 );
 assert.doesNotMatch(
   frontend,
@@ -47,8 +41,13 @@ assert.match(
 );
 assert.match(
   frontend,
-  /id="followUpComposer"[\s\S]*id="followUpInput"[\s\S]*id="newSubjectBottomBtn" onclick="resetForm\(\)"/,
-  'The completed-answer composer must include a bottom New Subject control',
+  /id="followUpComposer"[\s\S]*id="followUpInput"[\s\S]*class="follow-up-submit-row"[\s\S]*id="newSubjectBottomBtn" onclick="resetForm\(\)"[\s\S]*id="followUpSubmitBtn" onclick="runFollowUp\(document\.getElementById\('followUpInput'\)\)"/,
+  'The completed-answer composer must place New Subject and Enter on the same row',
+);
+assert.match(
+  frontend,
+  /\.follow-up-submit-row\s*\{[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*space-between;/,
+  'The follow-up action buttons must sit at opposite ends of their row',
 );
 assert.match(
   frontend,
@@ -57,7 +56,7 @@ assert.match(
 );
 assert.match(
   frontend,
-  /function showFollowUpComposer\(\)[\s\S]*positionResponseActions\(section, followUpComposer\)[\s\S]*followUpComposer\.style\.display = 'block'/,
+  /function showFollowUpComposer\(\)[\s\S]*followUpComposer\.style\.display = 'block'/,
   'The completed answer must reveal its dedicated follow-up composer',
 );
 assert.match(
@@ -77,11 +76,6 @@ assert.match(
 );
 assert.match(
   frontend,
-  /function positionResponseActions\(section, followUpComposer\)[\s\S]*section\.insertBefore\(governance, followUpComposer \|\| null\)/,
-  'The response actions must be positioned before the follow-up composer',
-);
-assert.match(
-  frontend,
   /function showFollowUpComposer\(\)[\s\S]*openingInput\.readOnly = true[\s\S]*submitBtn'\)\.style\.display = 'none'/,
   'A completed question must become read-only and hide the dead Interpret control',
 );
@@ -90,10 +84,10 @@ assert.match(
   /followUpInput'\)\.addEventListener\('keydown'[\s\S]*runFollowUp\(this\)/,
   'Enter in the empty follow-up field must submit the next question',
 );
-assert.match(
+assert.doesNotMatch(
   frontend,
-  /class="query-action-row"[\s\S]*id="queryPrintBtn"[\s\S]*>Print<\/button>[\s\S]*id="queryShareActionBtn"[\s\S]*>Share<\/button>[\s\S]*id="queryNotesActionBtn"[\s\S]*>Notes<\/button>/,
-  'Print, Share, and Notes must appear as one intuitive action row',
+  /id="sessionGovernance"|id="queryPrintBtn"|id="queryShareActionBtn"|id="queryNotesActionBtn"/,
+  'A movable singleton Query action row must not exist',
 );
 
 const nodeControlsStart = frontend.indexOf('function buildNodeControls(nodeId, queryText) {');
@@ -113,6 +107,11 @@ assert.match(
   nodeControlsFlow,
   /node-refraction-btn[\s\S]*textContent = 'Notes'[\s\S]*openNotesSurface\(nodeId, queryText\)/,
   'Every Refraction must open Notes at its own response node',
+);
+assert.match(
+  frontend,
+  /function renderResult\(d\)[\s\S]*resultContent\.innerHTML = html;[\s\S]*resultContent\.appendChild\(buildNodeControls\('root', currentSubject \|\| d\._subject \|\| ''\)\)/,
+  'The original Query must own a permanent response-scoped action row',
 );
 assert.match(
   frontend,
