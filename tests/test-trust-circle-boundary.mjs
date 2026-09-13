@@ -56,6 +56,58 @@ const authRoute = {
 
 {
   const { res, calls } = await run(
+    {
+      subject: 'A complete exchange',
+      threadId: 'thread-owner',
+      artifactId: 'artifact-owner',
+      artifactRevision: 3,
+      recipientName: 'Jordan',
+      inviteNote: 'I thought you would appreciate this.',
+      permission: 'contributor',
+    },
+    [authRoute, {
+      match: url => url.includes('/interpretation_artifacts?'),
+      respond: () => response(200, [{
+        artifact_id: 'artifact-owner',
+        artifact_revision: 3,
+        thread_id: 'thread-owner',
+        artifact: {
+          artifactId: 'artifact-owner',
+          revision: 3,
+          responseMode: 'reflective',
+          canonicalResponse: 'The answer.',
+          openDoorQuestion: 'What follows?',
+        },
+      }]),
+    }, {
+      match: url => url.includes('/interpretation_packets?'),
+      respond: () => response(200, []),
+    }, {
+      match: (url, init) => url.endsWith('/shares') && init.method === 'POST',
+      respond: () => response(201, [{ id: 'share-created' }]),
+    }, {
+      match: url => url.endsWith('/referrals'),
+      respond: () => response(201, {}),
+    }],
+    { authenticated: true },
+  );
+  assert.equal(res.statusCode, 200, 'An authenticated owner must be able to create a personalized share');
+  assert.equal(res.body.shareId, 'share-created');
+  assert.equal(res.body.recipientName, 'Jordan');
+  assert.equal(res.body.permission, 'contributor');
+  assert.match(res.body.shareUrl, /^https:\/\/theprism\.io\/share\.html\?t=/);
+  const insert = calls.find(call => call.url.endsWith('/shares') && call.init.method === 'POST');
+  assert.ok(insert, 'Share creation must insert a durable connection');
+  const record = JSON.parse(insert.init.body);
+  assert.equal(record.thread_id, 'thread-owner');
+  assert.equal(record.recipient_name, 'Jordan');
+  assert.equal(record.invite_note, 'I thought you would appreciate this.');
+  assert.equal(record.permission, 'contributor');
+  assert.equal(record.collaboration_open, true);
+}
+
+{
+  const { res, calls } = await run(
     { action: 'comment', shareId: 'share-1', token: 'viewer-token', content: 'hello' },
     [{
       match: url => url.includes('/shares?') && url.includes('token=eq.viewer-token'),

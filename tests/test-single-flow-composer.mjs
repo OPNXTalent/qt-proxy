@@ -100,8 +100,8 @@ assert.match(
 );
 assert.match(
   nodeControlsFlow,
-  /node-share-btn[\s\S]*textContent = 'Share'[\s\S]*openShareSurface\(nodeId, queryText\)/,
-  'Every Refraction must open Share at its own response node',
+  /node-share-btn[\s\S]*textContent = 'Share'[\s\S]*openPersonalShareSurface\(nodeId, queryText\)/,
+  'Every Refraction must open the personalized Share panel at its own response node',
 );
 assert.match(
   nodeControlsFlow,
@@ -115,8 +115,13 @@ assert.match(
 );
 assert.match(
   frontend,
-  /function openNotesSurface\([\s\S]*openNodeSurface\([\s\S]*'private'[\s\S]*function openShareSurface\(nodeId, queryText\)[\s\S]*openNodeSurface\(targetNodeId, targetQuery, 'trust_circle'\)/,
-  'Notes and Share must preserve their response node while opening the corresponding view',
+  /function openNotesSurface\([\s\S]*openNodeSurface\([\s\S]*'private'[\s\S]*function openPersonalShareSurface\(nodeId, queryText\)[\s\S]*_activeNodeId = targetNodeId[\s\S]*openSharePanel\(\)/,
+  'Notes and Share must preserve their response node while opening their distinct panels',
+);
+assert.doesNotMatch(
+  frontend,
+  /function openShareSurface\(|id="circleShareBox"|onclick="createCircleShare\(\)"/,
+  'The retired inline Circle sharing route must not coexist with personalized sharing',
 );
 assert.match(
   frontend,

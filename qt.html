@@ -2747,29 +2747,6 @@
     <div class="disc-anchor-text" id="discContextQuery">The original interpretation</div>
     <div class="disc-anchor-rule"></div>
 
-    <!-- Owner-only invitation controls shown when SHARE opens the Circle of Trust. -->
-    <div id="circleShareBox" style="display:none; margin:10px 16px 4px; padding:16px; border:1px solid var(--border); background:var(--surface); flex-shrink:0;">
-      <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text); margin-bottom:4px;">Share this inquiry</div>
-      <div style="font-family:var(--crimson); font-size:16px; color:var(--text-muted); line-height:1.45; margin-bottom:14px;">Invite someone into this Circle of Trust. Your other inquiries and private notes stay private.</div>
-      <div id="circleShareCreate" style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end;">
-        <label style="display:flex; flex-direction:column; gap:6px; font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted);">Access
-          <select id="circleShareAccess" style="min-height:38px; background:var(--deep); border:1px solid var(--border-lit); color:var(--text); font-family:var(--crimson); font-size:16px; padding:7px 10px;">
-            <option value="contributor">Contributor — may comment</option>
-            <option value="viewer">Viewer — may read</option>
-          </select>
-        </label>
-        <button id="circleCreateLinkBtn" onclick="createCircleShare()" style="min-height:38px; padding:7px 14px; border:1px solid var(--blue-lit); background:rgba(74,106,170,0.12); color:var(--blue-lit); font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer;">Create link</button>
-      </div>
-      <div id="circleShareActive" style="display:none;">
-        <div style="display:flex; gap:8px; align-items:center;">
-          <div id="circleShareUrl" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:9px 10px; border:1px solid var(--border); color:var(--text-dim); font-family:var(--mono); font-size:12px;"></div>
-          <button onclick="copyQueryLink()" style="min-height:36px; padding:7px 12px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer;">Copy</button>
-          <button onclick="openShareModal()" style="min-height:36px; padding:7px 12px; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer;">Manage</button>
-        </div>
-      </div>
-      <div id="circleShareStatus" role="status" style="display:none; margin-top:10px; font-family:var(--mono); font-size:11px; letter-spacing:0.08em; color:var(--text-muted);"></div>
-    </div>
-
     <!-- Save This Session — anonymous share-recipient context only.
          Visibility set/unset by updateSaveSessionVisibility(), called from
          loadSharedThread() and from the normal owner-view init paths so it
@@ -8352,15 +8329,16 @@ function buildNodeControls(nodeId, queryText) {
   });
   wrap.appendChild(printBtn);
 
-  // Share opens the Circle of Trust at this exact response. Discussion
-  // messages are already stored and filtered by node_id.
+  // Share opens the one personalized invitation surface. Keep the response
+  // node as context, but share the complete exchange so the recipient is not
+  // dropped into an isolated fragment.
   var shareBtn = document.createElement('button');
   shareBtn.className = 'node-ctrl-btn node-share-btn';
   shareBtn.textContent = 'Share';
   shareBtn.title = 'Share and discuss this response';
   shareBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    openShareSurface(nodeId, queryText);
+    openPersonalShareSurface(nodeId, queryText);
   });
   wrap.appendChild(shareBtn);
 
@@ -8394,10 +8372,13 @@ function openNotesSurface(nodeId, queryText) {
   openNodeSurface(nodeId || 'root', queryText || currentSubject || '', 'private');
 }
 
-function openShareSurface(nodeId, queryText) {
+function openPersonalShareSurface(nodeId, queryText) {
   var targetNodeId = nodeId || 'root';
   var targetQuery = queryText || (targetNodeId === 'root' ? currentSubject : '') || '';
-  openNodeSurface(targetNodeId, targetQuery, 'trust_circle');
+  _activeNodeId = targetNodeId;
+  _activeQueryText = targetQuery;
+  window._shareAnchorNodeId = targetNodeId;
+  openSharePanel();
 }
 
 function updateCircleShareUI() {
