@@ -5,6 +5,17 @@ const frontend = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 
 assert.match(
   frontend,
+  /name="viewport" content="width=device-width, initial-scale=1\.0, interactive-widget=resizes-content"/,
+  'The mobile keyboard must resize content instead of magnifying the visual viewport',
+);
+assert.match(
+  frontend,
+  /@media \(max-width: 600px\)[\s\S]*?textarea\.input-field,[\s\S]*?font-size:\s*20px !important;/,
+  'Mobile composers must stay safely above browser focus-zoom thresholds',
+);
+
+assert.match(
+  frontend,
   /html\s*\{[\s\S]*?-webkit-text-size-adjust:\s*100%;[\s\S]*?text-size-adjust:\s*100%;[\s\S]*?\}/,
   'Mobile browsers must preserve the intended text scale',
 );
