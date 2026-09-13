@@ -17,7 +17,8 @@ assert.doesNotMatch(client, /id="shareInvitedBy"[^>]*readonly|id="shareInviteNot
 assert.match(client, /recipientInput\.readOnly = false[\s\S]*recipientInput\.disabled = false[\s\S]*recipientInput\.focus\(\)/);
 assert.match(client, /send\.textContent = 'Send Invite'/);
 assert.match(client, /function sendConnectionInvite\(connection\)[\s\S]*navigator\.share\(shareData\)/);
-assert.match(client, /text: connectionInviteText\(connection, false\)[\s\S]*url: connectionUrl\(connection\)/);
+assert.match(client, /text: connectionInviteText\(connection, true\)/);
+assert.doesNotMatch(client, /text: connectionInviteText\(connection, false\)[\s\S]*url: connectionUrl\(connection\)/);
 assert.match(client, /Link ready for [\s\S]*Choose Send Invite or Copy Link/);
 assert.doesNotMatch(client, /if \(recipientEl\) recipientEl\.value = '';\s*await copyConnectionInvite\(connection\)/);
 assert.match(client, /function openPersonalShareSurface\(nodeId, queryText\)[\s\S]*openSharePanel\(\)/);

@@ -6980,8 +6980,10 @@ async function sendConnectionInvite(connection) {
   }
   var shareData = {
     title: 'The Prism — Shared Exchange',
-    text: connectionInviteText(connection, false),
-    url: connectionUrl(connection)
+    // Keep the URL inside the message itself. Some native share targets ignore
+    // the Web Share API's separate `url` field, leaving recipients with the
+    // greeting but no way to open the exchange.
+    text: connectionInviteText(connection, true)
   };
   if (navigator.canShare && !navigator.canShare(shareData)) {
     setSharePanelStatus('Native sharing is not available here. Use Copy Link instead.', true);
