@@ -57,11 +57,9 @@ assert.match(
 const nodeControlsStart = frontend.indexOf('function buildNodeControls(nodeId, queryText) {');
 const nodeControlsEnd = frontend.indexOf('function focusRefractionNode(', nodeControlsStart);
 const nodeControlsFlow = frontend.slice(nodeControlsStart, nodeControlsEnd);
-assert.doesNotMatch(
-  nodeControlsFlow,
-  /node-share-btn|textContent = 'Share'|textContent = '↓ Print'/,
-  'Per-response controls must omit redundant Share and Print actions',
-);
+assert.match(nodeControlsFlow, /textContent = 'Print'/, 'Each response must expose whole-exchange Print');
+assert.match(nodeControlsFlow, /textContent = 'Share'/, 'Each response must open Share');
+assert.match(nodeControlsFlow, /textContent = 'Notes'/, 'Each response must open its private Notes');
 assert.match(
   frontend,
   /function showResult\(preserveScroll\)[\s\S]*if \(!preserveScroll\)/,

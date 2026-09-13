@@ -20,6 +20,14 @@ function generateToken() {
   return randomBytes(24).toString('base64url');
 }
 
+function cleanName(value) {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
+}
+
+function cleanNote(value) {
+  return typeof value === 'string' ? value.trim().slice(0, 500) : '';
+}
+
 function sbHeaders(useServiceKey = false) {
   const key = useServiceKey ? SUPABASE_SERVICE_KEY : SUPABASE_ANON_KEY;
   return {
@@ -138,7 +146,7 @@ async function handlePost(req, res) {
     });
   }
 
-  const { subject, threadId, artifactId, artifactRevision } = body || {};
+  const { subject, threadId, artifactId, artifactRevision, recipientName, inviteNote } = body || {};
   const permission = body?.permission === 'contributor' || body?.collaborationOpen === true
     ? 'contributor'
     : 'viewer';
@@ -150,6 +158,11 @@ async function handlePost(req, res) {
   }
   if (!threadId || !artifactId || !Number.isInteger(Number(artifactRevision))) {
     return res.status(400).json({ error: 'threadId, artifactId, and artifactRevision are required' });
+  }
+  const normalizedRecipientName = cleanName(recipientName);
+  const normalizedPermission = permission === 'contributor' ? 'contributor' : 'viewer';
+  if (!normalizedRecipientName) {
+    return res.status(400).json({ error: 'Recipient name is required' });
   }
 
   const artifactRes = await sbFetch(
@@ -191,10 +204,13 @@ async function handlePost(req, res) {
     subject:            subject || null,
     thread_id:          artifact.thread_id,
     status:             'active',
-    collaboration_open: permission === 'contributor',
-    permission,
+    collaboration_open: normalizedPermission === 'contributor',
     artifact_id:        artifact.artifact_id,
     artifact_revision:  artifact.artifact_revision,
+    permission:         normalizedPermission,
+    recipient_name:     normalizedRecipientName,
+    invite_note:        cleanNote(inviteNote) || null,
+    revoked_at:         null
   };
 
   // Insert share record
@@ -227,7 +243,7 @@ async function handlePost(req, res) {
 
   // If collaboration is being opened immediately, create a room channel
   // anchored to this share so room_messages can be scoped to it
-  if (permission === 'contributor' && shareId && senderEmail) {
+  if (normalizedPermission === 'contributor' && shareId && senderEmail) {
     await openCollabChannel(shareId, senderEmail);
   }
 
@@ -244,14 +260,21 @@ async function handlePost(req, res) {
     }).catch(() => {});                 // non-fatal
   }
 
-  return res.status(200).json({ shareId, shareUrl, token });
+  return res.status(200).json({
+    shareId,
+    shareUrl,
+    token,
+    recipientName: normalizedRecipientName,
+    permission: normalizedPermission
+  });
 }
 
 // ── PATCH — Toggle collaboration or status ───────────────────────────────────
 
 async function handlePatch(req, res) {
+  const senderEmail = req.verifiedIdentity?.email || null;
   const senderUserId = req.verifiedIdentity?.userId || null;
-  if (!senderUserId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!senderEmail || !senderUserId) return res.status(401).json({ error: 'Unauthorized' });
 
   let body;
   try {
@@ -260,7 +283,7 @@ async function handlePatch(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const { shareId, token, collaborationOpen, status, permission } = body || {};
+  const { shareId, token, collaborationOpen, status, permission, recipientName, inviteNote } = body || {};
 
   if (!shareId && !token) {
     return res.status(400).json({ error: 'shareId or token required' });
@@ -275,9 +298,16 @@ async function handlePatch(req, res) {
     updates.permission = collaborationOpen ? 'contributor' : 'viewer';
     updates.collaboration_open = collaborationOpen;
   }
-  if (status === 'active' || status === 'inactive') updates.status = status;
-  if (status === 'inactive') updates.revoked_at = new Date().toISOString();
-  if (status === 'active') updates.revoked_at = null;
+  if (status === 'active' || status === 'inactive') {
+    updates.status = status;
+    updates.revoked_at = status === 'inactive' ? new Date().toISOString() : null;
+  }
+  if (recipientName !== undefined) {
+    const normalizedRecipientName = cleanName(recipientName);
+    if (!normalizedRecipientName) return res.status(400).json({ error: 'Recipient name is required' });
+    updates.recipient_name = normalizedRecipientName;
+  }
+  if (inviteNote !== undefined) updates.invite_note = cleanNote(inviteNote) || null;
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No valid fields to update' });
@@ -332,14 +362,31 @@ async function handleGet(req, res) {
     return res.status(200).json({ members: Array.isArray(members) ? members : [] });
   }
   const token = req.query?.t || new URL(req.url, BASE_URL).searchParams.get('t');
+  const threadId = req.query?.threadId || new URL(req.url, BASE_URL).searchParams.get('threadId');
+
+  if (threadId) {
+    const ownerUserId = req.verifiedIdentity?.userId || null;
+    if (!ownerUserId) return res.status(401).json({ error: 'Unauthorized' });
+    const ownerRes = await sbFetch(
+      `/shares?thread_id=eq.${encodeURIComponent(threadId)}` +
+      `&owner_user_id=eq.${encodeURIComponent(ownerUserId)}` +
+      '&select=id,token,recipient_name,invite_note,permission,collaboration_open,status,created_at,revoked_at' +
+      '&order=created_at.desc',
+      { headers: sbHeaders(true) }
+    );
+    if (!ownerRes.ok) return res.status(500).json({ error: 'Could not fetch connections' });
+    const connections = await ownerRes.json();
+    return res.status(200).json({ connections });
+  }
 
   if (!token) {
     return res.status(400).json({ error: 'Token required' });
   }
 
   const fetchRes = await sbFetch(
-    `/shares?token=eq.${encodeURIComponent(token)}&select=id,token,snapshot,subject,status,collaboration_open,permission,sender_email,thread_id,artifact_id,artifact_revision,created_at,revoked_at`,
-    { headers: sbHeaders(false) }
+    `/shares?token=eq.${encodeURIComponent(token)}` +
+    '&select=id,token,snapshot,subject,status,collaboration_open,thread_id,artifact_id,artifact_revision,created_at,permission,recipient_name,invite_note,revoked_at,sender_email',
+    { headers: sbHeaders(true) }
   );
 
   if (!fetchRes.ok) {
@@ -416,6 +463,7 @@ async function handleGet(req, res) {
     }
   }
   share.sender_display_name = senderDisplayName;
+  delete share.sender_email;
 
   // If collaboration is open, fetch the channel id for this share
   let channelId = null;

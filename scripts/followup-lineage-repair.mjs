@@ -9,6 +9,17 @@ function replaceExact(source, before, after, marker) {
 
 let interpret = readFileSync('api/interpret.js', 'utf8');
 
+// The reconstructed commercial runtime binds anonymous artifacts to a
+// server-issued guest principal. That supersedes the earlier signed inquiry
+// token repair below and is already the stronger lineage contract.
+if (
+  interpret.includes('candidate?.guest_id === guestId')
+  && interpret.includes('guestId,\n}) {\n  const fallback = createInitialInquiryState(subject);')
+) {
+  console.log('Follow-up lineage repair already satisfied by guest-principal authority.');
+  process.exit(0);
+}
+
 interpret = replaceExact(
   interpret,
   String.raw`async function restoreCanonicalInquiryState({
