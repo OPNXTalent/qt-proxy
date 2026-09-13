@@ -14,8 +14,13 @@ assert.equal(
 );
 assert.match(
   serviceWorker,
-  /const CACHE_NAME = 'prism-shell-v10'/,
+  /const CACHE_NAME = 'prism-shell-v11'/,
   'A new cache version must retire stale earlier responses',
+);
+assert.deepEqual(
+  manifest.display_override,
+  ['standalone', 'minimal-ui'],
+  'Installed launches should prefer a focused app window',
 );
 assert.match(
   serviceWorker,
