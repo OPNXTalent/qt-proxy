@@ -8,6 +8,12 @@ assert.match(
   /\.query-action-row\s*\{[\s\S]*?justify-content:\s*space-between;[\s\S]*?width:\s*100%;[\s\S]*?\}/,
   'Print, Share, and Notes must span the response width',
 );
+const sessionGovernanceCss = frontend.match(/#sessionGovernance\s*\{([^}]*)\}/)?.[1] ?? '';
+assert.doesNotMatch(
+  sessionGovernanceCss,
+  /border-top:/,
+  'The response action row must not add a second divider above Print, Share, and Notes',
+);
 assert.doesNotMatch(
   frontend,
   /id="downloadRow"|id="shareBtn"|id="presenceDot"|id="collabToggleBtn"|id="liveSyncBtn"/,
