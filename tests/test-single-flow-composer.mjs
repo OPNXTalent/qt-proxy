@@ -20,7 +20,7 @@ assert.match(
 );
 assert.match(
   frontend,
-  /@media \(max-width: 600px\)\s*\{\s*\.site-footer\s*\{\s*width:\s*calc\(100% - 40px\);/,
+  /@media \(max-width: 600px\)[\s\S]*?\.site-footer\s*\{[\s\S]*?width:\s*calc\(100% - 32px\);/,
   'The footer must share the mobile width of the question box',
 );
 
@@ -46,8 +46,8 @@ assert.match(
 );
 assert.match(
   frontend,
-  /\.follow-up-submit-row\s*\{[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*space-between;/,
-  'The follow-up action buttons must sit at opposite ends of their row',
+  /@media \(max-width: 600px\)[\s\S]*?\.follow-up-submit-row\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/,
+  'The follow-up action buttons must form two non-overflowing mobile columns',
 );
 assert.match(
   frontend,
