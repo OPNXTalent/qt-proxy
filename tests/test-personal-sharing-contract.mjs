@@ -10,6 +10,8 @@ assert.match(client, /<option value="viewer">Read Only<\/option>/);
 assert.match(client, /<option value="contributor">View\/Edit<\/option>/);
 assert.match(client, /id="shareRecipientName"[^>]+required|id="shareRecipientName"/);
 assert.match(client, /Your notes always remain private/);
+assert.match(client, /function openPersonalShareSurface\(nodeId, queryText\)[\s\S]*openSharePanel\(\)/);
+assert.doesNotMatch(client, /openShareSurface\(nodeId, queryText\)|id="circleShareBox"/);
 assert.match(client, /function updateJoinCircleVisibility\(\)[\s\S]*box\.style\.display = 'none'/);
 assert.match(client, /window\._sharedViewPermission === 'contributor'[\s\S]*source: 'recipient'/);
 assert.match(client, /window\._sharedViewPermission === 'viewer'[\s\S]*window\._sharedViewForkThreadId/);
