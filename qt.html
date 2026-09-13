@@ -151,6 +151,35 @@
     border-color: rgba(122,150,201,0.55);
     background: rgba(74,106,170,0.06);
   }
+  .shared-exchange-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 0 0 28px;
+    padding: 15px 17px;
+    border: 1px solid rgba(122,150,201,0.42);
+    background: rgba(74,106,170,0.07);
+  }
+  .shared-exchange-copy {
+    font-family: var(--crimson);
+    font-size: 17px;
+    line-height: 1.45;
+    color: var(--text-dim);
+  }
+  .shared-conversation-btn {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 9px 13px;
+    border: 1px solid rgba(122,150,201,0.65);
+    background: rgba(74,106,170,0.1);
+    color: rgba(205,218,242,0.96);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
 
   #discussionPanel {
     position: fixed;
@@ -364,6 +393,8 @@
     .share-card-actions .share-create-btn { width:100%; min-height:44px; }
     .share-connection-actions { flex-wrap:wrap; }
     .share-connection-actions button { min-height:42px; }
+    .shared-exchange-banner { align-items: stretch; flex-direction: column; }
+    .shared-conversation-btn { width: 100%; }
   }
 
   /* ── Breadcrumb — future sprint ── */
@@ -2724,6 +2755,10 @@
 
   <!-- RESULT ---->
   <div class="result" id="resultBlock">
+    <div id="sharedByBanner" class="shared-exchange-banner" role="status">
+      <div id="sharedByText" class="shared-exchange-copy">Someone shared this exchange with you.</div>
+      <button id="sharedConversationBtn" class="shared-conversation-btn" type="button" onclick="openSharedConversation('root', currentSubject || '')">Open Conversation</button>
+    </div>
     <div id="subjectBanner" style="display:none; margin-bottom:28px;">
       <div style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Current Subject</div>
       <div id="subjectText" style="font-size:20px; color:var(--text-dim); font-style:italic;"></div>
@@ -2753,7 +2788,7 @@
       <div id="followUpComposer" style="display:none;">
         <div class="input-wrap">
           <div style="position:relative;">
-            <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question…" rows="3" maxlength="600" style="padding-right:52px;"></textarea>
+            <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question…" rows="3" maxlength="600" inputmode="text" autocapitalize="sentences" autocorrect="on" spellcheck="true" style="padding-right:52px;"></textarea>
             <button id="followUpMicBtn" onclick="toggleFollowUpMic()" title="Speak your follow-up" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
           </div>
           <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -2918,7 +2953,7 @@
     <div id="chatMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); padding:0 16px 8px; text-transform:uppercase;"></div>
 
     <div class="chat-compose" id="chatComposeBar" style="padding:12px 16px;border-top:1px solid rgba(42,42,64,0.5);display:flex;flex-direction:column;gap:8px;">
-      <textarea class="chat-input" id="chatInput" placeholder="Add a message…" rows="2"
+      <textarea class="chat-input" id="chatInput" placeholder="Add a message…" rows="2" inputmode="text" autocapitalize="sentences" autocorrect="on" spellcheck="true"
         style="width:100%;"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"></textarea>
@@ -3163,7 +3198,57 @@ function usesCompactTouchKeyboard() {
 function releaseCompactTouchKeyboard(input) {
   if (!usesCompactTouchKeyboard()) return;
   var target = input || document.activeElement;
-  if (target && typeof target.blur === 'function') target.blur();
+  if (target && typeof target.blur === 'function') {
+    if (target.dataset) target.dataset.prismAllowBlurUntil = String(Date.now() + 1200);
+    target.blur();
+  }
+}
+
+function stabilizeMobileComposerInput(input) {
+  if (!input || input.dataset.prismComposerGuard === '1') return;
+  input.dataset.prismComposerGuard = '1';
+  var lastTypingAt = 0;
+
+  // Keep keystrokes and IME composition inside the textarea. Some installed
+  // Android browsers otherwise treat a keyboard-state change as a page-level
+  // command and move focus away from the active composer.
+  input.addEventListener('keydown', function(event) {
+    lastTypingAt = Date.now();
+    event.stopPropagation();
+  });
+  input.addEventListener('keyup', function(event) {
+    lastTypingAt = Date.now();
+    event.stopPropagation();
+  });
+  input.addEventListener('compositionstart', function() { lastTypingAt = Date.now(); });
+  input.addEventListener('compositionend', function() { lastTypingAt = Date.now(); });
+  input.addEventListener('input', function() { lastTypingAt = Date.now(); });
+
+  // A real tap outside the field is an intentional exit. Mark it before the
+  // ensuing blur so the guard never traps someone in the keyboard.
+  document.addEventListener('pointerdown', function(event) {
+    if (document.activeElement === input && event.target !== input) {
+      input.dataset.prismAllowBlurUntil = String(Date.now() + 1200);
+    }
+  }, true);
+
+  // Samsung Keyboard can emit an unrequested blur immediately after a
+  // character or Shift/composition update. Restore focus only for that short
+  // no-pointer window; normal taps, submits, and panel closes remain free.
+  input.addEventListener('blur', function() {
+    if (!usesCompactTouchKeyboard()) return;
+    if (Date.now() - lastTypingAt > 700) return;
+    if (Date.now() < Number(input.dataset.prismAllowBlurUntil || 0)) return;
+    window.requestAnimationFrame(function() {
+      var panel = input.closest('#discussionPanel');
+      if (panel && !panel.classList.contains('open')) return;
+      if (!input.isConnected || input.disabled || input.readOnly) return;
+      if (document.activeElement && document.activeElement !== document.body && document.activeElement !== document.documentElement) return;
+      var caret = input.value.length;
+      input.focus({ preventScroll: true });
+      if (input.setSelectionRange) input.setSelectionRange(caret, caret);
+    });
+  });
 }
 
 function stageComposerBelowResponse() {
@@ -4563,6 +4648,9 @@ document.getElementById('followUpInput').addEventListener('keydown', function(e)
   }
 });
 
+stabilizeMobileComposerInput(document.getElementById('followUpInput'));
+stabilizeMobileComposerInput(document.getElementById('chatInput'));
+
 // ── VOICE / MIC ──────────────────────────────────────────────────────────────
 (function initMic() {
   // ── Voice input — OpenAI batch transcription ────────────────────────────
@@ -5307,6 +5395,21 @@ function enterSharedThread(share) {
   allThreads     = [syntheticThread];
   activeThreadId = null;
   selectThread(syntheticThread.id);
+
+  // selectThread also serves the owner's Archive and therefore clears share
+  // state before performing an owner-only connection lookup. A recipient is
+  // not the owner, so establish the token-authorized channel directly from
+  // the share payload instead of waiting for that lookup to restore it.
+  _currentSharedSessionId = share.id;
+  _currentChannelId = share.id;
+  _shareStatus = 'on';
+  _shareMode = window._sharedViewPermission;
+  window._shareActive = true;
+  window._currentShareToken = window._sharedViewToken;
+  window._currentShareUrl = 'https://theprism.io/share.html?t=' + window._sharedViewToken;
+  _openThreadIds.add(syntheticThread.id);
+  startFollowUpRealtime(syntheticThread.id);
+  if (typeof window.startChatRealtime === 'function') window.startChatRealtime(share.id);
   updateSaveSessionVisibility();
   var composeBar = document.getElementById('chatComposeBar');
   if (composeBar) composeBar.style.display = window._sharedViewPermission === 'contributor' ? 'flex' : 'none';
@@ -5323,16 +5426,20 @@ function enterSharedThread(share) {
   if (mcEl) mcEl.classList.remove('sidebar-open');
   sidebarOpen = false;
 
-  // Sender attribution — "so-and-so shared this with you." Falls back to
-  // a generic phrase if no display name is on file. NOTE: #sharedByBanner
-  // doesn't exist in qt.html's markup yet — this needs one small addition
-  // near the header before this line does anything visible.
+  // Sender attribution plus a direct path into the shared conversation.
   var bannerEl = document.getElementById('sharedByBanner');
+  var bannerText = document.getElementById('sharedByText');
+  var conversationBtn = document.getElementById('sharedConversationBtn');
   if (bannerEl) {
-    bannerEl.textContent = share.sender_display_name
+    if (bannerText) bannerText.textContent = share.sender_display_name
       ? share.sender_display_name + ' shared this with you'
       : 'Someone shared this with you';
-    bannerEl.style.display = 'block';
+    bannerEl.style.display = 'flex';
+  }
+  if (conversationBtn) {
+    conversationBtn.textContent = window._sharedViewPermission === 'contributor'
+      ? 'Message ' + (share.sender_display_name || 'Sender')
+      : 'View Conversation';
   }
 
   // A signed-in recipient remains a share recipient until they explicitly
@@ -6082,6 +6189,15 @@ function renderFUWithSource(list, shouldScroll) {
   if (shouldScroll === undefined) shouldScroll = true; // default: live single-item arrival still auto-scrolls
   if (!list || !list.length) return;
 
+  // Polling commonly returns the full history. Do not touch the composer at
+  // all when every row is already present; mobile IMEs are especially prone
+  // to losing their editing session when unrelated UI is refreshed nearby.
+  list = list.filter(function(fu) {
+    var fuId = fu.id || (fu.query + '_' + fu.created_at);
+    return !_renderedFuIds.has(fuId) && !_renderedFuQueries.has((fu.query || '').trim());
+  });
+  if (!list.length) return;
+
   var fuSec = document.getElementById('followUpSection');
   if (!fuSec) return;
   showFollowUpComposer();
@@ -6090,11 +6206,8 @@ function renderFUWithSource(list, shouldScroll) {
   var container = document.getElementById('resultContent') || fuSec;
 
   list.forEach(function(fu) {
-    // Skip already-rendered entries
+    // Register the entry before rendering it.
     var fuId = fu.id || (fu.query + '_' + fu.created_at);
-    if (_renderedFuIds.has(fuId)) return;
-    // Also skip if this question was already rendered by the live streaming path
-    if (_renderedFuQueries.has((fu.query || '').trim())) return;
     _renderedFuIds.add(fuId);
 
     var isRecipient = fu.source === 'recipient';
@@ -6955,6 +7068,11 @@ function renderShareConnections() {
     meta.textContent = connection.permission === 'contributor' ? 'View/Edit · Active' : 'Read Only · Active';
     var actions = document.createElement('div');
     actions.className = 'share-connection-actions';
+    var conversation = document.createElement('button');
+    conversation.textContent = 'Conversation';
+    conversation.setAttribute('aria-label', 'Open conversation with ' + (connection.recipient_name || 'recipient'));
+    conversation.onclick = function() { openConnectionConversation(connection); };
+    actions.appendChild(conversation);
     if (navigator.share) {
       var send = document.createElement('button');
       send.className = 'share-send-invite';
@@ -6976,6 +7094,22 @@ function renderShareConnections() {
     row.appendChild(actions);
     list.appendChild(row);
   });
+}
+
+function openConnectionConversation(connection) {
+  if (!connection || !connection.id) return;
+  _currentSharedSessionId = connection.id;
+  _currentChannelId = connection.id;
+  _shareStatus = 'on';
+  _shareMode = connection.permission || 'contributor';
+  window._shareActive = true;
+  window._currentShareToken = connection.token || null;
+  window._currentShareUrl = connectionUrl(connection);
+  _renderedChatIds = new Set();
+  _chatLastCount = -1;
+  if (typeof window.startChatRealtime === 'function') window.startChatRealtime(connection.id);
+  closeSharePanel();
+  openNodeSurface('root', currentSubject || '', 'trust_circle');
 }
 
 function connectionInviteText(connection, includeUrl) {
@@ -7751,7 +7885,6 @@ function openChatPanel() {
     sigilEl.textContent = lbl === 'Query' ? 'Q' : lbl;
   }
   highlightRefractionNode(_activeNodeId || 'root');
-  _refractionView = 'private';
   panel.classList.add('open');
   _chatOpen = true;
   syncRefractionButtons(_activeNodeId || 'root');
@@ -7885,7 +8018,7 @@ function renderActiveRefractionView() {
     renderNotesView();
   } else {
     if (composeBar) {
-      composeBar.style.visibility = _currentSharedSessionId && _shareMode === 'contributor'
+      composeBar.style.visibility = canComposeInSharedConversation()
         ? 'visible'
         : 'hidden';
     }
@@ -7895,6 +8028,13 @@ function renderActiveRefractionView() {
     _chatLastCount = -1;
     renderDiscussionView();
   }
+}
+
+function canComposeInSharedConversation() {
+  if (window._sharedViewToken) return window._sharedViewPermission === 'contributor';
+  // An authenticated owner may always speak into their own active channel;
+  // the connection permission governs what the recipient may do.
+  return !!_currentSharedSessionId;
 }
 
 async function sendChatMessage() {
@@ -8487,16 +8627,16 @@ function buildNodeControls(nodeId, queryText) {
   });
   wrap.appendChild(printBtn);
 
-  // Share opens the one personalized invitation surface. Keep the response
-  // node as context, but share the complete exchange so the recipient is not
-  // dropped into an isolated fragment.
+  // Owners create/manage invitations here. For recipients, the same control
+  // is the direct path back to the conversation attached to this response.
   var shareBtn = document.createElement('button');
   shareBtn.className = 'node-ctrl-btn node-share-btn';
-  shareBtn.textContent = 'Share';
-  shareBtn.title = 'Share and discuss this response';
+  shareBtn.textContent = window._sharedViewToken ? 'Discuss' : 'Share';
+  shareBtn.title = window._sharedViewToken ? 'Open the shared conversation' : 'Share and discuss this response';
   shareBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    openPersonalShareSurface(nodeId, queryText);
+    if (window._sharedViewToken) openSharedConversation(nodeId, queryText);
+    else openPersonalShareSurface(nodeId, queryText);
   });
   wrap.appendChild(shareBtn);
 
@@ -8539,6 +8679,15 @@ function openPersonalShareSurface(nodeId, queryText) {
   openSharePanel();
 }
 
+function openSharedConversation(nodeId, queryText) {
+  if (!window._sharedViewToken || !window._sharedViewShareId) return;
+  _currentSharedSessionId = window._sharedViewShareId;
+  _currentChannelId = window._sharedViewShareId;
+  _shareStatus = 'on';
+  _shareMode = window._sharedViewPermission || 'viewer';
+  openNodeSurface(nodeId || 'root', queryText || currentSubject || '', 'trust_circle');
+}
+
 function updateCircleShareUI() {
   var create = document.getElementById('circleShareCreate');
   var active = document.getElementById('circleShareActive');
@@ -8550,7 +8699,7 @@ function updateCircleShareUI() {
   if (url) url.textContent = hasShare ? window._currentShareUrl : '';
   var composeBar = document.getElementById('chatComposeBar');
   if (composeBar && _refractionView === 'trust_circle') {
-    composeBar.style.visibility = hasShare && _shareMode === 'contributor' ? 'visible' : 'hidden';
+    composeBar.style.visibility = canComposeInSharedConversation() ? 'visible' : 'hidden';
   }
 }
 

@@ -35,6 +35,26 @@ assert.match(
   /function releaseCompactTouchKeyboard\(input\)[\s\S]*?target\.blur\(\)/,
   'The focused mobile control must be able to release the on-screen keyboard',
 );
+assert.match(
+  frontend,
+  /function stabilizeMobileComposerInput\(input\)[\s\S]*?keydown[\s\S]*?event\.stopPropagation\(\)[\s\S]*?blur[\s\S]*?input\.focus\(\{ preventScroll: true \}\)/,
+  'Mobile follow-up and conversation composers must retain focus through unrequested IME blur events',
+);
+assert.match(
+  frontend,
+  /stabilizeMobileComposerInput\(document\.getElementById\('followUpInput'\)\)[\s\S]*?stabilizeMobileComposerInput\(document\.getElementById\('chatInput'\)\)/,
+  'Both recipient text composers must install the mobile typing guard',
+);
+assert.match(
+  frontend,
+  /id="followUpInput"[^>]+autocapitalize="sentences"[^>]+autocorrect="on"[^>]+spellcheck="true"/,
+  'The follow-up composer must request sentence-aware mobile keyboard behavior',
+);
+assert.match(
+  frontend,
+  /id="chatInput"[^>]+autocapitalize="sentences"[^>]+autocorrect="on"[^>]+spellcheck="true"/,
+  'The shared conversation composer must request sentence-aware mobile keyboard behavior',
+);
 
 const interpretation = frontend.slice(
   frontend.indexOf('async function runInterpretation()'),

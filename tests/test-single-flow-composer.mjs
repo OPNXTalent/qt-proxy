@@ -100,8 +100,8 @@ assert.match(
 );
 assert.match(
   nodeControlsFlow,
-  /node-share-btn[\s\S]*textContent = 'Share'[\s\S]*openPersonalShareSurface\(nodeId, queryText\)/,
-  'Every Refraction must open the personalized Share panel at its own response node',
+  /node-share-btn[\s\S]*textContent = window\._sharedViewToken \? 'Discuss' : 'Share'[\s\S]*if \(window\._sharedViewToken\) openSharedConversation\(nodeId, queryText\);[\s\S]*else openPersonalShareSurface\(nodeId, queryText\)/,
+  'Every Refraction must open the owner Share panel or the recipient conversation at its own response node',
 );
 assert.match(
   nodeControlsFlow,

@@ -27,6 +27,13 @@ assert.doesNotMatch(client, /text: connectionInviteText\(connection, false\)[\s\
 assert.match(client, /Link ready for [\s\S]*Choose Send Invite or Copy Link/);
 assert.doesNotMatch(client, /if \(recipientEl\) recipientEl\.value = '';\s*await copyConnectionInvite\(connection\)/);
 assert.match(client, /function openPersonalShareSurface\(nodeId, queryText\)[\s\S]*openSharePanel\(\)/);
+assert.match(client, /id="sharedByBanner"[\s\S]*id="sharedConversationBtn"[\s\S]*openSharedConversation/);
+assert.match(client, /function enterSharedThread\(share\)[\s\S]*_currentSharedSessionId = share\.id;[\s\S]*_currentChannelId = share\.id;[\s\S]*startChatRealtime\(share\.id\)/);
+assert.match(client, /shareBtn\.textContent = window\._sharedViewToken \? 'Discuss' : 'Share'/);
+assert.match(client, /function openSharedConversation\(nodeId, queryText\)[\s\S]*openNodeSurface\([\s\S]*'trust_circle'\)/);
+assert.match(client, /conversation\.textContent = 'Conversation'[\s\S]*openConnectionConversation\(connection\)/);
+assert.match(client, /function openConnectionConversation\(connection\)[\s\S]*_currentChannelId = connection\.id;[\s\S]*openNodeSurface\('root',[\s\S]*'trust_circle'\)/);
+assert.match(client, /function canComposeInSharedConversation\(\)[\s\S]*window\._sharedViewPermission === 'contributor'[\s\S]*!!_currentSharedSessionId/);
 assert.doesNotMatch(client, /openShareSurface\(nodeId, queryText\)|id="circleShareBox"/);
 assert.match(client, /function updateJoinCircleVisibility\(\)[\s\S]*box\.style\.display = 'none'/);
 assert.match(client, /window\._sharedViewPermission === 'contributor'[\s\S]*source: 'recipient'/);
