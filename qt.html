@@ -106,27 +106,45 @@
   .node-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 14px 0 0;
-    margin-top: 20px;
+    justify-content: space-between;
+    gap: 20px;
+    width: 100%;
+    padding: 28px 0;
+    margin-top: 28px;
     border-top: 1px solid rgba(42,42,64,0.35);
-    flex-wrap: wrap;
+    border-bottom: 1px solid rgba(42,42,64,0.35);
   }
   .node-ctrl-btn {
+    width: clamp(96px, 16%, 126px);
+    min-height: 34px;
     font-family: var(--mono);
     font-size:12px;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    padding: 6px 12px;
-    border: 1px solid rgba(90,88,120,0.7);
+    padding: 7px 14px;
+    border: 1px solid var(--border-lit);
     background: transparent;
-    color: rgba(170,168,190,0.85);
+    color: var(--text-muted);
     cursor: pointer;
-    transition: color 0.2s, border-color 0.2s;
+    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
     white-space: nowrap;
   }
-  .node-ctrl-btn:hover { color: rgba(220,215,200,0.95); border-color: rgba(201,168,76,0.5); }
-  .node-ctrl-btn.share-active { color: rgba(80,180,120,0.9); border-color: rgba(80,180,120,0.5); }
+  .node-ctrl-btn:hover,
+  .node-ctrl-btn:focus-visible {
+    color: var(--gold-pale);
+    border-color: var(--gold-dim);
+    outline: none;
+  }
+  .node-refraction-btn.active {
+    color: var(--gold-pale);
+    border-color: var(--gold-dim);
+    background: rgba(122,98,48,0.06);
+  }
+  .node-share-btn.active {
+    color: rgba(150,175,220,0.92);
+    border-color: rgba(122,150,201,0.55);
+    background: rgba(74,106,170,0.06);
+  }
 
   #discussionPanel {
     position: fixed;
@@ -1789,8 +1807,10 @@
     .shell { padding: 40px 20px 80px; }
     .header h1 { font-size:29px; }
     .input-selector { grid-template-columns: repeat(2, 1fr); }
-    .query-action-row { gap: 12px; }
-    .query-action-btn { width: calc((100% - 24px) / 3); padding-inline: 8px; }
+    .query-action-row,
+    .node-controls { gap: 12px; }
+    .query-action-btn,
+    .node-ctrl-btn { width: calc((100% - 24px) / 3); padding-inline: 8px; }
     #circleShareCreate { grid-template-columns: 1fr !important; }
 
     /* Notes / Share panel — the fixed desktop width overflows any phone
@@ -6955,8 +6975,9 @@ function openChatPanel() {
   _chatOpen = true;
   var notesAction = document.getElementById('queryNotesActionBtn');
   var shareAction = document.getElementById('queryShareActionBtn');
-  if (notesAction) notesAction.classList.toggle('active', _refractionView === 'private');
-  if (shareAction) shareAction.classList.toggle('active', _refractionView === 'trust_circle');
+  var rootIsActive = _activeNodeId === 'root';
+  if (notesAction) notesAction.classList.toggle('active', rootIsActive && _refractionView === 'private');
+  if (shareAction) shareAction.classList.toggle('active', rootIsActive && _refractionView === 'trust_circle');
   var dot = document.getElementById('discHeaderDot');
   if (dot) dot.style.background = 'rgba(80,180,120,0.9)';
   updateChatBarUI();
@@ -7051,6 +7072,17 @@ function setRefractionView(next, shouldRender) {
     btn.style.color = 'var(--gold-dim)';
     btn.style.background = 'rgba(122,98,48,0.06)';
     btn.style.borderColor = 'var(--gold-dim)';
+  }
+
+  // Keep both the root action row and every Refraction row honest about
+  // which response and surface are currently open.
+  if (_chatOpen) {
+    var rootIsActive = _activeNodeId === 'root';
+    var notesAction = document.getElementById('queryNotesActionBtn');
+    var shareAction = document.getElementById('queryShareActionBtn');
+    if (notesAction) notesAction.classList.toggle('active', rootIsActive && _refractionView === 'private');
+    if (shareAction) shareAction.classList.toggle('active', rootIsActive && _refractionView === 'trust_circle');
+    syncRefractionButtons(_activeNodeId);
   }
 
   if (shouldRender !== false) renderActiveRefractionView();
@@ -7629,16 +7661,41 @@ function buildNodeControls(nodeId, queryText) {
   wrap.className = 'node-controls';
   wrap.dataset.nodeId = nodeId;
 
-  // A contextual shortcut into the private notebook for this response.
-  var refBtn = document.createElement('button');
-  refBtn.className = 'node-ctrl-btn node-refraction-btn';
-  var _btnLabel = getNodeLabel(nodeId);
-  refBtn.textContent = _btnLabel === 'Query' ? 'Notes' : _btnLabel + ' Notes';
-  refBtn.addEventListener('click', function(e) {
+  // Print remains intentionally global: every Print button produces the
+  // complete inquiry and all Refractions, never an isolated fragment.
+  var printBtn = document.createElement('button');
+  printBtn.className = 'node-ctrl-btn node-print-btn';
+  printBtn.textContent = 'Print';
+  printBtn.title = 'Print this entire exchange';
+  printBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    printPrism();
+  });
+  wrap.appendChild(printBtn);
+
+  // Share opens the Circle of Trust at this exact response. Discussion
+  // messages are already stored and filtered by node_id.
+  var shareBtn = document.createElement('button');
+  shareBtn.className = 'node-ctrl-btn node-share-btn';
+  shareBtn.textContent = 'Share';
+  shareBtn.title = 'Share and discuss this response';
+  shareBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    openShareSurface(nodeId, queryText);
+  });
+  wrap.appendChild(shareBtn);
+
+  // Notes opens the private notebook at this exact response. Notes are
+  // already stored and fetched by the same node_id boundary.
+  var notesBtn = document.createElement('button');
+  notesBtn.className = 'node-ctrl-btn node-refraction-btn';
+  notesBtn.textContent = 'Notes';
+  notesBtn.title = 'Open private notes for this response';
+  notesBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     openNotesSurface(nodeId, queryText);
   });
-  wrap.appendChild(refBtn);
+  wrap.appendChild(notesBtn);
 
   return wrap;
 }
@@ -7658,8 +7715,10 @@ function openNotesSurface(nodeId, queryText) {
   openNodeSurface(nodeId || 'root', queryText || currentSubject || '', 'private');
 }
 
-function openShareSurface() {
-  openNodeSurface('root', currentSubject || '', 'trust_circle');
+function openShareSurface(nodeId, queryText) {
+  var targetNodeId = nodeId || 'root';
+  var targetQuery = queryText || (targetNodeId === 'root' ? currentSubject : '') || '';
+  openNodeSurface(targetNodeId, targetQuery, 'trust_circle');
 }
 
 function updateCircleShareUI() {
@@ -7752,18 +7811,13 @@ function highlightRefractionNode(nodeId) {
 
 // Highlight the active refraction button, dim others
 function syncRefractionButtons(activeNodeId) {
-  document.querySelectorAll('.node-refraction-btn').forEach(function(btn) {
-    var wrap = btn.closest('.node-controls');
+  document.querySelectorAll('.node-controls').forEach(function(wrap) {
     var nid = wrap ? wrap.dataset.nodeId : null;
-    if (activeNodeId && nid === activeNodeId) {
-      btn.classList.add('refractions-active');
-      btn.style.color = 'rgba(201,168,76,0.75)';
-      btn.style.borderColor = 'rgba(201,168,76,0.3)';
-    } else {
-      btn.classList.remove('refractions-active');
-      btn.style.color = '';
-      btn.style.borderColor = '';
-    }
+    var nodeIsActive = !!activeNodeId && nid === activeNodeId;
+    var notesBtn = wrap.querySelector('.node-refraction-btn');
+    var shareBtn = wrap.querySelector('.node-share-btn');
+    if (notesBtn) notesBtn.classList.toggle('active', nodeIsActive && _refractionView === 'private');
+    if (shareBtn) shareBtn.classList.toggle('active', nodeIsActive && _refractionView === 'trust_circle');
   });
 }
 
