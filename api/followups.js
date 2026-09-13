@@ -92,14 +92,64 @@ async function handleClaimAnonSession(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const { anonId, threadId } = body || {};
+  const { anonId, threadId, shareId } = body || {};
   const userId = req.verifiedIdentity?.userId || null;
   if (!anonId || !userId || !threadId) {
     return res.status(400).json({ error: 'anonId, authenticated user, and threadId are required' });
   }
   return res.status(410).json({ error: 'Guest claims are handled by the verified guest-identity boundary' });
 
-  const results = { followUps: false, notes: false, participant: false };
+  const results = { followUps: false, notes: false, participant: false, fork: null };
+
+  let share = null;
+  if (shareId) {
+    try {
+      const shareRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}&thread_id=eq.${encodeURIComponent(threadId)}&select=id,permission,status,revoked_at&limit=1`,
+        { headers: sbHeaders() }
+      );
+      const rows = shareRes.ok ? await shareRes.json() : [];
+      share = rows?.[0] || null;
+    } catch (e) { /* handled by the legacy claim path below */ }
+  }
+
+  if (shareId && (!share || share.status !== 'active' || share.revoked_at)) {
+    return res.status(410).json({ error: 'This shared connection is no longer active' });
+  }
+
+  // A Read Only recipient owns a fork, never membership in the originator's
+  // thread. The database function copies the canonical artifact and makes
+  // the operation idempotent for this share/account pair.
+  if (share && share.permission === 'viewer') {
+    const forkRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fork_shared_prism_inquiry`, {
+      method: 'POST',
+      headers: sbHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ p_share_id: shareId, p_user_id: userId })
+    });
+    if (!forkRes.ok) {
+      console.error('claim-anon-session: fork failed:', await forkRes.text());
+      return res.status(500).json({ error: 'Could not save the shared exchange' });
+    }
+    const forkRows = await forkRes.json();
+    results.fork = forkRows?.[0] || null;
+
+    if (results.fork?.fork_thread_id) {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/refraction_notes?anon_session_id=eq.${encodeURIComponent(anonId)}&thread_id=eq.${encodeURIComponent(threadId)}`,
+        {
+          method: 'PATCH',
+          headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+          body: JSON.stringify({
+            user_id: userId,
+            anon_session_id: null,
+            thread_id: results.fork.fork_thread_id
+          })
+        }
+      );
+      results.notes = true;
+    }
+    return res.status(200).json({ success: true, results });
+  }
 
   try {
     const fuRes = await fetch(
@@ -357,13 +407,17 @@ export default async function handler(req, res) {
     if (shareId && shareToken) {
       const shareRes = await fetch(
         `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}&token=eq.${encodeURIComponent(shareToken)}` +
-        `&thread_id=eq.${encodeURIComponent(threadId)}&status=eq.active&revoked_at=is.null&select=id&limit=1`,
+        `&thread_id=eq.${encodeURIComponent(threadId)}&status=eq.active&revoked_at=is.null&select=id,permission,created_at&limit=1`,
         { headers: sbHeaders() }
       );
       const shares = await shareRes.json();
       if (shares?.length) {
+        const share = shares[0];
+        const snapshotBoundary = share.permission === 'viewer'
+          ? `&created_at=lte.${encodeURIComponent(share.created_at)}`
+          : '';
         const fuRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/follow_ups?thread_id=eq.${encodeURIComponent(threadId)}&order=created_at.asc&select=id,query,response,source,created_at,share_id,user_id`,
+          `${SUPABASE_URL}/rest/v1/follow_ups?thread_id=eq.${encodeURIComponent(threadId)}${snapshotBoundary}&order=created_at.asc&select=id,query,response,source,created_at,share_id,user_id,display_name`,
           { headers: sbHeaders() }
         );
         const followUps = await fuRes.json();
@@ -384,7 +438,7 @@ export default async function handler(req, res) {
     }
 
     const fuRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/follow_ups?thread_id=eq.${encodeURIComponent(threadId)}&order=created_at.asc&select=id,query,response,source,created_at,share_id,user_id`,
+      `${SUPABASE_URL}/rest/v1/follow_ups?thread_id=eq.${encodeURIComponent(threadId)}&order=created_at.asc&select=id,query,response,source,created_at,share_id,user_id,display_name`,
       { headers: sbHeaders() }
     );
     const followUps = await fuRes.json();
@@ -410,10 +464,39 @@ export default async function handler(req, res) {
     const postShareId = bodyShareId || shareId || null;
 
     if (postSource === 'recipient' && postShareId) {
-      return res.status(409).json({
-        error: 'Save this inquiry to My Prism before asking The Prism a follow-up',
-        code: 'TRUST_CIRCLE_FORK_REQUIRED',
+      if (!shareToken) {
+        return res.status(403).json({ error: 'Share credential required' });
+      }
+      const shareRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(postShareId)}&token=eq.${encodeURIComponent(shareToken)}&thread_id=eq.${encodeURIComponent(threadId)}&status=eq.active&revoked_at=is.null&permission=eq.contributor&select=id,recipient_name&limit=1`,
+        { headers: sbHeaders() }
+      );
+      const shares = await shareRes.json();
+      if (!shares?.length) {
+        return res.status(403).json({ error: 'Share not found, inactive, or does not match thread' });
+      }
+
+      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/follow_ups`, {
+        method: 'POST',
+        headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+        body: JSON.stringify({
+          thread_id:       threadId,
+          user_id:         null,
+          query:           question,
+          response:        typeof response === 'string' ? { text: response } : (response || {}),
+          query_cost:      0,
+          submitted_in:    'share',
+          source:          'recipient',
+          share_id:        postShareId,
+          anon_session_id: anonSessionId || null,
+          display_name:    shares[0].recipient_name || 'Guest'
+        })
       });
+      if (!insertRes.ok) {
+        return res.status(500).json({ error: 'Could not save shared contribution' });
+      }
+      const inserted = await insertRes.json();
+      return res.status(200).json({ success: true, followUp: inserted?.[0] || null });
     }
 
     if (postSource === 'participant') {

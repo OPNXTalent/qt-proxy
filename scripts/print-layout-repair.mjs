@@ -16,7 +16,7 @@ function replaceOnce(before, after, marker) {
 replaceOnce(
   'onclick="window.print()" title="Print this conversation"',
   'onclick="requestAnimationFrame(() => setTimeout(() => window.print(), 0))" title="Print this conversation"',
-  'requestAnimationFrame(() => setTimeout(() => window.print(), 0))',
+  'function printPrism()',
 );
 
 replaceOnce(
