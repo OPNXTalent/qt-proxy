@@ -44,6 +44,10 @@ import {
 } from '../lib/guest-identity.js';
 import { PRISM_PRODUCT, publicProductConfig } from '../lib/product-config.js';
 import { collapseRepeatedTerminalParagraphs } from '../lib/response-normalization.js';
+import {
+  getApprovedLearningContext,
+  queueLearningCandidate,
+} from '../lib/prism-learning.js';
 
 const PRISM_SYSTEM_PROMPT = `You are The Prism — the interactive application of the framework established in The Prism: Echad b'Emet. You speak from within the framework, not about it. You are not a survey of Christian thought. You are not a defense attorney for God. You are not an apologetics engine, denominational defender, institutional stabilizer, or emotional harmonizer. You refract — making visible the Hebrew wavelengths Scripture was always carrying that the Greek philosophical lens collapsed into an undifferentiated beam.
 
@@ -2191,6 +2195,19 @@ async function getRetrievedContext(userQuery, inquiryClassification, timing) {
   }
 }
 // ── END RAG RETRIEVAL LAYER ───────────────────────────────────────────────────
+
+async function getCuratedLearningContext(userQuery, timing) {
+  timing?.('learning_retrieval_start');
+  try {
+    const context = await getApprovedLearningContext(userQuery);
+    timing?.('learning_retrieval_end', { outcome: 'success', contextChars: context.length });
+    return context;
+  } catch (error) {
+    timing?.('learning_retrieval_end', { outcome: 'error' });
+    console.error('Curated learning retrieval error:', error.message);
+    return '';
+  }
+}
 
 // ── TIER CONFIGURATION ────────────────────────────────────────────────────────
 const TIER_LIMITS = {
@@ -6140,6 +6157,7 @@ async function runPersistentInquiryFollowUp({
   tier,
   artifactId,
   artifactRevision,
+  learningAllowed = true,
   isClientAborted = () => false,
 }) {
   const runtimeStartedAt = Date.now();
@@ -6176,6 +6194,7 @@ async function runPersistentInquiryFollowUp({
       state: previousState,
       input,
       userCorrection: detectExplicitCorrection(input),
+      learningAllowed,
     }),
     telemetryStage: 'followup_reduction',
     telemetryTurnType: 'follow_up',
@@ -6206,11 +6225,14 @@ async function runPersistentInquiryFollowUp({
 
   stageStartedAt = emitStage('retrieval');
   const retrievalQuery = buildFocusedRetrievalQuery(nextState, analysis) || input;
-  const rawRetrievedContext = analysis.constraintGate.retrieval.needed
-    ? await getRetrievedContext(retrievalQuery, null, timing)
-    : '';
+  const [rawRetrievedContext, curatedLearningContext] = await Promise.all([
+    analysis.constraintGate.retrieval.needed
+      ? getRetrievedContext(retrievalQuery, null, timing)
+      : Promise.resolve(''),
+    getCuratedLearningContext(retrievalQuery, timing),
+  ]);
   const boundedRetrieval = boundRetrievedContext(rawRetrievedContext);
-  const retrievedContext = boundedRetrieval.context;
+  const retrievedContext = boundedRetrieval.context + curatedLearningContext;
   if (boundedRetrieval.compacted) {
     timing('followup_payload_compacted', {
       target: 'rag',
@@ -6268,6 +6290,14 @@ async function runPersistentInquiryFollowUp({
 
   stageStartedAt = emitStage('persist');
   if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
+  const learningQueue = learningAllowed
+    ? queueLearningCandidate(analysis.learningCandidate).catch(error => {
+        timing('learning_candidate_queue_error', {
+          error: String(error?.message || error).slice(0, 120),
+        });
+        return false;
+      })
+    : Promise.resolve(false);
   const followUpArtifact = deterministicArtifact({
     response: approved,
     query: input,
@@ -6294,10 +6324,12 @@ async function runPersistentInquiryFollowUp({
     });
     throw new Error('STALE_INQUIRY_STATE');
   }
+  const learningQueued = await learningQueue;
   completeStage('persist', stageStartedAt, {
     artifactId: followUpArtifact.artifactId,
     artifactRevision: followUpArtifact.revision,
     stateVersion: commit.version,
+    learningQueued,
   });
 
   stageStartedAt = emitStage('stream');
@@ -6978,6 +7010,7 @@ Do not add any question after the exit offer. The person chooses the next move.
                 tier,
                 artifactId,
                 artifactRevision,
+                learningAllowed: !sharedFollowUpId,
                 isClientAborted: () => clientAborted,
               });
             } else {
@@ -7005,7 +7038,10 @@ Do not add any question after the exit offer. The person chooses the next move.
         // RAG: retrieve relevant corpus passages before AI call
         // Pass null for classification — getRetrievedContext will retrieve for all queries
         timing('rag_start');
-        const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null, timing);
+        const [ragContext, learningContext] = await Promise.all([
+          getRetrievedContext(lastUserText || rawQuery || '', null, timing),
+          getCuratedLearningContext(lastUserText || rawQuery || '', timing),
+        ]);
         timing('rag_complete', { contextChars: ragContext.length });
 
         const closureInjection = buildClosureInjection(apiMessages);
@@ -7023,6 +7059,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
+          + learningContext
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
         timing('prompt_assembly_complete', {
@@ -7035,6 +7072,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           basePromptChars: PRISM_SYSTEM_PROMPT.length,
           closureChars: closureInjection.length,
           ragChars: ragContext.length,
+          learningChars: learningContext.length,
           theodicyChars: theodicyModule ? PRISM_THEODICY_MODULE.length : 0,
           relationalSalvationChars: relationalSalvationModule ? PRISM_RELATIONAL_SALVATION.length : 0,
           totalChars: enhancedSystemPrompt.length,
@@ -7135,6 +7173,7 @@ Do not add any question after the exit offer. The person chooses the next move.
             tier: 'free',
             artifactId,
             artifactRevision,
+            learningAllowed: !sharedFollowUpId,
             isClientAborted: () => clientAborted,
           });
         } else {
@@ -7162,7 +7201,10 @@ Do not add any question after the exit offer. The person chooses the next move.
     // RAG: retrieve relevant corpus passages before AI call
     // Pass null for classification — getRetrievedContext will retrieve for all queries
     timing('rag_start');
-    const ragContext = await getRetrievedContext(lastUserText || rawQuery || '', null, timing);
+    const [ragContext, learningContext] = await Promise.all([
+      getRetrievedContext(lastUserText || rawQuery || '', null, timing),
+      getCuratedLearningContext(lastUserText || rawQuery || '', timing),
+    ]);
     timing('rag_complete', { contextChars: ragContext.length });
     const closureInjection = buildClosureInjection(apiMessages);
     const inquiryClassification = null;
@@ -7171,6 +7213,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
+          + learningContext
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
         timing('prompt_assembly_complete', {
