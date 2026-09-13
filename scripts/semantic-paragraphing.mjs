@@ -41,7 +41,10 @@ let qt = readFileSync('qt.html', 'utf8');
 // The reconstructed renderer already centralizes escaping/emphasis through
 // formatPrismProse(). Split only on semantic blank-line boundaries. For the
 // common one-paragraph case preserve the direct formatter path as well.
-if (!qt.includes('var coreParagraphs = String(d.core_insight).split')) {
+if (
+  !qt.includes('var coreParagraphs = String(d.core_insight).split')
+  && !qt.includes('var coreParagraphs = coreInsightText.split')
+) {
   const oldModern = `  if (d.core_insight) {\n    html += '<div class="qt-core-insight"><p>' + formatPrismProse(d.core_insight) + '</p></div>';\n  }`;
   const oldLegacy = `  if (d.core_insight) {\n    html += '<div class="qt-core-insight"><p>' + escHtml(d.core_insight) + '</p></div>';\n  }`;
   const modernReplacement = `  if (d.core_insight) {\n    var coreParagraphs = String(d.core_insight).split(/\\n\\s*\\n/).map(function(p) { return p.trim(); }).filter(Boolean);\n    if (coreParagraphs.length <= 1) {\n      html += '<div class="qt-core-insight"><p>' + formatPrismProse(d.core_insight) + '</p></div>';\n    } else {\n      html += '<div class="qt-core-insight">' + coreParagraphs.map(function(p) {\n        return '<p>' + formatPrismProse(p.replace(/\\n/g, ' ')) + '</p>';\n      }).join('') + '</div>';\n    }\n  }`;
@@ -87,12 +90,17 @@ for (const marker of requiredRuntime) {
 }
 
 const requiredQt = [
-  'var coreParagraphs = String(d.core_insight).split',
   '.qt-core-insight p + p',
   'margin-top: 1.05em;',
 ];
 for (const marker of requiredQt) {
   if (!qt.includes(marker)) throw new Error(`Missing semantic paragraphing presentation marker: ${marker}`);
+}
+if (
+  !qt.includes('var coreParagraphs = String(d.core_insight).split')
+  && !qt.includes('var coreParagraphs = coreInsightText.split')
+) {
+  throw new Error('Missing semantic paragraph source split');
 }
 if (!qt.includes("formatPrismProse(p.replace(/\\n/g, ' '))") && !qt.includes("escHtml(p.replace(/\\n/g, ' '))")) {
   throw new Error('Missing semantic paragraph formatter');

@@ -1942,8 +1942,32 @@ The purpose of inquiry is not merely to answer questions, but to faithfully perc
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const QUERY_LIMIT = PRISM_PRODUCT.explorer.queries;
+const QUERY_LIMIT = PRISM_PRODUCT.explorer.credits;
 const WINDOW_HOURS = PRISM_PRODUCT.explorer.windowHours;
+
+async function getActiveSharedAccess(shareId, shareToken, threadId = null) {
+  if (!shareId || !shareToken || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  const threadFilter = threadId ? `&thread_id=eq.${encodeURIComponent(threadId)}` : '';
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/shares?id=eq.${encodeURIComponent(shareId)}`
+        + `&token=eq.${encodeURIComponent(shareToken)}`
+        + `${threadFilter}&status=eq.active&revoked_at=is.null`
+        + '&select=id,thread_id,permission&limit=1',
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      },
+    );
+    if (!response.ok) return null;
+    const rows = await response.json();
+    return rows?.[0] || null;
+  } catch {
+    return null;
+  }
+}
 
 // ── RAG RETRIEVAL LAYER ───────────────────────────────────────────────────────
 // Queries corpus_embeddings before AI call.
@@ -6151,6 +6175,7 @@ async function runPersistentInquiryFollowUp({
   input,
   subject,
   inquiryKey,
+  inquiryToken,
   threadId,
   ownerUserId,
   guestId = null,
@@ -6802,7 +6827,7 @@ Do not add any question after the exit offer. The person chooses the next move.
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 
   let prompt, messages, rawQuery, isFollowUp;
-  let inquiryKey, inquiryToken, threadId, inquirySubject, sharedFollowUpId;
+  let inquiryKey, inquiryToken, threadId, inquirySubject, sharedFollowUpId, sharedFollowUpToken;
   let artifactId, artifactRevision;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
@@ -6831,8 +6856,18 @@ Do not add any question after the exit offer. The person chooses the next move.
       ? body.artifactRevision
       : null;
     sharedFollowUpId = typeof body?.shareId === 'string' ? body.shareId : null;
+    sharedFollowUpToken = typeof body?.shareToken === 'string' ? body.shareToken : null;
   } catch {
     return res.status(400).json({ error: 'Invalid request body' });
+  }
+  const validatedSharedAccess = await getActiveSharedAccess(
+    sharedFollowUpId,
+    sharedFollowUpToken,
+    threadId,
+  );
+  if (sharedFollowUpId && !validatedSharedAccess) {
+    timing('access_complete', { route: 'shared', allowed: false });
+    return res.status(403).json({ error: 'This shared connection is no longer active.' });
   }
   const initialInquiryCredential = issueInquiryCredential();
 
@@ -7004,6 +7039,7 @@ Do not add any question after the exit offer. The person chooses the next move.
                 input: lastUserText,
                 subject: inquirySubject,
                 inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
+                inquiryToken,
                 threadId,
                 ownerUserId: userId,
                 guestId: null,
@@ -7167,6 +7203,7 @@ Do not add any question after the exit offer. The person chooses the next move.
             input: lastUserText,
             subject: inquirySubject,
             inquiryKey: inquiryKey || `thread:${threadId || requestId}`,
+            inquiryToken,
             threadId,
             ownerUserId: null,
             guestId: guestIdentity?.guestId || null,

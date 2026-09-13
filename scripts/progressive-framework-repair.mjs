@@ -54,13 +54,17 @@ const auditedFallbackBlock = [
   "    const packets = createEnrichmentPackets(artifact, enrichment);",
 ].join('\n');
 
-interpret = replaceBetween(
-  interpret,
-  auditStart,
-  auditEnd,
-  auditedFallbackBlock,
-  "fallback: 'validated_generated_enrichment'",
-);
+const usesLegacyEnrichmentAudit = interpret.includes(auditStart)
+  || interpret.includes("fallback: 'validated_generated_enrichment'");
+if (usesLegacyEnrichmentAudit) {
+  interpret = replaceBetween(
+    interpret,
+    auditStart,
+    auditEnd,
+    auditedFallbackBlock,
+    "fallback: 'validated_generated_enrichment'",
+  );
+}
 
 writeFileSync('api/interpret.js', interpret);
 
@@ -121,7 +125,7 @@ qt = replaceExact(
 
 writeFileSync('qt.html', qt);
 
-const requiredInterpret = [
+const requiredInterpret = usesLegacyEnrichmentAudit ? [
   'A substantive generated Framework is already valid Prism Analysis',
   "maxTokens: 3600",
   "timeoutMs: 20000",
@@ -129,7 +133,7 @@ const requiredInterpret = [
   "fallback: 'validated_generated_enrichment'",
   "timing('progressive_analysis_audit_degraded'",
   'const packets = createEnrichmentPackets(artifact, enrichment);',
-];
+]: [];
 for (const marker of requiredInterpret) {
   if (!interpret.includes(marker)) throw new Error(`Missing progressive Framework server marker: ${marker}`);
 }

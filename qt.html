@@ -133,6 +133,7 @@
     cursor: pointer;
     transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
     white-space: nowrap;
+    flex: 0 1 128px;
   }
   .node-ctrl-btn:hover,
   .node-ctrl-btn:focus-visible {
@@ -190,6 +191,92 @@
   #discussionPanel.open {
     right: 0;
     opacity: 1;
+  }
+
+  #sharePanel {
+    position: fixed;
+    top: 0;
+    right: -620px;
+    width: min(520px, 100vw);
+    height: 100dvh;
+    background: rgba(8,8,14,0.99);
+    border-left: 1px solid rgba(201,168,76,0.18);
+    z-index: 520;
+    display: flex;
+    flex-direction: column;
+    transition: right 0.42s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.3s ease;
+    box-shadow: -24px 0 64px rgba(0,0,0,0.6);
+    opacity: 0;
+  }
+  #sharePanel.open { right: 0; opacity: 1; }
+  .share-panel-topbar {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:18px 22px;
+    border-bottom:1px solid var(--border);
+  }
+  .share-panel-title {
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.28em;
+    text-transform:uppercase;
+    color:var(--gold-pale);
+  }
+  .share-panel-body { padding:24px; overflow-y:auto; }
+  .share-field { margin-bottom:18px; }
+  .share-field label {
+    display:block;
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--text-muted);
+    margin-bottom:7px;
+  }
+  .share-field input, .share-field select, .share-field textarea {
+    width:100%;
+    box-sizing:border-box;
+    background:var(--surface);
+    border:1px solid var(--border-lit);
+    color:var(--text);
+    font-family:var(--crimson);
+    font-size:16px;
+    padding:11px 13px;
+    outline:none;
+  }
+  .share-field textarea { min-height:82px; resize:vertical; }
+  .share-field input:focus, .share-field select:focus, .share-field textarea:focus { border-color:var(--gold-dim); }
+  .share-create-btn {
+    width:100%;
+    font-family:var(--cinzel);
+    font-size:14px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    padding:12px 18px;
+    border:1px solid var(--gold-dim);
+    background:rgba(201,168,76,0.06);
+    color:var(--gold-pale);
+    cursor:pointer;
+  }
+  .share-privacy-note {
+    font-family:var(--crimson);
+    font-style:italic;
+    font-size:15px;
+    color:var(--text-muted);
+    line-height:1.55;
+    margin:14px 0 24px;
+  }
+  .share-connection {
+    border-top:1px solid var(--border);
+    padding:16px 0;
+  }
+  .share-connection-name { font-family:var(--crimson); font-size:18px; color:var(--text); }
+  .share-connection-meta { font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-top:3px; }
+  .share-connection-actions { display:flex; gap:8px; margin-top:11px; }
+  .share-connection-actions button {
+    font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase;
+    padding:7px 10px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;
   }
 
   /* ── Breadcrumb — future sprint ── */
@@ -609,6 +696,16 @@
     flex-shrink: 0;
   }
   .query-secondary-btn:hover { color: rgba(160,155,140,0.6); }
+
+  /* Print is the persistent artifact action opposite Share This. Keep it
+     visually quiet, but give it the same readable scale as Share This and
+     the same gold-pale foreground used by the Ask / Interpret action. */
+  #queryPrintBtn {
+    font-size:12px;
+    letter-spacing: 0.18em;
+    color: var(--gold-pale);
+  }
+  #queryPrintBtn:hover { color: var(--gold); }
 
   /* URL address layer — always mounted, opacity-driven */
   .query-address-layer {
@@ -1149,6 +1246,27 @@
   .qt-core-insight p + p {
     margin-top: 1.05em;
   }
+  .qt-core-insight p + p {
+    margin-top: 1.05em;
+  }
+  .qt-core-insight p + p {
+    margin-top: 1.05em;
+  }
+  .qt-core-insight p + p {
+    margin-top: 1.05em;
+  }
+  .qt-core-insight p + p {
+    margin-top: 1.05em;
+  }
+  .qt-core-insight p + p {
+    margin-top: 1.05em;
+  }
+  .qt-core-insight p + p {
+    margin-top: 1.05em;
+  }
+  .qt-core-insight p + p {
+    margin-top: 1.05em;
+  }
 
   /* Suggested threads */
   .qt-threads {
@@ -1303,6 +1421,105 @@
   }
   .qt-framework-body.open {
     display: block;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
+  }
+  /* Keep Prism Analysis bullets clear of the left accent rail. Global reset
+     removes the browser's normal list inset, which otherwise places markers
+     directly on top of the gold line. */
+  .qt-framework-body > ul {
+    margin: 10px 0 0;
+    padding-left: 24px;
+    list-style-position: outside;
+  }
+  .qt-framework-body > ul li {
+    padding-left: 3px;
   }
 
   /* Section block */
@@ -2230,7 +2447,7 @@
     <div style="border:1px solid rgba(80,160,100,0.35); background:rgba(80,160,100,0.06); padding:14px 16px;">
       <!-- Header row with collapse toggle -->
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom:0;" onclick="toggleKeepQuestioning()">
-        <div style="font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(80,180,120,0.85);">Keep Questioning</div>
+        <div style="font-family:var(--mono); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(80,180,120,0.85);">Purchase Queries</div>
         <button id="keepQuestioningToggle" style="background:none; border:none; color:rgba(80,180,120,0.85); font-size:16px; cursor:pointer; padding:0; line-height:1; transition:transform 0.2s;">↓</button>
       </div>
       <!-- Collapsible body — closed by default -->
@@ -2462,7 +2679,45 @@
     </div>
   </div>
 
-    <!-- ── DISCUSSION SLIDE-OVER PANEL ── -->
+  <!-- ── SHARE SLIDE-OVER PANEL ── -->
+  <aside id="sharePanel" aria-label="Share this exchange" aria-hidden="true">
+    <div class="share-panel-topbar">
+      <span class="share-panel-title">Share</span>
+      <button class="disc-close-btn" onclick="closeSharePanel()" title="Close Share">✕</button>
+    </div>
+    <div class="share-panel-body">
+      <div style="font-family:var(--crimson);font-size:20px;color:var(--text);margin-bottom:4px;">Invite someone into this exchange</div>
+      <div style="font-family:var(--crimson);font-style:italic;font-size:15px;color:var(--text-muted);line-height:1.55;margin-bottom:22px;">Create a personal connection they can open without an account.</div>
+
+      <div class="share-field">
+        <label for="shareInvitedBy">Invited by</label>
+        <input id="shareInvitedBy" type="text" readonly>
+      </div>
+      <div class="share-field">
+        <label for="shareRecipientName">Recipient</label>
+        <input id="shareRecipientName" type="text" maxlength="80" placeholder="Who are you inviting?" autocomplete="off" required>
+      </div>
+      <div class="share-field">
+        <label for="sharePermission">Access</label>
+        <select id="sharePermission">
+          <option value="viewer">Read Only</option>
+          <option value="contributor">View/Edit</option>
+        </select>
+      </div>
+      <div class="share-field">
+        <label for="shareInviteNote">Personal note <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+        <textarea id="shareInviteNote" maxlength="500" placeholder="Add a short note…"></textarea>
+      </div>
+      <button id="createShareConnectionBtn" class="share-create-btn" onclick="createShareConnection()">Create Link</button>
+      <div id="sharePanelStatus" style="display:none;font-family:var(--mono);font-size:12px;letter-spacing:0.1em;margin-top:12px;line-height:1.5;"></div>
+      <div class="share-privacy-note">Your notes always remain private. Anyone with an active link receives its assigned access.</div>
+
+      <div style="font-family:var(--mono);font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Connections</div>
+      <div id="shareConnectionsList"><div class="share-privacy-note">No active connections yet.</div></div>
+    </div>
+  </aside>
+
+    <!-- ── NOTES SLIDE-OVER PANEL ── -->
   <div id="discussionPanel">
     <div id="panelResizeHandle" title="Drag to resize"></div>
     <!-- Breadcrumb — future sprint -->
@@ -2571,7 +2826,7 @@
          entry is shared by definition — there's nothing left to mark
          per-entry, only a view left to choose. Sits bottom-right, always
          visible regardless of which view is active or scroll position. -->
-    <div style="padding:8px 16px 0; display:flex; justify-content:flex-end;">
+    <div style="display:none; padding:8px 16px 0; justify-content:flex-end;">
       <button id="entryVisibilityToggle" onclick="toggleEntryVisibility()" type="button"
         data-visibility="private"
         style="display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); background:rgba(122,98,48,0.06); border:1px solid var(--gold-dim); border-radius:20px; padding:7px 16px; cursor:pointer; transition:all 0.2s;">
@@ -3235,6 +3490,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
           ? window._lastParsedResult._artifactRevision
           : undefined,
         shareId: isFollowUp ? (window._sharedViewShareId || undefined) : undefined,
+        shareToken: isFollowUp ? (window._sharedViewToken || undefined) : undefined,
         debugMode: getTheodicyDebugMode(),
         requestId
       })
@@ -3827,6 +4083,10 @@ async function callProxy(messages, rawQuery, requestId, options) {
               renderResult(progressiveResult);
               tierFromStream = parsed.tier || tierFromStream;
               acceptInquiryCredential(parsed);
+              if (parsed.threadId) {
+                activeThreadId = parsed.threadId;
+                showSidebarAfterQuery(rawQuery || currentSubject || '', parsed.threadId, progressiveResult);
+              }
             } else if (parsed.type === 'interpretive_context') {
               progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
               progressiveResult.interpretive_context = parsed.text || '';
@@ -3969,12 +4229,48 @@ function renderResult(d) {
   // The first-response prompt owns whether the prose ends with a question.
 
   // ── 1. FRAMEWORK FOR INTERPRETATION (collapsed, top of response) ─────────────
-  const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0) || d._analysisPending;
+  const hasFramework = sections.some(function(s) { return s.content; }) || (d.key_terms && d.key_terms.length > 0) || d._analysisPending || d._analysisIncomplete;
   if (hasFramework) {
     let frameworkHtml = '';
 
     if (d._analysisPending) {
       frameworkHtml += '<div class="early-recognition-progress">Prism Analysis continuing… Completed packets will appear here.</div>';
+    } else if (d._analysisIncomplete) {
+      frameworkHtml += '<div id="prismAnalysisIncomplete" class="early-recognition-progress" data-artifact-id="' +
+        escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+        'Prism Analysis paused. <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
+    } else if (d._analysisIncomplete) {
+      frameworkHtml += '<div id="prismAnalysisIncomplete" class="early-recognition-progress" data-artifact-id="' +
+        escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+        'Prism Analysis paused. <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
+    } else if (d._analysisIncomplete) {
+      frameworkHtml += '<div id="prismAnalysisIncomplete" class="early-recognition-progress" data-artifact-id="' +
+        escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+        'Prism Analysis paused. <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
+    } else if (d._analysisIncomplete) {
+      frameworkHtml += '<div id="prismAnalysisIncomplete" class="early-recognition-progress" data-artifact-id="' +
+        escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+        'Prism Analysis paused. <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
+    } else if (d._analysisIncomplete) {
+      frameworkHtml += '<div id="prismAnalysisIncomplete" class="early-recognition-progress" data-artifact-id="' +
+        escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+        'Prism Analysis paused. <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
+    } else if (d._analysisIncomplete) {
+      frameworkHtml += '<div id="prismAnalysisIncomplete" class="early-recognition-progress" data-artifact-id="' +
+        escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+        'Prism Analysis paused. <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
+    } else if (d._analysisIncomplete) {
+      frameworkHtml += '<div id="prismAnalysisIncomplete" class="early-recognition-progress" data-artifact-id="' +
+        escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+        'Prism Analysis paused. <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
+    } else if (d._analysisIncomplete) {
+      frameworkHtml += '<div id="prismAnalysisIncomplete" class="early-recognition-progress" data-artifact-id="' +
+        escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+        'Prism Analysis paused. <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
+    } else if (d._analysisIncomplete) {
+      frameworkHtml += '<div id="prismAnalysisIncomplete" class="early-recognition-progress" data-artifact-id="' +
+        escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
+        'Prism Analysis paused. <button type="button" class="query-secondary-btn" onclick="retryProgressiveAnalysis(this)">Retry Analysis</button></div>';
     }
 
     sections.forEach(function(s) {
@@ -4045,7 +4341,7 @@ function renderResult(d) {
     }
   }
 
-  if (d._analysisIncomplete) {
+  if (d._analysisIncomplete && !hasFramework) {
     html += '<div id="prismAnalysisIncomplete" class="qt-framework-callout" data-artifact-id="' +
       escHtml(d._artifactId || '') + '" data-artifact-revision="' + escHtml(String(d._artifactRevision || '')) + '">' +
       '<span>Historical Prism Analysis is incomplete.</span></div>';
@@ -4872,6 +5168,15 @@ window._sharedViewToken         = null;
 window._sharedViewShareId       = null;
 window._sharedViewIsParticipant = false;
 window._sharedViewPermission    = null;
+window._sharedRecipientName     = null;
+window._sharedViewForkThreadId  = null;
+window._sharedGuestHasWork      = false;
+
+window.addEventListener('beforeunload', function(event) {
+  if (!window._sharedViewToken || userEmail() || !window._sharedGuestHasWork) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
 
 async function loadSharedThread(token) {
   window._sharedViewToken = token;
@@ -4900,8 +5205,8 @@ async function loadSharedThread(token) {
     // actually does. Anyone who's seen it before, or is already signed in,
     // skips straight to the thread — this only ever happens once per
     // browser, not every time a share link is opened.
-    if (!email && !localStorage.getItem('prism_gateway_seen')) {
-      showShareGateway(share.sender_display_name, token, function() {
+    if (!email && !localStorage.getItem('prism_gateway_seen_' + token)) {
+      showShareGateway(share, token, function() {
         enterSharedThread(share);
       });
       return;
@@ -4918,6 +5223,8 @@ async function loadSharedThread(token) {
 // gateway's "Explore Freely" can trigger it on demand, rather than it
 // always firing immediately on page load.
 function enterSharedThread(share) {
+  window._sharedViewPermission = share.permission || (share.collaboration_open ? 'contributor' : 'viewer');
+  window._sharedRecipientName = share.recipient_name || 'Guest';
   // Synthetic thread entry — same shape selectThread()/renderThreads()
   // already expect from a real /api/threads row. share.snapshot is
   // field-for-field the same object renderResult() already knows how
@@ -5025,8 +5332,11 @@ function showSharedThreadError(message) {
 // exists for people who already have an account and want continuity from
 // the start; Explore Freely is the expected default path for everyone
 // else, matching "recipient can read and interact without registering."
-function showShareGateway(senderName, token, onExplore) {
-  localStorage.setItem('prism_gateway_seen', '1');
+function showShareGateway(share, token, onExplore) {
+  localStorage.setItem('prism_gateway_seen_' + token, '1');
+  var senderName = share && share.sender_display_name;
+  var recipientName = share && share.recipient_name;
+  var permission = share && share.permission === 'contributor' ? 'contributor' : 'viewer';
 
   var modal = document.createElement('div');
   modal.id = 'shareGatewayModal';
@@ -5041,15 +5351,26 @@ function showShareGateway(senderName, token, onExplore) {
 
   var invite = document.createElement('p');
   invite.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:16px;color:var(--gold-pale);line-height:1.6;margin:0 0 6px;';
-  invite.textContent = (senderName || 'Someone') + ' invited you into a conversation.';
+  invite.textContent = recipientName
+    ? recipientName + ', you may be wondering what this is.'
+    : 'You may be wondering what this is.';
 
   var title = document.createElement('p');
   title.style.cssText = 'font-family:var(--crimson);font-size:19px;color:var(--text);line-height:1.5;margin:0 0 18px;font-weight:500;';
-  title.textContent = 'Better questions lead to deeper understanding.';
+  title.textContent = (senderName || 'Someone') + ' shared a conversation from The Prism with you.';
 
   var desc = document.createElement('p');
   desc.style.cssText = 'font-size:14px;color:var(--text-dim);line-height:1.65;margin:0 0 28px;';
-  desc.textContent = "Explore Scripture, philosophy, science, and life's hardest questions through a framework that helps reveal assumptions, sharpen reasoning, and deepen understanding — without requiring agreement.";
+  desc.textContent = permission === 'contributor'
+    ? 'The Prism is a place for examining difficult questions from different angles. You can read this exchange and add your own questions. No account is required to begin.'
+    : 'The Prism is a place for examining difficult questions from different angles. You can read this exchange without creating an account. If you continue questioning, your additions remain in your own copy.';
+
+  var personalNote = null;
+  if (share && share.invite_note) {
+    personalNote = document.createElement('p');
+    personalNote.style.cssText = 'font-family:var(--crimson);font-style:italic;font-size:16px;color:var(--gold-pale);line-height:1.6;margin:0 0 24px;padding:14px 16px;border-left:2px solid var(--gold-dim);text-align:left;';
+    personalNote.textContent = share.invite_note;
+  }
 
   var btnWrap = document.createElement('div');
   btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
@@ -5068,7 +5389,7 @@ function showShareGateway(senderName, token, onExplore) {
   };
 
   var exploreBtn = document.createElement('button');
-  exploreBtn.textContent = 'Explore freely →';
+  exploreBtn.textContent = 'View the exchange →';
   exploreBtn.style.cssText = 'width:100%;padding:12px;border-radius:6px;border:none;background:var(--gold-dim);color:var(--deep);font-family:var(--mono);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:background 0.2s;';
   exploreBtn.onmouseover = function() { this.style.background = 'var(--gold)'; };
   exploreBtn.onmouseout  = function() { this.style.background = 'var(--gold-dim)'; };
@@ -5077,14 +5398,14 @@ function showShareGateway(senderName, token, onExplore) {
     if (typeof onExplore === 'function') onExplore();
   };
 
-  btnWrap.appendChild(signInBtn);
   btnWrap.appendChild(exploreBtn);
 
   var footnote = document.createElement('p');
   footnote.style.cssText = 'font-size:11px;color:var(--text-muted);margin:20px 0 0;';
-  footnote.textContent = 'No account required. Save your reflections anytime by signing in.';
+  footnote.textContent = 'No account required.';
 
   box.appendChild(badge); box.appendChild(invite); box.appendChild(title); box.appendChild(desc);
+  if (personalNote) box.appendChild(personalNote);
   box.appendChild(btnWrap); box.appendChild(footnote);
   modal.appendChild(box);
   document.body.appendChild(modal);
@@ -5166,11 +5487,12 @@ function selectThread(id) {
     (function(threadId) {
       var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://fgngixbhpilefmyyeldr.supabase.co';
       var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-      fetch(SUPA_URL + '/rest/v1/shares?thread_id=eq.' + encodeURIComponent(threadId) + '&status=eq.active&select=id,token,collaboration_open&limit=1', {
-        headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
-      })
+      authenticatedFetch('/api/share?threadId=' + encodeURIComponent(threadId))
       .then(function(r) { return r.json(); })
-      .then(function(rows) {
+      .then(function(data) {
+        var rows = (data && data.connections || []).filter(function(connection) {
+          return connection.status === 'active' && !connection.revoked_at;
+        });
         if (!rows || !rows.length) {
           window._shareHandlingFollowUps = false;
           return;
@@ -5743,8 +6065,9 @@ function renderFUWithSource(list, shouldScroll) {
     }).join('');
 
     var label = assignNodeLabel(nodeId);
+    var recipientLabel = fu.display_name || window._sharedRecipientName || 'Guest';
     el.innerHTML =
-      (isRecipient ? '<div class="fu-label-recipient">From the person you shared with</div>' : '') +
+      (isRecipient ? '<div class="fu-label-recipient">From ' + escHtml(recipientLabel) + '</div>' : '') +
       '<div class="fu-question" data-label="' + label + ' — ">' + escHtml(fu.query || '') + '</div>' +
       '<div class="fu-body">' + (paras || '<p>' + escHtml(bodyText) + '</p>') + '</div>';
 
@@ -5759,13 +6082,41 @@ function renderFUWithSource(list, shouldScroll) {
 // SAVE FOLLOW-UP
 function saveFollowUp(threadId, question, response) {
   if (!threadId) return;
-  var key = 'qt_followups_' + threadId;
+  var storageThreadId = (window._sharedViewPermission === 'viewer' && window._sharedViewForkThreadId)
+    ? window._sharedViewForkThreadId
+    : threadId;
+  var key = 'qt_followups_' + storageThreadId;
   var list = [];
   try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
   list.push({ question: question, response: response });
   localStorage.setItem(key, JSON.stringify(list));
+  if (window._sharedViewToken && !userEmail()) window._sharedGuestHasWork = true;
 
-  if (threadId.startsWith('pending-')) return;
+  if (storageThreadId.startsWith('pending-')) return;
+
+  // A View/Edit invitation writes through the personal share connection.
+  // A Read Only invitation never writes to the originator's thread; once a
+  // signed-in recipient has a saved fork, their questions persist there.
+  if (window._sharedViewToken && window._sharedViewShareId) {
+    if (window._sharedViewPermission === 'contributor') {
+      authenticatedFetch(API_BASE + '/api/followups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-share-id': window._sharedViewShareId,
+          'x-share-token': window._sharedViewToken
+        },
+        body: JSON.stringify({ threadId: threadId, question: question, response: response, source: 'recipient', shareId: window._sharedViewShareId, anonSessionId: getAnonSessionId() })
+      }).catch(function() {});
+    } else if (window._sharedViewForkThreadId && userEmail()) {
+      authenticatedFetch(API_BASE + '/api/followups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: window._sharedViewForkThreadId, question: question, response: response })
+      }).catch(function() {});
+    }
+    return;
+  }
 
   // Owner follow-ups are already persisted durably by canonical completion
   // as a new Interpretation Artifact revision. Do not duplicate that write
@@ -5773,17 +6124,6 @@ function saveFollowUp(threadId, question, response) {
   // for historical rows and shared-recipient history.
   if (canActAsThreadMember()) return;
 
-  // Anonymous-style recipient — either genuinely anonymous, or signed in
-  // but hasn't joined this thread's Trust Circle yet. Uses the same
-  // x-share-id/source=recipient path followups.js already supports and
-  // share.html already relied on.
-  if (window._sharedViewToken && window._sharedViewShareId) {
-    authenticatedFetch(API_BASE + '/api/followups', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-share-id': window._sharedViewShareId },
-      body: JSON.stringify({ threadId: threadId, question: question, response: response, source: 'recipient', shareId: window._sharedViewShareId, anonSessionId: getAnonSessionId() })
-    }).catch(function() {});
-  }
 }
 
 // RENAME
@@ -6174,6 +6514,9 @@ async function loadSidebarCreditsAnon() {
   // credits rather than just the raw anonymous visitor count.
   try {
     var url = API_BASE + '/api/interpret?_ts=' + Date.now();
+    if (window._sharedViewShareId && window._sharedViewToken) {
+      url += '&shareId=' + encodeURIComponent(window._sharedViewShareId) + '&t=' + encodeURIComponent(window._sharedViewToken);
+    }
     const res = await fetch(url, {
       method: 'GET',
       headers: await getInterpretRequestHeaders(),
@@ -6328,12 +6671,18 @@ function initSidebar() {
       if (!threads || !threads.length) return;
       var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://fgngixbhpilefmyyeldr.supabase.co';
       var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
-      var ids = threads.map(function(t) { return t.id; }).join(',');
-      fetch(SUPA_URL + '/rest/v1/shares?thread_id=in.(' + encodeURIComponent(ids) + ')&status=eq.active&select=thread_id', {
-        headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(rows) {
+      Promise.all(threads.map(function(thread) {
+        return authenticatedFetch('/api/share?threadId=' + encodeURIComponent(thread.id))
+          .then(function(r) { return r.ok ? r.json() : { connections: [] }; })
+          .then(function(data) {
+            var active = (data.connections || []).some(function(connection) {
+              return connection.status === 'active' && !connection.revoked_at;
+            });
+            return active ? { thread_id: thread.id } : null;
+          });
+      }))
+      .then(function(results) {
+        var rows = results.filter(Boolean);
         if (!rows || !rows.length) return;
         rows.forEach(function(row) {
           if (row.thread_id) {
@@ -6427,6 +6776,199 @@ async function handleLogout() {
 
 window._shareActive     = false;  // true once share is created
 var _presencePollInterval = null;
+var _shareConnections = [];
+
+function openSharePanel() {
+  if (!window._lastParsedResult) return;
+  if (!verifiedAuthState.authenticated) {
+    showFreeAccountModal('share');
+    return;
+  }
+  closeDiscussionPanel();
+  var panel = document.getElementById('sharePanel');
+  var invitedBy = document.getElementById('shareInvitedBy');
+  if (invitedBy) {
+    invitedBy.value = localStorage.getItem('qt_display_name') ||
+      ((userEmail() || '').split('@')[0].replace(/[._]+/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); })) ||
+      'The Prism user';
+  }
+  if (panel) {
+    panel.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+  }
+  loadShareConnections();
+}
+
+function closeSharePanel() {
+  var panel = document.getElementById('sharePanel');
+  if (!panel) return;
+  panel.classList.remove('open');
+  panel.setAttribute('aria-hidden', 'true');
+}
+
+function setSharePanelStatus(message, isError) {
+  var el = document.getElementById('sharePanelStatus');
+  if (!el) return;
+  el.textContent = message || '';
+  el.style.color = isError ? '#c97878' : 'rgba(80,180,120,0.9)';
+  el.style.display = message ? 'block' : 'none';
+}
+
+async function loadShareConnections() {
+  if (!activeThreadId || activeThreadId.startsWith('pending-')) return;
+  try {
+    var res = await authenticatedFetch('/api/share?threadId=' + encodeURIComponent(activeThreadId));
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not load connections');
+    _shareConnections = Array.isArray(data.connections) ? data.connections : [];
+    window._shareActive = _shareConnections.some(function(c) { return c.status === 'active' && !c.revoked_at; });
+    renderShareConnections();
+    updateSessionGovernanceUI();
+    updateSidebarSharedDot(activeThreadId, window._shareActive);
+  } catch (e) {
+    setSharePanelStatus('Could not load existing connections.', true);
+  }
+}
+
+function connectionUrl(connection) {
+  return 'https://theprism.io/share.html?t=' + connection.token;
+}
+
+function renderShareConnections() {
+  var list = document.getElementById('shareConnectionsList');
+  if (!list) return;
+  var active = _shareConnections.filter(function(c) { return c.status === 'active' && !c.revoked_at; });
+  if (!active.length) {
+    list.innerHTML = '<div class="share-privacy-note">No active connections yet.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  active.forEach(function(connection) {
+    var row = document.createElement('div');
+    row.className = 'share-connection';
+    var name = document.createElement('div');
+    name.className = 'share-connection-name';
+    name.textContent = connection.recipient_name || 'Recipient';
+    var meta = document.createElement('div');
+    meta.className = 'share-connection-meta';
+    meta.textContent = connection.permission === 'contributor' ? 'View/Edit · Active' : 'Read Only · Active';
+    var actions = document.createElement('div');
+    actions.className = 'share-connection-actions';
+    var copy = document.createElement('button');
+    copy.textContent = 'Copy Link';
+    copy.onclick = function() { copyConnectionInvite(connection); };
+    var close = document.createElement('button');
+    close.textContent = 'Close Connection';
+    close.onclick = function() { closeShareConnection(connection.id); };
+    actions.appendChild(copy);
+    actions.appendChild(close);
+    row.appendChild(name);
+    row.appendChild(meta);
+    row.appendChild(actions);
+    list.appendChild(row);
+  });
+}
+
+function connectionInviteText(connection) {
+  var inviter = (document.getElementById('shareInvitedBy') || {}).value || 'Someone';
+  var recipient = connection.recipient_name || 'Hello';
+  var access = connection.permission === 'contributor'
+    ? 'You can read the exchange and add questions—no account is required.'
+    : 'You can read the exchange, and any questions you continue with will remain in your own copy.';
+  var subject = currentSubject ? '\n\n“' + currentSubject + '”' : '';
+  var note = connection.invite_note ? '\n\n' + connection.invite_note : '';
+  return recipient + ', you may be wondering what this is.\n\n'
+    + inviter + ' shared a conversation from The Prism with you. ' + access
+    + subject + note + '\n\n' + connectionUrl(connection);
+}
+
+async function copyConnectionInvite(connection) {
+  try {
+    await navigator.clipboard.writeText(connectionInviteText(connection));
+    setSharePanelStatus('Invitation copied.', false);
+  } catch (e) {
+    setSharePanelStatus('Could not copy the invitation.', true);
+  }
+}
+
+async function createShareConnection() {
+  var recipientEl = document.getElementById('shareRecipientName');
+  var permissionEl = document.getElementById('sharePermission');
+  var noteEl = document.getElementById('shareInviteNote');
+  var button = document.getElementById('createShareConnectionBtn');
+  var recipientName = recipientEl ? recipientEl.value.trim() : '';
+  if (!recipientName) {
+    setSharePanelStatus('Enter the recipient’s name.', true);
+    if (recipientEl) recipientEl.focus();
+    return;
+  }
+  if (!activeThreadId || activeThreadId.startsWith('pending-')) {
+    setSharePanelStatus('This exchange is not ready to share yet.', true);
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = 'Creating…'; }
+  try {
+    var parsed = window._lastParsedResult || {};
+    var res = await authenticatedFetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subject: currentSubject,
+        threadId: activeThreadId,
+        artifactId: parsed._artifactId,
+        artifactRevision: parsed._artifactRevision,
+        recipientName: recipientName,
+        permission: permissionEl ? permissionEl.value : 'viewer',
+        inviteNote: noteEl ? noteEl.value : ''
+      })
+    });
+    var data = await res.json();
+    if (!res.ok || !data.shareId) throw new Error(data.error || 'Could not create link');
+    var connection = {
+      id: data.shareId,
+      token: data.token,
+      recipient_name: data.recipientName,
+      invite_note: noteEl ? noteEl.value.trim() : '',
+      permission: data.permission,
+      status: 'active',
+      revoked_at: null
+    };
+    _shareConnections.unshift(connection);
+    window._shareActive = true;
+    window._currentShareUrl = data.shareUrl;
+    renderShareConnections();
+    updateSessionGovernanceUI();
+    updateSidebarSharedDot(activeThreadId, true);
+    if (recipientEl) recipientEl.value = '';
+    if (noteEl) noteEl.value = '';
+    await copyConnectionInvite(connection);
+  } catch (e) {
+    setSharePanelStatus(e.message || 'Could not create the connection.', true);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = 'Create Link'; }
+  }
+}
+
+async function closeShareConnection(shareId) {
+  try {
+    var res = await authenticatedFetch('/api/share', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shareId: shareId, status: 'inactive' })
+    });
+    if (!res.ok) throw new Error('Could not close connection');
+    _shareConnections = _shareConnections.map(function(c) {
+      return c.id === shareId ? Object.assign({}, c, { status: 'inactive', revoked_at: new Date().toISOString() }) : c;
+    });
+    window._shareActive = _shareConnections.some(function(c) { return c.status === 'active' && !c.revoked_at; });
+    renderShareConnections();
+    updateSessionGovernanceUI();
+    updateSidebarSharedDot(activeThreadId, window._shareActive);
+    setSharePanelStatus('Connection closed.', false);
+  } catch (e) {
+    setSharePanelStatus(e.message || 'Could not close the connection.', true);
+  }
+}
 
 // Called when user taps "Share"
 // First tap: creates share + starts delivery flow
@@ -6445,22 +6987,23 @@ function updateSessionGovernanceUI() {
   if (window._shareActive) {
     // Fade in Shared label, fade out Share This button
     stateEl.style.opacity = '1';
-    stateEl.style.pointerEvents = 'none';
+    stateEl.style.pointerEvents = 'auto';
+    stateEl.style.cursor = 'pointer';
+    stateEl.onclick = openSharePanel;
     stateEl.className = 'query-state-label open';
     if (openTrig) openTrig.style.opacity = '0';
     if (openTrig) openTrig.style.pointerEvents = 'none';
     if (stateDot) stateDot.classList.add('visible');
-    // Fade in URL layer
-    if (urlRow)   urlRow.classList.add('visible');
-    if (urlText && window._currentShareUrl) {
-      urlText.textContent = window._currentShareUrl;
-      urlText.classList.add('active');
-    }
-    checkNativeShareSupport();
+    // Each recipient has a different link; management belongs in Share.
+    if (urlRow) urlRow.classList.remove('visible');
+    if (urlText) { urlText.textContent = '—'; urlText.classList.remove('active'); }
   } else {
     // Fade in Share This button, fade out Shared label
     stateEl.style.opacity = '0';
     stateEl.className = 'query-state-label';
+    stateEl.style.pointerEvents = 'none';
+    stateEl.style.cursor = '';
+    stateEl.onclick = null;
     if (openTrig) openTrig.style.opacity = '1';
     if (openTrig) openTrig.style.pointerEvents = 'auto';
     if (stateDot) stateDot.classList.remove('visible');
@@ -6656,6 +7199,8 @@ async function deactivateShare() {
 }
 
 async function handleShareBtn() {
+  openSharePanel();
+  return;
   if (window._shareActive) {
     // Already shared — toggle off (deactivate share)
     await deactivateShare();
@@ -7071,6 +7616,7 @@ function openChatPanel() {
     sigilEl.textContent = lbl === 'Query' ? 'Q' : lbl;
   }
   highlightRefractionNode(_activeNodeId || 'root');
+  _refractionView = 'private';
   panel.classList.add('open');
   _chatOpen = true;
   syncRefractionButtons(_activeNodeId || 'root');
@@ -7652,6 +8198,7 @@ function startNewSection(wrap) {
 }
 
 function scheduleNoteAutosave(noteId, fields) {
+  if (window._sharedViewToken && !userEmail()) window._sharedGuestHasWork = true;
   if (_noteAutosaveTimers[noteId]) clearTimeout(_noteAutosaveTimers[noteId].timer);
   var pending = (_noteAutosaveTimers[noteId] && _noteAutosaveTimers[noteId].fields) || {};
   Object.assign(pending, fields);
@@ -9179,6 +9726,9 @@ async function runPreflightCheck() {
   if (userEmail && !_anonMode && _paidTier) return;
   try {
     var url = '/api/interpret?_ts=' + Date.now();
+    if (window._sharedViewShareId && window._sharedViewToken) {
+      url += '&shareId=' + encodeURIComponent(window._sharedViewShareId) + '&t=' + encodeURIComponent(window._sharedViewToken);
+    }
     var res = await fetch(url, {
       method: 'GET',
       headers: await getInterpretRequestHeaders(),
