@@ -326,18 +326,18 @@
     transition: border-color 0.5s, padding-left 0.5s;
   }
 
-  /* ── Highlight-to-note bottom sheet ── */
+  /* ── Response highlight palette ── */
   #highlightSheet {
     position: fixed;
-    left: 0; right: 0; top: 0;
+    left: 0; right: 0; bottom: 0;
     background: var(--deep);
-    border-bottom: 1px solid var(--border-lit);
-    padding: calc(14px + env(safe-area-inset-top)) 20px 14px;
+    border-top: 1px solid var(--border-lit);
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 14px;
-    transform: translateY(-100%);
+    transform: translateY(100%);
     transition: transform 0.25s ease;
     z-index: 900;
   }
@@ -2428,12 +2428,12 @@
 
     <!-- Response-highlight bottom sheet — appears when text is selected
          within a response and offers five visual highlight colors. -->
-    <div id="highlightSheet">
-      <button class="highlight-swatch" style="background:rgba(201,168,76,0.85);" title="Gold" onclick="applyHighlight('rgba(201,168,76,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(74,106,170,0.85);" title="Blue" onclick="applyHighlight('rgba(74,106,170,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(212,83,110,0.85);" title="Rose" onclick="applyHighlight('rgba(212,83,110,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(29,158,117,0.85);" title="Teal" onclick="applyHighlight('rgba(29,158,117,0.32)')"></button>
-      <button class="highlight-swatch" style="background:rgba(127,119,221,0.85);" title="Violet" onclick="applyHighlight('rgba(127,119,221,0.32)')"></button>
+    <div id="highlightSheet" role="toolbar" aria-label="Highlight selected text">
+      <button class="highlight-swatch" style="background:rgba(201,168,76,0.85);" title="Gold" aria-label="Highlight gold" onclick="applyHighlight('rgba(201,168,76,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(74,106,170,0.85);" title="Blue" aria-label="Highlight blue" onclick="applyHighlight('rgba(74,106,170,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(212,83,110,0.85);" title="Rose" aria-label="Highlight rose" onclick="applyHighlight('rgba(212,83,110,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(29,158,117,0.85);" title="Teal" aria-label="Highlight teal" onclick="applyHighlight('rgba(29,158,117,0.32)')"></button>
+      <button class="highlight-swatch" style="background:rgba(127,119,221,0.85);" title="Violet" aria-label="Highlight violet" onclick="applyHighlight('rgba(127,119,221,0.32)')"></button>
     </div>
 
 
@@ -7435,22 +7435,37 @@ function buildNoteBlock(n) {
 // Selecting text anywhere inside a response reveals a bottom sheet of
 // highlight colors (see #highlightSheet). Highlighting is visual only;
 // Refractions notes are created deliberately from within Refractions.
+var _pendingHighlightRange = null;
+var _highlightSheetInteracting = false;
 (function initResponseHighlighting() {
   var sheet = document.getElementById('highlightSheet');
   if (!sheet) return;
   var resultContent = document.getElementById('resultContent');
   if (!resultContent) return;
 
+  // Tapping a toolbar control can collapse the native selection before
+  // its click handler runs, especially on Android. Keep the palette in
+  // place through that pointer sequence; applyHighlight uses the cloned
+  // range captured below rather than depending on browser focus behavior.
+  sheet.addEventListener('pointerdown', function() {
+    _highlightSheetInteracting = true;
+  });
+  document.addEventListener('pointerup', function() {
+    setTimeout(function() { _highlightSheetInteracting = false; }, 0);
+  });
+
   document.addEventListener('selectionchange', function() {
     var sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-      sheet.classList.remove('visible');
+      if (!_highlightSheetInteracting) sheet.classList.remove('visible');
       return;
     }
     var range = sel.getRangeAt(0);
     if (resultContent.contains(range.commonAncestorContainer)) {
+      _pendingHighlightRange = range.cloneRange();
       sheet.classList.add('visible');
     } else {
+      _pendingHighlightRange = null;
       sheet.classList.remove('visible');
     }
   });
@@ -7477,25 +7492,20 @@ function removeHighlightMark(mark) {
 
 function applyHighlight(color) {
   var sel = window.getSelection();
-  if (!sel || sel.isCollapsed) return;
-  var range = sel.getRangeAt(0);
-  if (!sel.toString().trim()) return;
+  var resultContent = document.getElementById('resultContent');
+  var liveRange = sel && !sel.isCollapsed && sel.rangeCount ? sel.getRangeAt(0) : null;
+  var range = liveRange && resultContent && resultContent.contains(liveRange.commonAncestorContainer)
+    ? liveRange.cloneRange()
+    : (_pendingHighlightRange ? _pendingHighlightRange.cloneRange() : null);
+  if (!range || range.collapsed || !resultContent || !resultContent.contains(range.commonAncestorContainer)) return;
 
   // Clear any existing highlight(s) this selection overlaps, so a new
   // color replaces the old one cleanly instead of nesting inside it and
   // creating a visibly "layered" double-highlight effect.
-  var resultContent = document.getElementById('resultContent');
-  if (resultContent) {
-    var existingMarks = resultContent.querySelectorAll('mark');
-    existingMarks.forEach(function(m) {
-      if (range.intersectsNode(m)) unwrapMark(m);
-    });
-  }
-  // The unwrap above can shift text nodes around, so re-derive a fresh
-  // range from the current selection rather than reusing the stale one.
-  sel = window.getSelection();
-  if (!sel || sel.isCollapsed) return;
-  range = sel.getRangeAt(0);
+  var existingMarks = resultContent.querySelectorAll('mark');
+  existingMarks.forEach(function(m) {
+    if (range.intersectsNode(m)) unwrapMark(m);
+  });
 
   // Mark the selection in the response itself
   var mark = document.createElement('mark');
@@ -7517,7 +7527,9 @@ function applyHighlight(color) {
     range.insertNode(mark);
   }
 
-  sel.removeAllRanges();
+  if (sel) sel.removeAllRanges();
+  _pendingHighlightRange = null;
+  _highlightSheetInteracting = false;
   document.getElementById('highlightSheet').classList.remove('visible');
 }
 
