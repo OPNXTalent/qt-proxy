@@ -224,6 +224,78 @@
     color:var(--gold-pale);
   }
   .share-panel-body { padding:24px; overflow-y:auto; }
+  .share-invite-card {
+    border:1px solid var(--border-lit);
+    background:rgba(16,16,27,0.82);
+  }
+  .share-invite-card-head {
+    position:relative;
+    padding:17px 48px 15px 18px;
+    border-bottom:1px solid var(--border);
+  }
+  .share-invite-card-title {
+    font-family:var(--crimson);
+    font-size:19px;
+    font-weight:600;
+    color:var(--text);
+  }
+  .share-invite-card-copy {
+    margin-top:3px;
+    font-family:var(--crimson);
+    font-size:15px;
+    color:var(--text-muted);
+    line-height:1.45;
+  }
+  .share-card-close {
+    position:absolute;
+    top:13px;
+    right:13px;
+    background:transparent;
+    border:0;
+    color:var(--text-muted);
+    font-size:20px;
+    line-height:1;
+    padding:4px 7px;
+    cursor:pointer;
+  }
+  .share-invite-card-form { padding:13px 18px 10px; }
+  .share-card-row {
+    display:grid;
+    grid-template-columns:112px minmax(0,1fr);
+    gap:12px;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .share-card-row > label,
+  .share-card-label {
+    font-family:var(--mono);
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--text-muted);
+  }
+  .share-inviter-value {
+    min-height:42px;
+    display:flex;
+    align-items:center;
+    box-sizing:border-box;
+    border:1px solid var(--border-lit);
+    background:var(--surface);
+    color:var(--text);
+    font-family:var(--crimson);
+    font-size:16px;
+    padding:9px 12px;
+  }
+  .share-card-actions {
+    display:flex;
+    justify-content:flex-end;
+    padding:0 18px 14px;
+  }
+  .share-card-footer {
+    border-top:1px solid var(--border);
+    padding:14px 18px 16px;
+  }
   .share-field { margin-bottom:18px; }
   .share-field label {
     display:block;
@@ -234,7 +306,8 @@
     color:var(--text-muted);
     margin-bottom:7px;
   }
-  .share-field input, .share-field select, .share-field textarea {
+  .share-field input, .share-field select, .share-field textarea,
+  .share-card-row input, .share-card-row select {
     width:100%;
     box-sizing:border-box;
     background:var(--surface);
@@ -246,14 +319,15 @@
     outline:none;
   }
   .share-field textarea { min-height:82px; resize:vertical; }
-  .share-field input:focus, .share-field select:focus, .share-field textarea:focus { border-color:var(--gold-dim); }
+  .share-field input:focus, .share-field select:focus, .share-field textarea:focus,
+  .share-card-row input:focus, .share-card-row select:focus { border-color:var(--gold-dim); }
   .share-create-btn {
-    width:100%;
+    width:auto;
     font-family:var(--cinzel);
     font-size:14px;
     letter-spacing:0.18em;
     text-transform:uppercase;
-    padding:12px 18px;
+    padding:10px 17px;
     border:1px solid var(--gold-dim);
     background:rgba(201,168,76,0.06);
     color:var(--gold-pale);
@@ -267,6 +341,7 @@
     line-height:1.55;
     margin:14px 0 24px;
   }
+  .share-card-footer .share-privacy-note { margin:0; }
   .share-connection {
     border-top:1px solid var(--border);
     padding:16px 0;
@@ -277,6 +352,11 @@
   .share-connection-actions button {
     font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase;
     padding:7px 10px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;
+  }
+  @media (max-width: 600px) {
+    .share-panel-body { padding:16px; }
+    .share-card-row { grid-template-columns:92px minmax(0,1fr); gap:10px; }
+    .share-card-actions .share-create-btn { width:100%; min-height:44px; }
   }
 
   /* ── Breadcrumb — future sprint ── */
@@ -2686,34 +2766,37 @@
       <button class="disc-close-btn" onclick="closeSharePanel()" title="Close Share">✕</button>
     </div>
     <div class="share-panel-body">
-      <div style="font-family:var(--crimson);font-size:20px;color:var(--text);margin-bottom:4px;">Invite someone into this exchange</div>
-      <div style="font-family:var(--crimson);font-style:italic;font-size:15px;color:var(--text-muted);line-height:1.55;margin-bottom:22px;">Create a personal connection they can open without an account.</div>
-
-      <div class="share-field">
-        <label for="shareInvitedBy">Invited by</label>
-        <input id="shareInvitedBy" type="text" readonly>
-      </div>
-      <div class="share-field">
-        <label for="shareRecipientName">Recipient</label>
-        <input id="shareRecipientName" type="text" maxlength="80" placeholder="Who are you inviting?" autocomplete="off" required>
-      </div>
-      <div class="share-field">
-        <label for="sharePermission">Access</label>
-        <select id="sharePermission">
-          <option value="viewer">Read Only</option>
-          <option value="contributor">View/Edit</option>
-        </select>
-      </div>
-      <div class="share-field">
-        <label for="shareInviteNote">Personal note <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
-        <textarea id="shareInviteNote" maxlength="500" placeholder="Add a short note…"></textarea>
-      </div>
-      <button id="createShareConnectionBtn" class="share-create-btn" onclick="createShareConnection()">Create Link</button>
-      <div id="sharePanelStatus" style="display:none;font-family:var(--mono);font-size:12px;letter-spacing:0.1em;margin-top:12px;line-height:1.5;"></div>
-      <div class="share-privacy-note">Your notes always remain private. Anyone with an active link receives its assigned access.</div>
-
-      <div style="font-family:var(--mono);font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Connections</div>
-      <div id="shareConnectionsList"><div class="share-privacy-note">No active connections yet.</div></div>
+      <section class="share-invite-card" aria-labelledby="shareInviteTitle">
+        <div class="share-invite-card-head">
+          <div class="share-invite-card-title" id="shareInviteTitle">Invite to this exchange</div>
+          <div class="share-invite-card-copy">The Prism prepares the greeting and link automatically. Your notes remain private.</div>
+          <button class="share-card-close" onclick="closeSharePanel()" aria-label="Close Share">×</button>
+        </div>
+        <div class="share-invite-card-form">
+          <div class="share-card-row">
+            <span class="share-card-label">Invited by</span>
+            <span id="shareInvitedBy" class="share-inviter-value"></span>
+          </div>
+          <div class="share-card-row">
+            <label for="shareRecipientName">Recipient</label>
+            <input id="shareRecipientName" type="text" maxlength="80" placeholder="Who are you inviting?" autocomplete="name" autocapitalize="words" required>
+          </div>
+          <div class="share-card-row">
+            <label for="sharePermission">Access</label>
+            <select id="sharePermission">
+              <option value="viewer">Read Only — may explore privately</option>
+              <option value="contributor">View/Edit — may contribute</option>
+            </select>
+          </div>
+        </div>
+        <div class="share-card-actions">
+          <button id="createShareConnectionBtn" class="share-create-btn" onclick="createShareConnection()">Create Link</button>
+        </div>
+        <div id="sharePanelStatus" role="status" style="display:none;font-family:var(--mono);font-size:12px;letter-spacing:0.1em;margin:0 18px 14px;line-height:1.5;"></div>
+        <div class="share-card-footer">
+          <div id="shareConnectionsList"><div class="share-privacy-note">No active connections yet.</div></div>
+        </div>
+      </section>
     </div>
   </aside>
 
@@ -6765,13 +6848,19 @@ function openSharePanel() {
   var panel = document.getElementById('sharePanel');
   var invitedBy = document.getElementById('shareInvitedBy');
   if (invitedBy) {
-    invitedBy.value = localStorage.getItem('qt_display_name') ||
+    invitedBy.textContent = localStorage.getItem('qt_display_name') ||
       ((userEmail() || '').split('@')[0].replace(/[._]+/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); })) ||
       'The Prism user';
   }
   if (panel) {
     panel.classList.add('open');
     panel.setAttribute('aria-hidden', 'false');
+  }
+  var recipientInput = document.getElementById('shareRecipientName');
+  if (recipientInput) {
+    recipientInput.readOnly = false;
+    recipientInput.disabled = false;
+    window.setTimeout(function() { recipientInput.focus(); }, 80);
   }
   loadShareConnections();
 }
@@ -6847,7 +6936,7 @@ function renderShareConnections() {
 }
 
 function connectionInviteText(connection) {
-  var inviter = (document.getElementById('shareInvitedBy') || {}).value || 'Someone';
+  var inviter = (document.getElementById('shareInvitedBy') || {}).textContent || 'Someone';
   var recipient = connection.recipient_name || 'Hello';
   var access = connection.permission === 'contributor'
     ? 'You can read the exchange and add questions—no account is required.'
@@ -6871,7 +6960,6 @@ async function copyConnectionInvite(connection) {
 async function createShareConnection() {
   var recipientEl = document.getElementById('shareRecipientName');
   var permissionEl = document.getElementById('sharePermission');
-  var noteEl = document.getElementById('shareInviteNote');
   var button = document.getElementById('createShareConnectionBtn');
   var recipientName = recipientEl ? recipientEl.value.trim() : '';
   if (!recipientName) {
@@ -6895,8 +6983,7 @@ async function createShareConnection() {
         artifactId: parsed._artifactId,
         artifactRevision: parsed._artifactRevision,
         recipientName: recipientName,
-        permission: permissionEl ? permissionEl.value : 'viewer',
-        inviteNote: noteEl ? noteEl.value : ''
+        permission: permissionEl ? permissionEl.value : 'viewer'
       })
     });
     var data = await res.json();
@@ -6905,7 +6992,7 @@ async function createShareConnection() {
       id: data.shareId,
       token: data.token,
       recipient_name: data.recipientName,
-      invite_note: noteEl ? noteEl.value.trim() : '',
+      invite_note: '',
       permission: data.permission,
       status: 'active',
       revoked_at: null
@@ -6917,7 +7004,6 @@ async function createShareConnection() {
     updateSessionGovernanceUI();
     updateSidebarSharedDot(activeThreadId, true);
     if (recipientEl) recipientEl.value = '';
-    if (noteEl) noteEl.value = '';
     await copyConnectionInvite(connection);
   } catch (e) {
     setSharePanelStatus(e.message || 'Could not create the connection.', true);

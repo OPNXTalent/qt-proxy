@@ -6,10 +6,15 @@ const shareApi = readFileSync(new URL('../api/share.js', import.meta.url), 'utf8
 const followupsApi = readFileSync(new URL('../api/followups.js', import.meta.url), 'utf8');
 const interpretApi = readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
 
-assert.match(client, /<option value="viewer">Read Only<\/option>/);
-assert.match(client, /<option value="contributor">View\/Edit<\/option>/);
+assert.match(client, /<option value="viewer">Read Only/);
+assert.match(client, /<option value="contributor">View\/Edit/);
 assert.match(client, /id="shareRecipientName"[^>]+required|id="shareRecipientName"/);
-assert.match(client, /Your notes always remain private/);
+assert.match(client, /Your notes remain private/);
+assert.match(client, /class="share-invite-card"/);
+assert.match(client, /The Prism prepares the greeting and link automatically/);
+assert.match(client, /id="shareInvitedBy" class="share-inviter-value"/);
+assert.doesNotMatch(client, /id="shareInvitedBy"[^>]*readonly|id="shareInviteNote"|Personal note/);
+assert.match(client, /recipientInput\.readOnly = false[\s\S]*recipientInput\.disabled = false[\s\S]*recipientInput\.focus\(\)/);
 assert.match(client, /function openPersonalShareSurface\(nodeId, queryText\)[\s\S]*openSharePanel\(\)/);
 assert.doesNotMatch(client, /openShareSurface\(nodeId, queryText\)|id="circleShareBox"/);
 assert.match(client, /function updateJoinCircleVisibility\(\)[\s\S]*box\.style\.display = 'none'/);
