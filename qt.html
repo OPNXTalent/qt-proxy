@@ -2786,7 +2786,7 @@
           </div>
           <div class="share-card-row">
             <label for="shareRecipientName">Recipient</label>
-            <input id="shareRecipientName" type="text" maxlength="80" placeholder="Who are you inviting?" autocomplete="name" autocapitalize="words" required>
+            <input id="shareRecipientName" type="text" maxlength="80" placeholder="Who are you inviting?" inputmode="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required>
           </div>
           <div class="share-card-row">
             <label for="sharePermission">Access</label>
@@ -6845,6 +6845,33 @@ window._shareActive     = false;  // true once share is created
 var _presencePollInterval = null;
 var _shareConnections = [];
 
+function titleCaseRecipientName(value) {
+  return String(value || '').replace(/(^|[\s'-])([a-z])/g, function(_, boundary, letter) {
+    return boundary + letter.toUpperCase();
+  });
+}
+
+function stabilizeRecipientNameInput(input) {
+  if (!input || input.dataset.prismTypingGuard === '1') return;
+  input.dataset.prismTypingGuard = '1';
+
+  // Keep physical-keyboard events inside the field instead of allowing a
+  // page-level or embedded-browser shortcut to steal focus.
+  input.addEventListener('keydown', function(event) { event.stopPropagation(); });
+  input.addEventListener('keyup', function(event) { event.stopPropagation(); });
+
+  // Samsung Keyboard can drop focus when its Shift state changes inside an
+  // installed PWA. Capitalize names ourselves so Shift is unnecessary and
+  // preserve the caret because this replacement never changes string length.
+  input.addEventListener('input', function() {
+    var caret = input.selectionStart;
+    var normalized = titleCaseRecipientName(input.value);
+    if (normalized === input.value) return;
+    input.value = normalized;
+    if (caret != null && input.setSelectionRange) input.setSelectionRange(caret, caret);
+  });
+}
+
 function openSharePanel() {
   if (!window._lastParsedResult) return;
   if (!verifiedAuthState.authenticated) {
@@ -6865,6 +6892,7 @@ function openSharePanel() {
   }
   var recipientInput = document.getElementById('shareRecipientName');
   if (recipientInput) {
+    stabilizeRecipientNameInput(recipientInput);
     recipientInput.readOnly = false;
     recipientInput.disabled = false;
     window.setTimeout(function() { recipientInput.focus(); }, 80);
@@ -7005,7 +7033,7 @@ async function createShareConnection() {
   var recipientEl = document.getElementById('shareRecipientName');
   var permissionEl = document.getElementById('sharePermission');
   var button = document.getElementById('createShareConnectionBtn');
-  var recipientName = recipientEl ? recipientEl.value.trim() : '';
+  var recipientName = recipientEl ? titleCaseRecipientName(recipientEl.value).trim().replace(/\s+/g, ' ') : '';
   if (!recipientName) {
     setSharePanelStatus('Enter the recipient’s name.', true);
     if (recipientEl) recipientEl.focus();

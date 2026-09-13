@@ -9,12 +9,17 @@ const interpretApi = readFileSync(new URL('../api/interpret.js', import.meta.url
 assert.match(client, /<option value="viewer">Read Only/);
 assert.match(client, /<option value="contributor">View\/Edit/);
 assert.match(client, /id="shareRecipientName"[^>]+required|id="shareRecipientName"/);
+assert.match(client, /id="shareRecipientName"[^>]+autocapitalize="none"[^>]+autocorrect="off"[^>]+spellcheck="false"/);
 assert.match(client, /Your notes remain private/);
 assert.match(client, /class="share-invite-card"/);
 assert.match(client, /The Prism prepares the greeting and link automatically/);
 assert.match(client, /id="shareInvitedBy" class="share-inviter-value"/);
 assert.doesNotMatch(client, /id="shareInvitedBy"[^>]*readonly|id="shareInviteNote"|Personal note/);
 assert.match(client, /recipientInput\.readOnly = false[\s\S]*recipientInput\.disabled = false[\s\S]*recipientInput\.focus\(\)/);
+assert.match(client, /function stabilizeRecipientNameInput\(input\)[\s\S]*keydown[\s\S]*event\.stopPropagation\(\)[\s\S]*keyup[\s\S]*event\.stopPropagation\(\)/);
+assert.match(client, /function titleCaseRecipientName\(value\)[\s\S]*letter\.toUpperCase\(\)/);
+assert.match(client, /stabilizeRecipientNameInput\(recipientInput\)[\s\S]*recipientInput\.readOnly = false/);
+assert.match(client, /titleCaseRecipientName\(recipientEl\.value\)\.trim\(\)\.replace\(\/\\s\+\/g, ' '\)/);
 assert.match(client, /send\.textContent = 'Send Invite'/);
 assert.match(client, /function sendConnectionInvite\(connection\)[\s\S]*navigator\.share\(shareData\)/);
 assert.match(client, /text: connectionInviteText\(connection, true\)/);
