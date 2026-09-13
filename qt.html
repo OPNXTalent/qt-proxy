@@ -353,10 +353,17 @@
     font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase;
     padding:7px 10px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer;
   }
+  .share-connection-actions .share-send-invite {
+    border-color:var(--gold-dim);
+    color:var(--gold-pale);
+    background:rgba(201,168,76,0.06);
+  }
   @media (max-width: 600px) {
     .share-panel-body { padding:16px; }
     .share-card-row { grid-template-columns:92px minmax(0,1fr); gap:10px; }
     .share-card-actions .share-create-btn { width:100%; min-height:44px; }
+    .share-connection-actions { flex-wrap:wrap; }
+    .share-connection-actions button { min-height:42px; }
   }
 
   /* ── Breadcrumb — future sprint ── */
@@ -6920,6 +6927,14 @@ function renderShareConnections() {
     meta.textContent = connection.permission === 'contributor' ? 'View/Edit · Active' : 'Read Only · Active';
     var actions = document.createElement('div');
     actions.className = 'share-connection-actions';
+    if (navigator.share) {
+      var send = document.createElement('button');
+      send.className = 'share-send-invite';
+      send.textContent = 'Send Invite';
+      send.setAttribute('aria-label', 'Send invite to ' + (connection.recipient_name || 'recipient'));
+      send.onclick = function() { sendConnectionInvite(connection); };
+      actions.appendChild(send);
+    }
     var copy = document.createElement('button');
     copy.textContent = 'Copy Link';
     copy.onclick = function() { copyConnectionInvite(connection); };
@@ -6935,7 +6950,7 @@ function renderShareConnections() {
   });
 }
 
-function connectionInviteText(connection) {
+function connectionInviteText(connection, includeUrl) {
   var inviter = (document.getElementById('shareInvitedBy') || {}).textContent || 'Someone';
   var recipient = connection.recipient_name || 'Hello';
   var access = connection.permission === 'contributor'
@@ -6943,9 +6958,10 @@ function connectionInviteText(connection) {
     : 'You can read the exchange, and any questions you continue with will remain in your own copy.';
   var subject = currentSubject ? '\n\n“' + currentSubject + '”' : '';
   var note = connection.invite_note ? '\n\n' + connection.invite_note : '';
-  return recipient + ', you may be wondering what this is.\n\n'
+  var message = recipient + ', you may be wondering what this is.\n\n'
     + inviter + ' shared a conversation from The Prism with you. ' + access
-    + subject + note + '\n\n' + connectionUrl(connection);
+    + subject + note;
+  return includeUrl === false ? message : message + '\n\n' + connectionUrl(connection);
 }
 
 async function copyConnectionInvite(connection) {
@@ -6954,6 +6970,32 @@ async function copyConnectionInvite(connection) {
     setSharePanelStatus('Invitation copied.', false);
   } catch (e) {
     setSharePanelStatus('Could not copy the invitation.', true);
+  }
+}
+
+async function sendConnectionInvite(connection) {
+  if (!navigator.share) {
+    await copyConnectionInvite(connection);
+    return;
+  }
+  var shareData = {
+    title: 'The Prism — Shared Exchange',
+    text: connectionInviteText(connection, false),
+    url: connectionUrl(connection)
+  };
+  if (navigator.canShare && !navigator.canShare(shareData)) {
+    setSharePanelStatus('Native sharing is not available here. Use Copy Link instead.', true);
+    return;
+  }
+  try {
+    await navigator.share(shareData);
+    setSharePanelStatus('Invite shared.', false);
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      setSharePanelStatus('Sharing canceled. Your link remains ready.', false);
+      return;
+    }
+    setSharePanelStatus('Could not open sharing options. Use Copy Link instead.', true);
   }
 }
 
@@ -7004,7 +7046,7 @@ async function createShareConnection() {
     updateSessionGovernanceUI();
     updateSidebarSharedDot(activeThreadId, true);
     if (recipientEl) recipientEl.value = '';
-    await copyConnectionInvite(connection);
+    setSharePanelStatus('Link ready for ' + (connection.recipient_name || 'your recipient') + '. Choose Send Invite or Copy Link.', false);
   } catch (e) {
     setSharePanelStatus(e.message || 'Could not create the connection.', true);
   } finally {
