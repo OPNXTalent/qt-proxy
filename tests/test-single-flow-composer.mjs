@@ -99,20 +99,40 @@ assert.match(
 const nodeControlsStart = frontend.indexOf('function buildNodeControls(nodeId, queryText) {');
 const nodeControlsEnd = frontend.indexOf('function focusRefractionNode(', nodeControlsStart);
 const nodeControlsFlow = frontend.slice(nodeControlsStart, nodeControlsEnd);
-assert.doesNotMatch(
+assert.match(
   nodeControlsFlow,
-  /node-share-btn|textContent = 'Share'|textContent = '↓ Print'/,
-  'Per-response controls must omit redundant Share and Print actions',
+  /node-print-btn[\s\S]*textContent = 'Print'[\s\S]*printPrism\(\)/,
+  'Every Refraction must offer a Print action for the entire exchange',
 );
 assert.match(
   nodeControlsFlow,
-  /textContent = _btnLabel === 'Query' \? 'Notes' : _btnLabel \+ ' Notes'/,
-  'Per-response note shortcuts must use plain Notes language',
+  /node-share-btn[\s\S]*textContent = 'Share'[\s\S]*openShareSurface\(nodeId, queryText\)/,
+  'Every Refraction must open Share at its own response node',
+);
+assert.match(
+  nodeControlsFlow,
+  /node-refraction-btn[\s\S]*textContent = 'Notes'[\s\S]*openNotesSurface\(nodeId, queryText\)/,
+  'Every Refraction must open Notes at its own response node',
 );
 assert.match(
   frontend,
-  /function openNotesSurface\([\s\S]*openNodeSurface\([\s\S]*'private'[\s\S]*function openShareSurface\([\s\S]*openNodeSurface\([\s\S]*'trust_circle'/,
-  'Notes and Share must open their corresponding panel views directly',
+  /function openNotesSurface\([\s\S]*openNodeSurface\([\s\S]*'private'[\s\S]*function openShareSurface\(nodeId, queryText\)[\s\S]*openNodeSurface\(targetNodeId, targetQuery, 'trust_circle'\)/,
+  'Notes and Share must preserve their response node while opening the corresponding view',
+);
+assert.match(
+  frontend,
+  /nodeId:\s*_activeNodeId/,
+  'Trust Circle messages must be written within the active response node',
+);
+assert.match(
+  frontend,
+  /return \(m\.node_id \|\| 'root'\) === _activeNodeId/,
+  'Loaded Trust Circle messages must be filtered to the active response node',
+);
+assert.match(
+  frontend,
+  /\(msg\.node_id \|\| 'root'\) !== _activeNodeId/,
+  'Realtime Trust Circle messages must be filtered to the active response node',
 );
 assert.match(
   frontend,
