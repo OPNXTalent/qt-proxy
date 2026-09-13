@@ -20,6 +20,11 @@
 <script src="/realtime.js" defer></script>
 <script type="module" src="/lib/stream-json.js"></script>
 <style>
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   :root {
     --void: #06060a;
     --deep: #0d0d14;
@@ -2739,6 +2744,16 @@ function submitComposer() {
   return runInterpretation();
 }
 
+function usesCompactTouchKeyboard() {
+  return !!(window.matchMedia && window.matchMedia('(max-width: 900px), (hover: none) and (pointer: coarse)').matches);
+}
+
+function releaseCompactTouchKeyboard(input) {
+  if (!usesCompactTouchKeyboard()) return;
+  var target = input || document.activeElement;
+  if (target && typeof target.blur === 'function') target.blur();
+}
+
 function stageComposerBelowResponse() {
   // Keep the original question at the top while its answer is being built.
   // The empty follow-up composer is revealed only once an answer exists.
@@ -2795,8 +2810,10 @@ function showOpeningComposer() {
 }
 
 async function runInterpretation() {
-  const input = document.getElementById('userInput').value.trim();
+  const inputEl = document.getElementById('userInput');
+  const input = inputEl.value.trim();
   if (!input) return;
+  releaseCompactTouchKeyboard(inputEl);
 
   // Admission is server-authoritative. The browser counter is presentation only.
   const requestId = createPrismRequestId();
@@ -2968,6 +2985,7 @@ async function runFollowUp(sourceInput) {
   const inputEl = sourceInput || document.getElementById('followUpInput') || document.getElementById('userInput');
   const input = inputEl.value.trim();
   if (!input) return;
+  releaseCompactTouchKeyboard(inputEl);
 
   // Follow-ups consume the same server-authoritative Query unit as primaries.
   const requestId = createPrismRequestId();
@@ -3059,7 +3077,7 @@ async function runFollowUp(sourceInput) {
       followUpComposer.style.opacity = '';
       followUpComposer.style.pointerEvents = '';
     }
-    inputEl.focus();
+    if (!usesCompactTouchKeyboard()) inputEl.focus();
   }
 }
 
@@ -7139,6 +7157,7 @@ async function sendChatMessage() {
   if (!input) return;
   var text = input.value.trim();
   if (!text) return;
+  releaseCompactTouchKeyboard(input);
 
   var email = userEmail();
   // Distinct from just "has an email" — a signed-in visitor who hasn't
@@ -7190,7 +7209,7 @@ async function sendChatMessage() {
   } catch(e) { console.error('Chat send error:', e); }
 
   input.disabled = false;
-  input.focus();
+  if (!usesCompactTouchKeyboard()) input.focus();
 }
 
 // ── Private View — your own notes for this response ──────────────────────
@@ -7267,7 +7286,7 @@ function buildNoteTextarea(initialContent, onInput) {
   var textarea = document.createElement('textarea');
   textarea.value = initialContent || '';
   textarea.placeholder = 'Write freely — saves as you go';
-  textarea.style.cssText = 'width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:var(--crimson); font-size:15px; line-height:1.5; padding:0 32px 4px 0; resize:vertical; display:block;';
+  textarea.style.cssText = 'width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:var(--crimson); font-size:16px; line-height:1.5; padding:0 32px 4px 0; resize:vertical; display:block;';
   textarea.addEventListener('input', function() { onInput(textarea.value); });
 
   var micBtn = document.createElement('button');
@@ -7308,7 +7327,7 @@ function buildNoteBlock(n) {
   titleInput.type = 'text';
   titleInput.value = n.title || n.quote || '';
   titleInput.placeholder = 'Section title';
-  titleInput.style.cssText = 'width:100%; font-family:var(--crimson); font-weight:600; font-size:15px; color:var(--text); background:transparent; border:none; border-bottom:1px solid rgba(122,98,48,0.25); padding:0 0 6px; margin-bottom:8px;';
+  titleInput.style.cssText = 'width:100%; font-family:var(--crimson); font-weight:600; font-size:16px; color:var(--text); background:transparent; border:none; border-bottom:1px solid rgba(122,98,48,0.25); padding:0 0 6px; margin-bottom:8px;';
   titleInput.addEventListener('input', function() {
     scheduleNoteAutosave(n.id, { title: titleInput.value });
   });
@@ -7466,7 +7485,7 @@ function startNewSection(wrap) {
   var titleInput = document.createElement('input');
   titleInput.type = 'text';
   titleInput.placeholder = 'Section title';
-  titleInput.style.cssText = 'width:100%; font-family:var(--crimson); font-weight:600; font-size:15px; color:var(--text); background:transparent; border:none; border-bottom:1px solid rgba(122,98,48,0.25); padding:0 0 6px; margin-bottom:8px;';
+  titleInput.style.cssText = 'width:100%; font-family:var(--crimson); font-weight:600; font-size:16px; color:var(--text); background:transparent; border:none; border-bottom:1px solid rgba(122,98,48,0.25); padding:0 0 6px; margin-bottom:8px;';
   var created = false;
   var createdId = null;
 
