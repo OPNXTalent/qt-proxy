@@ -5,8 +5,8 @@ const frontend = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 
 assert.match(
   frontend,
-  /name="viewport" content="width=device-width, initial-scale=1\.0, interactive-widget=resizes-content"/,
-  'The mobile keyboard must resize content instead of magnifying the visual viewport',
+  /name="viewport" content="width=device-width, initial-scale=1\.0, maximum-scale=1\.0, user-scalable=no, interactive-widget=resizes-content"/,
+  'The Android in-app browser must be explicitly prevented from magnifying focused fields',
 );
 assert.match(
   frontend,
