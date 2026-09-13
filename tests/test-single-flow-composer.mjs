@@ -41,6 +41,16 @@ assert.match(
 );
 assert.match(
   frontend,
+  /id="followUpComposer"[\s\S]*id="followUpInput"[\s\S]*id="newSubjectBottomBtn" onclick="resetForm\(\)"/,
+  'The completed-answer composer must include a bottom New Subject control',
+);
+assert.match(
+  frontend,
+  /\.disclaimer\s*\{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;[\s\S]*?text-align:\s*left;[\s\S]*?\}/,
+  'The disclaimer must be left aligned across the full question width',
+);
+assert.match(
+  frontend,
   /function showFollowUpComposer\(\)[\s\S]*positionResponseActions\(section, followUpComposer\)[\s\S]*followUpComposer\.style\.display = 'block'/,
   'The completed answer must reveal its dedicated follow-up composer',
 );
