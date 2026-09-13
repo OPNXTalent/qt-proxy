@@ -186,10 +186,25 @@ assert.ok(
   'Visual response highlighting flow must exist',
 );
 const applyHighlightFlow = frontend.slice(applyHighlightStart, applyHighlightEnd);
+assert.match(
+  frontend,
+  /#highlightSheet\s*\{[\s\S]*?bottom:\s*0;[\s\S]*?transform:\s*translateY\(100%\);/,
+  'The highlight palette must remain visible at the reader-facing bottom edge',
+);
+assert.match(
+  frontend,
+  /var _pendingHighlightRange = null;[\s\S]*?_pendingHighlightRange = range\.cloneRange\(\);/,
+  'Response selection must be preserved before a mobile toolbar tap changes focus',
+);
 assert.doesNotMatch(
   applyHighlightFlow,
   /kind=note|focusRefractionNode|toggleEntryVisibility|noteIdentityHeaders/,
   'Highlighting must not create or open Refractions automatically',
+);
+assert.match(
+  applyHighlightFlow,
+  /_pendingHighlightRange \? _pendingHighlightRange\.cloneRange\(\) : null/,
+  'Highlight application must fall back to the preserved mobile selection',
 );
 assert.doesNotMatch(
   frontend,
