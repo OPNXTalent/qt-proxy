@@ -23,6 +23,15 @@ const reducerPrompt = buildReducerPrompt({
 });
 assert.match(reducerPrompt, /under 6,000 characters/);
 assert.match(reducerPrompt, /at most 3 entries per array/);
+assert.match(reducerPrompt, /fully de-identified/);
+assert.match(reducerPrompt, /Private Notes/);
+const excludedLearningPrompt = buildReducerPrompt({
+  state: initial,
+  input: 'A collaborative follow-up',
+  learningAllowed: false,
+});
+assert.match(excludedLearningPrompt, /EXCLUDED/);
+assert.match(excludedLearningPrompt, /learningCandidate\.eligible to false/);
 
 const analysis = validateAnalysis(parseModelJson(`\`\`\`json
 {
@@ -198,6 +207,7 @@ assert.equal(corrupt.confidence.orientation.level, 'tentative');
 assert.equal(corrupt.confidence.orientation.score, 1);
 
 assert.equal(detectExplicitCorrection("No—that isn't what I meant."), true);
+assert.equal(detectExplicitCorrection('This author analogy is meaningless filler.'), true);
 assert.equal(detectExplicitCorrection('I agree with that distinction.'), false);
 
 const query = buildFocusedRetrievalQuery(next, analysis);
