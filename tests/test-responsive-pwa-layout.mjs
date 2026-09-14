@@ -29,6 +29,11 @@ assert.match(
 );
 assert.match(
   mobile,
+  /#newSubjectTopBtn,\s*#shareSubjectTopBtn\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/,
+  'New Subject and Share must remain balanced below the initial question on mobile',
+);
+assert.match(
+  mobile,
   /#discussionPanel\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100dvh;[\s\S]*?env\(safe-area-inset-top\)/,
   'Notes and Share must open as a safe-area-aware full-screen phone surface',
 );
