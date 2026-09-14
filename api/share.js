@@ -46,11 +46,47 @@ async function resolveActiveShareCredential({ shareId, token }) {
   if (!shareId || !token) return null;
   const shareRes = await sbFetch(
     `/shares?id=eq.${encodeURIComponent(shareId)}&token=eq.${encodeURIComponent(token)}` +
-    '&status=eq.active&select=id,owner_user_id,permission,recipient_name,revoked_at&limit=1',
+    '&status=eq.active&select=id,owner_user_id,thread_id,permission,recipient_name,revoked_at&limit=1',
     { headers: sbHeaders(true) },
   );
   const share = shareRes.ok ? (await shareRes.json())?.[0] : null;
   return share && !share.revoked_at ? share : null;
+}
+
+async function getActiveGroupChannelId(shareId) {
+  if (!shareId) return null;
+  const memberRes = await sbFetch(
+    `/channel_participants?share_id=eq.${encodeURIComponent(shareId)}` +
+    '&status=eq.active&select=channel_id&limit=1',
+    { headers: sbHeaders(true) },
+  );
+  const member = memberRes.ok ? (await memberRes.json())?.[0] : null;
+  if (!member?.channel_id) return null;
+  const channelRes = await sbFetch(
+    `/room_channels?id=eq.${encodeURIComponent(member.channel_id)}` +
+    '&channel_type=eq.small_group&is_active=eq.true&select=id&limit=1',
+    { headers: sbHeaders(true) },
+  );
+  return channelRes.ok ? (await channelRes.json())?.[0]?.id || null : null;
+}
+
+async function getGroupParticipantNames(channelId) {
+  if (!channelId) return [];
+  const memberRes = await sbFetch(
+    `/channel_participants?channel_id=eq.${encodeURIComponent(channelId)}` +
+    '&status=eq.active&share_id=not.is.null&select=share_id',
+    { headers: sbHeaders(true) },
+  );
+  const members = memberRes.ok ? await memberRes.json() : [];
+  const shareIds = (Array.isArray(members) ? members : []).map(member => member.share_id).filter(Boolean);
+  if (!shareIds.length) return [];
+  const sharesRes = await sbFetch(
+    `/shares?id=in.(${shareIds.map(id => encodeURIComponent(id)).join(',')})` +
+    '&status=eq.active&select=id,recipient_name',
+    { headers: sbHeaders(true) },
+  );
+  const shares = sharesRes.ok ? await sharesRes.json() : [];
+  return (Array.isArray(shares) ? shares : []).map(share => share.recipient_name).filter(Boolean);
 }
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
@@ -80,7 +116,7 @@ async function handlePost(req, res) {
     if (!share && req.verifiedIdentity?.userId) {
       const ownerRes = await sbFetch(
         `/shares?id=eq.${encodeURIComponent(body.shareId)}&owner_user_id=eq.${encodeURIComponent(req.verifiedIdentity.userId)}` +
-        '&status=eq.active&select=id,owner_user_id,permission,revoked_at&limit=1',
+        '&status=eq.active&select=id,owner_user_id,thread_id,permission,recipient_name,revoked_at&limit=1',
         { headers: sbHeaders(true) },
       );
       share = ownerRes.ok ? (await ownerRes.json())?.[0] : null;
@@ -89,7 +125,8 @@ async function handlePost(req, res) {
       isOwner = req.verifiedIdentity?.userId === share?.owner_user_id;
     }
     if (!share || share.revoked_at) return res.status(410).json({ error: 'This share credential is no longer active' });
-    if (!isOwner && share.permission !== 'contributor') {
+    const groupChannelId = await getActiveGroupChannelId(share.id);
+    if (!isOwner && !groupChannelId && share.permission !== 'contributor') {
       return res.status(403).json({ error: 'This Trust Circle link is view-only' });
     }
     let guest = null;
@@ -101,10 +138,18 @@ async function handlePost(req, res) {
       });
       if (guest.issued) res.setHeader('Set-Cookie', guestCookieHeader(guest.credential));
     }
-    const insertRes = await sbFetch('/share_chat_messages', {
+    const insertRes = await sbFetch(groupChannelId ? '/room_messages' : '/share_chat_messages', {
       method: 'POST',
       headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
-      body: JSON.stringify({
+      body: JSON.stringify(groupChannelId ? {
+        channel_id: groupChannelId,
+        user_id: isOwner ? req.verifiedIdentity?.userId || null : null,
+        share_id: isOwner ? null : share.id,
+        content: String(body.content).trim().slice(0, 8000),
+        message_type: 'text',
+        display_name: String(body.displayName || (isOwner ? 'Originator' : share.recipient_name) || 'Guest').trim().slice(0, 120),
+        node_id: body.nodeId || 'root',
+      } : {
         share_id: share.id,
         content: String(body.content).trim().slice(0, 8000),
         message_type: isOwner ? 'sender' : 'recipient',
@@ -117,6 +162,85 @@ async function handlePost(req, res) {
     if (!insertRes.ok) return res.status(500).json({ error: 'Could not save comment' });
     const rows = await insertRes.json();
     return res.status(200).json({ success: true, comment: rows?.[0] || null });
+  }
+
+  if (body?.action === 'create_group') {
+    const ownerUserId = req.verifiedIdentity?.userId || null;
+    if (!ownerUserId) return res.status(401).json({ error: 'Verified authentication is required' });
+    const shareIds = [...new Set((Array.isArray(body.shareIds) ? body.shareIds : [])
+      .map(value => String(value || '').trim()).filter(Boolean))].slice(0, 20);
+    if (shareIds.length < 2) return res.status(400).json({ error: 'Select at least two invitees' });
+
+    const sharesRes = await sbFetch(
+      `/shares?id=in.(${shareIds.map(id => encodeURIComponent(id)).join(',')})` +
+      `&owner_user_id=eq.${encodeURIComponent(ownerUserId)}` +
+      '&status=eq.active&revoked_at=is.null&select=id,thread_id,recipient_name',
+      { headers: sbHeaders(true) },
+    );
+    const shares = sharesRes.ok ? await sharesRes.json() : [];
+    if (!Array.isArray(shares) || shares.length !== shareIds.length) {
+      return res.status(403).json({ error: 'One or more invitations are unavailable' });
+    }
+    const threadIds = [...new Set(shares.map(share => share.thread_id).filter(Boolean))];
+    if (threadIds.length !== 1) return res.status(409).json({ error: 'Invitees must belong to the same exchange' });
+
+    const existingRes = await sbFetch(
+      `/channel_participants?share_id=in.(${shareIds.map(id => encodeURIComponent(id)).join(',')})` +
+      '&status=eq.active&select=channel_id,share_id',
+      { headers: sbHeaders(true) },
+    );
+    const existing = existingRes.ok ? await existingRes.json() : [];
+    const existingChannelIds = [...new Set((Array.isArray(existing) ? existing : []).map(row => row.channel_id).filter(Boolean))];
+    if (existingChannelIds.length > 1) {
+      return res.status(409).json({ error: 'Selected invitees already belong to different groups' });
+    }
+
+    let channelId = existingChannelIds[0] || null;
+    if (channelId) {
+      const channelRes = await sbFetch(
+        `/room_channels?id=eq.${encodeURIComponent(channelId)}` +
+        `&room_id=eq.${encodeURIComponent(threadIds[0])}` +
+        '&channel_type=eq.small_group&is_active=eq.true&select=id',
+        { headers: sbHeaders(true) },
+      );
+      const channels = channelRes.ok ? await channelRes.json() : [];
+      if (!Array.isArray(channels) || channels.length !== 1) {
+        return res.status(409).json({ error: 'The existing group discussion is no longer available' });
+      }
+    }
+    if (!channelId) {
+      const channelRes = await sbFetch('/room_channels', {
+        method: 'POST',
+        headers: { ...sbHeaders(true), 'Prefer': 'return=representation' },
+        body: JSON.stringify({
+          room_id: threadIds[0],
+          channel_type: 'small_group',
+          created_by: ownerUserId,
+          is_active: true,
+        }),
+      });
+      if (!channelRes.ok) return res.status(500).json({ error: 'Could not create group discussion' });
+      channelId = (await channelRes.json())?.[0]?.id || null;
+    }
+    if (!channelId) return res.status(500).json({ error: 'Could not create group discussion' });
+
+    const existingShareIds = new Set((Array.isArray(existing) ? existing : []).map(row => row.share_id));
+    const participantRows = shares
+      .filter(share => !existingShareIds.has(share.id))
+      .map(share => ({ channel_id: channelId, user_id: null, share_id: share.id, status: 'active' }));
+    if (participantRows.length) {
+      const participantsRes = await sbFetch('/channel_participants', {
+        method: 'POST',
+        headers: { ...sbHeaders(true), 'Prefer': 'return=minimal' },
+        body: JSON.stringify(participantRows),
+      });
+      if (!participantsRes.ok) return res.status(500).json({ error: 'Could not add group participants' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      group: { channelId, participants: shares.map(share => share.recipient_name).filter(Boolean) },
+    });
   }
 
   if (body?.action === 'fork') {
@@ -356,7 +480,7 @@ async function handleGet(req, res) {
     if (!share && req.verifiedIdentity?.userId) {
       const ownerRes = await sbFetch(
         `/shares?id=eq.${encodeURIComponent(shareId)}&owner_user_id=eq.${encodeURIComponent(req.verifiedIdentity.userId)}` +
-        '&status=eq.active&select=id,owner_user_id,permission,recipient_name,revoked_at&limit=1',
+        '&status=eq.active&select=id,owner_user_id,thread_id,permission,recipient_name,revoked_at&limit=1',
         { headers: sbHeaders(true) },
       );
       share = ownerRes.ok ? (await ownerRes.json())?.[0] : null;
@@ -378,26 +502,36 @@ async function handleGet(req, res) {
       if (guest.issued) res.setHeader('Set-Cookie', guestCookieHeader(guest.credential));
     }
 
+    const groupChannelId = await getActiveGroupChannelId(share.id);
     const messagesRes = await sbFetch(
-      `/share_chat_messages?share_id=eq.${encodeURIComponent(share.id)}` +
-      '&visibility=eq.trust_circle&order=created_at.asc' +
-      '&select=id,content,message_type,display_name,session_token,node_id,created_at',
+      groupChannelId
+        ? `/room_messages?channel_id=eq.${encodeURIComponent(groupChannelId)}` +
+          '&order=created_at.asc&select=id,content,message_type,display_name,user_id,share_id,node_id,created_at'
+        : `/share_chat_messages?share_id=eq.${encodeURIComponent(share.id)}` +
+          '&visibility=eq.trust_circle&order=created_at.asc' +
+          '&select=id,content,message_type,display_name,session_token,node_id,created_at',
       { headers: sbHeaders(true) },
     );
     if (!messagesRes.ok) return res.status(500).json({ error: 'Could not load conversation' });
     const rows = await messagesRes.json();
     const messages = (Array.isArray(rows) ? rows : []).map(message => ({
       ...message,
-      mine: isOwner
-        ? message.message_type === 'sender'
-        : message.message_type === 'recipient' && (
-            guest?.guestId
-              ? message.session_token === guest.guestId
-              : message.display_name === share.recipient_name
-          ),
+      mine: groupChannelId
+        ? (isOwner ? message.user_id === req.verifiedIdentity?.userId : message.share_id === share.id)
+        : (isOwner
+          ? message.message_type === 'sender'
+          : message.message_type === 'recipient' && (
+              guest?.guestId
+                ? message.session_token === guest.guestId
+                : message.display_name === share.recipient_name
+            )),
     }));
+    const group = groupChannelId ? {
+      channelId: groupChannelId,
+      participants: await getGroupParticipantNames(groupChannelId),
+    } : null;
     res.setHeader('Cache-Control', 'private, no-store');
-    return res.status(200).json({ messages });
+    return res.status(200).json({ messages, group });
   }
 
   const memberShareId = req.query?.shareId || new URL(req.url, BASE_URL).searchParams.get('shareId');
@@ -431,7 +565,24 @@ async function handleGet(req, res) {
     );
     if (!ownerRes.ok) return res.status(500).json({ error: 'Could not fetch connections' });
     const connections = await ownerRes.json();
-    return res.status(200).json({ connections });
+    const ids = (Array.isArray(connections) ? connections : []).map(connection => connection.id).filter(Boolean);
+    let memberships = [];
+    if (ids.length) {
+      const memberRes = await sbFetch(
+        `/channel_participants?share_id=in.(${ids.map(id => encodeURIComponent(id)).join(',')})` +
+        '&status=eq.active&select=channel_id,share_id',
+        { headers: sbHeaders(true) },
+      );
+      memberships = memberRes.ok ? await memberRes.json() : [];
+    }
+    const channelByShare = new Map((Array.isArray(memberships) ? memberships : [])
+      .map(member => [member.share_id, member.channel_id]));
+    return res.status(200).json({
+      connections: (Array.isArray(connections) ? connections : []).map(connection => ({
+        ...connection,
+        group_channel_id: channelByShare.get(connection.id) || null,
+      })),
+    });
   }
 
   if (!token) {
@@ -524,6 +675,14 @@ async function handleGet(req, res) {
   let channelId = null;
   if (share.collaboration_open) {
     channelId = await getCollabChannelId(share.id);
+  }
+
+  const groupChannelId = await getActiveGroupChannelId(share.id);
+  if (groupChannelId) {
+    share.group_chat = {
+      channelId: groupChannelId,
+      participants: await getGroupParticipantNames(groupChannelId),
+    };
   }
 
   return res.status(200).json({ share, channelId });

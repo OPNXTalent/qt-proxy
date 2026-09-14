@@ -376,6 +376,8 @@
     padding:16px 0;
   }
   .share-connection-name { font-family:var(--crimson); font-size:18px; color:var(--text); }
+  .share-connection-heading { display:flex; align-items:center; gap:10px; }
+  .share-group-select { width:17px; height:17px; accent-color:var(--gold); cursor:pointer; flex:0 0 auto; }
   .share-connection-meta { font-family:var(--mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-top:3px; }
   .share-connection-actions { display:flex; gap:8px; margin-top:11px; }
   .share-connection-actions button {
@@ -387,6 +389,10 @@
     color:var(--gold-pale);
     background:rgba(201,168,76,0.06);
   }
+  .share-group-actions { margin-top:15px; padding-top:15px; border-top:1px solid var(--border); }
+  .share-group-actions button { width:100%; min-height:42px; font-family:var(--mono); font-size:11px; letter-spacing:0.15em; text-transform:uppercase; border:1px solid rgba(122,150,201,0.55); background:rgba(74,106,170,0.07); color:rgba(205,218,242,0.96); cursor:pointer; }
+  .share-group-actions button:disabled { opacity:0.38; cursor:not-allowed; }
+  .share-group-hint { margin-top:8px; font-family:var(--crimson); font-size:14px; color:var(--text-muted); line-height:1.4; }
   @media (max-width: 600px) {
     .share-panel-body { padding:16px; }
     .share-card-row { grid-template-columns:92px minmax(0,1fr); gap:10px; }
@@ -2839,6 +2845,10 @@
         <div id="sharePanelStatus" role="status" style="display:none;font-family:var(--mono);font-size:12px;letter-spacing:0.1em;margin:0 18px 14px;line-height:1.5;"></div>
         <div class="share-card-footer">
           <div id="shareConnectionsList"><div class="share-privacy-note">No active connections yet.</div></div>
+          <div id="shareGroupActions" class="share-group-actions" style="display:none;">
+            <button id="createGroupChatBtn" type="button" onclick="createGroupChat()" disabled>Create Group Chat</button>
+            <div id="shareGroupHint" class="share-group-hint">Select at least two invitees.</div>
+          </div>
         </div>
       </section>
     </div>
@@ -2872,6 +2882,7 @@
     <!-- Attached-to context -->
     <div class="disc-attached-label">Attached to:</div>
     <div class="disc-anchor-text" id="discContextQuery">The original interpretation</div>
+    <div id="discGroupParticipants" style="display:none; margin:7px 24px 0; font-family:var(--mono); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:rgba(150,175,220,0.7);"></div>
     <div class="disc-anchor-rule"></div>
 
     <!-- Save This Session — anonymous share-recipient context only.
@@ -5335,6 +5346,7 @@ window._sharedViewShareId       = null;
 window._sharedViewIsParticipant = false;
 window._sharedViewPermission    = null;
 window._sharedRecipientName     = null;
+window._sharedGroupChat         = null;
 window._sharedViewForkThreadId  = null;
 window._sharedGuestHasWork      = false;
 
@@ -5391,6 +5403,8 @@ async function loadSharedThread(token) {
 function enterSharedThread(share) {
   window._sharedViewPermission = share.permission || (share.collaboration_open ? 'contributor' : 'viewer');
   window._sharedRecipientName = share.recipient_name || 'Guest';
+  window._sharedGroupChat = share.group_chat || null;
+  _activeGroupChat = window._sharedGroupChat;
   // Synthetic thread entry — same shape selectThread()/renderThreads()
   // already expect from a real /api/threads row. share.snapshot is
   // field-for-field the same object renderResult() already knows how
@@ -5423,7 +5437,7 @@ function enterSharedThread(share) {
   if (typeof window.startChatRealtime === 'function') window.startChatRealtime(share.id);
   updateSaveSessionVisibility();
   var composeBar = document.getElementById('chatComposeBar');
-  if (composeBar) composeBar.style.display = window._sharedViewPermission === 'contributor' ? 'flex' : 'none';
+  if (composeBar) composeBar.style.display = canComposeInSharedConversation() ? 'flex' : 'none';
 
   // initSidebar() is what normally adds the "visible" class the hamburger
   // toggle and sidebar need to appear at all — this entry point bypasses
@@ -5448,7 +5462,9 @@ function enterSharedThread(share) {
     bannerEl.style.display = 'flex';
   }
   if (conversationBtn) {
-    conversationBtn.textContent = window._sharedViewPermission === 'contributor'
+    conversationBtn.textContent = window._sharedGroupChat
+      ? 'Open Group Discussion'
+      : window._sharedViewPermission === 'contributor'
       ? 'Message ' + (share.sender_display_name || 'Sender')
       : 'View Conversation';
   }
@@ -6968,6 +6984,8 @@ async function handleLogout() {
 window._shareActive     = false;  // true once share is created
 var _presencePollInterval = null;
 var _shareConnections = [];
+var _selectedGroupShareIds = new Set();
+var _activeGroupChat = null;
 
 function titleCaseRecipientName(value) {
   return String(value || '').replace(/(^|[\s'-])([a-z])/g, function(_, boundary, letter) {
@@ -7046,6 +7064,12 @@ async function loadShareConnections() {
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not load connections');
     _shareConnections = Array.isArray(data.connections) ? data.connections : [];
+    var activeIds = new Set(_shareConnections.filter(function(connection) {
+      return connection.status === 'active' && !connection.revoked_at;
+    }).map(function(connection) { return connection.id; }));
+    _selectedGroupShareIds.forEach(function(id) {
+      if (!activeIds.has(id)) _selectedGroupShareIds.delete(id);
+    });
     window._shareActive = _shareConnections.some(function(c) { return c.status === 'active' && !c.revoked_at; });
     renderShareConnections();
     updateSessionGovernanceUI();
@@ -7065,22 +7089,38 @@ function renderShareConnections() {
   var active = _shareConnections.filter(function(c) { return c.status === 'active' && !c.revoked_at; });
   if (!active.length) {
     list.innerHTML = '<div class="share-privacy-note">No active connections yet.</div>';
+    updateGroupChatSelectionUI();
     return;
   }
   list.innerHTML = '';
   active.forEach(function(connection) {
     var row = document.createElement('div');
     row.className = 'share-connection';
-    var name = document.createElement('div');
+    var heading = document.createElement('label');
+    heading.className = 'share-connection-heading';
+    var selector = document.createElement('input');
+    selector.type = 'checkbox';
+    selector.className = 'share-group-select';
+    selector.checked = _selectedGroupShareIds.has(connection.id);
+    selector.setAttribute('aria-label', 'Include ' + (connection.recipient_name || 'recipient') + ' in group chat');
+    selector.onchange = function() {
+      if (selector.checked) _selectedGroupShareIds.add(connection.id);
+      else _selectedGroupShareIds.delete(connection.id);
+      updateGroupChatSelectionUI();
+    };
+    var name = document.createElement('span');
     name.className = 'share-connection-name';
     name.textContent = connection.recipient_name || 'Recipient';
+    heading.appendChild(selector);
+    heading.appendChild(name);
     var meta = document.createElement('div');
     meta.className = 'share-connection-meta';
-    meta.textContent = connection.permission === 'contributor' ? 'View/Edit · Active' : 'Read Only · Active';
+    meta.textContent = (connection.permission === 'contributor' ? 'View/Edit · Active' : 'Read Only · Active') +
+      (connection.group_channel_id ? ' · Group Chat' : '');
     var actions = document.createElement('div');
     actions.className = 'share-connection-actions';
     var conversation = document.createElement('button');
-    conversation.textContent = 'Open Discussion';
+    conversation.textContent = connection.group_channel_id ? 'Open Group' : 'Open Discussion';
     conversation.setAttribute('aria-label', 'Open conversation with ' + (connection.recipient_name || 'recipient'));
     conversation.onclick = function() { openConnectionConversation(connection); };
     actions.appendChild(conversation);
@@ -7101,11 +7141,54 @@ function renderShareConnections() {
     close.onclick = function() { closeShareConnection(connection.id); };
     actions.appendChild(copy);
     actions.appendChild(close);
-    row.appendChild(name);
+    row.appendChild(heading);
     row.appendChild(meta);
     row.appendChild(actions);
     list.appendChild(row);
   });
+  updateGroupChatSelectionUI();
+}
+
+function updateGroupChatSelectionUI() {
+  var wrap = document.getElementById('shareGroupActions');
+  var button = document.getElementById('createGroupChatBtn');
+  var hint = document.getElementById('shareGroupHint');
+  var activeCount = _shareConnections.filter(function(connection) {
+    return connection.status === 'active' && !connection.revoked_at;
+  }).length;
+  if (wrap) wrap.style.display = activeCount >= 2 ? 'block' : 'none';
+  var count = _selectedGroupShareIds.size;
+  if (button) {
+    button.disabled = count < 2;
+    button.textContent = count >= 2 ? 'Create Group Chat (' + count + ')' : 'Create Group Chat';
+  }
+  if (hint) hint.textContent = count >= 2
+    ? 'Only the selected invitees will share this discussion.'
+    : 'Select at least two invitees.';
+}
+
+async function createGroupChat() {
+  var shareIds = Array.from(_selectedGroupShareIds);
+  var button = document.getElementById('createGroupChatBtn');
+  if (shareIds.length < 2) return;
+  if (button) { button.disabled = true; button.textContent = 'Creating Group…'; }
+  try {
+    var res = await authenticatedFetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create_group', shareIds: shareIds })
+    });
+    var data = await res.json();
+    if (!res.ok || !data.group) throw new Error(data.error || 'Could not create group chat');
+    _activeGroupChat = data.group;
+    setSharePanelStatus('Group chat ready for ' + data.group.participants.join(', ') + '.', false);
+    await loadShareConnections();
+    var connection = _shareConnections.find(function(item) { return shareIds.indexOf(item.id) !== -1; });
+    if (connection) openConnectionConversation(connection);
+  } catch (error) {
+    setSharePanelStatus(error.message || 'Could not create group chat.', true);
+    updateGroupChatSelectionUI();
+  }
 }
 
 function openConnectionConversation(connection) {
@@ -7117,6 +7200,7 @@ function openConnectionConversation(connection) {
   window._shareActive = true;
   window._currentShareToken = connection.token || null;
   window._currentShareUrl = connectionUrl(connection);
+  _activeGroupChat = connection.group_channel_id ? { channelId: connection.group_channel_id, participants: [] } : null;
   _renderedChatIds = new Set();
   _chatLastCount = -1;
   if (typeof window.startChatRealtime === 'function') window.startChatRealtime(connection.id);
@@ -8100,14 +8184,14 @@ function renderActiveRefractionView() {
 }
 
 function canComposeInSharedConversation() {
-  if (window._sharedViewToken) return window._sharedViewPermission === 'contributor';
+  if (window._sharedViewToken) return !!window._sharedGroupChat || window._sharedViewPermission === 'contributor';
   // An authenticated owner may always speak into their own active channel;
   // the connection permission governs what the recipient may do.
   return !!_currentSharedSessionId;
 }
 
 async function sendChatMessage() {
-  if (window._sharedViewToken && window._sharedViewPermission !== 'contributor') {
+  if (window._sharedViewToken && !window._sharedGroupChat && window._sharedViewPermission !== 'contributor') {
     if (typeof showQueryActionConfirm === 'function') showQueryActionConfirm('This Trust Circle link is view-only');
     return;
   }
@@ -8619,6 +8703,22 @@ async function renderDiscussionView() {
     );
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not load conversation');
+    _activeGroupChat = data.group || null;
+    if (window._sharedViewToken) window._sharedGroupChat = data.group || window._sharedGroupChat;
+    var groupParticipants = document.getElementById('discGroupParticipants');
+    if (groupParticipants) {
+      var participantNames = data.group && Array.isArray(data.group.participants) ? data.group.participants : [];
+      groupParticipants.textContent = participantNames.length ? 'Group: ' + participantNames.join(' · ') : '';
+      groupParticipants.style.display = participantNames.length ? 'block' : 'none';
+    }
+    if (data.group) {
+      var topbarLabel = document.getElementById('discTopbarLabel');
+      var chamberTitle = document.getElementById('discChamberTitle');
+      if (topbarLabel) topbarLabel.textContent = 'Group Discussion';
+      if (chamberTitle) chamberTitle.textContent = 'Group Discussion';
+      var composeBar = document.getElementById('chatComposeBar');
+      if (composeBar) composeBar.style.visibility = 'visible';
+    }
     var messages = data.messages;
     if (!Array.isArray(messages)) messages = [];
     var filtered = messages.filter(function(m) {

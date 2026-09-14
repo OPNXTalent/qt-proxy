@@ -5,6 +5,7 @@ const client = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 const shareApi = readFileSync(new URL('../api/share.js', import.meta.url), 'utf8');
 const followupsApi = readFileSync(new URL('../api/followups.js', import.meta.url), 'utf8');
 const interpretApi = readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
+const groupMigration = readFileSync(new URL('../docs/migrations/2026-09-13-selected-invitee-group-chat.sql', import.meta.url), 'utf8');
 
 assert.match(client, /<option value="viewer">Read Only/);
 assert.match(client, /<option value="contributor">View\/Edit/);
@@ -34,6 +35,11 @@ assert.match(client, /copy\.className = 'share-delivery-action'[\s\S]*if \(copie
 assert.match(client, /onclick="shareViaCopy\(this\)" id="copyLinkBtn"/);
 assert.match(client, /id="newSubjectTopBtn"[\s\S]*id="shareSubjectTopBtn" onclick="openSharePanel\(\)"[\s\S]*id="submitBtn"/);
 assert.match(client, /function showFollowUpComposer\(\)[\s\S]*shareSubjectTopBtn'\)\.style\.display = 'block'/);
+assert.match(client, /selector\.type = 'checkbox'[\s\S]*_selectedGroupShareIds\.add\(connection\.id\)/);
+assert.match(client, /id="createGroupChatBtn"[\s\S]*onclick="createGroupChat\(\)"/);
+assert.match(client, /async function createGroupChat\(\)[\s\S]*action: 'create_group'[\s\S]*openConnectionConversation\(connection\)/);
+assert.match(client, /window\._sharedGroupChat[\s\S]*canComposeInSharedConversation\(\)[\s\S]*!!window\._sharedGroupChat/);
+assert.match(client, /discGroupParticipants[\s\S]*data\.group\.participants[\s\S]*Group: /);
 assert.doesNotMatch(client, /text: connectionInviteText\(connection, false\)[\s\S]*url: connectionUrl\(connection\)/);
 assert.match(client, /Link ready for [\s\S]*Choose Send Invite or Copy Link/);
 assert.doesNotMatch(client, /if \(recipientEl\) recipientEl\.value = '';\s*await copyConnectionInvite\(connection\)/);
@@ -42,7 +48,7 @@ assert.match(client, /id="sharedByBanner"[\s\S]*id="sharedConversationBtn"[\s\S]
 assert.match(client, /function enterSharedThread\(share\)[\s\S]*_currentSharedSessionId = share\.id;[\s\S]*_currentChannelId = share\.id;[\s\S]*startChatRealtime\(share\.id\)/);
 assert.match(client, /shareBtn\.textContent = window\._sharedViewToken \? 'Discuss' : 'Share'/);
 assert.match(client, /function openSharedConversation\(nodeId, queryText\)[\s\S]*openNodeSurface\([\s\S]*'trust_circle'\)/);
-assert.match(client, /conversation\.textContent = 'Open Discussion'[\s\S]*openConnectionConversation\(connection\)/);
+assert.match(client, /conversation\.textContent = connection\.group_channel_id \? 'Open Group' : 'Open Discussion'[\s\S]*openConnectionConversation\(connection\)/);
 assert.match(client, /function renderDiscussionView\(\)[\s\S]*'x-share-token'[\s\S]*\/api\/share\?action=messages[\s\S]*data\.messages/);
 assert.doesNotMatch(client, /rest\/v1\/share_chat_messages\?share_id/);
 assert.match(client, /var name = window\._sharedViewToken[\s\S]*window\._sharedRecipientName/);
@@ -59,10 +65,18 @@ assert.match(client, /shareToken: isFollowUp \? \(window\._sharedViewToken/);
 assert.match(shareApi, /randomBytes\(24\)\.toString\('base64url'\)/);
 assert.match(shareApi, /recipient_name:\s+normalizedRecipientName/);
 assert.match(shareApi, /action === 'messages'[\s\S]*resolveActiveShareCredential[\s\S]*owner_user_id=eq[\s\S]*\/share_chat_messages\?share_id=eq[\s\S]*mine:/);
+assert.match(shareApi, /action === 'create_group'[\s\S]*Select at least two invitees[\s\S]*\/room_channels[\s\S]*\/channel_participants/);
+assert.match(shareApi, /getActiveGroupChannelId[\s\S]*groupChannelId \? '\/room_messages' : '\/share_chat_messages'/);
 assert.match(shareApi, /owner_user_id=eq/);
 assert.match(followupsApi, /share\.permission === 'viewer'[\s\S]*fork_shared_prism_inquiry/);
 assert.match(followupsApi, /permission=eq\.contributor/);
 assert.match(followupsApi, /display_name:\s+shares\[0\]\.recipient_name/);
 assert.match(interpretApi, /getActiveSharedAccess/);
+
+assert.match(groupMigration, /channel_participants_identity_exactly_one/);
+assert.match(groupMigration, /room_messages_author_exactly_one/);
+assert.match(groupMigration, /channel_participants_share_active_idx/);
+assert.match(groupMigration, /room_messages_channel_created_idx/);
+assert.match(groupMigration, /revoke all on table public\.room_channels from public, anon, authenticated/);
 
 console.log('Personal sharing contract checks passed.');

@@ -54,6 +54,11 @@ const authRoute = {
   respond: () => response(200, { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.test' }),
 };
 
+const noGroupRoute = {
+  match: url => url.includes('/channel_participants?share_id=eq.'),
+  respond: () => response(200, []),
+};
+
 {
   const { res, calls } = await run(
     {
@@ -112,7 +117,7 @@ const authRoute = {
     [{
       match: url => url.includes('/shares?') && url.includes('token=eq.viewer-token'),
       respond: () => response(200, [{ id: 'share-1', owner_user_id: 'owner', permission: 'viewer', revoked_at: null }]),
-    }],
+    }, noGroupRoute],
   );
   assert.equal(res.statusCode, 403, 'Viewer must not be able to comment');
   assert.equal(calls.some(call => call.url.includes('/share_chat_messages')), false);
@@ -124,7 +129,7 @@ const authRoute = {
     [authRoute, {
       match: url => url.includes('/shares?') && url.includes('token=eq.contributor-token'),
       respond: () => response(200, [{ id: 'share-1', owner_user_id: 'owner', permission: 'contributor', revoked_at: null }]),
-    }, {
+    }, noGroupRoute, {
       match: url => url.endsWith('/share_chat_messages'),
       respond: () => response(201, [{ id: 'comment-1' }]),
     }],
@@ -142,7 +147,7 @@ const authRoute = {
       respond: () => response(200, [{
         id: 'share-1', owner_user_id: 'owner', permission: 'contributor', recipient_name: 'Jordan', revoked_at: null,
       }]),
-    }, {
+    }, noGroupRoute, {
       match: url => url.includes('/share_chat_messages?share_id=eq.share-1'),
       respond: () => response(200, [{
         id: 'comment-recipient', content: 'A saved reply', message_type: 'recipient', display_name: 'Jordan',
@@ -162,6 +167,98 @@ const authRoute = {
   assert.equal(res.body.messages[0].mine, true, 'A signed-in recipient must recognize their own persisted message');
   const read = calls.find(call => call.url.includes('/share_chat_messages?share_id=eq.share-1'));
   assert.equal(read.init.headers.Authorization, 'Bearer service-key', 'Discussion reads must stay behind the server boundary');
+}
+
+{
+  const { res, calls } = await run(
+    { action: 'create_group', shareIds: ['share-sandy', 'share-hank'] },
+    [authRoute, {
+      match: url => url.includes('/shares?') && url.includes('id=in.'),
+      respond: () => response(200, [
+        { id: 'share-sandy', thread_id: 'thread-owner', recipient_name: 'Sandy' },
+        { id: 'share-hank', thread_id: 'thread-owner', recipient_name: 'Hank' },
+      ]),
+    }, {
+      match: url => url.includes('/channel_participants?share_id=in.'),
+      respond: () => response(200, []),
+    }, {
+      match: (url, init) => url.endsWith('/room_channels') && init.method === 'POST',
+      respond: () => response(201, [{ id: 'group-channel' }]),
+    }, {
+      match: (url, init) => url.endsWith('/channel_participants') && init.method === 'POST',
+      respond: () => response(201, []),
+    }],
+    { authenticated: true },
+  );
+  assert.equal(res.statusCode, 200, 'An owner can group two personalized invitations');
+  assert.deepEqual(res.body.group.participants, ['Sandy', 'Hank']);
+  const participantInsert = calls.find(call => call.url.endsWith('/channel_participants') && call.init.method === 'POST');
+  const participants = JSON.parse(participantInsert.init.body);
+  assert.deepEqual(participants.map(row => row.share_id), ['share-sandy', 'share-hank']);
+  assert.equal(participants.every(row => row.user_id === null), true);
+}
+
+{
+  const { res, calls } = await run(
+    { action: 'comment', shareId: 'share-1', token: 'viewer-token', content: 'Hello group', displayName: 'Sandy' },
+    [authRoute, {
+      match: url => url.includes('/shares?') && url.includes('token=eq.viewer-token'),
+      respond: () => response(200, [{ id: 'share-1', owner_user_id: 'owner', permission: 'viewer', recipient_name: 'Sandy', revoked_at: null }]),
+    }, {
+      match: url => url.includes('/channel_participants?share_id=eq.share-1'),
+      respond: () => response(200, [{ channel_id: 'group-channel' }]),
+    }, {
+      match: url => url.includes('/room_channels?id=eq.group-channel'),
+      respond: () => response(200, [{ id: 'group-channel' }]),
+    }, {
+      match: (url, init) => url.endsWith('/room_messages') && init.method === 'POST',
+      respond: () => response(201, [{ id: 'group-message' }]),
+    }],
+    { authenticated: true },
+  );
+  assert.equal(res.statusCode, 200, 'Selected read-only invitees may participate in group chat without editing the Prism');
+  const insert = calls.find(call => call.url.endsWith('/room_messages'));
+  const message = JSON.parse(insert.init.body);
+  assert.equal(message.channel_id, 'group-channel');
+  assert.equal(message.share_id, 'share-1');
+  assert.equal(message.user_id, null);
+}
+
+{
+  const { res } = await run(
+    null,
+    [authRoute, {
+      match: url => url.includes('/shares?') && url.includes('token=eq.viewer-token'),
+      respond: () => response(200, [{ id: 'share-1', owner_user_id: 'owner', permission: 'viewer', recipient_name: 'Sandy', revoked_at: null }]),
+    }, {
+      match: url => url.includes('/channel_participants?share_id=eq.share-1'),
+      respond: () => response(200, [{ channel_id: 'group-channel' }]),
+    }, {
+      match: url => url.includes('/room_channels?id=eq.group-channel'),
+      respond: () => response(200, [{ id: 'group-channel' }]),
+    }, {
+      match: url => url.includes('/room_messages?channel_id=eq.group-channel'),
+      respond: () => response(200, [{
+        id: 'group-message', content: 'Hello group', message_type: 'text', display_name: 'Sandy',
+        user_id: null, share_id: 'share-1', node_id: 'root', created_at: '2026-09-13T23:59:00Z',
+      }]),
+    }, {
+      match: url => url.includes('/channel_participants?channel_id=eq.group-channel'),
+      respond: () => response(200, [{ share_id: 'share-1' }, { share_id: 'share-2' }]),
+    }, {
+      match: url => url.includes('/shares?id=in.'),
+      respond: () => response(200, [{ id: 'share-1', recipient_name: 'Sandy' }, { id: 'share-2', recipient_name: 'Hank' }]),
+    }],
+    {
+      authenticated: true,
+      method: 'GET',
+      query: { action: 'messages', shareId: 'share-1' },
+      headers: { 'x-share-id': 'share-1', 'x-share-token': 'viewer-token' },
+    },
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.messages[0].mine, true);
+  assert.deepEqual(res.body.group.participants, ['Sandy', 'Hank']);
 }
 
 {
