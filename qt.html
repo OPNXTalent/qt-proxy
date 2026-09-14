@@ -7126,13 +7126,44 @@ function connectionInviteText(connection, includeUrl) {
   return includeUrl === false ? message : message + '\n\n' + connectionUrl(connection);
 }
 
-async function copyConnectionInvite(connection) {
-  try {
-    await navigator.clipboard.writeText(connectionInviteText(connection));
-    setSharePanelStatus('Invitation copied.', false);
-  } catch (e) {
-    setSharePanelStatus('Could not copy the invitation.', true);
+async function writeClipboardText(text) {
+  if (!text) return false;
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      // Clipboard permission varies by browser. Fall through to the
+      // selection-based copy path while the original click is still active.
+    }
   }
+
+  var field = document.createElement('textarea');
+  field.value = text;
+  field.setAttribute('readonly', '');
+  field.style.position = 'fixed';
+  field.style.left = '-9999px';
+  field.style.top = '0';
+  document.body.appendChild(field);
+  field.focus();
+  field.select();
+  field.setSelectionRange(0, field.value.length);
+  try {
+    return document.execCommand('copy') === true;
+  } catch (e) {
+    return false;
+  } finally {
+    document.body.removeChild(field);
+  }
+}
+
+async function copyConnectionInvite(connection) {
+  var url = connectionUrl(connection);
+  var copied = await writeClipboardText(url);
+  setSharePanelStatus(
+    copied ? 'Link copied.' : 'Could not copy automatically. Link: ' + url,
+    !copied
+  );
 }
 
 async function sendConnectionInvite(connection) {
@@ -9199,11 +9230,12 @@ function startLiveSync() {
   }
 }
 
-function copyShareLink() {
+async function copyShareLink() {
   var url = window._currentShareUrl || '';
   if (!url) return;
-  try { navigator.clipboard.writeText(url); } catch(e) {}
-  showCopyToast(url);
+  var copied = await writeClipboardText(url);
+  if (copied) showCopyToast(url);
+  else showShareStatus('Could not copy automatically. Link: ' + url, 'var(--text-muted)');
 }
 
 async function shareViaWebShare() {
@@ -9220,11 +9252,11 @@ async function shareViaWebShare() {
 
 async function shareViaCopy() {
   var url = window._currentShareUrl || window.location.href;
-  try {
-    await navigator.clipboard.writeText(url);
+  var copied = await writeClipboardText(url);
+  if (copied) {
     showShareStatus('Link copied.', 'var(--gold-dim)');
-  } catch {
-    showShareStatus('Could not copy — link: ' + url, 'var(--text-muted)');
+  } else {
+    showShareStatus('Could not copy automatically. Link: ' + url, 'var(--text-muted)');
   }
 }
 

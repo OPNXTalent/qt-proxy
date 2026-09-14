@@ -23,6 +23,9 @@ assert.match(client, /titleCaseRecipientName\(recipientEl\.value\)\.trim\(\)\.re
 assert.match(client, /send\.textContent = 'Send Invite'/);
 assert.match(client, /function sendConnectionInvite\(connection\)[\s\S]*navigator\.share\(shareData\)/);
 assert.match(client, /text: connectionInviteText\(connection, true\)/);
+assert.match(client, /async function writeClipboardText\(text\)[\s\S]*navigator\.clipboard[\s\S]*document\.execCommand\('copy'\)/);
+assert.match(client, /async function copyConnectionInvite\(connection\)[\s\S]*connectionUrl\(connection\)[\s\S]*writeClipboardText\(url\)[\s\S]*Link copied/);
+assert.doesNotMatch(client, /copyConnectionInvite\(connection\)[\s\S]{0,180}connectionInviteText/);
 assert.doesNotMatch(client, /text: connectionInviteText\(connection, false\)[\s\S]*url: connectionUrl\(connection\)/);
 assert.match(client, /Link ready for [\s\S]*Choose Send Invite or Copy Link/);
 assert.doesNotMatch(client, /if \(recipientEl\) recipientEl\.value = '';\s*await copyConnectionInvite\(connection\)/);
