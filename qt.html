@@ -7083,7 +7083,7 @@ function renderShareConnections() {
     }
     var copy = document.createElement('button');
     copy.textContent = 'Copy Link';
-    copy.onclick = function() { copyConnectionInvite(connection); };
+    copy.onclick = function() { copyConnectionInvite(connection, copy); };
     var close = document.createElement('button');
     close.textContent = 'Close Connection';
     close.onclick = function() { closeShareConnection(connection.id); };
@@ -7157,9 +7157,26 @@ async function writeClipboardText(text) {
   }
 }
 
-async function copyConnectionInvite(connection) {
+function showCopyButtonResult(button, copied) {
+  if (!button) return;
+  var originalLabel = button.dataset.copyLabel || button.textContent;
+  button.dataset.copyLabel = originalLabel;
+  if (button._copyFeedbackTimer) window.clearTimeout(button._copyFeedbackTimer);
+  button.textContent = copied ? 'Copied ✓' : 'Try again';
+  button.disabled = true;
+  button.setAttribute('aria-live', 'polite');
+  button._copyFeedbackTimer = window.setTimeout(function() {
+    button.textContent = originalLabel;
+    button.disabled = false;
+    button.removeAttribute('aria-live');
+    button._copyFeedbackTimer = null;
+  }, 1800);
+}
+
+async function copyConnectionInvite(connection, button) {
   var url = connectionUrl(connection);
   var copied = await writeClipboardText(url);
+  showCopyButtonResult(button, copied);
   setSharePanelStatus(
     copied ? 'Link copied.' : 'Could not copy automatically. Link: ' + url,
     !copied
@@ -9250,9 +9267,10 @@ async function shareViaWebShare() {
   } catch (e) { /* user cancelled */ }
 }
 
-async function shareViaCopy() {
+async function shareViaCopy(button) {
   var url = window._currentShareUrl || window.location.href;
   var copied = await writeClipboardText(url);
+  showCopyButtonResult(button, copied);
   if (copied) {
     showShareStatus('Link copied.', 'var(--gold-dim)');
   } else {
@@ -10386,7 +10404,7 @@ window.addEventListener('appinstalled', function() {
           onmouseover="this.style.background='rgba(201,168,76,0.08)'" onmouseout="this.style.background='rgba(201,168,76,0.04)'">
           Share… <span style="font-family:var(--mono); font-size:12px; color:var(--text-muted); letter-spacing:0.12em;">opens share sheet</span>
         </button>
-        <button onclick="shareViaCopy()" id="copyLinkBtn" style="font-family:var(--crimson); font-size:19px; font-style:italic; color:var(--text); padding:13px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s; text-align:left;"
+        <button onclick="shareViaCopy(this)" id="copyLinkBtn" style="font-family:var(--crimson); font-size:19px; font-style:italic; color:var(--text); padding:13px 20px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all 0.2s; text-align:left;"
           onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
           Copy link
         </button>
@@ -10406,7 +10424,7 @@ window.addEventListener('appinstalled', function() {
       <div style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">Share link</div>
       <div style="display:flex; gap:8px; margin-bottom:24px;">
         <div id="shareUrlDisplay" style="flex:1; font-family:var(--mono); font-size:14px; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:9px 12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
-        <button onclick="shareViaCopy()" style="font-family:var(--mono); font-size:13px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s;"
+        <button onclick="shareViaCopy(this)" style="font-family:var(--mono); font-size:13px; letter-spacing:0.14em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all 0.2s;"
           onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)'"
           onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Copy</button>
       </div>
