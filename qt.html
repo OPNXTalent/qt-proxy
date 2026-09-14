@@ -7069,7 +7069,7 @@ function renderShareConnections() {
     var actions = document.createElement('div');
     actions.className = 'share-connection-actions';
     var conversation = document.createElement('button');
-    conversation.textContent = 'Conversation';
+    conversation.textContent = 'Open Discussion';
     conversation.setAttribute('aria-label', 'Open conversation with ' + (connection.recipient_name || 'recipient'));
     conversation.onclick = function() { openConnectionConversation(connection); };
     actions.appendChild(conversation);
@@ -8053,14 +8053,12 @@ async function sendChatMessage() {
   // explicitly joined this thread's Trust Circle yet still sends as an
   // anonymous-style recipient, same as anyone else, until they join.
   var isAnonSender = !canActAsThreadMember();
-  // Named participants (owner, or anyone who's joined the Circle) keep
-  // their real chosen name. An anonymous sender's own label is derived
-  // from color identity instead — the same scheme used to render everyone
-  // else's messages — rather than getChatParticipantName()'s old
-  // "Participant N" counter, which is purely local per browser and was
-  // the actual cause of every anonymous visitor's first message
-  // independently landing in the database as "Participant 1".
-  var name = isAnonSender ? getParticipantLabel(null, 'recipient', getAnonSessionId()) : getChatParticipantName();
+  // A personal invitation already carries the recipient name chosen by the
+  // originator. Use that stable identity in the discussion instead of an
+  // unrelated browser-local color label.
+  var name = window._sharedViewToken
+    ? (window._sharedRecipientName || 'Guest')
+    : (isAnonSender ? getParticipantLabel(null, 'recipient', getAnonSessionId()) : getChatParticipantName());
 
   // This only ever runs for Trust Circle now — the compose bar is hidden
   // entirely in Private View, since notes are created and edited directly
@@ -8078,7 +8076,8 @@ async function sendChatMessage() {
   input.disabled = true;
 
   // Optimistic render
-  var msg = { id: Date.now(), name: name, text: text, mine: true };
+  var optimisticId = 'pending-' + Date.now();
+  var msg = { id: optimisticId, name: name, text: text, mine: true };
   _chatMessages.push(msg);
   _sentByMe.add(name + '::' + text);
   renderChatMessage(msg);
@@ -8089,13 +8088,30 @@ async function sendChatMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'comment', shareId: _currentChannelId, token: window._sharedViewToken, content: text, displayName: name, nodeId: _activeNodeId })
     });
-    if (sendRes.ok) {
-      var saved = await sendRes.json();
-      if (saved.comment && saved.comment.id) {
-        _renderedChatIds.add(saved.comment.id);
-      }
+    var saved = await sendRes.json();
+    if (!sendRes.ok) throw new Error(saved.error || 'Message could not be sent');
+    if (saved.comment && saved.comment.id) {
+      _renderedChatIds.add(saved.comment.id);
     }
-  } catch(e) { console.error('Chat send error:', e); }
+    _chatLastCount = -1;
+    await renderDiscussionView();
+    if (window._sharedViewToken) {
+      fetch('/api/share?action=notify-engagement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shareId: _currentChannelId })
+      }).catch(function() {});
+    }
+  } catch(e) {
+    console.error('Chat send error:', e);
+    _chatMessages = _chatMessages.filter(function(item) { return item.id !== optimisticId; });
+    input.value = text;
+    var failed = document.createElement('div');
+    failed.className = 'chat-empty';
+    failed.textContent = e.message || 'Message could not be sent. Please try again.';
+    var failedStream = document.getElementById('chatStream');
+    if (failedStream) failedStream.appendChild(failed);
+  }
 
   input.disabled = false;
   if (!usesCompactTouchKeyboard()) input.focus();
@@ -8525,14 +8541,16 @@ async function renderDiscussionView() {
     return;
   }
 
-  var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
   try {
-    var res = await fetch(
-      SUPA_URL + '/rest/v1/share_chat_messages?share_id=eq.' + encodeURIComponent(_currentChannelId) + '&visibility=eq.trust_circle&order=created_at.asc&select=id,content,message_type,display_name,session_token,node_id,created_at',
-      { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON } }
+    var headers = { 'x-share-id': _currentChannelId };
+    if (window._sharedViewToken) headers['x-share-token'] = window._sharedViewToken;
+    var res = await authenticatedFetch(
+      '/api/share?action=messages&shareId=' + encodeURIComponent(_currentChannelId),
+      { headers: headers, cache: 'no-store' }
     );
-    var messages = await res.json();
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not load conversation');
+    var messages = data.messages;
     if (!Array.isArray(messages)) messages = [];
     var filtered = messages.filter(function(m) {
       return (m.node_id || 'root') === _activeNodeId;
@@ -8552,14 +8570,8 @@ async function renderDiscussionView() {
       stream.innerHTML = '<div class="chat-empty">No shared messages yet.<br>Begin the conversation.</div>';
       return;
     }
-    var myEmail = userEmail();
-    var myName  = getChatParticipantName();
-    var myAnonId = getAnonSessionId();
     filtered.forEach(function(m) {
-      // isMine: true only if this message was sent by the current viewer
-      // Compare stored email for named participants, anon session for anonymous
-      var isMine = (m.message_type === 'sender' && m.display_name === myName && myEmail)
-                || (m.session_token && m.session_token === myAnonId);
+      var isMine = m.mine === true;
       // Always use the stored display_name from the DB — never infer from local state
       var name = m.display_name
         ? m.display_name

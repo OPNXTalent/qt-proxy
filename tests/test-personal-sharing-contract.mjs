@@ -31,7 +31,11 @@ assert.match(client, /id="sharedByBanner"[\s\S]*id="sharedConversationBtn"[\s\S]
 assert.match(client, /function enterSharedThread\(share\)[\s\S]*_currentSharedSessionId = share\.id;[\s\S]*_currentChannelId = share\.id;[\s\S]*startChatRealtime\(share\.id\)/);
 assert.match(client, /shareBtn\.textContent = window\._sharedViewToken \? 'Discuss' : 'Share'/);
 assert.match(client, /function openSharedConversation\(nodeId, queryText\)[\s\S]*openNodeSurface\([\s\S]*'trust_circle'\)/);
-assert.match(client, /conversation\.textContent = 'Conversation'[\s\S]*openConnectionConversation\(connection\)/);
+assert.match(client, /conversation\.textContent = 'Open Discussion'[\s\S]*openConnectionConversation\(connection\)/);
+assert.match(client, /function renderDiscussionView\(\)[\s\S]*'x-share-token'[\s\S]*\/api\/share\?action=messages[\s\S]*data\.messages/);
+assert.doesNotMatch(client, /rest\/v1\/share_chat_messages\?share_id/);
+assert.match(client, /var name = window\._sharedViewToken[\s\S]*window\._sharedRecipientName/);
+assert.match(client, /sendRes\.ok\) throw new Error[\s\S]*await renderDiscussionView\(\)[\s\S]*notify-engagement/);
 assert.match(client, /function openConnectionConversation\(connection\)[\s\S]*_currentChannelId = connection\.id;[\s\S]*openNodeSurface\('root',[\s\S]*'trust_circle'\)/);
 assert.match(client, /function canComposeInSharedConversation\(\)[\s\S]*window\._sharedViewPermission === 'contributor'[\s\S]*!!_currentSharedSessionId/);
 assert.doesNotMatch(client, /openShareSurface\(nodeId, queryText\)|id="circleShareBox"/);
@@ -43,6 +47,7 @@ assert.match(client, /shareToken: isFollowUp \? \(window\._sharedViewToken/);
 
 assert.match(shareApi, /randomBytes\(24\)\.toString\('base64url'\)/);
 assert.match(shareApi, /recipient_name:\s+normalizedRecipientName/);
+assert.match(shareApi, /action === 'messages'[\s\S]*resolveActiveShareCredential[\s\S]*owner_user_id=eq[\s\S]*\/share_chat_messages\?share_id=eq[\s\S]*mine:/);
 assert.match(shareApi, /owner_user_id=eq/);
 assert.match(followupsApi, /share\.permission === 'viewer'[\s\S]*fork_shared_prism_inquiry/);
 assert.match(followupsApi, /permission=eq\.contributor/);

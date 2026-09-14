@@ -46,7 +46,7 @@ async function resolveActiveShareCredential({ shareId, token }) {
   if (!shareId || !token) return null;
   const shareRes = await sbFetch(
     `/shares?id=eq.${encodeURIComponent(shareId)}&token=eq.${encodeURIComponent(token)}` +
-    '&status=eq.active&select=id,owner_user_id,permission,revoked_at&limit=1',
+    '&status=eq.active&select=id,owner_user_id,permission,recipient_name,revoked_at&limit=1',
     { headers: sbHeaders(true) },
   );
   const share = shareRes.ok ? (await shareRes.json())?.[0] : null;
@@ -58,7 +58,7 @@ async function resolveActiveShareCredential({ shareId, token }) {
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', 'https://theprism.io');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-share-id, x-share-token');
 }
 
 // ── POST — Create share ───────────────────────────────────────────────────────
@@ -345,6 +345,61 @@ async function handlePatch(req, res) {
 // ── GET — Fetch share by token ────────────────────────────────────────────────
 
 async function handleGet(req, res) {
+  const action = req.query?.action || new URL(req.url, BASE_URL).searchParams.get('action');
+  if (action === 'messages') {
+    const shareId = req.headers['x-share-id'] || req.query?.shareId || new URL(req.url, BASE_URL).searchParams.get('shareId');
+    const token = req.headers['x-share-token'] || null;
+    if (!shareId) return res.status(400).json({ error: 'shareId required' });
+
+    let share = await resolveActiveShareCredential({ shareId, token });
+    let isOwner = false;
+    if (!share && req.verifiedIdentity?.userId) {
+      const ownerRes = await sbFetch(
+        `/shares?id=eq.${encodeURIComponent(shareId)}&owner_user_id=eq.${encodeURIComponent(req.verifiedIdentity.userId)}` +
+        '&status=eq.active&select=id,owner_user_id,permission,recipient_name,revoked_at&limit=1',
+        { headers: sbHeaders(true) },
+      );
+      share = ownerRes.ok ? (await ownerRes.json())?.[0] : null;
+      isOwner = Boolean(share && !share.revoked_at);
+    } else {
+      isOwner = req.verifiedIdentity?.userId === share?.owner_user_id;
+    }
+    if (!share || share.revoked_at) {
+      return res.status(410).json({ error: 'This share credential is no longer active' });
+    }
+
+    let guest = null;
+    if (!isOwner && !req.verifiedIdentity) {
+      guest = await getOrIssueGuestIdentity({
+        cookieHeader: req.headers.cookie,
+        supabaseUrl: SUPABASE_URL,
+        serviceRoleKey: SUPABASE_SERVICE_KEY,
+      });
+      if (guest.issued) res.setHeader('Set-Cookie', guestCookieHeader(guest.credential));
+    }
+
+    const messagesRes = await sbFetch(
+      `/share_chat_messages?share_id=eq.${encodeURIComponent(share.id)}` +
+      '&visibility=eq.trust_circle&order=created_at.asc' +
+      '&select=id,content,message_type,display_name,session_token,node_id,created_at',
+      { headers: sbHeaders(true) },
+    );
+    if (!messagesRes.ok) return res.status(500).json({ error: 'Could not load conversation' });
+    const rows = await messagesRes.json();
+    const messages = (Array.isArray(rows) ? rows : []).map(message => ({
+      ...message,
+      mine: isOwner
+        ? message.message_type === 'sender'
+        : message.message_type === 'recipient' && (
+            guest?.guestId
+              ? message.session_token === guest.guestId
+              : message.display_name === share.recipient_name
+          ),
+    }));
+    res.setHeader('Cache-Control', 'private, no-store');
+    return res.status(200).json({ messages });
+  }
+
   const memberShareId = req.query?.shareId || new URL(req.url, BASE_URL).searchParams.get('shareId');
   if (memberShareId && req.verifiedIdentity?.userId) {
     const ownerId = req.verifiedIdentity.userId;

@@ -13,12 +13,12 @@ function response(status, body) {
   });
 }
 
-function request(body, { authenticated = false } = {}) {
+function request(body, { authenticated = false, method = 'POST', query = {}, headers = {} } = {}) {
   return {
-    method: 'POST',
-    url: '/api/share',
-    query: {},
-    headers: authenticated ? { authorization: 'Bearer verified-token' } : {},
+    method,
+    url: method === 'GET' ? '/api/share?action=messages&shareId=share-1' : '/api/share',
+    query,
+    headers: { ...(authenticated ? { authorization: 'Bearer verified-token' } : {}), ...headers },
     body,
   };
 }
@@ -132,6 +132,36 @@ const authRoute = {
   );
   assert.equal(res.statusCode, 200, 'Contributor should be able to comment');
   assert.equal(calls.filter(call => call.url.endsWith('/share_chat_messages')).length, 1);
+}
+
+{
+  const { res, calls } = await run(
+    null,
+    [authRoute, {
+      match: url => url.includes('/shares?') && url.includes('token=eq.contributor-token'),
+      respond: () => response(200, [{
+        id: 'share-1', owner_user_id: 'owner', permission: 'contributor', recipient_name: 'Jordan', revoked_at: null,
+      }]),
+    }, {
+      match: url => url.includes('/share_chat_messages?share_id=eq.share-1'),
+      respond: () => response(200, [{
+        id: 'comment-recipient', content: 'A saved reply', message_type: 'recipient', display_name: 'Jordan',
+        session_token: null, node_id: 'root', created_at: '2026-09-13T23:49:52Z',
+      }]),
+    }],
+    {
+      authenticated: true,
+      method: 'GET',
+      query: { action: 'messages', shareId: 'share-1' },
+      headers: { 'x-share-id': 'share-1', 'x-share-token': 'contributor-token' },
+    },
+  );
+  assert.equal(res.statusCode, 200, 'A token-authorized recipient must be able to read the persisted discussion');
+  assert.equal(res.body.messages.length, 1);
+  assert.equal(res.body.messages[0].content, 'A saved reply');
+  assert.equal(res.body.messages[0].mine, true, 'A signed-in recipient must recognize their own persisted message');
+  const read = calls.find(call => call.url.includes('/share_chat_messages?share_id=eq.share-1'));
+  assert.equal(read.init.headers.Authorization, 'Bearer service-key', 'Discussion reads must stay behind the server boundary');
 }
 
 {
