@@ -42,6 +42,15 @@ async function sbFetch(path, options = {}) {
   return res;
 }
 
+async function logSupabaseFailure(operation, response) {
+  let detail = '';
+  try { detail = await response.text(); } catch (_) { /* best-effort logging */ }
+  console.error(`[share] ${operation} failed`, {
+    status: response.status,
+    detail: detail.slice(0, 500),
+  });
+}
+
 async function resolveActiveShareCredential({ shareId, token }) {
   if (!shareId || !token) return null;
   const shareRes = await sbFetch(
@@ -159,7 +168,10 @@ async function handlePost(req, res) {
         visibility: 'trust_circle',
       }),
     });
-    if (!insertRes.ok) return res.status(500).json({ error: 'Could not save comment' });
+    if (!insertRes.ok) {
+      await logSupabaseFailure('save comment', insertRes);
+      return res.status(500).json({ error: 'Could not save comment' });
+    }
     const rows = await insertRes.json();
     return res.status(200).json({ success: true, comment: rows?.[0] || null });
   }
@@ -219,7 +231,10 @@ async function handlePost(req, res) {
           is_active: true,
         }),
       });
-      if (!channelRes.ok) return res.status(500).json({ error: 'Could not create group discussion' });
+      if (!channelRes.ok) {
+        await logSupabaseFailure('create group channel', channelRes);
+        return res.status(500).json({ error: 'Could not create group discussion' });
+      }
       channelId = (await channelRes.json())?.[0]?.id || null;
     }
     if (!channelId) return res.status(500).json({ error: 'Could not create group discussion' });
@@ -234,7 +249,10 @@ async function handlePost(req, res) {
         headers: { ...sbHeaders(true), 'Prefer': 'return=minimal' },
         body: JSON.stringify(participantRows),
       });
-      if (!participantsRes.ok) return res.status(500).json({ error: 'Could not add group participants' });
+      if (!participantsRes.ok) {
+        await logSupabaseFailure('add group participants', participantsRes);
+        return res.status(500).json({ error: 'Could not add group participants' });
+      }
     }
 
     return res.status(200).json({

@@ -6,6 +6,7 @@ const shareApi = readFileSync(new URL('../api/share.js', import.meta.url), 'utf8
 const followupsApi = readFileSync(new URL('../api/followups.js', import.meta.url), 'utf8');
 const interpretApi = readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
 const groupMigration = readFileSync(new URL('../docs/migrations/2026-09-13-selected-invitee-group-chat.sql', import.meta.url), 'utf8');
+const groupAuthMigration = readFileSync(new URL('../docs/migrations/2026-09-13-group-chat-auth-user-fks.sql', import.meta.url), 'utf8');
 
 assert.match(client, /<option value="viewer">Read Only/);
 assert.match(client, /<option value="contributor">View\/Edit/);
@@ -76,6 +77,10 @@ assert.match(interpretApi, /getActiveSharedAccess/);
 assert.match(groupMigration, /channel_participants_identity_exactly_one/);
 assert.match(groupMigration, /room_messages_author_exactly_one/);
 assert.match(groupMigration, /channel_participants_share_active_idx/);
+assert.match(groupAuthMigration, /room_channels_created_by_fkey[\s\S]*references auth\.users\(id\)/i);
+assert.match(groupAuthMigration, /channel_participants_user_id_fkey[\s\S]*references auth\.users\(id\)/i);
+assert.match(groupAuthMigration, /room_messages_user_id_fkey[\s\S]*references auth\.users\(id\)/i);
+assert.match(shareApi, /logSupabaseFailure\('create group channel'/);
 assert.match(groupMigration, /room_messages_channel_created_idx/);
 assert.match(groupMigration, /revoke all on table public\.room_channels from public, anon, authenticated/);
 
