@@ -2202,6 +2202,8 @@
     #discussionPanel input,
     #discussionPanel select,
     #discussionPanel textarea { font-size: 18px !important; }
+    textarea.input-field,
+    textarea.chat-input { touch-action: pan-y; }
     #circleShareCreate { grid-template-columns: 1fr !important; }
 
     .verse-banner,
@@ -3238,52 +3240,44 @@ function releaseCompactTouchKeyboard(input) {
 function stabilizeMobileComposerInput(input) {
   if (!input || input.dataset.prismComposerGuard === '1') return;
   input.dataset.prismComposerGuard = '1';
-  var lastTypingAt = 0;
 
   // Keep keystrokes and IME composition inside the textarea. Some installed
   // Android browsers otherwise treat a keyboard-state change as a page-level
   // command and move focus away from the active composer.
   input.addEventListener('keydown', function(event) {
-    lastTypingAt = Date.now();
     event.stopPropagation();
   });
   input.addEventListener('keyup', function(event) {
-    lastTypingAt = Date.now();
     event.stopPropagation();
   });
-  input.addEventListener('compositionstart', function() { lastTypingAt = Date.now(); });
-  input.addEventListener('compositionend', function() { lastTypingAt = Date.now(); });
-  input.addEventListener('input', function() { lastTypingAt = Date.now(); });
 
-  // A real tap outside the field is an intentional exit. Mark it before the
-  // ensuing blur so the guard never traps someone in the keyboard.
-  document.addEventListener('pointerdown', function(event) {
-    if (document.activeElement === input && event.target !== input) {
-      input.dataset.prismAllowBlurUntil = String(Date.now() + 1200);
-    }
-  }, true);
-
-  // Samsung Keyboard can emit an unrequested blur immediately after a
-  // character or Shift/composition update. Restore focus only for that short
-  // no-pointer window; normal taps, submits, and panel closes remain free.
-  input.addEventListener('blur', function() {
-    if (!usesCompactTouchKeyboard()) return;
-    // A shared-query recipient must always be able to dismiss the Android
-    // keyboard. Reclaiming focus here traps the installed PWA at the IME's
-    // magnified viewport and makes the rest of the exchange unreachable.
-    if (window._sharedViewToken) return;
-    if (Date.now() - lastTypingAt > 700) return;
-    if (Date.now() < Number(input.dataset.prismAllowBlurUntil || 0)) return;
+  // Never reclaim focus after blur. On Samsung's standalone PWA, a swipe that
+  // begins over the large composer can blur the textarea while dismissing the
+  // keyboard. Programmatically focusing it again creates an inescapable IME
+  // loop and leaves the visual viewport looking magnified.
+  var touchSurface = input.closest('#followUpComposer, .chat-compose') || input;
+  var gestureStartY = null;
+  var gestureMoved = false;
+  touchSurface.addEventListener('pointerdown', function(event) {
+    if (event.pointerType !== 'touch') return;
+    gestureStartY = event.clientY;
+    gestureMoved = false;
+  }, { passive: true });
+  touchSurface.addEventListener('pointermove', function(event) {
+    if (gestureStartY === null || event.pointerType !== 'touch') return;
+    if (Math.abs(event.clientY - gestureStartY) > 12) gestureMoved = true;
+  }, { passive: true });
+  function finishComposerGesture() {
+    var moved = gestureMoved;
+    gestureStartY = null;
+    gestureMoved = false;
+    if (!moved || !usesCompactTouchKeyboard()) return;
     window.requestAnimationFrame(function() {
-      var panel = input.closest('#discussionPanel');
-      if (panel && !panel.classList.contains('open')) return;
-      if (!input.isConnected || input.disabled || input.readOnly) return;
-      if (document.activeElement && document.activeElement !== document.body && document.activeElement !== document.documentElement) return;
-      var caret = input.value.length;
-      input.focus({ preventScroll: true });
-      if (input.setSelectionRange) input.setSelectionRange(caret, caret);
+      if (document.activeElement === input) releaseCompactTouchKeyboard(input);
     });
-  });
+  }
+  touchSurface.addEventListener('pointerup', finishComposerGesture, { passive: true });
+  touchSurface.addEventListener('pointercancel', finishComposerGesture, { passive: true });
 }
 
 function stageComposerBelowResponse() {

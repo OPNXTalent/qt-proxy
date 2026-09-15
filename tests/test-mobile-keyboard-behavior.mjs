@@ -46,10 +46,29 @@ assert.match(
   /function releaseCompactTouchKeyboard\(input\)[\s\S]*?target\.blur\(\)/,
   'The focused mobile control must be able to release the on-screen keyboard',
 );
+const composerStabilizer = frontend.slice(
+  frontend.indexOf('function stabilizeMobileComposerInput(input)'),
+  frontend.indexOf('function stageComposerBelowResponse()'),
+);
+assert.match(
+  composerStabilizer,
+  /keydown[\s\S]*?event\.stopPropagation\(\)[\s\S]*?keyup[\s\S]*?event\.stopPropagation\(\)/,
+  'Composer keyboard events must remain isolated from page-level shortcuts',
+);
+assert.doesNotMatch(
+  composerStabilizer,
+  /\.focus\(/,
+  'Mobile composer stabilization must never reopen the keyboard after it is dismissed',
+);
+assert.match(
+  composerStabilizer,
+  /touchSurface[\s\S]*?pointermove[\s\S]*?gestureMoved = true[\s\S]*?releaseCompactTouchKeyboard\(input\)/,
+  'A vertical swipe across the composer surface must release keyboard focus',
+);
 assert.match(
   frontend,
-  /function stabilizeMobileComposerInput\(input\)[\s\S]*?keydown[\s\S]*?event\.stopPropagation\(\)[\s\S]*?blur[\s\S]*?if \(window\._sharedViewToken\) return;[\s\S]*?input\.focus\(\{ preventScroll: true \}\)/,
-  'Mobile composers may recover from stray IME blur events, but shared-query recipients must be able to dismiss the keyboard',
+  /textarea\.input-field,[\s\S]*?textarea\.chat-input \{ touch-action: pan-y; \}/,
+  'Mobile textarea surfaces must hand vertical gestures to page scrolling',
 );
 assert.match(
   frontend,
