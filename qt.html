@@ -2,18 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <script>
   // Shared links are frequently opened inside an installed Android PWA.
-  // Keep that narrow entry path at its intended scale: once Samsung's IME
-  // magnifies a focused composer, a standalone window has no browser chrome
-  // with which to reset the viewport. Normal Prism pages retain pinch zoom.
-  (function lockSharedQueryViewport() {
+  // Their scale policy must be present in the initial HTML parse: Samsung's
+  // standalone window can preserve zoom across the share.html redirect before
+  // a later script gets a chance to lock it. Normal Prism pages still restore
+  // user-controlled pinch zoom immediately, before any visible content parses.
+  (function configurePrismViewport() {
     var params = new URLSearchParams(window.location.search);
-    if (!params.get('t')) return;
+    if (params.get('t')) return;
     var viewport = document.querySelector('meta[name="viewport"]');
     if (!viewport) return;
-    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content');
+    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content');
   })();
 </script>
 <title>The Prism — Framework Interpreter</title>

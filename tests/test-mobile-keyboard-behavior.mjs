@@ -2,21 +2,27 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const frontend = readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
+const shareRedirect = readFileSync(new URL('../share.html', import.meta.url), 'utf8');
 
 assert.match(
   frontend,
-  /name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover, interactive-widget=resizes-content"/,
-  'The mobile viewport must support safe areas and keyboard resizing without disabling user zoom',
-);
-assert.doesNotMatch(
-  frontend.slice(0, frontend.indexOf('lockSharedQueryViewport')),
-  /user-scalable=no|maximum-scale=1\.0/,
-  'The normal browser experience must preserve user-controlled pinch zoom',
+  /name="viewport" content="width=device-width, initial-scale=1\.0, maximum-scale=1\.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"/,
+  'Shared-query scale protection must be present during the initial qt.html parse',
 );
 assert.match(
   frontend,
-  /function lockSharedQueryViewport\(\)[\s\S]*params\.get\('t'\)[\s\S]*maximum-scale=1\.0, user-scalable=no/,
-  'Personalized shared-query entry must prevent a standalone Android PWA from becoming stuck at a magnified scale',
+  /function configurePrismViewport\(\)[\s\S]*if \(params\.get\('t'\)\) return;[\s\S]*viewport\.setAttribute\('content', 'width=device-width, initial-scale=1\.0, viewport-fit=cover, interactive-widget=resizes-content'\)/,
+  'Normal Prism pages must immediately restore user-controlled pinch zoom while shared-query pages retain their initial lock',
+);
+assert.match(
+  shareRedirect,
+  /name="viewport" content="width=device-width, initial-scale=1\.0, maximum-scale=1\.0, user-scalable=no, viewport-fit=cover"/,
+  'The compatibility redirect must establish the shared-query scale lock before navigating',
+);
+assert.match(
+  shareRedirect,
+  /window\.location\.replace\('\/qt\.html\?mode=anon&t=' \+ encodeURIComponent\(token\)\)/,
+  'The compatibility redirect must preserve the share token when opening qt.html',
 );
 assert.match(
   frontend,
