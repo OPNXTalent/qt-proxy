@@ -10,7 +10,26 @@
   // control; otherwise the keyboard and magnified viewport appear at startup.
   (function prepareSharedQueryEntry() {
     var params = new URLSearchParams(window.location.search);
-    if (!params.get('t')) return;
+    var gatedSelector = '[data-prism-focus-gated]';
+    function unlockGatedField(field) {
+      if (!field || !field.matches || !field.matches(gatedSelector)) return;
+      field.readOnly = false;
+      field.setAttribute('inputmode', field.dataset.prismFocusGated || 'text');
+    }
+    function unlockAllGatedFields() {
+      document.querySelectorAll(gatedSelector).forEach(unlockGatedField);
+    }
+    function lockAllGatedFields() {
+      document.querySelectorAll(gatedSelector).forEach(function(field) {
+        field.readOnly = true;
+        field.setAttribute('inputmode', 'none');
+      });
+    }
+
+    if (!params.get('t')) {
+      document.addEventListener('DOMContentLoaded', unlockAllGatedFields);
+      return;
+    }
     if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 
     var userRequestedEditableFocus = false;
@@ -18,6 +37,12 @@
       return !!(target && target.matches && target.matches('input, textarea, select, [contenteditable="true"]'));
     }
     document.addEventListener('pointerdown', function(event) {
+      if (event.target && event.target.matches && event.target.matches(gatedSelector)) {
+        // The root question is immutable in a shared exchange. The follow-up
+        // and discussion composers become editable only through this real tap.
+        if (event.target.id === 'userInput') return;
+        unlockGatedField(event.target);
+      }
       if (isEditable(event.target)) userRequestedEditableFocus = true;
     }, true);
     document.addEventListener('focusin', function(event) {
@@ -32,9 +57,11 @@
     }
     window.addEventListener('pageshow', function() {
       userRequestedEditableFocus = false;
+      lockAllGatedFields();
       resetRestoredSharedEntryState();
     });
     document.addEventListener('DOMContentLoaded', function() {
+      lockAllGatedFields();
       resetRestoredSharedEntryState();
       window.setTimeout(resetRestoredSharedEntryState, 0);
       window.setTimeout(resetRestoredSharedEntryState, 250);
@@ -2697,7 +2724,7 @@
     <div id="inputSection">
       <div class="input-wrap">
         <div style="position:relative;">
-          <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+          <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly oninput="updateCharCount()" style="padding-right:52px;"></textarea>
           <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
         </div>
         <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -2836,7 +2863,7 @@
       <div id="followUpComposer" style="display:none;">
         <div class="input-wrap">
           <div style="position:relative;">
-            <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question…" rows="3" maxlength="600" inputmode="text" autocapitalize="sentences" autocorrect="on" spellcheck="true" style="padding-right:52px;"></textarea>
+            <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question…" rows="3" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly autocapitalize="sentences" autocorrect="on" spellcheck="true" style="padding-right:52px;"></textarea>
             <button id="followUpMicBtn" onclick="toggleFollowUpMic()" title="Speak your follow-up" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
           </div>
           <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -3006,7 +3033,7 @@
     <div id="chatMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); padding:0 16px 8px; text-transform:uppercase;"></div>
 
     <div class="chat-compose" id="chatComposeBar" style="padding:12px 16px;border-top:1px solid rgba(42,42,64,0.5);display:flex;flex-direction:column;gap:8px;">
-      <textarea class="chat-input" id="chatInput" placeholder="Add a message…" rows="2" inputmode="text" autocapitalize="sentences" autocorrect="on" spellcheck="true"
+      <textarea class="chat-input" id="chatInput" placeholder="Add a message…" rows="2" inputmode="none" data-prism-focus-gated="text" readonly autocapitalize="sentences" autocorrect="on" spellcheck="true"
         style="width:100%;"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"></textarea>

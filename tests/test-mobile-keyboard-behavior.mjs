@@ -31,6 +31,23 @@ assert.match(
 );
 assert.match(
   frontend,
+  /function unlockGatedField\(field\)[\s\S]*field\.readOnly = false;[\s\S]*field\.setAttribute\('inputmode', field\.dataset\.prismFocusGated[\s\S]*if \(!params\.get\('t'\)\)[\s\S]*unlockAllGatedFields/,
+  'Ordinary pages must unlock the static focus gate while shared pages wait for a real tap',
+);
+assert.match(
+  frontend,
+  /pointerdown[\s\S]*event\.target\.id === 'userInput'[\s\S]*unlockGatedField\(event\.target\)/,
+  'A real tap must unlock shared follow-up and discussion fields without making the immutable root question editable',
+);
+for (const id of ['userInput', 'followUpInput', 'chatInput']) {
+  assert.match(
+    frontend,
+    new RegExp(`id="${id}"[^>]+inputmode="none"[^>]+data-prism-focus-gated="text"[^>]+readonly`),
+    `${id} must be keyboard-inert in static HTML so Android cannot restore startup focus`,
+  );
+}
+assert.match(
+  frontend,
   /@media \(max-width: 600px\)[\s\S]*?textarea\.input-field,[\s\S]*?font-size:\s*18px !important;/,
   'Mobile composers must stay safely above browser focus-zoom thresholds',
 );
