@@ -9,9 +9,14 @@ assert.match(
   'The mobile viewport must support safe areas and keyboard resizing without disabling user zoom',
 );
 assert.doesNotMatch(
-  frontend,
+  frontend.slice(0, frontend.indexOf('lockSharedQueryViewport')),
   /user-scalable=no|maximum-scale=1\.0/,
-  'The browser experience must preserve user-controlled pinch zoom',
+  'The normal browser experience must preserve user-controlled pinch zoom',
+);
+assert.match(
+  frontend,
+  /function lockSharedQueryViewport\(\)[\s\S]*params\.get\('t'\)[\s\S]*maximum-scale=1\.0, user-scalable=no/,
+  'Personalized shared-query entry must prevent a standalone Android PWA from becoming stuck at a magnified scale',
 );
 assert.match(
   frontend,
@@ -37,8 +42,13 @@ assert.match(
 );
 assert.match(
   frontend,
-  /function stabilizeMobileComposerInput\(input\)[\s\S]*?keydown[\s\S]*?event\.stopPropagation\(\)[\s\S]*?blur[\s\S]*?input\.focus\(\{ preventScroll: true \}\)/,
-  'Mobile follow-up and conversation composers must retain focus through unrequested IME blur events',
+  /function stabilizeMobileComposerInput\(input\)[\s\S]*?keydown[\s\S]*?event\.stopPropagation\(\)[\s\S]*?blur[\s\S]*?if \(window\._sharedViewToken\) return;[\s\S]*?input\.focus\(\{ preventScroll: true \}\)/,
+  'Mobile composers may recover from stray IME blur events, but shared-query recipients must be able to dismiss the keyboard',
+);
+assert.match(
+  frontend,
+  /function closeDiscussionPanel\(\)[\s\S]*?panel\.contains\(active\)[\s\S]*?releaseCompactTouchKeyboard\(active\)[\s\S]*?panel\.classList\.remove\('open'\)/,
+  'Closing the shared discussion must release its focused keyboard before hiding the panel',
 );
 assert.match(
   frontend,

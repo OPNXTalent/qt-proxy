@@ -3,6 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<script>
+  // Shared links are frequently opened inside an installed Android PWA.
+  // Keep that narrow entry path at its intended scale: once Samsung's IME
+  // magnifies a focused composer, a standalone window has no browser chrome
+  // with which to reset the viewport. Normal Prism pages retain pinch zoom.
+  (function lockSharedQueryViewport() {
+    var params = new URLSearchParams(window.location.search);
+    if (!params.get('t')) return;
+    var viewport = document.querySelector('meta[name="viewport"]');
+    if (!viewport) return;
+    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content');
+  })();
+</script>
 <title>The Prism — Framework Interpreter</title>
 
 <!-- PWA -->
@@ -3254,6 +3267,10 @@ function stabilizeMobileComposerInput(input) {
   // no-pointer window; normal taps, submits, and panel closes remain free.
   input.addEventListener('blur', function() {
     if (!usesCompactTouchKeyboard()) return;
+    // A shared-query recipient must always be able to dismiss the Android
+    // keyboard. Reclaiming focus here traps the installed PWA at the IME's
+    // magnified viewport and makes the rest of the exchange unreachable.
+    if (window._sharedViewToken) return;
     if (Date.now() - lastTypingAt > 700) return;
     if (Date.now() < Number(input.dataset.prismAllowBlurUntil || 0)) return;
     window.requestAnimationFrame(function() {
@@ -8049,6 +8066,8 @@ function openChatPanel() {
 function closeDiscussionPanel() {
   var panel = document.getElementById('discussionPanel');
   if (!panel) return;
+  var active = document.activeElement;
+  if (active && panel.contains(active)) releaseCompactTouchKeyboard(active);
   panel.classList.remove('open');
   _chatOpen = false;
   syncRefractionButtons(null);
