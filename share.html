@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>The Prism</title>
 <meta name="robots" content="noindex">
 <!--
@@ -46,7 +46,11 @@
         document.getElementById('redirectNote').textContent = 'This link appears to be incomplete. Please check the original invitation.';
         return;
       }
-      window.location.replace('/qt.html?mode=anon&t=' + encodeURIComponent(token));
+      // A fresh entry id prevents Android's standalone task from restoring a
+      // previously focused textarea and its magnified visual viewport for the
+      // same tokenized destination URL.
+      var entryId = Date.now().toString(36);
+      window.location.replace('/qt.html?mode=anon&t=' + encodeURIComponent(token) + '&entry=' + entryId);
     })();
   </script>
 </body>

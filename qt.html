@@ -2,19 +2,43 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <script>
-  // Shared links are frequently opened inside an installed Android PWA.
-  // Their scale policy must be present in the initial HTML parse: Samsung's
-  // standalone window can preserve zoom across the share.html redirect before
-  // a later script gets a chance to lock it. Normal Prism pages still restore
-  // user-controlled pinch zoom immediately, before any visible content parses.
-  (function configurePrismViewport() {
+  // Samsung's standalone PWA can restore the last focused textarea and visual
+  // viewport when the same shared-query URL is opened again. Reject that
+  // browser-restored focus until the visitor actually touches an editable
+  // control; otherwise the keyboard and magnified viewport appear at startup.
+  (function prepareSharedQueryEntry() {
     var params = new URLSearchParams(window.location.search);
-    if (params.get('t')) return;
-    var viewport = document.querySelector('meta[name="viewport"]');
-    if (!viewport) return;
-    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content');
+    if (!params.get('t')) return;
+    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+
+    var userRequestedEditableFocus = false;
+    function isEditable(target) {
+      return !!(target && target.matches && target.matches('input, textarea, select, [contenteditable="true"]'));
+    }
+    document.addEventListener('pointerdown', function(event) {
+      if (isEditable(event.target)) userRequestedEditableFocus = true;
+    }, true);
+    document.addEventListener('focusin', function(event) {
+      if (!userRequestedEditableFocus && isEditable(event.target)) event.target.blur();
+    }, true);
+
+    function resetRestoredSharedEntryState() {
+      if (userRequestedEditableFocus) return;
+      var active = document.activeElement;
+      if (isEditable(active)) active.blur();
+      window.scrollTo(0, 0);
+    }
+    window.addEventListener('pageshow', function() {
+      userRequestedEditableFocus = false;
+      resetRestoredSharedEntryState();
+    });
+    document.addEventListener('DOMContentLoaded', function() {
+      resetRestoredSharedEntryState();
+      window.setTimeout(resetRestoredSharedEntryState, 0);
+      window.setTimeout(resetRestoredSharedEntryState, 250);
+    });
   })();
 </script>
 <title>The Prism — Framework Interpreter</title>

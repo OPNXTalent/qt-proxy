@@ -6,23 +6,28 @@ const shareRedirect = readFileSync(new URL('../share.html', import.meta.url), 'u
 
 assert.match(
   frontend,
-  /name="viewport" content="width=device-width, initial-scale=1\.0, maximum-scale=1\.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"/,
-  'Shared-query scale protection must be present during the initial qt.html parse',
+  /name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover, interactive-widget=resizes-content"/,
+  'The mobile viewport must allow recovery from browser magnification',
+);
+assert.doesNotMatch(
+  frontend.slice(0, frontend.indexOf('<title>')),
+  /maximum-scale|user-scalable/,
+  'Shared-query startup must not lock someone inside a restored magnified viewport',
+);
+assert.match(
+  shareRedirect,
+  /name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover"/,
+  'The compatibility redirect must preserve user-controlled viewport recovery',
+);
+assert.match(
+  shareRedirect,
+  /var entryId = Date\.now\(\)\.toString\(36\);[\s\S]*window\.location\.replace\('\/qt\.html\?mode=anon&t=' \+ encodeURIComponent\(token\) \+ '&entry=' \+ entryId\)/,
+  'Each compatibility redirect must use a fresh destination while preserving the share token',
 );
 assert.match(
   frontend,
-  /function configurePrismViewport\(\)[\s\S]*if \(params\.get\('t'\)\) return;[\s\S]*viewport\.setAttribute\('content', 'width=device-width, initial-scale=1\.0, viewport-fit=cover, interactive-widget=resizes-content'\)/,
-  'Normal Prism pages must immediately restore user-controlled pinch zoom while shared-query pages retain their initial lock',
-);
-assert.match(
-  shareRedirect,
-  /name="viewport" content="width=device-width, initial-scale=1\.0, maximum-scale=1\.0, user-scalable=no, viewport-fit=cover"/,
-  'The compatibility redirect must establish the shared-query scale lock before navigating',
-);
-assert.match(
-  shareRedirect,
-  /window\.location\.replace\('\/qt\.html\?mode=anon&t=' \+ encodeURIComponent\(token\)\)/,
-  'The compatibility redirect must preserve the share token when opening qt.html',
+  /function prepareSharedQueryEntry\(\)[\s\S]*params\.get\('t'\)[\s\S]*history\.scrollRestoration = 'manual'[\s\S]*pointerdown[\s\S]*userRequestedEditableFocus = true[\s\S]*focusin[\s\S]*event\.target\.blur\(\)[\s\S]*pageshow/,
+  'Shared-query startup must reject restored field focus until a real editable-control tap occurs',
 );
 assert.match(
   frontend,
