@@ -11,8 +11,11 @@
   (function prepareSharedQueryEntry() {
     var params = new URLSearchParams(window.location.search);
     var gatedSelector = '[data-prism-focus-gated]';
+    var isSharedEntry = !!params.get('t');
+    if (isSharedEntry) document.documentElement.classList.add('shared-query-entry');
     function unlockGatedField(field) {
       if (!field || !field.matches || !field.matches(gatedSelector)) return;
+      field.disabled = false;
       field.readOnly = false;
       field.setAttribute('inputmode', field.dataset.prismFocusGated || 'text');
     }
@@ -21,63 +24,32 @@
     }
     function lockAllGatedFields() {
       document.querySelectorAll(gatedSelector).forEach(function(field) {
+        field.disabled = true;
         field.readOnly = true;
         field.setAttribute('inputmode', 'none');
       });
     }
 
-    if (!params.get('t')) {
+    if (!isSharedEntry) {
       document.addEventListener('DOMContentLoaded', unlockAllGatedFields);
       return;
     }
     if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 
     var userRequestedEditableFocus = false;
-    var pendingGatedTap = null;
     function isEditable(target) {
       return !!(target && target.matches && target.matches('input, textarea, select, [contenteditable="true"]'));
     }
-    document.addEventListener('pointerdown', function(event) {
-      if (event.target && event.target.matches && event.target.matches(gatedSelector)) {
-        // The root question is immutable in a shared exchange. The follow-up
-        // and discussion composers stay inert until this gesture proves to be
-        // a stationary tap rather than the beginning of a page scroll.
-        if (event.target.id === 'userInput') return;
-        pendingGatedTap = {
-          field: event.target,
-          pointerId: event.pointerId,
-          startX: event.clientX,
-          startY: event.clientY,
-          moved: false
-        };
-        return;
-      }
-      if (isEditable(event.target)) userRequestedEditableFocus = true;
-    }, true);
-    document.addEventListener('pointermove', function(event) {
-      if (!pendingGatedTap || pendingGatedTap.pointerId !== event.pointerId) return;
-      if (Math.abs(event.clientX - pendingGatedTap.startX) > 10 ||
-          Math.abs(event.clientY - pendingGatedTap.startY) > 10) {
-        pendingGatedTap.moved = true;
-      }
-    }, true);
-    document.addEventListener('pointercancel', function(event) {
-      if (pendingGatedTap && pendingGatedTap.pointerId === event.pointerId) pendingGatedTap = null;
-    }, true);
-    document.addEventListener('pointerup', function(event) {
-      if (!pendingGatedTap || pendingGatedTap.pointerId !== event.pointerId) return;
-      var gesture = pendingGatedTap;
-      pendingGatedTap = null;
-      if (gesture.moved) return;
-      event.preventDefault();
-      unlockGatedField(gesture.field);
+    document.addEventListener('prism:shared-composer-open', function(event) {
+      var field = event.detail && event.detail.field;
+      if (!field) return;
+      unlockGatedField(field);
       userRequestedEditableFocus = true;
-      try {
-        gesture.field.focus({ preventScroll: true });
-      } catch (_) {
-        gesture.field.focus();
-      }
-    }, { capture: true, passive: false });
+    });
+    document.addEventListener('prism:shared-composer-close', function() {
+      userRequestedEditableFocus = false;
+      lockAllGatedFields();
+    });
     document.addEventListener('focusin', function(event) {
       if (!userRequestedEditableFocus && isEditable(event.target)) event.target.blur();
     }, true);
@@ -86,11 +58,16 @@
       if (userRequestedEditableFocus) return;
       var active = document.activeElement;
       if (isEditable(active)) active.blur();
+      var overlay = document.getElementById('sharedComposerOverlay');
+      if (overlay) {
+        overlay.classList.remove('open');
+        overlay.setAttribute('aria-hidden', 'true');
+      }
+      if (document.body) document.body.style.overflow = '';
       window.scrollTo(0, 0);
     }
     window.addEventListener('pageshow', function() {
       userRequestedEditableFocus = false;
-      pendingGatedTap = null;
       lockAllGatedFields();
       resetRestoredSharedEntryState();
     });
@@ -278,6 +255,110 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
     cursor: pointer;
+  }
+  .shared-compose-trigger { display: none; }
+  .shared-query-entry [data-prism-focus-gated] {
+    pointer-events: none;
+  }
+  .shared-query-entry #followUpComposer .input-wrap,
+  .shared-query-entry #followUpSubmitBtn,
+  .shared-query-entry #chatInput,
+  .shared-query-entry #chatComposeBar > div {
+    display: none !important;
+  }
+  .shared-query-entry .shared-compose-trigger {
+    display: block;
+    width: 100%;
+    min-height: 48px;
+  }
+  .shared-query-entry #sharedComposerInput {
+    pointer-events: auto;
+  }
+  .shared-chat-compose-trigger {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border: 1px solid rgba(122,150,201,0.55);
+    background: rgba(74,106,170,0.08);
+    color: rgba(205,218,242,0.96);
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+  .shared-composer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(3,3,7,0.82);
+    box-sizing: border-box;
+  }
+  .shared-composer-overlay.open { display: flex; }
+  .shared-composer-sheet {
+    width: min(680px, 100%);
+    max-height: calc(100dvh - 32px);
+    padding: 18px;
+    border: 1px solid var(--border-lit);
+    background: rgba(12,12,20,0.99);
+    box-shadow: 0 -20px 60px rgba(0,0,0,0.65);
+    box-sizing: border-box;
+  }
+  .shared-composer-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    font-family: var(--cinzel);
+    font-size: 16px;
+    color: var(--gold-pale);
+  }
+  .shared-composer-head button {
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 26px;
+    cursor: pointer;
+  }
+  #sharedComposerInput {
+    width: 100%;
+    min-height: 150px;
+    max-height: 42dvh;
+    box-sizing: border-box;
+    resize: vertical;
+    border: 1px solid var(--border-lit);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--crimson);
+    font-size: 18px;
+    line-height: 1.55;
+    padding: 14px;
+    outline: none;
+  }
+  #sharedComposerInput:focus { border-color: var(--gold-dim); }
+  .shared-composer-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .shared-composer-actions button {
+    min-height: 46px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .shared-composer-actions #sharedComposerSubmitBtn {
+    border-color: var(--gold-dim);
+    color: var(--gold-pale);
+    background: rgba(201,168,76,0.06);
   }
 
   #discussionPanel {
@@ -2758,7 +2839,7 @@
     <div id="inputSection">
       <div class="input-wrap">
         <div style="position:relative;">
-          <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+          <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly disabled oninput="updateCharCount()" style="padding-right:52px;"></textarea>
           <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
         </div>
         <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -2897,7 +2978,7 @@
       <div id="followUpComposer" style="display:none;">
         <div class="input-wrap">
           <div style="position:relative;">
-            <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question…" rows="3" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly autocapitalize="sentences" autocorrect="on" spellcheck="true" style="padding-right:52px;"></textarea>
+            <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question…" rows="3" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly disabled autocapitalize="sentences" autocorrect="on" spellcheck="true" style="padding-right:52px;"></textarea>
             <button id="followUpMicBtn" onclick="toggleFollowUpMic()" title="Speak your follow-up" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
           </div>
           <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -2905,6 +2986,7 @@
         <div class="follow-up-submit-row">
           <button class="response-new-subject" id="newSubjectBottomBtn" onclick="resetForm()">↻ New Subject</button>
           <button class="response-new-subject" id="followUpSubmitBtn" onclick="runFollowUp(document.getElementById('followUpInput'))">Enter →</button>
+          <button class="response-new-subject shared-compose-trigger" id="sharedFollowUpComposeBtn" type="button" onclick="openSharedComposer('followup')">Ask a Follow-Up</button>
         </div>
       </div>
     </div>
@@ -3067,13 +3149,28 @@
     <div id="chatMicStatus" style="display:none; font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--gold-dim); padding:0 16px 8px; text-transform:uppercase;"></div>
 
     <div class="chat-compose" id="chatComposeBar" style="padding:12px 16px;border-top:1px solid rgba(42,42,64,0.5);display:flex;flex-direction:column;gap:8px;">
-      <textarea class="chat-input" id="chatInput" placeholder="Add a message…" rows="2" inputmode="none" data-prism-focus-gated="text" readonly autocapitalize="sentences" autocorrect="on" spellcheck="true"
+      <textarea class="chat-input" id="chatInput" placeholder="Add a message…" rows="2" inputmode="none" data-prism-focus-gated="text" readonly disabled autocapitalize="sentences" autocorrect="on" spellcheck="true"
         style="width:100%;"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"></textarea>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button id="chatMicBtn" onclick="toggleChatMic()" title="Speak your message" style="display:none; flex-shrink:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:15px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
         <button class="chat-send-btn" onclick="sendChatMessage()">Enter →</button>
+      </div>
+      <button class="shared-compose-trigger shared-chat-compose-trigger" id="sharedChatComposeBtn" type="button" onclick="openSharedComposer('chat')">Write a Message</button>
+    </div>
+  </div>
+
+  <div id="sharedComposerOverlay" class="shared-composer-overlay" aria-hidden="true">
+    <div class="shared-composer-sheet" role="dialog" aria-modal="true" aria-labelledby="sharedComposerTitle">
+      <div class="shared-composer-head">
+        <span id="sharedComposerTitle">Write a message</span>
+        <button type="button" onclick="closeSharedComposer()" aria-label="Close composer">×</button>
+      </div>
+      <textarea id="sharedComposerInput" rows="7" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly disabled autocapitalize="sentences" autocorrect="on" spellcheck="true" placeholder="Write your message…"></textarea>
+      <div class="shared-composer-actions">
+        <button type="button" onclick="closeSharedComposer()">Cancel</button>
+        <button type="button" id="sharedComposerSubmitBtn" onclick="submitSharedComposer()">Send →</button>
       </div>
     </div>
   </div>
@@ -3363,6 +3460,77 @@ function stabilizeMobileComposerInput(input) {
   }
   touchSurface.addEventListener('pointerup', finishComposerGesture, { passive: true });
   touchSurface.addEventListener('pointercancel', finishComposerGesture, { passive: true });
+}
+
+var _sharedComposerMode = null;
+var _sharedComposerBodyOverflow = '';
+
+function openSharedComposer(mode) {
+  if (!window._sharedViewToken) return;
+  var overlay = document.getElementById('sharedComposerOverlay');
+  var input = document.getElementById('sharedComposerInput');
+  var title = document.getElementById('sharedComposerTitle');
+  var submit = document.getElementById('sharedComposerSubmitBtn');
+  if (!overlay || !input || !title || !submit) return;
+
+  _sharedComposerMode = mode === 'followup' ? 'followup' : 'chat';
+  title.textContent = _sharedComposerMode === 'followup' ? 'Ask a follow-up' : 'Write a message';
+  input.placeholder = _sharedComposerMode === 'followup'
+    ? 'Ask a follow-up question…'
+    : 'Write your message…';
+  submit.textContent = _sharedComposerMode === 'followup' ? 'Ask →' : 'Send →';
+  input.value = '';
+  _sharedComposerBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.dispatchEvent(new CustomEvent('prism:shared-composer-open', { detail: { field: input } }));
+  window.requestAnimationFrame(function() {
+    try { input.focus({ preventScroll: true }); }
+    catch (_) { input.focus(); }
+  });
+}
+
+function closeSharedComposer() {
+  var overlay = document.getElementById('sharedComposerOverlay');
+  var input = document.getElementById('sharedComposerInput');
+  if (input) input.blur();
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+  document.body.style.overflow = _sharedComposerBodyOverflow;
+  document.dispatchEvent(new CustomEvent('prism:shared-composer-close'));
+  _sharedComposerMode = null;
+}
+
+async function submitSharedComposer() {
+  var input = document.getElementById('sharedComposerInput');
+  var submit = document.getElementById('sharedComposerSubmitBtn');
+  if (!input || !submit) return;
+  var text = input.value.trim();
+  if (!text) return;
+  var mode = _sharedComposerMode;
+  submit.disabled = true;
+  closeSharedComposer();
+
+  try {
+    if (mode === 'followup') {
+      var followUpInput = document.getElementById('followUpInput');
+      if (!followUpInput) return;
+      followUpInput.disabled = false;
+      followUpInput.readOnly = false;
+      followUpInput.value = text;
+      await runFollowUp(followUpInput);
+      followUpInput.disabled = true;
+      followUpInput.readOnly = true;
+      followUpInput.setAttribute('inputmode', 'none');
+    } else {
+      await sendChatMessage(text);
+    }
+  } finally {
+    submit.disabled = false;
+  }
 }
 
 function stageComposerBelowResponse() {
@@ -4734,6 +4902,17 @@ function resetForm() {
   if (window._sharedViewToken) {
     sessionStorage.setItem('prism_shared_thread', '/qt.html?mode=anon&t=' + window._sharedViewToken);
     sessionStorage.setItem('prism_shared_thread_title', currentSubject || 'Shared interpretation');
+    window._sharedViewToken = null;
+    window._sharedViewShareId = null;
+    window._sharedViewPermission = null;
+    window._sharedGroupChat = null;
+    document.documentElement.classList.remove('shared-query-entry');
+    document.querySelectorAll('[data-prism-focus-gated]').forEach(function(field) {
+      field.disabled = false;
+      field.readOnly = false;
+      field.setAttribute('inputmode', field.dataset.prismFocusGated || 'text');
+    });
+    window.history.replaceState(null, '', '/qt.html?mode=anon&source=shared-new');
   }
   conversationHistory = [];
   currentSubject = '';
@@ -8289,16 +8468,17 @@ function canComposeInSharedConversation() {
   return !!_currentSharedSessionId;
 }
 
-async function sendChatMessage() {
+async function sendChatMessage(suppliedText) {
   if (window._sharedViewToken && !window._sharedGroupChat && window._sharedViewPermission !== 'contributor') {
     if (typeof showQueryActionConfirm === 'function') showQueryActionConfirm('This Trust Circle link is view-only');
     return;
   }
   var input = document.getElementById('chatInput');
   if (!input) return;
-  var text = input.value.trim();
+  var hasSuppliedText = typeof suppliedText === 'string';
+  var text = hasSuppliedText ? suppliedText.trim() : input.value.trim();
   if (!text) return;
-  releaseCompactTouchKeyboard(input);
+  if (!hasSuppliedText) releaseCompactTouchKeyboard(input);
 
   var email = userEmail();
   // Distinct from just "has an email" — a signed-in visitor who hasn't
@@ -8323,9 +8503,11 @@ async function sendChatMessage() {
     showQueryActionConfirm && showQueryActionConfirm('Share this first to start a discussion');
     return;
   }
-  input.value = '';
-  input.style.height = 'auto';
-  input.disabled = true;
+  if (!hasSuppliedText) {
+    input.value = '';
+    input.style.height = 'auto';
+    input.disabled = true;
+  }
 
   // Optimistic render
   var optimisticId = 'pending-' + Date.now();
@@ -8357,7 +8539,7 @@ async function sendChatMessage() {
   } catch(e) {
     console.error('Chat send error:', e);
     _chatMessages = _chatMessages.filter(function(item) { return item.id !== optimisticId; });
-    input.value = text;
+    if (!hasSuppliedText) input.value = text;
     var failed = document.createElement('div');
     failed.className = 'chat-empty';
     failed.textContent = e.message || 'Message could not be sent. Please try again.';
@@ -8365,8 +8547,10 @@ async function sendChatMessage() {
     if (failedStream) failedStream.appendChild(failed);
   }
 
-  input.disabled = false;
-  if (!usesCompactTouchKeyboard()) input.focus();
+  if (!hasSuppliedText) {
+    input.disabled = false;
+    if (!usesCompactTouchKeyboard()) input.focus();
+  }
 }
 
 // ── Private View — your own notes for this response ──────────────────────

@@ -26,40 +26,46 @@ assert.match(
 );
 assert.match(
   frontend,
-  /function prepareSharedQueryEntry\(\)[\s\S]*params\.get\('t'\)[\s\S]*history\.scrollRestoration = 'manual'[\s\S]*pointerdown[\s\S]*userRequestedEditableFocus = true[\s\S]*focusin[\s\S]*event\.target\.blur\(\)[\s\S]*pageshow/,
-  'Shared-query startup must reject restored field focus until a real editable-control tap occurs',
+  /function prepareSharedQueryEntry\(\)[\s\S]*isSharedEntry[\s\S]*classList\.add\('shared-query-entry'\)[\s\S]*history\.scrollRestoration = 'manual'[\s\S]*prism:shared-composer-open[\s\S]*focusin[\s\S]*event\.target\.blur\(\)[\s\S]*pageshow/,
+  'Shared-query startup must reject restored field focus until its dedicated composer opens',
 );
 assert.match(
   frontend,
-  /function unlockGatedField\(field\)[\s\S]*field\.readOnly = false;[\s\S]*field\.setAttribute\('inputmode', field\.dataset\.prismFocusGated[\s\S]*if \(!params\.get\('t'\)\)[\s\S]*unlockAllGatedFields/,
-  'Ordinary pages must unlock the static focus gate while shared pages wait for a real tap',
+  /function unlockGatedField\(field\)[\s\S]*field\.disabled = false;[\s\S]*field\.readOnly = false;[\s\S]*if \(!isSharedEntry\)[\s\S]*unlockAllGatedFields/,
+  'Ordinary pages must unlock the static focus gate while shared pages remain disabled',
 );
 assert.match(
   frontend,
-  /pointerdown[\s\S]*event\.target\.id === 'userInput'[\s\S]*pendingGatedTap = \{[\s\S]*pointermove[\s\S]*pendingGatedTap\.moved = true[\s\S]*pointercancel[\s\S]*pointerup/,
-  'Shared composers must distinguish a stationary tap from a scrolling gesture before unlocking',
-);
-const gatedPointerDown = frontend.slice(
-  frontend.indexOf("document.addEventListener('pointerdown'"),
-  frontend.indexOf("document.addEventListener('pointermove'"),
+  /function lockAllGatedFields\(\)[\s\S]*field\.disabled = true;[\s\S]*field\.readOnly = true;[\s\S]*field\.setAttribute\('inputmode', 'none'\)/,
+  'Shared fields must be truly disabled rather than merely read-only',
 );
 assert.doesNotMatch(
-  gatedPointerDown,
-  /unlockGatedField/,
-  'Touch-down alone must never unlock a shared composer',
+  frontend.slice(0, frontend.indexOf('<title>')),
+  /pendingGatedTap|document\.addEventListener\('pointer(?:down|move|up|cancel)'/,
+  'The shared reading page must not unlock text fields from pointer gestures',
 );
 assert.match(
   frontend,
-  /pointerup[\s\S]*if \(gesture\.moved\) return;[\s\S]*event\.preventDefault\(\);[\s\S]*unlockGatedField\(gesture\.field\)[\s\S]*gesture\.field\.focus/,
-  'Only a completed stationary tap may unlock and focus a shared composer',
+  /\.shared-query-entry #followUpComposer \.input-wrap,[\s\S]*\.shared-query-entry #chatInput,[\s\S]*display: none !important;[\s\S]*\.shared-query-entry \.shared-compose-trigger/,
+  'Shared pages must replace inline text controls with explicit compose buttons',
 );
-for (const id of ['userInput', 'followUpInput', 'chatInput']) {
+for (const id of ['userInput', 'followUpInput', 'chatInput', 'sharedComposerInput']) {
   assert.match(
     frontend,
-    new RegExp(`id="${id}"[^>]+inputmode="none"[^>]+data-prism-focus-gated="text"[^>]+readonly`),
+    new RegExp(`id="${id}"[^>]+inputmode="none"[^>]+data-prism-focus-gated="text"[^>]+readonly[^>]+disabled`),
     `${id} must be keyboard-inert in static HTML so Android cannot restore startup focus`,
   );
 }
+assert.match(
+  frontend,
+  /function openSharedComposer\(mode\)[\s\S]*prism:shared-composer-open[\s\S]*input\.focus/,
+  'Only the dedicated shared composer action may enable and focus text entry',
+);
+assert.match(
+  frontend,
+  /function closeSharedComposer\(\)[\s\S]*input\.blur\(\)[\s\S]*prism:shared-composer-close/,
+  'Closing the dedicated composer must blur and disable text entry again',
+);
 assert.match(
   frontend,
   /@media \(max-width: 600px\)[\s\S]*?textarea\.input-field,[\s\S]*?font-size:\s*18px !important;/,
@@ -84,7 +90,7 @@ assert.match(
 );
 const composerStabilizer = frontend.slice(
   frontend.indexOf('function stabilizeMobileComposerInput(input)'),
-  frontend.indexOf('function stageComposerBelowResponse()'),
+  frontend.indexOf('var _sharedComposerMode'),
 );
 assert.match(
   composerStabilizer,
@@ -158,7 +164,7 @@ assert.doesNotMatch(
 );
 
 const trustCircleSend = frontend.slice(
-  frontend.indexOf('async function sendChatMessage()'),
+  frontend.indexOf('async function sendChatMessage(suppliedText)'),
   frontend.indexOf('// ── Private View'),
 );
 assert.match(
