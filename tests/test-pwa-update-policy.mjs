@@ -14,7 +14,7 @@ assert.equal(
 );
 assert.match(
   serviceWorker,
-  /const CACHE_NAME = 'prism-shell-v11'/,
+  /const CACHE_NAME = 'prism-shell-v12'/,
   'A new cache version must retire stale earlier responses',
 );
 assert.deepEqual(
@@ -31,6 +31,20 @@ assert.match(
   serviceWorker,
   /if \(isNavigation \|\| isCodeAsset\) \{[\s\S]*fetch\(event\.request\)[\s\S]*\.catch\(\(\) => caches\.match\(event\.request\)\)/,
   'Documents and executable assets must be network-first with cached fallback',
+);
+assert.match(
+  serviceWorker,
+  /const isSharedNavigation = isNavigation && url\.searchParams\.has\('t'\);[\s\S]*if \(isSharedNavigation\) \{[\s\S]*fetch\(event\.request, \{ cache: 'no-store' \}\)[\s\S]*return;/,
+  'Tokenized shared-query documents must always come from the network without a stale fallback',
+);
+const sharedNavigationPolicy = serviceWorker.slice(
+  serviceWorker.indexOf('if (isSharedNavigation)'),
+  serviceWorker.indexOf('// The interpreter and its executable assets'),
+);
+assert.doesNotMatch(
+  sharedNavigationPolicy,
+  /caches\.(?:match|open)|cache\.put/,
+  'Shared-query HTML must never be read from or written to the PWA cache',
 );
 assert.match(
   serviceWorker,

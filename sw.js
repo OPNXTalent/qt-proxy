@@ -8,7 +8,7 @@
 // itself; this service worker exists to satisfy installability and speed
 // up shell loading, not to provide offline AI responses.
 
-const CACHE_NAME = 'prism-shell-v11';
+const CACHE_NAME = 'prism-shell-v12';
 
 // Keep this list small and static-only. Do not add qt.html here as a
 // blanket precache target beyond what's needed for install — it changes
@@ -56,6 +56,16 @@ self.addEventListener('fetch', (event) => {
     || url.pathname.endsWith('.html');
   const isCodeAsset = ['script', 'style', 'worker', 'manifest']
     .includes(event.request.destination);
+
+  // A personalized share is a live application entry, not an offline shell.
+  // Never retain tokenized HTML or fall back to an older copy: Android may
+  // resume the same standalone task for days, and a cached qt.html?t=... would
+  // keep obsolete keyboard/focus behavior alive after production is fixed.
+  const isSharedNavigation = isNavigation && url.searchParams.has('t');
+  if (isSharedNavigation) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
 
   // The interpreter and its executable assets are network-first. Installed
   // PWAs therefore receive the current qt.html and matching JavaScript on
