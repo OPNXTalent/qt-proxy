@@ -33,18 +33,51 @@
     if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 
     var userRequestedEditableFocus = false;
+    var pendingGatedTap = null;
     function isEditable(target) {
       return !!(target && target.matches && target.matches('input, textarea, select, [contenteditable="true"]'));
     }
     document.addEventListener('pointerdown', function(event) {
       if (event.target && event.target.matches && event.target.matches(gatedSelector)) {
         // The root question is immutable in a shared exchange. The follow-up
-        // and discussion composers become editable only through this real tap.
+        // and discussion composers stay inert until this gesture proves to be
+        // a stationary tap rather than the beginning of a page scroll.
         if (event.target.id === 'userInput') return;
-        unlockGatedField(event.target);
+        pendingGatedTap = {
+          field: event.target,
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          moved: false
+        };
+        return;
       }
       if (isEditable(event.target)) userRequestedEditableFocus = true;
     }, true);
+    document.addEventListener('pointermove', function(event) {
+      if (!pendingGatedTap || pendingGatedTap.pointerId !== event.pointerId) return;
+      if (Math.abs(event.clientX - pendingGatedTap.startX) > 10 ||
+          Math.abs(event.clientY - pendingGatedTap.startY) > 10) {
+        pendingGatedTap.moved = true;
+      }
+    }, true);
+    document.addEventListener('pointercancel', function(event) {
+      if (pendingGatedTap && pendingGatedTap.pointerId === event.pointerId) pendingGatedTap = null;
+    }, true);
+    document.addEventListener('pointerup', function(event) {
+      if (!pendingGatedTap || pendingGatedTap.pointerId !== event.pointerId) return;
+      var gesture = pendingGatedTap;
+      pendingGatedTap = null;
+      if (gesture.moved) return;
+      event.preventDefault();
+      unlockGatedField(gesture.field);
+      userRequestedEditableFocus = true;
+      try {
+        gesture.field.focus({ preventScroll: true });
+      } catch (_) {
+        gesture.field.focus();
+      }
+    }, { capture: true, passive: false });
     document.addEventListener('focusin', function(event) {
       if (!userRequestedEditableFocus && isEditable(event.target)) event.target.blur();
     }, true);
@@ -57,6 +90,7 @@
     }
     window.addEventListener('pageshow', function() {
       userRequestedEditableFocus = false;
+      pendingGatedTap = null;
       lockAllGatedFields();
       resetRestoredSharedEntryState();
     });

@@ -36,8 +36,22 @@ assert.match(
 );
 assert.match(
   frontend,
-  /pointerdown[\s\S]*event\.target\.id === 'userInput'[\s\S]*unlockGatedField\(event\.target\)/,
-  'A real tap must unlock shared follow-up and discussion fields without making the immutable root question editable',
+  /pointerdown[\s\S]*event\.target\.id === 'userInput'[\s\S]*pendingGatedTap = \{[\s\S]*pointermove[\s\S]*pendingGatedTap\.moved = true[\s\S]*pointercancel[\s\S]*pointerup/,
+  'Shared composers must distinguish a stationary tap from a scrolling gesture before unlocking',
+);
+const gatedPointerDown = frontend.slice(
+  frontend.indexOf("document.addEventListener('pointerdown'"),
+  frontend.indexOf("document.addEventListener('pointermove'"),
+);
+assert.doesNotMatch(
+  gatedPointerDown,
+  /unlockGatedField/,
+  'Touch-down alone must never unlock a shared composer',
+);
+assert.match(
+  frontend,
+  /pointerup[\s\S]*if \(gesture\.moved\) return;[\s\S]*event\.preventDefault\(\);[\s\S]*unlockGatedField\(gesture\.field\)[\s\S]*gesture\.field\.focus/,
+  'Only a completed stationary tap may unlock and focus a shared composer',
 );
 for (const id of ['userInput', 'followUpInput', 'chatInput']) {
   assert.match(
