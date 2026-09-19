@@ -1980,6 +1980,8 @@ const RAG_CONFIG = {
   matchCount:       4,
 };
 
+const MAX_QUERY_CHARS = 4000;
+
 const RETRIEVAL_ELIGIBLE_TYPES = [
   'Framework-Definitional',
   'Philosophical',
@@ -6848,7 +6850,7 @@ Do not add any question after the exit offer. The person chooses the next move.
       : null;
     threadId = typeof body?.threadId === 'string' ? body.threadId : null;
     inquirySubject = typeof body?.inquirySubject === 'string'
-      ? body.inquirySubject.slice(0, 2000)
+      ? body.inquirySubject.slice(0, MAX_QUERY_CHARS)
       : '';
     artifactId = typeof body?.artifactId === 'string'
       && /^[0-9a-f-]{36}$/i.test(body.artifactId)
@@ -6884,7 +6886,7 @@ Do not add any question after the exit offer. The person chooses the next move.
 
   // ── CRISIS DETECTION ──────────────────────────────────────────────────────
   const lastUserText = (() => {
-    if (rawQuery && rawQuery.trim().length > 0) return rawQuery.trim();
+    if (typeof rawQuery === 'string' && rawQuery.trim().length > 0) return rawQuery.trim();
 
     const extractFromPrompt = (text) => {
       if (!text) return null;
@@ -6914,8 +6916,21 @@ Do not add any question after the exit offer. The person chooses the next move.
       }
     }
 
-    return prompt || '';
+    return typeof prompt === 'string' ? prompt : '';
   })();
+
+  if (lastUserText.length > MAX_QUERY_CHARS) {
+    timing('request_rejected', {
+      reason: 'query_too_long',
+      queryLength: lastUserText.length,
+      maxQueryChars: MAX_QUERY_CHARS,
+    });
+    return res.status(413).json({
+      error: 'Query is too long',
+      message: `Please keep your inquiry within ${MAX_QUERY_CHARS.toLocaleString()} characters.`,
+      maxChars: MAX_QUERY_CHARS,
+    });
+  }
 
   if (detectChildAbuse(lastUserText)) {
     timing('safety_complete', { outcome: 'child_abuse_intercept' });

@@ -2839,11 +2839,11 @@
     <div id="inputSection">
       <div class="input-wrap">
         <div style="position:relative;">
-          <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly disabled oninput="updateCharCount()" style="padding-right:52px;"></textarea>
+          <textarea class="input-field" id="userInput" placeholder="A verse, a question, or whatever is on your mind…" rows="3" maxlength="4000" inputmode="none" data-prism-focus-gated="text" readonly disabled oninput="updateCharCount()" style="padding-right:52px;"></textarea>
           <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
         </div>
         <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
-        <div id="charCount" style="font-family:var(--mono); font-size:20px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 600</div>
+        <div id="charCount" style="font-family:var(--mono); font-size:20px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 4000</div>
       </div>
     </div>
 
@@ -2978,7 +2978,7 @@
       <div id="followUpComposer" style="display:none;">
         <div class="input-wrap">
           <div style="position:relative;">
-            <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question…" rows="3" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly disabled autocapitalize="sentences" autocorrect="on" spellcheck="true" style="padding-right:52px;"></textarea>
+            <textarea class="input-field" id="followUpInput" placeholder="Ask a follow-up question…" rows="3" maxlength="4000" inputmode="none" data-prism-focus-gated="text" readonly disabled autocapitalize="sentences" autocorrect="on" spellcheck="true" style="padding-right:52px;"></textarea>
             <button id="followUpMicBtn" onclick="toggleFollowUpMic()" title="Speak your follow-up" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
           </div>
           <div id="followUpMicStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
@@ -3167,7 +3167,7 @@
         <span id="sharedComposerTitle">Write a message</span>
         <button type="button" onclick="closeSharedComposer()" aria-label="Close composer">×</button>
       </div>
-      <textarea id="sharedComposerInput" rows="7" maxlength="600" inputmode="none" data-prism-focus-gated="text" readonly disabled autocapitalize="sentences" autocorrect="on" spellcheck="true" placeholder="Write your message…"></textarea>
+      <textarea id="sharedComposerInput" rows="7" maxlength="4000" inputmode="none" data-prism-focus-gated="text" readonly disabled autocapitalize="sentences" autocorrect="on" spellcheck="true" placeholder="Write your message…"></textarea>
       <div class="shared-composer-actions">
         <button type="button" onclick="closeSharedComposer()">Cancel</button>
         <button type="button" id="sharedComposerSubmitBtn" onclick="submitSharedComposer()">Send →</button>
@@ -3271,10 +3271,12 @@ function setType(type, el) {
 }
 
 function updateCharCount() {
-  const len = document.getElementById('userInput').value.length;
+  const input = document.getElementById('userInput');
+  const len = input.value.length;
+  const limit = input.maxLength > 0 ? input.maxLength : 4000;
   document.getElementById('charNum').textContent = len;
   const el = document.getElementById('charNum');
-  el.style.color = len > 500 ? 'var(--warn)' : 'var(--text-muted)';
+  el.style.color = len > Math.floor(limit * 0.85) ? 'var(--warn)' : 'var(--text-muted)';
 }
 
 // --- Query limit state ---
