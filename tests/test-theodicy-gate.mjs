@@ -40,6 +40,9 @@ function shouldLoadTheodicyModule(query, inquiryClassification) {
     /epicurus/i,
     /hume.*(god|evil|suffering)/i,
     /(evil|suffering).*(existence|existence of god|god exists)/i,
+    /(hard|harder|difficult|struggl(e|ing)|unable) to (believe|have faith|trust).*(because of|due to|given|with).*(evil|suffering|pain|death|tragedy|injustice)/i,
+    /(evil|suffering|pain|death|tragedy|injustice).*(hard|harder|difficult|struggl(e|ing)|unable).*(believe|have faith|trust)/i,
+    /why (does )?(evil|suffering|pain|death|tragedy|injustice) exist.*(christ|christian|faith|god|creator)/i,
   ];
   const semanticSignal = challengePhrases.some(pattern => pattern.test(q));
 
@@ -51,7 +54,7 @@ function shouldLoadTheodicyModule(query, inquiryClassification) {
   ];
   const accusationMarkers = [
     'god', 'yhwh', 'he ', 'his ', 'lord', 'creator', 'jesus', 'sovereign',
-    'omnipotent', 'all-powerful', 'all powerful', 'omniscient', 'omnisci'
+    'omnipotent', 'all-powerful', 'all powerful', 'omniscient', 'omnisci', 'christ'
   ];
   const hasSuffering = sufferingTerms.some(t => q.includes(t));
   const hasAccusation = accusationMarkers.some(t => q.includes(t));
@@ -98,6 +101,10 @@ const cases = [
     cls: 'Philosophical', expected: LOAD,   note: 'Epicurus reference' },
   { q: 'How can God be sovereign if evil exists?',
     cls: 'Theological',  expected: LOAD,    note: 'Sovereignty challenge' },
+  { q: 'I have been a Christian all my life, but suffering has made it harder to believe and have faith in Christ.',
+    cls: 'Existential',  expected: LOAD,    note: 'Faith crisis without direct accusation' },
+  { q: 'Why does suffering exist? I am a Christian struggling with my faith.',
+    cls: 'Existential',  expected: LOAD,    note: 'Quiet problem-of-evil phrasing' },
 
   // ── Should NOT trigger ────────────────────────────────────────────────────
   { q: 'Why did Job suffer?',
@@ -158,13 +165,17 @@ const stubText = 'THEODICY PRESSURE — STUB (FULL PROTOCOL LOADS CONDITIONALLY)
 // Module content integrity
 const moduleChecks = [
   ['Module: Move 1 present',        PRISM_THEODICY_MODULE.includes('MOVE 1 — THE YES')],
-  ['Module: Move 8 present',        PRISM_THEODICY_MODULE.includes('MOVE 8 — SCIENTIFIC CORROBORATION')],
+  ['Module: context-sensitivity',   PRISM_THEODICY_MODULE.includes('MOVE 5 — CONTEXT-SENSITIVITY')],
+  ['Module: Cross anchor',          PRISM_THEODICY_MODULE.includes('Acts 2:23')],
+  ['Module: divine cost',           PRISM_THEODICY_MODULE.includes('GOD DOES NOT EXTERNALIZE THE COST')],
+  ['Module: retained wounds',       PRISM_THEODICY_MODULE.includes('risen Christ retains his wounds')],
+  ['Module: Move 9 present',        PRISM_THEODICY_MODULE.includes('MOVE 9 — SCIENTIFIC CORROBORATION')],
   ['Module: Isaiah 45:7 present',   PRISM_THEODICY_MODULE.includes('Isaiah 45:7')],
   ['Module: Genesis 50:20 present', PRISM_THEODICY_MODULE.includes('Genesis 50:20')],
   ['Module: Penrose-Hameroff',      PRISM_THEODICY_MODULE.includes('Penrose-Hameroff')],
   ['Module: Van Lommel',            PRISM_THEODICY_MODULE.includes('van Lommel')],
   ['Module: Wigner',                PRISM_THEODICY_MODULE.includes('Wigner')],
-  ['Module: Emet connection',       PRISM_THEODICY_MODULE.includes('EMET CONNECTION')],
+  ['Module: Emet connection',       PRISM_THEODICY_MODULE.includes('Emet as stable truth')],
   ['Module: Olam HaBa',             PRISM_THEODICY_MODULE.includes('Olam HaBa')],
   ['Module: no double-load guard',  !PRISM_THEODICY_MODULE.includes('PRISM_THEODICY_MODULE')],
   [`Module: token size reasonable (got ~${moduleTokens})`,

@@ -2053,6 +2053,9 @@ function shouldLoadTheodicyModule(query, inquiryClassification) {
     /epicurus/i,
     /hume.*(god|evil|suffering)/i,
     /(evil|suffering).*(existence|existence of god|god exists)/i,
+    /(hard|harder|difficult|struggl(e|ing)|unable) to (believe|have faith|trust).*(because of|due to|given|with).*(evil|suffering|pain|death|tragedy|injustice)/i,
+    /(evil|suffering|pain|death|tragedy|injustice).*(hard|harder|difficult|struggl(e|ing)|unable).*(believe|have faith|trust)/i,
+    /why (does )?(evil|suffering|pain|death|tragedy|injustice) exist.*(christ|christian|faith|god|creator)/i,
   ];
 
   const semanticSignal = challengePhrases.some(pattern => pattern.test(q));
@@ -2067,7 +2070,7 @@ function shouldLoadTheodicyModule(query, inquiryClassification) {
   ];
   const accusationMarkers = [
     'god', 'yhwh', 'he ', 'his ', 'lord', 'creator', 'jesus', 'sovereign',
-    'omnipotent', 'all-powerful', 'all powerful', 'omniscient', 'omnisci'
+    'omnipotent', 'all-powerful', 'all powerful', 'omniscient', 'omnisci', 'christ'
   ];
   const hasSuffering = sufferingTerms.some(t => q.includes(t));
   const hasAccusation = accusationMarkers.some(t => q.includes(t));
