@@ -3737,6 +3737,7 @@ async function runInterpretation() {
     prismEarlyRecognitionRequests.delete(requestId);
     prismBrowserTimelines.delete(requestId);
     if (err.message === 'RATE_LIMITED') return;
+    if (err.message === 'CHILD_ABUSE_DETECTED') return;
     if (err.message === 'CRISIS_DETECTED') return;
     if (err.message === 'SURVEY_DETECTED') return;
     if (err.message === 'QUOTA_EXCEEDED') return;
@@ -3838,6 +3839,7 @@ async function runFollowUp(sourceInput) {
     });
     prismBrowserTimelines.delete(requestId);
     if (err.message === 'RATE_LIMITED') return;
+    if (err.message === 'CHILD_ABUSE_DETECTED') return;
     if (err.message === 'QUOTA_EXCEEDED') return;
     if (err.message === 'STALE_INQUIRY_STATE') return;
     if (err.message === 'INQUIRY_STATE_UNAVAILABLE') return;
@@ -3978,6 +3980,21 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
   }
   if (!response.ok) {
     const err = new Error(`SERVER_ERROR_${response.status}`); err.type = 'server'; throw err;
+  }
+
+  // Safety intercepts are JSON responses, even though normal follow-ups stream.
+  // Handle them explicitly so their panel is not replaced by a generic error.
+  const responseContentType = response.headers.get('content-type') || '';
+  if (responseContentType.includes('application/json')) {
+    let bodyData = {};
+    try { bodyData = await response.json(); } catch {}
+    if (bodyData.child_abuse) {
+      showChildAbusePanel();
+      throw new Error('CHILD_ABUSE_DETECTED');
+    }
+    const err = new Error('Unexpected JSON response from server.');
+    err.type = 'server';
+    throw err;
   }
 
   const reader = response.body.getReader();
