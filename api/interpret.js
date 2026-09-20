@@ -12,6 +12,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
+import { PRISM_DIVINE_HIDDENNESS } from '../lib/prompt-modules/divine-hiddenness.js';
 import {
   ARTIFACT_SCHEMA_VERSION,
   RUNTIME_CONSTITUTION_VERSION,
@@ -2155,6 +2156,29 @@ export function shouldLoadRelationalSalvation(query) {
   ].some(p => p.test(q));
 
   return godSignal && agencySignal;
+}
+
+// Determines whether to append the Divine Hiddenness Protocol module.
+// This is intentionally separate from theodicy: a person may affirm God's
+// goodness while struggling with God's apparent absence or lack of encounter.
+export function shouldLoadDivineHiddenness(query) {
+  if (!query) return false;
+  const q = query.toLowerCase();
+
+  return [
+    /divine hidden(ness)?/i,
+    /why (is|does) god.*(hidden|hide|silent|absent|distant)/i,
+    /why (doesn.t|won.t|wouldn.t) god.*(obvious|reveal|show himself|speak|answer)/i,
+    /god (is|seems|feels).*(hidden|silent|absent|far away|distant)/i,
+    /(cannot|can't|do not|don't|never) (feel|find|hear|experience|encounter)( or (feel|find|hear|experience|encounter))? god/i,
+    /why (can't|cannot|don't|do not) i (feel|find|hear|experience|encounter) god/i,
+    /never (had|experienced).*(religious|spiritual|divine).*(experience|encounter|dream|vision)/i,
+    /(want|need|ask|asked|prayed for).*(sign|wonder|voice|dream|vision|apparition|encounter).*(god|jesus|christ|faith|christian)/i,
+    /(god|jesus|christ|christianity|faith).*(sign|wonder|voice|dream|vision|apparition|encounter).*(proof|prove|know|certain|certainty|believe)/i,
+    /(possess(ed|ion)?|demon(ic)?|exorcism|levitation).*(proof|prove|evidence|know|certain|believe|christian)/i,
+    /(proof|prove|evidence|know|certain|believe).*(possess(ed|ion)?|demon(ic)?|exorcism|levitation)/i,
+    /(signs? and wonders?|miracle|manifestation).*(deceive|deception|false|counterfeit|enemy|satan|demon)/i,
+  ].some(pattern => pattern.test(q));
 }
 
 
@@ -7106,11 +7130,13 @@ Do not add any question after the exit offer. The person chooses the next move.
         const inquiryClassification = null;
         const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
         const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
+        const divineHiddennessModule = shouldLoadDivineHiddenness(lastUserText || rawQuery || '');
 
         console.log(`[interpret:${requestId}] module-decision`, {
           inquiryClassification,
           theodicyModule,
           relationalSalvationModule,
+          divineHiddennessModule,
           elapsedMs: Date.now() - startedAt,
         });
 
@@ -7119,7 +7145,8 @@ Do not add any question after the exit offer. The person chooses the next move.
           + ragContext
           + learningContext
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
-          + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
+          + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '')
+          + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '');
         timing('prompt_assembly_complete', {
           promptChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
@@ -7133,6 +7160,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           learningChars: learningContext.length,
           theodicyChars: theodicyModule ? PRISM_THEODICY_MODULE.length : 0,
           relationalSalvationChars: relationalSalvationModule ? PRISM_RELATIONAL_SALVATION.length : 0,
+          divineHiddennessChars: divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS.length : 0,
           totalChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
           elapsedMs: Date.now() - startedAt,
@@ -7269,12 +7297,14 @@ Do not add any question after the exit offer. The person chooses the next move.
     const inquiryClassification = null;
     const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
     const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
+    const divineHiddennessModule = shouldLoadDivineHiddenness(lastUserText || rawQuery || '');
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
           + learningContext
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
-          + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '');
+          + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '')
+          + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '');
         timing('prompt_assembly_complete', {
           promptChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
@@ -7286,6 +7316,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
           theodicyLoaded: theodicyModule,
           relationalSalvationLoaded: relationalSalvationModule,
+          divineHiddennessLoaded: divineHiddennessModule,
           elapsedMs: Date.now() - startedAt,
         });
 
