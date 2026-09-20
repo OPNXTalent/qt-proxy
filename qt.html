@@ -2843,7 +2843,7 @@
           <button id="micBtn" onclick="toggleMic()" title="Speak your input" style="display:none; position:absolute; bottom:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-lit); background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; transition:all 0.2s; padding:0;">🎙</button>
         </div>
         <div id="micStatus" style="display:none; font-family:var(--mono); font-size:13px; letter-spacing:0.16em; color:var(--gold-dim); margin-top:5px; text-transform:uppercase;"></div>
-        <div id="charCount" style="font-family:var(--mono); font-size:20px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 4000</div>
+        <div id="charCount" style="font-family:var(--mono); font-size:20px; color:var(--text-muted); text-align:right; margin-top:6px; display:none;"><span id="charNum">0</span> / 12,000</div>
       </div>
     </div>
 
@@ -3273,7 +3273,7 @@ function setType(type, el) {
 function updateCharCount() {
   const input = document.getElementById('userInput');
   const len = input.value.length;
-  const limit = input.maxLength > 0 ? input.maxLength : 4000;
+  const limit = input.maxLength > 0 ? input.maxLength : 12000;
   document.getElementById('charNum').textContent = len;
   const el = document.getElementById('charNum');
   el.style.color = len > Math.floor(limit * 0.85) ? 'var(--warn)' : 'var(--text-muted)';
@@ -3963,6 +3963,16 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
     throw new Error('RATE_LIMITED');
   }
 
+  if (response.status === 413) {
+    let errorData = {};
+    try { errorData = await response.json(); } catch {}
+    const err = new Error(errorData.message || 'Your inquiry exceeds The Prism’s character limit.');
+    err.type = 'query_too_long';
+    err.maxChars = Number(errorData.maxChars) || 12000;
+    err.actualChars = Number(errorData.actualChars) || null;
+    throw err;
+  }
+
   if (response.status === 504 || response.status === 524) {
     const err = new Error('TIMEOUT'); err.type = 'timeout'; throw err;
   }
@@ -4303,6 +4313,16 @@ async function callProxy(messages, rawQuery, requestId, options) {
     throw new Error('RATE_LIMITED');
   }
 
+  if (response.status === 413) {
+    let errorData = {};
+    try { errorData = await response.json(); } catch {}
+    const err = new Error(errorData.message || 'Your inquiry exceeds The Prism’s character limit.');
+    err.type = 'query_too_long';
+    err.maxChars = Number(errorData.maxChars) || 12000;
+    err.actualChars = Number(errorData.actualChars) || null;
+    throw err;
+  }
+
   if (response.status === 504 || response.status === 524) {
     const err = new Error('TIMEOUT');
     err.type = 'timeout';
@@ -4576,6 +4596,20 @@ async function callProxy(messages, rawQuery, requestId, options) {
 }
 
 function getErrorMessage(err) {
+  if (err.type === 'query_too_long') {
+    const limit = Number(err.maxChars || 12000);
+    const actual = Number(err.actualChars || 0);
+    const overBy = actual > limit ? actual - limit : 0;
+    const detail = overBy > 0
+      ? `This inquiry is ${actual.toLocaleString()} characters—${overBy.toLocaleString()} over the ${limit.toLocaleString()}-character limit.`
+      : `The Prism accepts inquiries of up to ${limit.toLocaleString()} characters.`;
+    return `<div class="error-block error-query-length">
+      <div class="error-icon">◷</div>
+      <div class="error-title">Your inquiry is too long.</div>
+      <div class="error-body">${detail} Please shorten it and try again.</div>
+      <div class="error-hint">If needed, begin with the central question and add the remaining context as a follow-up.</div>
+    </div>`;
+  }
   if (err.type === 'timeout') {
     return `<div class="error-block error-timeout">
       <div class="error-icon">⧖</div>
