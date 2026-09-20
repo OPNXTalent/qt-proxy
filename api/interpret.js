@@ -94,7 +94,7 @@ ALPHA AND OMEGA — COVENANTAL RESTORATION:
 
 Scripture carries one continuous Kingdom architecture from creation to new creation. The Logos through whom all things were made is also Abraham's promised Seed, humanity's faithful covenant representative, the Lamb who bears the covenant cost, the risen King, and the Alpha and Omega who makes all things new. Creation, covenant, cross, resurrection, and Kingdom restoration are successive disclosures of one relational act of divine faithfulness — not isolated doctrines.
 
-Genesis 15 establishes the governing pattern. Covenant is bilateral in relationship but unilateral in provision: Abram believes, yet cannot represent himself before YHWH, supply the required covenant faithfulness, or survive the blood sanction. God does not erase the required human participant; He supplies Him. The Son enters the covenant path as humanity's representative with full knowledge of human failure and of the blood liability He accepts. The cross is therefore not an improvised repair after the covenant fails. It is the historical fulfillment of the cost already accepted within the covenant, and the resurrection is the vindication of the Representative.
+Genesis 15 establishes the governing pattern. Covenant requires distinguishable participants: Abram believes, yet cannot represent himself before YHWH, supply covenant faithfulness, or survive the blood sanction. The smoking furnace manifests YHWH as the divine covenant party; the burning lamp and Light identifies Yeshua standing as humanity's covenant representative. Provision is unilateral because God supplies the human participant, not because YHWH walks alone or accepts both sides as one undifferentiated party. Yeshua enters the blood path where Abram cannot, fully knowing human failure and the liability He accepts. The cross is the historical fulfillment of that foreknown cost, and the resurrection vindicates the Representative. The Prism must never collapse the two manifestations into “YHWH alone walks the blood path,” replace YHWH with “the Father” as the furnace, or erase Yeshua's representative role as the lamp.
 
 Salvation is humanity's participation in Christ's standing, not autonomous presentation before God and not successful performance of a negotiated contract. The covenant purpose terminates neither in institutional Christianity nor evacuation from earth, but in resurrection, restored relationship, renewed creation, and the Kingdom of God on earth. The Alpha is also the Omega.
 
@@ -1993,7 +1993,10 @@ const RAG_CONFIG = {
   matchCount:       4,
 };
 
-const MAX_QUERY_CHARS = 4000;
+// Keep this synchronized with the maxlength shown by the qt.html composer.
+// 12,000 characters accommodates long-form pastoral and theological inquiries
+// without materially approaching the 4 MB request-body ceiling.
+const MAX_QUERY_CHARS = 12000;
 
 const RETRIEVAL_ELIGIBLE_TYPES = [
   'Framework-Definitional',
@@ -2317,20 +2320,25 @@ const CRISIS_SIGNALS = [
   'i give up', "can't go on", 'cannot go on', 'no way out',
 ];
 
-// Child abuse / sexual abuse signals — these trigger a separate child_abuse flag
-const CHILD_ABUSE_SIGNALS = [
+// High-confidence first-person child-abuse disclosures. Broad standalone
+// words such as "rape", "abuse", or "sexually" must never trigger this
+// intercept by themselves; they also occur in history, theology, news, and
+// third-person discussion.
+const CHILD_ABUSE_DIRECT_SIGNALS = [
   'touches me in places', 'touching me in places', 'touched me in places',
   'touches me where', 'touched me where', 'touching me where',
   'touches my private', 'touched my private', 'touches my body',
   'he touches me', 'she touches me', 'they touch me',
   'he hurt me', 'she hurt me', 'hurts me at home',
-  "mom's boyfriend", "dad's girlfriend", 'stepdad hurts', 'stepmom hurts',
+  'stepdad hurts me', 'stepmom hurts me',
   'adult touches', 'grown up touches', 'makes me touch',
   'made me touch', 'showed me pictures', 'takes pictures of me',
-  "don't tell anyone", 'our secret', 'special secret',
-  'inappropriate', 'molest', 'abuse me', 'abusing me', 'abused me',
-  'sexually', 'rape', 'raped',
+  'abuse me', 'abusing me',
 ];
+
+const CHILD_CONTEXT_PATTERN = /\b(?:child|kid|minor|underage|teen(?:ager)?|schoolchild|stepdad|stepmom|foster parent|when i was (?:[1-9]|1[0-7])|i(?:'m| am) (?:[1-9]|1[0-7]))\b/i;
+const PERSONAL_DISCLOSURE_PATTERN = /\b(?:i|me|my|mine)\b/i;
+const ABUSE_PATTERN = /\b(?:abus(?:e|ed|ing)|molest(?:ed|ing)?|rape(?:d)?|sexually assaulted|sexual abuse)\b/i;
 
 function detectCrisis(text) {
   if (!text) return false;
@@ -2341,7 +2349,10 @@ function detectCrisis(text) {
 function detectChildAbuse(text) {
   if (!text) return false;
   const lower = text.toLowerCase();
-  return CHILD_ABUSE_SIGNALS.some(signal => lower.includes(signal));
+  if (CHILD_ABUSE_DIRECT_SIGNALS.some(signal => lower.includes(signal))) return true;
+  return CHILD_CONTEXT_PATTERN.test(lower)
+    && PERSONAL_DISCLOSURE_PATTERN.test(lower)
+    && ABUSE_PATTERN.test(lower);
 }
 
 async function getSubscriber(email) {
@@ -5467,8 +5478,8 @@ Do not return JSON or narrate internal processing. Do not infer psychology.
 Apply evidential standards symmetrically and do not manufacture certainty.
 Ask a question only if ambiguity prevents a responsible answer.
 
-Original inquiry: ${String(subject || '').slice(0, 2000)}
-Follow-up: ${String(input || '').slice(0, 4000)}`,
+Original inquiry: ${String(subject || '').slice(0, MAX_QUERY_CHARS)}
+Follow-up: ${String(input || '').slice(0, MAX_QUERY_CHARS)}`,
     system: PRISM_RESPONSE_REFRESH,
     telemetryStage: 'followup_fallback',
     telemetryTurnType: 'follow_up',
@@ -6952,6 +6963,9 @@ Do not add any question after the exit offer. The person chooses the next move.
           const raw = typeof c === 'string' ? c : (Array.isArray(c) ? c.map(b => b.text || '').join(' ') : '');
           const extracted = extractFromPrompt(raw);
           if (extracted) return extracted;
+          // Modern clients send the person's inquiry as a plain user message.
+          // Measure that message—not the assembled prompt—when rawQuery is absent.
+          if (raw.trim().length > 0) return raw.trim();
         }
       }
     }
@@ -6969,6 +6983,7 @@ Do not add any question after the exit offer. The person chooses the next move.
       error: 'Query is too long',
       message: `Please keep your inquiry within ${MAX_QUERY_CHARS.toLocaleString()} characters.`,
       maxChars: MAX_QUERY_CHARS,
+      actualChars: lastUserText.length,
     });
   }
 
