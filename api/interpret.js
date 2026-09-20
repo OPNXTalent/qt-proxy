@@ -2040,6 +2040,32 @@ async function embedQuery(text) {
 // "What does Isaiah 45:7 mean?" → does NOT trigger — textual, no challenge posture
 // "Does the Bible contradict itself?" → does NOT trigger — no theodicy proposition
 // ─────────────────────────────────────────────────────────────────────────────
+function buildTheodicyRoutingText(messages, currentText = '') {
+  const userTurns = Array.isArray(messages)
+    ? messages
+        .filter(message => message?.role === 'user')
+        .map(message => {
+          if (typeof message.content === 'string') return message.content.trim();
+          if (!Array.isArray(message.content)) return '';
+          return message.content
+            .filter(part => part?.type === 'text' && typeof part.text === 'string')
+            .map(part => part.text)
+            .join('\n')
+            .trim();
+        })
+        .filter(Boolean)
+    : [];
+
+  const current = String(currentText || '').trim();
+  if (current && userTurns[userTurns.length - 1] !== current) userTurns.push(current);
+
+  // Conditional modules must remain active through context-dependent follow-ups
+  // such as "this behavior" or "then the causal chain lands with God." New
+  // Subject resets the message history, so retaining recent turns here does not
+  // leak theodicy pressure into a new inquiry.
+  return userTurns.slice(-8).join('\n\n').slice(-32000);
+}
+
 function shouldLoadTheodicyModule(query, inquiryClassification) {
   if (!query) return false;
   const q = query.toLowerCase();
@@ -7155,7 +7181,8 @@ Do not add any question after the exit offer. The person chooses the next move.
 
         const closureInjection = buildClosureInjection(apiMessages);
         const inquiryClassification = null;
-        const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
+        const theodicyRoutingText = buildTheodicyRoutingText(apiMessages, lastUserText || rawQuery || '');
+        const theodicyModule = shouldLoadTheodicyModule(theodicyRoutingText, inquiryClassification);
         const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
         const divineHiddennessModule = shouldLoadDivineHiddenness(lastUserText || rawQuery || '');
         const covenantalRestorationModule = shouldLoadCovenantalRestoration(lastUserText || rawQuery || '');
@@ -7163,6 +7190,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         console.log(`[interpret:${requestId}] module-decision`, {
           inquiryClassification,
           theodicyModule,
+          theodicyRoutingChars: theodicyRoutingText.length,
           relationalSalvationModule,
           divineHiddennessModule,
           covenantalRestorationModule,
@@ -7326,7 +7354,8 @@ Do not add any question after the exit offer. The person chooses the next move.
     timing('rag_complete', { contextChars: ragContext.length });
     const closureInjection = buildClosureInjection(apiMessages);
     const inquiryClassification = null;
-    const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
+    const theodicyRoutingText = buildTheodicyRoutingText(apiMessages, lastUserText || rawQuery || '');
+    const theodicyModule = shouldLoadTheodicyModule(theodicyRoutingText, inquiryClassification);
     const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
     const divineHiddennessModule = shouldLoadDivineHiddenness(lastUserText || rawQuery || '');
     const covenantalRestorationModule = shouldLoadCovenantalRestoration(lastUserText || rawQuery || '');
@@ -7348,6 +7377,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           totalChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
           theodicyLoaded: theodicyModule,
+          theodicyRoutingChars: theodicyRoutingText.length,
           relationalSalvationLoaded: relationalSalvationModule,
           divineHiddennessLoaded: divineHiddennessModule,
           covenantalRestorationLoaded: covenantalRestorationModule,
