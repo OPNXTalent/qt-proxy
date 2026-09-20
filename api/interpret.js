@@ -14,6 +14,10 @@ import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.j
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
 import { PRISM_DIVINE_HIDDENNESS } from '../lib/prompt-modules/divine-hiddenness.js';
 import {
+  PRISM_COVENANTAL_RESTORATION,
+  shouldLoadCovenantalRestoration,
+} from '../lib/prompt-modules/prism-covenantal-restoration.js';
+import {
   ARTIFACT_SCHEMA_VERSION,
   RUNTIME_CONSTITUTION_VERSION,
   createCanonicalPackets,
@@ -85,6 +89,14 @@ The moment the Prism begins protecting an outcome rather than investigating real
 Emet before comfort. Observation before conclusion. Tension before forced resolution. Evidence before certainty. Scripture over tradition. Relationship over abstraction. Coherence over slogan.
 
 These do not replace Scripture. They govern how Scripture is approached.
+
+ALPHA AND OMEGA — COVENANTAL RESTORATION:
+
+Scripture carries one continuous Kingdom architecture from creation to new creation. The Logos through whom all things were made is also Abraham's promised Seed, humanity's faithful covenant representative, the Lamb who bears the covenant cost, the risen King, and the Alpha and Omega who makes all things new. Creation, covenant, cross, resurrection, and Kingdom restoration are successive disclosures of one relational act of divine faithfulness — not isolated doctrines.
+
+Genesis 15 establishes the governing pattern. Covenant is bilateral in relationship but unilateral in provision: Abram believes, yet cannot represent himself before YHWH, supply the required covenant faithfulness, or survive the blood sanction. God does not erase the required human participant; He supplies Him. The Son enters the covenant path as humanity's representative with full knowledge of human failure and of the blood liability He accepts. The cross is therefore not an improvised repair after the covenant fails. It is the historical fulfillment of the cost already accepted within the covenant, and the resurrection is the vindication of the Representative.
+
+Salvation is humanity's participation in Christ's standing, not autonomous presentation before God and not successful performance of a negotiated contract. The covenant purpose terminates neither in institutional Christianity nor evacuation from earth, but in resurrection, restored relationship, renewed creation, and the Kingdom of God on earth. The Alpha is also the Omega.
 
 EPISTEMIC JURISDICTION AND CLAIM DISCIPLINE — FIRES BEFORE EVERY RESPONSE:
 
@@ -7131,12 +7143,14 @@ Do not add any question after the exit offer. The person chooses the next move.
         const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
         const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
         const divineHiddennessModule = shouldLoadDivineHiddenness(lastUserText || rawQuery || '');
+        const covenantalRestorationModule = shouldLoadCovenantalRestoration(lastUserText || rawQuery || '');
 
         console.log(`[interpret:${requestId}] module-decision`, {
           inquiryClassification,
           theodicyModule,
           relationalSalvationModule,
           divineHiddennessModule,
+          covenantalRestorationModule,
           elapsedMs: Date.now() - startedAt,
         });
 
@@ -7146,7 +7160,8 @@ Do not add any question after the exit offer. The person chooses the next move.
           + learningContext
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '')
-          + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '');
+          + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '')
+          + (covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION : '');
         timing('prompt_assembly_complete', {
           promptChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
@@ -7161,6 +7176,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           theodicyChars: theodicyModule ? PRISM_THEODICY_MODULE.length : 0,
           relationalSalvationChars: relationalSalvationModule ? PRISM_RELATIONAL_SALVATION.length : 0,
           divineHiddennessChars: divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS.length : 0,
+          covenantalRestorationChars: covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION.length : 0,
           totalChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
           elapsedMs: Date.now() - startedAt,
@@ -7298,13 +7314,15 @@ Do not add any question after the exit offer. The person chooses the next move.
     const theodicyModule = shouldLoadTheodicyModule(lastUserText || rawQuery || '', inquiryClassification);
     const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
     const divineHiddennessModule = shouldLoadDivineHiddenness(lastUserText || rawQuery || '');
+    const covenantalRestorationModule = shouldLoadCovenantalRestoration(lastUserText || rawQuery || '');
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
           + ragContext
           + learningContext
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '')
-          + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '');
+          + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '')
+          + (covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION : '');
         timing('prompt_assembly_complete', {
           promptChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
@@ -7317,6 +7335,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           theodicyLoaded: theodicyModule,
           relationalSalvationLoaded: relationalSalvationModule,
           divineHiddennessLoaded: divineHiddennessModule,
+          covenantalRestorationLoaded: covenantalRestorationModule,
           elapsedMs: Date.now() - startedAt,
         });
 
