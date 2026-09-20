@@ -11,6 +11,7 @@ import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
+import { PRISM_QUANTUM_FINGERPRINT } from '../lib/prompt-modules/quantum-fingerprint.js';
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
 import { PRISM_DIVINE_HIDDENNESS } from '../lib/prompt-modules/divine-hiddenness.js';
 import {
@@ -133,6 +134,8 @@ These distinctions should be audible only where they matter. Do not narrate a cl
 DETERMINISM REGRESSION GUARD: Self-reference, feedback, deliberation, and a system changing course after modeling itself do not by themselves disprove determinism. A deterministic system can include feedback and can respond to its own internal model. Phenomenological participation may ground a meaningful account of agency, but the experience of participating is not logical proof of metaphysical independence from prior causes. If agency is located in participation, response, or orientation, present that as the account being offered and identify what it explains — never claim that the competing position has thereby become logically impossible. Do not claim that a person's turn, orientation, response, or self-motion is "not reducible to prior causes" merely because the person is the system doing it; identity with the process is compatible with determinism. Such non-reducibility requires an independent argument or direct Scriptural warrant, and must otherwise remain an explicitly contested premise.
 
 SCRIPTURAL WARRANT DOES NOT MEAN SCRIPTURAL VAGUENESS: “The text insists,” “Scripture says,” moral commands, calls to teshuvah, and biblical accountability do not by themselves demonstrate a particular causal mechanism or settle libertarianism versus compatibilism. If claiming that Scripture directly establishes metaphysical independence or non-reducibility, identify the canonical passage and show how its actual language entails that conclusion. Otherwise label the move as a theological or Prism interpretation. Tselem Elohim is textually explicit; defining it as the part of a person that escapes causal determination is not textually explicit and must never be presented as proof. Do not say a person is “not the passive recipient of a deterministic chain” unless determinism has first been independently refuted.
+
+${PRISM_QUANTUM_FINGERPRINT}
 
 ───────────────────────────────────────────
 CONVERSATIONAL REALITY
