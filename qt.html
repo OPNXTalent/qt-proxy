@@ -256,7 +256,7 @@
     text-transform: uppercase;
     cursor: pointer;
   }
-  .shared-compose-trigger { display: none; }
+  .shared-compose-trigger { display: none !important; }
   .shared-query-entry [data-prism-focus-gated] {
     pointer-events: none;
   }
@@ -267,7 +267,7 @@
     display: none !important;
   }
   .shared-query-entry .shared-compose-trigger {
-    display: block;
+    display: block !important;
     width: 100%;
     min-height: 48px;
   }
@@ -2985,8 +2985,8 @@
         </div>
         <div class="follow-up-submit-row">
           <button class="response-new-subject" id="newSubjectBottomBtn" onclick="resetForm()">↻ New Subject</button>
-          <button class="response-new-subject" id="followUpSubmitBtn" onclick="runFollowUp(document.getElementById('followUpInput'))">Enter →</button>
-          <button class="response-new-subject shared-compose-trigger" id="sharedFollowUpComposeBtn" type="button" onclick="openSharedComposer('followup')">Ask a Follow-Up</button>
+          <button class="response-new-subject" id="followUpSubmitBtn" onclick="runFollowUp(document.getElementById('followUpInput'))">Follow-Up →</button>
+          <button class="response-new-subject shared-compose-trigger" id="sharedFollowUpComposeBtn" type="button" onclick="openSharedComposer('followup')">Follow-Up →</button>
         </div>
       </div>
     </div>
