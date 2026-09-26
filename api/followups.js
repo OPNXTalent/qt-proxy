@@ -33,6 +33,7 @@
 // only ever affects what the MUTER sees — never removes anything for anyone
 // else, never notifies the muted person.
 
+import { createHash } from 'node:crypto';
 import { verifySupabaseIdentity } from '../lib/server-auth.js';
 
 const SUPABASE_URL              = process.env.SUPABASE_URL;
@@ -63,6 +64,13 @@ async function getMutedUserIds(threadId, viewerUserId) {
 function filterForViewer(followUps, mutedIds) {
   return followUps.filter(f => !(f.user_id && mutedIds.includes(f.user_id)));
 }
+
+function recoveryId(threadId, index, question, response) {
+  const hex = createHash('sha256').update(JSON.stringify([threadId, index, question, response])).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+export { recoveryId };
 
 // ── Claim anonymous session on registration ─────────────────────────────────
 // Runs once, immediately after a share recipient completes the "Save This
@@ -455,6 +463,77 @@ export default async function handler(req, res) {
       body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     } catch {
       return res.status(400).json({ error: 'Invalid JSON' });
+    }
+
+    if (body?.action === 'recover_local') {
+      const threadId = body.threadId;
+      const entries = body.followUps;
+      if (!authenticatedUserId || !userEmail) return res.status(401).json({ error: 'Sign in required' });
+      if (!/^[0-9a-f-]{36}$/i.test(threadId || '') || !Array.isArray(entries)
+        || entries.length < 1 || entries.length > 100) {
+        return res.status(400).json({ error: 'Invalid local follow-up history' });
+      }
+      const normalized = entries.map((item, index) => ({
+        index,
+        question: typeof item?.question === 'string' ? item.question.trim() : '',
+        response: (typeof item?.response === 'string' ? item.response
+          : (typeof item?.response?.text === 'string' ? item.response.text : '')).trim(),
+      }));
+      if (normalized.some(item => !item.question || !item.response
+        || item.question.length > 12000 || item.response.length > 16000)) {
+        return res.status(400).json({ error: 'Invalid local follow-up entry' });
+      }
+      const ownerRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(authenticatedUserId)}&select=id&limit=1`,
+        { headers: sbHeaders() }
+      );
+      const owned = ownerRes.ok ? await ownerRes.json() : [];
+      if (!owned?.length) return res.status(403).json({ error: 'Thread ownership required' });
+
+      // Count matching server entries so retrying the same local cache is
+      // harmless, including where canonical revisions already exist.
+      const [legacyRes, artifactRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/follow_ups?thread_id=eq.${encodeURIComponent(threadId)}&source=eq.owner_local_recovery&select=query,response`, { headers: sbHeaders() }),
+        fetch(`${SUPABASE_URL}/rest/v1/interpretation_artifacts?thread_id=eq.${encodeURIComponent(threadId)}&artifact_revision=gt.1&select=artifact`, { headers: sbHeaders() }),
+      ]);
+      if (!legacyRes.ok || !artifactRes.ok) return res.status(503).json({ error: 'History unavailable; retry later' });
+      const existing = [
+        ...(await legacyRes.json()).map(row => [row.query, row.response?.text || '']),
+        ...(await artifactRes.json()).map(row => [row.artifact?.query, row.artifact?.canonicalResponse]),
+      ];
+      const counts = new Map();
+      for (const pair of existing) {
+        const key = JSON.stringify(pair);
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      const missing = normalized.filter(item => {
+        const key = JSON.stringify([item.question, item.response]);
+        const count = counts.get(key) || 0;
+        if (count) { counts.set(key, count - 1); return false; }
+        return true;
+      });
+      if (!missing.length) return res.status(200).json({ synced: true, added: 0 });
+      const importedAt = Date.now();
+      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/follow_ups?on_conflict=id`, {
+        method: 'POST',
+        headers: sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates,return=minimal' }),
+        body: JSON.stringify(missing.map(item => ({
+          id: recoveryId(threadId, item.index, item.question, item.response),
+          thread_id: threadId,
+          // Legacy follow_ups.user_id references subscribers.id, while the
+          // canonical owner identity is auth.users.id. Ownership was verified
+          // above; never put an auth ID into this legacy foreign key.
+          user_id: null,
+          query: item.question,
+          response: { text: item.response },
+          created_at: new Date(importedAt + item.index).toISOString(),
+          query_cost: 0,
+          submitted_in: 'solo',
+          source: 'owner_local_recovery',
+        }))),
+      });
+      if (!insertRes.ok) return res.status(503).json({ error: 'Could not sync saved follow-ups' });
+      return res.status(200).json({ synced: true, added: missing.length });
     }
 
     const { threadId, question, response, source, shareId: bodyShareId, anonSessionId } = body || {};
