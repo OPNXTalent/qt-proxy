@@ -3797,13 +3797,14 @@ async function runFollowUp(sourceInput) {
   followUpEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
-    const responseText = await callProxyStream(
+    const followUpResult = await callProxyStream(
       [{ role: 'user', content: followUpPrompt }],
       followUpTextEl,
       input,
       true,  // isFollowUp — prevents saving as new thread
       requestId
     );
+    const responseText = followUpResult.text;
     markPrismBrowserTiming(requestId, 'response_complete');
     prismBrowserTimelines.delete(requestId);
 
@@ -3817,7 +3818,7 @@ async function runFollowUp(sourceInput) {
     // canonical artifact revision written by /api/interpret is the only
     // authoritative server-side persistence path for owner follow-ups.
     if (activeThreadId) {
-      saveFollowUp(activeThreadId, input, responseText);
+      saveFollowUp(activeThreadId, input, responseText, followUpResult.runtimeDisabled);
     }
 
     // Append node controls to this streamed follow-up
@@ -4009,6 +4010,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
   let stateUnavailable = null;
   let terminalStreamError = null;
   let pendingCommitToken = null;
+  let runtimeDisabled = false;
   let followUpOrientation = '';
   let progressiveFollowUp = false;
 
@@ -4113,6 +4115,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
               ).join('');
             }
           } else if (parsed.type === 'done') {
+            runtimeDisabled = parsed.runtimeDisabled === true;
             if (!progressiveFollowUp && parsed.response && targetEl) {
               fullText = parsed.response;
               targetEl.innerHTML = fullText.split(/\n\n/).map(function(p) {
@@ -4200,7 +4203,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
     unavailableError.type = 'retryable';
     throw unavailableError;
   }
-  return fullText;
+  return { text: fullText, runtimeDisabled: runtimeDisabled };
 }
 
 function progressiveAnalysisHasSubstance(content) {
@@ -6221,7 +6224,11 @@ function restoreFollowUps(id) {
   }
   var local = [];
   try { local = JSON.parse(localStorage.getItem('qt_followups_' + id) || '[]'); } catch(e) {}
-  if (local.length > 0) { renderFU(local); return; }
+  if (local.length > 0) {
+    renderFU(local);
+    syncLocalFollowUps(id, local);
+    return;
+  }
   if (id.startsWith('pending-')) return;
 
   if (canActAsThreadMember()) {
@@ -6632,7 +6639,18 @@ function renderFUWithSource(list, shouldScroll) {
 }
 
 // SAVE FOLLOW-UP
-function saveFollowUp(threadId, question, response) {
+function syncLocalFollowUps(threadId, list) {
+  if (!canActAsThreadMember() || !/^[0-9a-f-]{36}$/i.test(threadId || '') || !list.length) return;
+  authenticatedFetch(API_BASE + '/api/followups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'recover_local', threadId: threadId, followUps: list })
+  }).then(function(r) {
+    if (!r.ok) console.warn('[Prism] Saved follow-up sync will retry when this thread reopens.');
+  }).catch(function() {});
+}
+
+function saveFollowUp(threadId, question, response, runtimeDisabled) {
   if (!threadId) return;
   var storageThreadId = (window._sharedViewPermission === 'viewer' && window._sharedViewForkThreadId)
     ? window._sharedViewForkThreadId
@@ -6674,7 +6692,10 @@ function saveFollowUp(threadId, question, response) {
   // as a new Interpretation Artifact revision. Do not duplicate that write
   // through the legacy follow_ups table. GET /api/followups remains available
   // for historical rows and shared-recipient history.
-  if (canActAsThreadMember()) return;
+  if (canActAsThreadMember()) {
+    if (runtimeDisabled) syncLocalFollowUps(storageThreadId, list);
+    return;
+  }
 
 }
 
