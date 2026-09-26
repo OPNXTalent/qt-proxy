@@ -97,14 +97,33 @@ function selectAuthoritativeArtifacts(artifacts) {
       && artifact.inquiry_key.startsWith('server:');
     const currentIsServerIssued = typeof current?.inquiry_key === 'string'
       && current.inquiry_key.startsWith('server:');
-    if (!current || (isServerIssued && !currentIsServerIssued)) {
+    if (!current || (isServerIssued && !currentIsServerIssued)
+      || (isServerIssued === currentIsServerIssued
+        && artifact.artifact_id === current.artifact_id
+        && artifact.artifact_revision < current.artifact_revision)) {
       byThread.set(artifact.thread_id, artifact);
     }
   }
   return byThread;
 }
 
-export { responseFromArtifact, selectAuthoritativeArtifacts };
+function followUpsFromArtifacts(artifacts, root) {
+  if (!root) return [];
+  return (Array.isArray(artifacts) ? artifacts : [])
+    .filter(row => row.thread_id === root.thread_id
+      && row.artifact_id === root.artifact_id
+      && row.artifact_revision > root.artifact_revision
+      && row.artifact?.query && row.artifact?.canonicalResponse)
+    .sort((a, b) => a.artifact_revision - b.artifact_revision)
+    .map(row => ({
+      id: `${row.artifact_id}:${row.artifact_revision}`,
+      query: row.artifact.query,
+      response: row.artifact.canonicalResponse,
+      source: 'owner',
+    }));
+}
+
+export { responseFromArtifact, selectAuthoritativeArtifacts, followUpsFromArtifacts };
 
 async function getSubscriberProfile(userEmail) {
   const res = await fetch(
@@ -214,6 +233,7 @@ export default async function handler(req, res) {
       // Restore completed root artifacts and enrichments from the server.
       const threadIds = [...byId.keys()];
       let artifactByThread = new Map();
+      let artifacts = [];
       const packetsByArtifact = new Map();
       const packetsByLineage = new Map();
       if (threadIds.length) {
@@ -223,7 +243,7 @@ export default async function handler(req, res) {
             `${SUPABASE_URL}/rest/v1/interpretation_artifacts?thread_id=in.(${idsFilter})&order=artifact_revision.desc&select=thread_id,artifact_id,artifact_revision,inquiry_key,artifact`,
             { headers: sbHeaders() },
           );
-          const artifacts = artifactRes.ok ? await artifactRes.json() : [];
+          artifacts = artifactRes.ok ? await artifactRes.json() : [];
           artifactByThread = selectAuthoritativeArtifacts(artifacts);
           const artifactIds = [...new Set((Array.isArray(artifacts) ? artifacts : [])
             .map(row => row.artifact_id))];
@@ -328,6 +348,7 @@ export default async function handler(req, res) {
               return restoredResponse;
             })()
             : (t.response || null),
+          followUps:    followUpsFromArtifacts(artifacts, artifactByThread.get(t.id)),
           queryType:    t.query_type || 'free_text',
           createdAt:    new Date(t.created_at).getTime(),
           daysLeft,

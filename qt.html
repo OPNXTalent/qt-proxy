@@ -6165,6 +6165,22 @@ function selectThread(id) {
 
 // RESTORE FOLLOW-UPS
 function restoreFollowUps(id) {
+  var thread = allThreads.find(function(item) { return item.id === id; });
+  // Canonical revisions are the server's record of owner follow-ups. The
+  // local cache belongs to one installation and cannot hydrate another one.
+  if (thread && Array.isArray(thread.followUps) && thread.followUps.length) {
+    renderFUWithSource(thread.followUps, false);
+    // Recipient contributions still live in the legacy follow_ups table.
+    if (canActAsThreadMember()) {
+      authenticatedFetch(API_BASE + '/api/followups?threadId=' + encodeURIComponent(id), {
+        headers: { 'x-user-email': userEmail() }
+      }).then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (activeThreadId === id && data.followUps) renderFUWithSource(data.followUps, false);
+        }).catch(function() {});
+    }
+    return;
+  }
   function renderFU(list) {
     list.forEach(function(fu, idx) {
       var el = document.createElement('div');
