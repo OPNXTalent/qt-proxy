@@ -28,7 +28,7 @@
   "redirects": [
     {
       "source": "/",
-      "destination": "/qt.html?mode=anon",
+      "destination": "/qt-gateway.html",
       "permanent": false
     }
   ],

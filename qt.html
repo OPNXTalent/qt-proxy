@@ -2826,6 +2826,7 @@
     <div style="font-family:var(--cinzel); font-size:23px; letter-spacing:0.18em; color:var(--gold); margin-bottom:4px;">Echad b'Emet</div>
     <div style="font-family:var(--crimson); font-size:27px; color:var(--hebrew); letter-spacing:0.08em; margin-bottom:16px; direction:rtl;">אֶחָד בֶּאֱמֶת</div>
     <div class="header-sub">Framework Interpreter</div>
+    <a id="guestSignInLink" href="/qt-gateway.html" style="display:none; margin:16px auto 0; width:max-content; max-width:100%; font-family:var(--mono); font-size:14px; letter-spacing:0.12em; color:var(--gold-pale); text-decoration:none; border-bottom:1px solid var(--gold-dim); padding:4px 0;">Sign in to your account →</a>
     <div class="header-rule"></div>
     <p class="header-premise"><strong>Not a foundation. A relation. Reality stands between you and the question.</strong><br><strong>We all have faith in reality.</strong></p>
   </header>
@@ -6299,6 +6300,8 @@ function applyVerifiedIdentityPresentation() {
   if (labelEl) labelEl.textContent = tierLabels[CURRENT_TIER] || tierLabels.free;
   var signOut = document.getElementById('sidebarSignOut');
   if (signOut) signOut.style.display = verifiedAuthState.authenticated ? '' : 'none';
+  var signIn = document.getElementById('guestSignInLink');
+  if (signIn) signIn.style.display = verifiedAuthState.authenticated ? 'none' : 'block';
 }
 
 async function hydrateVerifiedAuthState() {
@@ -7217,6 +7220,14 @@ function initSidebar() {
       _archiveRawResponseDiagnostics.set(thread.id, archiveDiagnosticShape(thread.response));
     });
     allThreads = data.threads;
+    // The installed PWA may hold follow-ups made while the persistent
+    // runtime was disabled. Recover them as soon as its Archive loads; do
+    // not require the person to reopen every thread one by one.
+    if (email) allThreads.forEach(function(thread) {
+      var local = [];
+      try { local = JSON.parse(localStorage.getItem('qt_followups_' + thread.id) || '[]'); } catch(e) {}
+      if (Array.isArray(local) && local.length) syncLocalFollowUps(thread.id, local);
+    });
     // Cache display_name for chat attribution
     if (data.display_name) {
       localStorage.setItem('qt_display_name', data.display_name);
