@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const { responseFromArtifact, selectAuthoritativeArtifacts } = await import('../api/threads.js');
+const { responseFromArtifact, selectAuthoritativeArtifacts, followUpsFromArtifacts } = await import('../api/threads.js');
 
 const client = fs.readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 const threadsApi = fs.readFileSync(new URL('../api/threads.js', import.meta.url), 'utf8');
@@ -149,6 +149,22 @@ assert.equal(
   artifactId,
   'Archive must prefer the server-issued inquiry lineage over a thread fallback root',
 );
+
+const revisionHistory = [
+  { thread_id: 'thread-1', artifact_id: artifactId, artifact_revision: 3,
+    inquiry_key: 'server:constitutional-inquiry', artifact: { query: 'Second follow-up', canonicalResponse: 'Second answer' } },
+  { thread_id: 'thread-1', artifact_id: artifactId, artifact_revision: 2,
+    inquiry_key: 'server:constitutional-inquiry', artifact: { query: 'First follow-up', canonicalResponse: 'First answer' } },
+  { thread_id: 'thread-1', artifact_id: artifactId, artifact_revision: 1,
+    inquiry_key: 'server:constitutional-inquiry', artifact: { query: 'Opening query', canonicalResponse: 'Opening answer' } },
+];
+const rootByThread = selectAuthoritativeArtifacts(revisionHistory);
+assert.equal(rootByThread.get('thread-1').artifact.canonicalResponse, 'Opening answer');
+assert.deepEqual(followUpsFromArtifacts(revisionHistory, rootByThread.get('thread-1'))
+  .map(row => [row.query, row.response]), [
+    ['First follow-up', 'First answer'],
+    ['Second follow-up', 'Second answer'],
+  ]);
 
 const legacyEmpty = responseFromArtifact({
   artifact_id: artifactId,
