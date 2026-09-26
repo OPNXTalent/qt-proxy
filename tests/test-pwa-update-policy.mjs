@@ -6,6 +6,7 @@ const interpreter = readFileSync(new URL('../qt.html', import.meta.url), 'utf8')
 const manifest = JSON.parse(
   readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'),
 );
+const vercel = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
 
 assert.equal(
   manifest.start_url,
@@ -14,7 +15,7 @@ assert.equal(
 );
 assert.match(
   serviceWorker,
-  /const CACHE_NAME = 'prism-shell-v14'/,
+  /const CACHE_NAME = 'prism-shell-v15'/,
   'A new cache version must retire stale earlier responses',
 );
 assert.deepEqual(
@@ -71,5 +72,11 @@ assert.match(
   /serviceWorker\.addEventListener\('controllerchange'[\s\S]*window\.location\.reload\(\)/,
   'An existing installation must reload once when an updated worker takes control',
 );
+assert.equal(vercel.redirects.find(({ source }) => source === '/')?.destination,
+  '/qt-gateway.html', 'The public entry must offer account sign-in');
+assert.match(interpreter, /id="guestSignInLink" href="\/qt-gateway\.html"/,
+  'Anonymous interpreter visitors need a visible account sign-in route');
+assert.match(interpreter, /allThreads = data\.threads;[\s\S]*?syncLocalFollowUps\(thread\.id, local\)/,
+  'An existing local thread must recover its follow-ups when the Archive loads');
 
 console.log('PWA update policy checks passed.');

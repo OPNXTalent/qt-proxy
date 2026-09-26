@@ -11,10 +11,10 @@ assert.deepEqual(
   rootRedirect,
   {
     source: '/',
-    destination: '/qt.html?mode=anon',
+    destination: '/qt-gateway.html',
     permanent: false,
   },
-  'The bare production domain must open the anonymous Prism interpreter',
+  'The bare production domain must offer account sign-in and guest access',
 );
 
 console.log('Canonical app entry routing checks passed.');
