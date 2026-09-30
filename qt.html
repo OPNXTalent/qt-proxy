@@ -4073,11 +4073,14 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
             renderProvisionalResponse(fullText, requestId, targetEl);
           } else if (parsed.type === 'canonical_complete') {
             fullText = parsed.response || fullText;
-            if (targetEl) targetEl.innerHTML = fullText.split(/\n\n/).map(function(p) {
+            var verseHtml = parsed.verse_identified && parsed.verse_text ? '<div class="verse-banner"><div class="verse-ref">' + escHtml(parsed.verse_identified) + '</div><div class="verse-text">' + escHtml(parsed.verse_text) + '</div></div>' : '';
+            if (targetEl) targetEl.innerHTML = verseHtml + fullText.split(/\n\n/).map(function(p) {
               return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
             }).join('');
             if (window._lastParsedResult) {
               window._lastParsedResult.core_insight = fullText;
+              window._lastParsedResult.verse_identified = parsed.verse_identified || '';
+              window._lastParsedResult.verse_text = parsed.verse_text || '';
               window._lastParsedResult._artifactId = parsed.artifactId;
               window._lastParsedResult._artifactRevision = parsed.artifactRevision;
             }
@@ -4456,6 +4459,8 @@ async function callProxy(messages, rawQuery, requestId, options) {
               canonicalAvailable = true;
               progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
               progressiveResult.core_insight = parsed.response || fullText;
+              progressiveResult.verse_identified = parsed.verse_identified || '';
+              progressiveResult.verse_text = parsed.verse_text || '';
               progressiveResult._artifactId = parsed.artifactId;
               progressiveResult._artifactRevision = parsed.artifactRevision;
               window._lastParsedResult = progressiveResult;
@@ -4556,6 +4561,8 @@ async function callProxy(messages, rawQuery, requestId, options) {
               canonicalAvailable = true;
               progressiveResult = progressiveResult || { response_mode: 'reflective', key_terms: [] };
               progressiveResult.core_insight = parsed.response || fullText;
+              progressiveResult.verse_identified = parsed.verse_identified || '';
+              progressiveResult.verse_text = parsed.verse_text || '';
               progressiveResult._artifactId = parsed.artifactId;
               progressiveResult._artifactRevision = parsed.artifactRevision;
               window._lastParsedResult = progressiveResult;
