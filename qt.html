@@ -3255,8 +3255,19 @@ function renderProvisionalResponse(text, requestId, targetEl) {
   if (typeof text !== 'string' || !text) return;
   var target = targetEl || document.getElementById('resultContent');
   if (!target) return;
-  target.innerHTML = '<div class="qt-core-insight" aria-live="polite">' +
-    text.split(/\n\n/).map(function(paragraph) {
+  // Show the selected passage before the explanation finishes streaming.
+  var verseHtml = '';
+  var bodyText = text;
+  var leadingVerse = text.match(/^((?:[1-3]\s+)?[A-Za-z]+(?:\s+[A-Za-z]+){0,3}\s+\d+:\d+(?:[–-]\d+(?::\d+)?)?(?:\s*\((?:ESV|NRSV|NRSVue|KJV|NKJV|NIV|WEB)\))?)\n[“"]([\s\S]*)$/);
+  if (leadingVerse) {
+    var quotation = leadingVerse[2];
+    var close = quotation.search(/[”"](?=\s*(?:\n\s*\n|$))/);
+    var verseText = close >= 0 ? quotation.slice(0, close) : quotation;
+    bodyText = close >= 0 ? quotation.slice(close + 1).trimStart() : '';
+    verseHtml = '<div class="verse-banner"><div class="verse-ref">' + escHtml(leadingVerse[1]) + '</div><div class="verse-text">' + escHtml(verseText) + '</div></div>';
+  }
+  target.innerHTML = verseHtml + '<div class="qt-core-insight" aria-live="polite">' +
+    bodyText.split(/\n\n/).map(function(paragraph) {
       return '<p>' + escHtml(paragraph.replace(/\n/g, ' ')) + '</p>';
     }).join('') + '</div>' +
     '<div class="early-recognition-progress">Still interpreting…</div>';

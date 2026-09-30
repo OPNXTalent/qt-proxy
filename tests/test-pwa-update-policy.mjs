@@ -15,7 +15,7 @@ assert.equal(
 );
 assert.match(
   serviceWorker,
-  /const CACHE_NAME = 'prism-shell-v16'/,
+  /const CACHE_NAME = 'prism-shell-v17'/,
   'A new cache version must retire stale earlier responses',
 );
 assert.deepEqual(
