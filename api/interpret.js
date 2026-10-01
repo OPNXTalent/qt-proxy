@@ -7,6 +7,7 @@ export const config = {
   maxDuration: 60,
 };
 
+import { PRISM_EMET_COVENANT_INQUIRY } from '../lib/prompt-modules/emet-covenant-inquiry.js';
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
@@ -81,7 +82,9 @@ Before constructing any response, run these eight questions. They are not theolo
 
 The Emet lens asks one thing above all: what is true here, regardless of who benefits?
 
-Emet (\u05D0\u05B6\u05DE\u05B6\u05EA): truth as reality rightly related to its sustaining ground. Aleph, Mem, Tav — first, middle, last letters of the Hebrew alphabet. Remove the aleph — remove the sustaining source — and what remains is met (\u05DE\u05B5\u05EA): death. Not error. Structural dissolution.
+${PRISM_EMET_COVENANT_INQUIRY}
+
+Emet is truth, faithfulness, and reliability, explored through the shared governing guidance above.
 
 A tribal lens asks how to defend a side. A denominational lens asks how to preserve a doctrine. An atheist lens asks how to disprove God. The Emet lens asks what survives honest examination — and builds from there.
 
@@ -95,7 +98,7 @@ ALPHA AND OMEGA — COVENANTAL RESTORATION:
 
 Scripture carries one continuous Kingdom architecture from creation to new creation. The Logos through whom all things were made is also Abraham's promised Seed, humanity's faithful covenant representative, the Lamb who bears the covenant cost, the risen King, and the Alpha and Omega who makes all things new. Creation, covenant, cross, resurrection, and Kingdom restoration are successive disclosures of one relational act of divine faithfulness — not isolated doctrines.
 
-Genesis 15 establishes the governing pattern. Covenant requires distinguishable participants: Abram believes, yet cannot represent himself before YHWH, supply covenant faithfulness, or survive the blood sanction. The smoking furnace manifests YHWH as the divine covenant party; the burning lamp and Light identifies Yeshua standing as humanity's covenant representative. Provision is unilateral because God supplies the human participant, not because YHWH walks alone or accepts both sides as one undifferentiated party. Yeshua enters the blood path where Abram cannot, fully knowing human failure and the liability He accepts. The cross is the historical fulfillment of that foreknown cost, and the resurrection vindicates the Representative. The Prism must never collapse the two manifestations into “YHWH alone walks the blood path,” replace YHWH with “the Father” as the furnace, or erase Yeshua's representative role as the lamp.
+Genesis 15 supplies the covenant scene for exploration: Abram is asleep while the smoking furnace and flaming torch pass between the pieces. Read its relation to Christ through the canonical covenant and redemption passages. The furnace/lamp identification and the foreknown-cost connection are available interpretive readings, open to scrutiny under the shared Emet guidance, rather than compulsory doctrinal identifications.
 
 Salvation is humanity's participation in Christ's standing, not autonomous presentation before God and not successful performance of a negotiated contract. The covenant purpose terminates neither in institutional Christianity nor evacuation from earth, but in resurrection, restored relationship, renewed creation, and the Kingdom of God on earth. The Alpha is also the Omega.
 
@@ -5490,7 +5493,7 @@ Ask a question only if ambiguity prevents a responsible answer.
 
 Original inquiry: ${String(subject || '').slice(0, MAX_QUERY_CHARS)}
 Follow-up: ${String(input || '').slice(0, MAX_QUERY_CHARS)}`,
-    system: PRISM_RESPONSE_REFRESH,
+    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT + PRISM_EMET_COVENANT_INQUIRY,
     telemetryStage: 'followup_fallback',
     telemetryTurnType: 'follow_up',
     onTextDelta: text => sse.write({ type: 'response_delta', text }),
@@ -6352,6 +6355,7 @@ async function runPersistentInquiryFollowUp({
     timeoutMs: 75000,
     maxTotalMs: 240000,
     prompt: draftPrompt,
+    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT,
     telemetryStage: 'followup_draft',
     telemetryTurnType: 'follow_up',
     onTextDelta: text => sse.write({ type: 'response_delta', text }),
@@ -7398,3 +7402,4 @@ Do not add any question after the exit offer. The person chooses the next move.
     return res.end();
   }
 }
+
