@@ -5418,6 +5418,7 @@ export async function classifyFollowUpContext({
   inquiryToken,
   threadId,
   ownerUserId,
+  guestId = null,
   shareId,
 }) {
   if (verifyInquiryCredential(inquiryKey, inquiryToken)) {
@@ -5441,13 +5442,16 @@ export async function classifyFollowUpContext({
     }
   }
 
-  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && ownerUserId) {
+  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && (ownerUserId || guestId)) {
+    const principalFilter = ownerUserId
+      ? `user_id=eq.${encodeURIComponent(ownerUserId)}`
+      : `guest_id=eq.${encodeURIComponent(guestId)}&user_id=is.null`;
     const ownedResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&select=id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&${principalFilter}&select=id&limit=1`,
       { headers: inquiryServiceHeaders() },
     );
     const owned = ownedResponse.ok ? await ownedResponse.json() : [];
-    if (owned?.length) return { isFollowUp: true, reason: 'owned_thread' };
+    if (owned?.length) return { isFollowUp: true, reason: ownerUserId ? 'owned_thread' : 'owned_guest_thread' };
   }
 
   return {
@@ -5696,6 +5700,11 @@ export function captureQualificationPrompt({ query, ragContext = '', learningCon
     scope: 'primary-canonical-generation',
     retrievalStatus: ragContext || learningContext ? 'caller-supplied-frozen-context' : 'no-retrieval-smoke-only',
   };
+}
+
+export function requireVerifiedFollowUp(clientHint, context) {
+  // A failed continuation must not silently become a paid primary generation.
+  if (clientHint && !context?.isFollowUp) throw new Error('FOLLOWUP_CONTEXT_UNVERIFIED');
 }
 
 function deterministicArtifact({ response, query, inquiryKey, revision, ownerUserId, threadId }) {
@@ -6794,6 +6803,7 @@ Do not add any question after the exit offer. The person chooses the next move.
             shareId: sharedFollowUpId,
           })
           : { isFollowUp: false, reason: 'no_candidate_context' };
+        requireVerifiedFollowUp(isFollowUp, followUpContext);
         timing('followup_classification_complete', {
           classified: followUpContext.isFollowUp,
           reason: followUpContext.reason,
@@ -6983,9 +6993,11 @@ Do not add any question after the exit offer. The person chooses the next move.
         inquiryToken,
         threadId,
         ownerUserId: null,
+        guestId: guestIdentity?.guestId || null,
         shareId: sharedFollowUpId,
       })
       : { isFollowUp: false, reason: 'no_candidate_context' };
+    requireVerifiedFollowUp(isFollowUp, followUpContext);
     timing('followup_classification_complete', {
       classified: followUpContext.isFollowUp,
       reason: followUpContext.reason,
