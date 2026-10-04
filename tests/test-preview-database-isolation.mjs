@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { assertPreviewDatabaseIsolation, publicClientConfig } from '../lib/preview-database-isolation.js';
-import handler from '../api/client-config.js';
+import handler from '../lib/client-config-handler.js';
+import transcribeHandler from '../api/transcribe.js';
 
 const ref = 'abcdefghijklmnopqrst';
 const token = role => ['header', Buffer.from(JSON.stringify({ ref, role })).toString('base64url'), 'signature'].join('.');
@@ -88,4 +89,25 @@ test('browser auth/realtime reads deployed config and scripts still parse', () =
   }
   const sw=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');
   assert.match(sw, /url\.pathname\.startsWith\('\/api\/'\)/);
+});
+
+ test('configuration rewrite shares a function without invoking transcription', async () => {
+  const config = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url)));
+  assert.deepEqual(config.rewrites.find(r => r.source === '/api/client-config'),
+    { source: '/api/client-config', destination: '/api/transcribe?prism_client_config=1' });
+  assert.equal(fs.readdirSync(new URL('../api/', import.meta.url)).filter(n => n.endsWith('.js')).length, 12);
+  const savedFetch = global.fetch;
+  global.fetch = () => { throw Error('PROVIDER_CALLED'); };
+  const response = () => ({ headers: {}, setHeader(k,v) { this.headers[k]=v; },
+    status(code) { this.statusCode=code;return this; }, end(body) {this.body=body;}, json(body) {this.body=body;} });
+  try {
+    const configResponse = response();
+    await transcribeHandler({method:'POST',query:{prism_client_config:'1'}}, configResponse);
+    assert.equal(configResponse.statusCode,405);
+    assert.equal(configResponse.headers.Allow,'GET');
+    const normalResponse = response();
+    await transcribeHandler({method:'GET',query:{}}, normalResponse);
+    assert.equal(normalResponse.statusCode,405);
+    assert.deepEqual(normalResponse.body,{error:'Method not allowed'});
+  } finally {global.fetch=savedFetch;}
 });
