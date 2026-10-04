@@ -88,3 +88,57 @@ export function openAIAdapter(apiKey, fetchImpl = fetch, timeoutMs = 90000) {
     },
   };
 }
+
+export const SONNET_RATE = {input:3,cachedInput:0.30,cacheWrite:3.75,output:15};
+
+export function anthropicRequest(snapshot, maxOutputTokens = 3151) {
+  if (!snapshot?.system || !snapshot?.input || !Number.isInteger(maxOutputTokens) || maxOutputTokens < 1)
+    throw new Error('INVALID_EXECUTION_INPUT');
+  return { model:'claude-sonnet-4-6',
+    system:[{type:'text',text:snapshot.system,cache_control:{type:'ephemeral',ttl:'5m'}}],
+    messages:[{role:'user',content:snapshot.input}],max_tokens:maxOutputTokens,
+    thinking:{type:'adaptive'},output_config:{effort:'low'},service_tier:'standard_only' };
+}
+
+export function anthropicUsage(usage) {
+  if (!usage) throw new Error('USAGE_REQUIRED');
+  const uncached=usage.input_tokens, cached=usage.cache_read_input_tokens??0;
+  const writes=usage.cache_creation_input_tokens??0;
+  const output=usage.output_tokens;
+  if ([uncached,cached,writes,output].some(n=>!Number.isInteger(n)||n<0)) throw new Error('INVALID_USAGE');
+  if ((usage.cache_creation?.ephemeral_1h_input_tokens||0)>0) throw new Error('UNEXPECTED_CACHE_TTL');
+  const reasoning=usage.output_tokens_details?.thinking_tokens??usage.output_tokens_details?.reasoning_tokens??null;
+  if(reasoning!==null&&(!Number.isInteger(reasoning)||reasoning<0||reasoning>output))throw new Error('INVALID_USAGE');
+  return {input_tokens:uncached+cached+writes,input_tokens_details:{cached_tokens:cached,cache_write_tokens:writes},
+    output_tokens:output,output_tokens_details:{reasoning_tokens:reasoning},total_tokens:uncached+cached+writes+output};
+}
+
+export function anthropicAdapter(apiKey, fetchImpl=fetch, timeoutMs=90000) {
+  if (!apiKey) throw new Error('ANTHROPIC_KEY_REQUIRED');
+  async function request(path,body) {
+    const start=performance.now();let response,data;
+    try {
+      response=await fetchImpl(`https://api.anthropic.com/v1${path}`,{
+        method:'POST',headers:{'x-api-key':apiKey,'anthropic-version':'2023-06-01','Content-Type':'application/json'},
+        body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
+      data=await response.json();
+    } catch {return {ok:false,error:'NETWORK_OR_TIMEOUT',latencyMs:performance.now()-start,uncertainCharge:true};}
+    const telemetry={latencyMs:performance.now()-start,httpStatus:response.status,requestId:response.headers.get('request-id')};
+    if (!response.ok) return {ok:false,error:/^[a-z0-9_]{1,80}$/i.test(data.error?.type||'')?data.error.type:'PROVIDER_ERROR',
+      ...telemetry,uncertainCharge:response.status>=500};
+    return {ok:true,data,...telemetry};
+  }
+  return {
+    count:body=>request('/messages/count_tokens',{model:body.model,system:body.system,messages:body.messages,thinking:body.thinking}),
+    async execute(body) {
+      const r=await request('/messages',body);if(!r.ok)return r;
+      const data=r.data;
+      return {ok:true,response:(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n'),
+        rawUsage:data.usage,usage:anthropicUsage(data.usage),resolvedModel:data.model,
+        status:data.stop_reason==='end_turn'?'completed':'incomplete',stopReason:data.stop_reason,
+        serviceTier:data.usage?.service_tier??null,responseId:data.id,
+        thinkingBlocksPresent:(data.content||[]).some(b=>['thinking','redacted_thinking'].includes(b.type)),
+        latencyMs:r.latencyMs,requestId:r.requestId,httpStatus:r.httpStatus};
+    },
+  };
+}

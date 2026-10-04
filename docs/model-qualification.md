@@ -71,7 +71,31 @@ Prices checked October 4, 2026 against each official model page:
 - https://developers.openai.com/api/docs/models/gpt-6-sol
 - https://developers.openai.com/api/docs/models/gpt-6.1-sol
 
+### Sonnet comparator under the original cumulative cap
+
+The Anthropic evaluation adapter reuses the saved five-question manifest rather than capturing new prompts. `prism-sonnet-pilot.mjs` verifies each frozen prompt hash against all five completed OpenAI outputs, checks prior cost, counts inputs on the Anthropic API, then reserves the entire Sonnet worst case before generation:
+
+```bash
+node tests/test-prism-sonnet-adapter.mjs
+node scripts/prism-sonnet-pilot.mjs .qualification-runs/pilot/manifest.json /absolute/private/previous-pilot-results.json /absolute/private/authorized-anthropic.env .qualification-runs/sonnet-pilot
+node scripts/prism-model-qualification.mjs blind .qualification-runs/sonnet-pilot/outputs.json .qualification-runs/sonnet-review
+```
+
+Prior spending is read from the completed pilot, including cache-write charges. The five new calls must keep prior spending plus the full prospective reserve strictly below $2. The reserve uses the Standard five-minute cache-write rate for every counted input token, another 1,024 input tokens per call, and the same output cap as the OpenAI pilot. It assumes no cache hits and never regenerates or truncates system text to fit the budget. Missing credentials, rejected token-count preflight, unsupported counts or inadequate remaining budget block generation. Each destination is single-use; unknown charges retain reservations and are never retried automatically.
+
+Anthropic-specific differences are recorded in the private manifest: `/v1/messages`, `x-api-key`, `anthropic-version: 2023-06-01`, the exact frozen system string in a top-level text block, and the exact query in one user message. `max_tokens` replaces `max_output_tokens`. Adaptive thinking plus `output_config.effort=low` is the closest supported low-effort configuration, but effort is not equivalent across providers. `service_tier=standard_only` requests Standard capacity; a system cache explicitly uses a five-minute TTL. The Messages API has no Responses `store=false` option; provider retention policy still applies. No tools or persistence integrations are enabled. Production currently uses a different Anthropic generation configuration, so this is a controlled low-effort comparator, not a replay of production execution settings.
+
+Anthropic's `input_tokens` excludes cache-read and cache-creation tokens. Normalized total input includes all three, and charges use their separate rates. Output tokens include thinking; use a separately reported thinking-token count when present and record null when absent. Never charge those thinking tokens twice. `end_turn` indicates completion; output-limit and other stop reasons are incomplete. Raw usage, stop reason, IDs and response latency are retained privately without thinking text.
+
+Preserve the original five 1–5 dimensions, original OpenAI judgments and acceptance rule. Report content quality as fidelity, reasoning and factual integrity; report delivery as voice and constraints. Group means do not replace the rule requiring every individual dimension >=4 and no critical failure. Incomplete outputs cannot be acceptable. Keep analyst review provisional until independent human review; five questions cannot certify production.
+
+Anthropic references checked October 4, 2026:
+- https://platform.claude.com/docs/en/models/sonnet-4-6/overview
+- https://platform.claude.com/docs/en/build-with-claude/effort
+- https://platform.claude.com/docs/en/api/messages/count_tokens
+
 ### Remaining qualification prerequisites
+
 
 1. Enable the OpenAI Developers plugin to obtain authorized API access; verify actual account availability for each candidate. Reuse authorized Anthropic access for the incumbent comparator. Never move keys into the client or corpus.
 2. Add provider-specific execution adapters on this experiment branch. Primary generation currently uses Anthropic Messages; OpenAI candidates need a Responses adapter. Preserve endpoint, reasoning, output cap, service tier, caching and timeout settings in every run. Record provider-resolved model ID; use dated snapshots when offered. An alias is not an immutable version.
