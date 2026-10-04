@@ -1,0 +1,3 @@
+# Private qualification runs contain full prompts and potentially user data.
+.qualification-runs/
+evals/model-qualification/runs/

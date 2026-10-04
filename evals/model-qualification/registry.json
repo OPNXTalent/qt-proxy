@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "production_routing_enabled": false,
+  "baseline": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-6",
+    "status": "incumbent-primary"
+  },
+  "supporting_baseline": {
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5-20251001",
+    "status": "incumbent-supporting"
+  },
+  "candidates": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.6-luna",
+      "status": "candidate",
+      "roles": [
+        "PRISM_FAST"
+      ]
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6-luna",
+      "status": "candidate",
+      "roles": [
+        "PRISM_FAST"
+      ]
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "status": "candidate",
+      "roles": [
+        "PRISM_CORE"
+      ]
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6-sol",
+      "status": "candidate",
+      "roles": [
+        "PRISM_DEEP"
+      ]
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "status": "candidate",
+      "roles": [
+        "PRISM_CORE",
+        "PRISM_DEEP"
+      ]
+    }
+  ],
+  "pricing_status": "record-service-tier-and-current-rates-at-run-time",
+  "promotion": "manual-only-after-qualification"
+}

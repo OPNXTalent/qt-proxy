@@ -5991,6 +5991,33 @@ function cachedCanonicalResponseSystem(systemPrompt) {
   ];
 }
 
+// Offline qualification only. No retrieval, billing, persistence, or provider calls.
+// Caller freezes retrieved/approved-learning context once for all candidates.
+export function captureQualificationPrompt({ query, ragContext = '', learningContext = '' }) {
+  if (typeof query !== 'string' || !query.trim()) throw new Error('QUALIFICATION_QUERY_REQUIRED');
+  if (query.length > 12000) throw new Error('QUALIFICATION_QUERY_TOO_LONG');
+  const modules = {
+    theodicy: shouldLoadTheodicyModule(buildTheodicyRoutingText([], query), null),
+    relationalSalvation: shouldLoadRelationalSalvation(query),
+    divineHiddenness: shouldLoadDivineHiddenness(query),
+    covenantalRestoration: shouldLoadCovenantalRestoration(query),
+  };
+  const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
+    + ragContext
+    + learningContext
+    + (modules.theodicy ? PRISM_THEODICY_MODULE : '')
+    + (modules.relationalSalvation ? PRISM_RELATIONAL_SALVATION : '')
+    + (modules.divineHiddenness ? PRISM_DIVINE_HIDDENNESS : '')
+    + (modules.covenantalRestoration ? PRISM_COVENANTAL_RESTORATION : '');
+  return {
+    system: cachedCanonicalResponseSystem(enhancedSystemPrompt).map(block => block.text).join(''),
+    input: query,
+    modules,
+    scope: 'primary-canonical-generation',
+    retrievalStatus: ragContext || learningContext ? 'caller-supplied-frozen-context' : 'no-retrieval-smoke-only',
+  };
+}
+
 function deterministicArtifact({ response, query, inquiryKey, revision, ownerUserId, threadId }) {
   const thesis = String(response || '').split(/(?<=[.!?])\s/)[0] || String(response || '');
   return validateArtifactCore({
