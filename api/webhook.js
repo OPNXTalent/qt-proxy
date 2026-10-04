@@ -1,3 +1,4 @@
+import '../lib/require-preview-isolation.js';
 import crypto from 'crypto';
 import { PRISM_PRODUCT, queryBankCreditsForAmount } from '../lib/product-config.js';
 

@@ -1,3 +1,4 @@
+import '../lib/require-preview-isolation.js';
 // api/threads.js
 // Returns thread list for authenticated subscriber, plus Trust Circle management:
 // toggling a thread's visibility, joining a shared thread into your own Archive,

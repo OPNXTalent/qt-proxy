@@ -1,3 +1,4 @@
+import '../lib/require-preview-isolation.js';
 // api/welcome.js
 // Sends a welcome email to new free account registrants via Resend.
 // Called after submitFreeAccount() in qt.html.

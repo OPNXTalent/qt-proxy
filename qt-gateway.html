@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/api/client-config"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>The Prism — Enter</title>
@@ -773,14 +774,14 @@ var flowCopies = {
   }
 
   /* ── Supabase client ── */
-  var SUPABASE_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  var SUPABASE_URL  = window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+  var SUPABASE_ANON = window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
   var sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   /* ── Route after auth ── */
  function routeAfterAuth(email) {
-    var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    var SUPA_URL  = window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+    var SUPA_ANON = window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
 
     var tierDisplayNames = { scholar: 'Refraction', theologian: 'Full Spectrum', companion: 'Full Spectrum', refraction: 'Refraction', full_spectrum: 'Full Spectrum', free: 'Observer' };
     var tierMessages = {

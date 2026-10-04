@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/api/client-config"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Prism — Framework Interpreter</title>
@@ -2822,8 +2823,8 @@ async function loadSidebarCredits() {
   if (limit === null) return;
 
   try {
-    const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    const sbUrl  = window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+    const sbAnon = window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
     const res = await fetch(
       `${sbUrl}/rest/v1/subscribers?email=eq.${encodeURIComponent(email)}&select=query_count,purchased_credits&limit=1`,
       { headers: { 'apikey': sbAnon, 'Authorization': `Bearer ${sbAnon}` } }
@@ -2952,8 +2953,8 @@ function undoDelete() {
 async function handleLogout() {
   // Sign out of Supabase Auth
   try {
-    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    var sbUrl  = window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+    var sbAnon = window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
     await fetch(sbUrl + '/auth/v1/logout', {
       method: 'POST',
       headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon }
@@ -3233,8 +3234,8 @@ async function handleCreditsAdded() {
   document.body.appendChild(statusEl);
 
   // Poll Supabase up to 8 times (every 1.5s) waiting for webhook to land
-  const sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  const sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  const sbUrl  = window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+  const sbAnon = window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
 
   let credits = 0;
   for (let i = 0; i < 8; i++) {
