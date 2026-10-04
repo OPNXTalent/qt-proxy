@@ -1,6 +1,6 @@
 # Prism model qualification — Phase One
 
-Status: offline foundation implemented; no candidate has been evaluated or certified.
+Status: offline foundation plus evaluation-only OpenAI execution adapters implemented. A five-question smoke pilot does not certify any candidate.
 Production baseline inspected at commit `3b5abc2a40986a42f5acfffb27dd76cadabe9eab`.
 
 ## Baseline and candidates
@@ -44,6 +44,34 @@ All candidate models must receive the exact same system text and query from each
 The corpus contains authored cases, not 50 approved historical exchanges. PQ-031 preserves the exact query from the October 4 01:56 Shroud PDF (`libfile_f6d194ea3dd481918673a851f3606696`); its saved answer is not labeled approved. Review expectations against current governance and approved examples before changing `approval` to `approved`. No-context manifests and unreviewed corpora cannot qualify a model.
 
 ## Live evaluation next
+
+### Five-question OpenAI pilot
+
+`scripts/prism-execution-adapters.mjs` implements the OpenAI Responses adapter for every registered OpenAI candidate. It is not imported by production handlers. Run locally with an explicitly selected evaluation key file; the runner never falls back to a process or production key:
+
+```bash
+node tests/test-prism-execution-adapters.mjs
+node scripts/prism-model-qualification.mjs prepare .qualification-runs/pilot
+node scripts/prism-model-pilot.mjs .qualification-runs/pilot/manifest.json /absolute/private/evaluation.env .qualification-runs/pilot-execution
+node scripts/prism-model-qualification.mjs blind .qualification-runs/pilot-execution/outputs.json .qualification-runs/pilot-review
+```
+
+The pilot selects PQ-002, PQ-008, PQ-021, PQ-031 and PQ-048 to cover lexical interpretation, covenant inference, suffering, disputed historical evidence and a fabrication request. It sends the captured canonical prompt unchanged. It queries account model availability and counts each input with `/v1/responses/input_tokens` before generation. Missing models are reported without substituting aliases. All five questions must pass token-count preflight before a candidate runs.
+
+Budget is capped at $2, with a planned worst-case reserve of $1.90. The runner uses verified Standard prices in `pilot-pricing.json`, adds 1,024 input tokens of allowance per request, assumes the highest input/cache-write rate without relying on cache hits, and reserves the entire output cap before dispatch. The common output cap is calculated to fit the full pilot and must be at least 1,800 tokens. Reasoning is `low`, service tier is `default`, storage is disabled, no tools are enabled, and there are no automatic retries. This reduced output budget is a pilot condition, not the production generation configuration.
+
+An exclusive run lock prevents accidental replays. Timeouts or unknown charges retain their full reservation. Execution stops on provider failures, missing usage or a model/service-tier mismatch. Record usage, cached input, reasoning tokens, provider model ID, request ID, status, incomplete-output details, full response latency and rate-derived cost privately. Rate-derived costs are not invoice reconciliation; cache-write charges absent from reported usage are covered by the conservative reserve. Refresh rates before a later run. The pilot performs no Anthropic baseline calls and cannot establish relative quality versus Sonnet.
+
+Full frozen requests, outputs and review identity mappings remain in ignored private run directories. Commit only adapter source, tests, pricing configuration and documentation. Reviews remain provisional until a qualified human checks the corpus, factual sources, framework fidelity and blinded output provenance. Incomplete outputs must not count as acceptable. The existing full-corpus score command continues to require all 50 reviews; five-question pilot scores never authorize promotion.
+
+Prices checked October 4, 2026 against each official model page:
+- https://developers.openai.com/api/docs/models/gpt-5.6-luna
+- https://developers.openai.com/api/docs/models/gpt-6-luna
+- https://developers.openai.com/api/docs/models/gpt-5.6-terra
+- https://developers.openai.com/api/docs/models/gpt-6-sol
+- https://developers.openai.com/api/docs/models/gpt-6.1-sol
+
+### Remaining qualification prerequisites
 
 1. Enable the OpenAI Developers plugin to obtain authorized API access; verify actual account availability for each candidate. Reuse authorized Anthropic access for the incumbent comparator. Never move keys into the client or corpus.
 2. Add provider-specific execution adapters on this experiment branch. Primary generation currently uses Anthropic Messages; OpenAI candidates need a Responses adapter. Preserve endpoint, reasoning, output cap, service tier, caching and timeout settings in every run. Record provider-resolved model ID; use dated snapshots when offered. An alias is not an immutable version.
