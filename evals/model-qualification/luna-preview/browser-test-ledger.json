@@ -1,0 +1,29 @@
+{
+  "status": "paused-unresolved-embedding-usage",
+  "date": "2026-10-04",
+  "deploymentId": "dpl_8Ayuhk9HuAdMuWH4REX6y24FXmj7",
+  "priorSpendingUsd": 1.46367651,
+  "capUsd": 2,
+  "test": "one browser guest initial inquiry; no retries",
+  "model": "gpt-6-luna",
+  "maxOutputTokens": 3600,
+  "reservationUsd": 0.266,
+  "worstCaseCumulativeUsd": 1.72967651,
+  "reservationBasis": "Entire 1,050,000-token context at the higher long-context cache-write rate $0.25/M, plus all 3600 output tokens at $0.75/M, plus up to two 8192-token embeddings at $0.02/M, rounded upward. No cache savings assumed. This model-capacity ceiling replaces estimated/exact prompt counts for this application smoke test; not a five-question pilot retest.",
+  "pricingSources": [
+    "https://developers.openai.com/api/docs/models/gpt-6-luna",
+    "https://developers.openai.com/api/docs/models/text-embedding-3-small"
+  ],
+  "unknownUsagePolicy": "Retain reservation and stop; do not retry or dispatch follow-ups with uncertain charges.",
+  "additionalDispatches": 0,
+  "generationRequests": 1,
+  "successfulEmbeddingRequests": 1,
+  "retries": 0,
+  "knownLunaCostUsd": 0.0043443,
+  "knownCumulativeSpendingUsd": 1.46802081,
+  "embeddingCostUsd": null,
+  "outstandingReservationUsd": 0.2616557,
+  "qualityGate": "failed-forced-choice-closing",
+  "creditCompletionRows": 1,
+  "creditDebit": 2
+}

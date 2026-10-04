@@ -9,6 +9,8 @@ export const config = {
 };
 
 import { callLunaModel, PRISM_LUNA_MODEL } from '../lib/luna-provider.js';
+import { callEmbedding } from '../lib/embedding-provider.js';
+import { withLunaClosingExperiment } from '../lib/luna-closing-experiment.js';
 import { PRISM_EMET_COVENANT_INQUIRY } from '../lib/prompt-modules/emet-covenant-inquiry.js';
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -1995,21 +1997,13 @@ const RETRIEVAL_ELIGIBLE_TYPES = [
   'Comparative',
 ];
 
-async function embedQuery(text) {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      model: RAG_CONFIG.embeddingModel,
-      input: text,
-    }),
+async function embedQuery(text, timing, turnType) {
+  return callEmbedding({
+    input: text, model: RAG_CONFIG.embeddingModel,
+    requestId: timing?.requestId ?? null,
+    turnType,
+    onTelemetry: details => timing?.('embedding_usage', details),
   });
-  if (!response.ok) throw new Error(`Embedding error: ${response.status}`);
-  const data = await response.json();
-  return data.data[0].embedding;
 }
 
 
@@ -2212,7 +2206,7 @@ export function shouldLoadDivineHiddenness(query) {
 }
 
 
-async function getRetrievedContext(userQuery, inquiryClassification, timing) {
+async function getRetrievedContext(userQuery, inquiryClassification, timing, turnType = 'unknown') {
   // When classification is null, retrieve for all queries
   // When classification is provided, only retrieve for eligible types
   if (inquiryClassification && !RETRIEVAL_ELIGIBLE_TYPES.includes(inquiryClassification)) {
@@ -2222,7 +2216,7 @@ async function getRetrievedContext(userQuery, inquiryClassification, timing) {
   let embedding;
   timing?.('embedding_start');
   try {
-    embedding = await embedQuery(userQuery);
+    embedding = await embedQuery(userQuery, timing, turnType);
     timing?.('embedding_end', { outcome: 'success' });
   } catch (err) {
     timing?.('embedding_end', { outcome: 'error' });
@@ -5887,7 +5881,7 @@ async function runProgressiveInitialInquiry({
     maxTokens: 3600,
     timeoutMs: 75000,
     maxTotalMs: 240000,
-    system: cachedCanonicalResponseSystem(systemPrompt),
+    system: withLunaClosingExperiment(cachedCanonicalResponseSystem(systemPrompt)),
     prompt: query,
     telemetryStage: 'canonical_generation',
     telemetryTurnType: 'primary',
@@ -6035,7 +6029,7 @@ async function runPersistentInquiryFollowUp({
   const retrievalQuery = buildFocusedRetrievalQuery(nextState, analysis) || input;
   const [rawRetrievedContext, curatedLearningContext] = await Promise.all([
     analysis.constraintGate.retrieval.needed
-      ? getRetrievedContext(retrievalQuery, null, timing)
+      ? getRetrievedContext(retrievalQuery, null, timing, 'follow_up')
       : Promise.resolve(''),
     getCuratedLearningContext(retrievalQuery, timing),
   ]);
@@ -6200,6 +6194,7 @@ export default async function handler(req, res) {
       ...details,
     });
   };
+  timing.requestId = requestId;
 
   let clientAborted = false;
   res.setHeader('X-Prism-Request-Id', requestId);
@@ -6868,7 +6863,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         // Pass null for classification — getRetrievedContext will retrieve for all queries
         timing('rag_start');
         const [ragContext, learningContext] = await Promise.all([
-          getRetrievedContext(lastUserText || rawQuery || '', null, timing),
+          getRetrievedContext(lastUserText || rawQuery || '', null, timing, 'primary'),
           getCuratedLearningContext(lastUserText || rawQuery || '', timing),
         ]);
         timing('rag_complete', { contextChars: ragContext.length });
@@ -7042,7 +7037,7 @@ Do not add any question after the exit offer. The person chooses the next move.
     // Pass null for classification — getRetrievedContext will retrieve for all queries
     timing('rag_start');
     const [ragContext, learningContext] = await Promise.all([
-      getRetrievedContext(lastUserText || rawQuery || '', null, timing),
+      getRetrievedContext(lastUserText || rawQuery || '', null, timing, 'primary'),
       getCuratedLearningContext(lastUserText || rawQuery || '', timing),
     ]);
     timing('rag_complete', { contextChars: ragContext.length });
