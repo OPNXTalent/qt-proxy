@@ -1,3 +1,4 @@
+import financeHandler from '../lib/finance-handler.js';
 import clientConfigHandler from '../lib/client-config-handler.js';
 
 // api/transcribe.js
@@ -25,6 +26,7 @@ const MODEL = 'gpt-4o-mini-transcribe';
 export default async function handler(req, res) {
   // Public configuration is an allowlist; dispatch before transcription or provider access.
   if (req.query?.prism_client_config === '1') return clientConfigHandler(req, res);
+  if (req.query?.prism_owner_finance === '1') return financeHandler(req, res);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

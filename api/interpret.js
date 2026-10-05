@@ -1,3 +1,4 @@
+import { withFinanceRequest, setFinanceApplicationId, linkFinanceCompletion } from '../lib/finance-store.js';
 import '../lib/require-preview-isolation.js';
 export const config = {
   api: {
@@ -5790,6 +5791,7 @@ async function completeInterpretationArtifact(artifact, packets, options) {
   const rows = await response.json();
   const result = Array.isArray(rows) ? rows[0] : rows;
   if (!result?.completed) throw new Error('ARTIFACT_COMPLETION_UNCONFIRMED');
+  await linkFinanceCompletion({completionKey:options.completionKey,threadId:result.thread_id || artifact.threadId});
   return result;
 }
 
@@ -5836,6 +5838,7 @@ async function completeFollowUpArtifact({
   const result = Array.isArray(rows) ? rows[0] : rows;
   if (result?.conflict) return { conflict: true, version: result.state_version, state: result.canonical_state };
   if (!result?.completed) throw new Error('FOLLOWUP_COMPLETION_UNCONFIRMED');
+  await linkFinanceCompletion({completionKey,threadId:artifact.threadId});
   return { committed: true, version: result.state_version, state: result.canonical_state };
 }
 
@@ -6179,7 +6182,11 @@ async function runPersistentInquiryFollowUp({
 }
 
 
-export default async function handler(req, res) {
+export default function handler(req, res) {
+  return withFinanceRequest(() => interpretHandler(req, res));
+}
+
+async function interpretHandler(req, res) {
   const startedAt = Date.now();
   const correlationBody = (() => {
     if (req.body && typeof req.body === 'object') return req.body;
@@ -6204,6 +6211,7 @@ export default async function handler(req, res) {
     });
   };
   timing.requestId = requestId;
+  setFinanceApplicationId(requestId);
 
   let clientAborted = false;
   res.setHeader('X-Prism-Request-Id', requestId);

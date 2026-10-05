@@ -1,3 +1,4 @@
+import { recordStripeFinance } from '../lib/finance-store.js';
 import '../lib/require-preview-isolation.js';
 import crypto from 'crypto';
 import { PRISM_PRODUCT, queryBankCreditsForAmount } from '../lib/product-config.js';
@@ -419,6 +420,7 @@ export default async function handler(req, res) {
       }
 
     }
+    await recordStripeFinance(event, PRISM_PRODUCT);
   } catch (err) {
     console.error('Webhook handler error:', err.message);
     return res.status(500).json({ error: 'Handler error' });
