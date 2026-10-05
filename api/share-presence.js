@@ -1,3 +1,4 @@
+import '../lib/require-preview-isolation.js';
 // api/share-presence.js
 // Two operations:
 // POST — recipient heartbeat: updates last_viewed_at on the share record

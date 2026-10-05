@@ -1,5 +1,5 @@
 {
-  "buildCommand": "for test in tests/*.mjs; do node \"$test\"; done",
+  "buildCommand": "node scripts/run-offline-tests.mjs",
   "outputDirectory": ".",
   "functions": {
     "api/interpret.js": {
@@ -33,9 +33,33 @@
     }
   ],
   "rewrites": [
-    { "source": "/terms", "destination": "/terms.html" },
-    { "source": "/privacy", "destination": "/privacy.html" },
-    { "source": "/reset-password", "destination": "/reset-password.html" },
-    { "source": "/:token([a-z0-9]{8,})", "destination": "/share.html?t=:token" }
+    {
+      "source": "/api/owner-finance",
+      "destination": "/api/transcribe?prism_owner_finance=1"
+    },
+    {
+      "source": "/owner",
+      "destination": "/owner-finance.html"
+    },
+    {
+      "source": "/api/client-config",
+      "destination": "/api/transcribe?prism_client_config=1"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/reset-password",
+      "destination": "/reset-password.html"
+    },
+    {
+      "source": "/:token([a-z0-9]{8,})",
+      "destination": "/share.html?t=:token"
+    }
   ]
 }

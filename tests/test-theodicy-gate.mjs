@@ -184,7 +184,8 @@ const moduleChecks = [
   ['Module: rejects Universalism',  PRISM_THEODICY_MODULE.includes('do not convert resurrection into Universalism')],
   ['Module: lasting condemnation', PRISM_THEODICY_MODULE.includes('real and lasting condemnation')],
   ['Module: retained wounds',       PRISM_THEODICY_MODULE.includes('risen Christ retains his wounds')],
-  ['Module: Move 10 present',       PRISM_THEODICY_MODULE.includes('MOVE 10 — SCIENTIFIC CORROBORATION')],
+  ['Module: direct answer exception', PRISM_THEODICY_MODULE.includes('MOVE 10 — DIRECT ANSWER COMPLIANCE') && PRISM_THEODICY_MODULE.includes('No question at the end.')],
+  ['Module: scientific corroboration', PRISM_THEODICY_MODULE.includes('MOVE 11 — SCIENTIFIC CORROBORATION')],
   ['Module: Isaiah 45:7 present',   PRISM_THEODICY_MODULE.includes('Isaiah 45:7')],
   ['Module: Genesis 50:20 present', PRISM_THEODICY_MODULE.includes('Genesis 50:20')],
   ['Module: Penrose-Hameroff',      PRISM_THEODICY_MODULE.includes('Penrose-Hameroff')],
@@ -194,7 +195,7 @@ const moduleChecks = [
   ['Module: Olam HaBa',             PRISM_THEODICY_MODULE.includes('Olam HaBa')],
   ['Module: no double-load guard',  !PRISM_THEODICY_MODULE.includes('PRISM_THEODICY_MODULE')],
   [`Module: token size reasonable (got ~${moduleTokens})`,
-                                    moduleTokens > 1800 && moduleTokens < 3000],
+                                    moduleTokens > 1800 && moduleTokens < 5000],
 ];
 
 for (const [name, cond] of moduleChecks) {

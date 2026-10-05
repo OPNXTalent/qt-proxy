@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import { responsesRequest, costFromUsage, reserveCost, SpendLedger, openAIAdapter } from '../scripts/prism-execution-adapters.mjs';
+
+const rate = {input:2,cachedInput:0.2,cacheWrite:2.5,output:10};
+assert.equal(costFromUsage({input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:500}},rate),0.0021);
+assert.equal(costFromUsage({input_tokens:1000,output_tokens:100,input_tokens_details:{cache_creation_tokens:1000}},rate),0.0035);
+assert.equal(costFromUsage({input_tokens:1000,output_tokens:100,input_tokens_details:{cache_write_tokens:1000}},rate),0.0035);
+assert.throws(()=>costFromUsage({input_tokens:1000,output_tokens:100,input_tokens_details:{cache_write_tokens:1000,cache_creation_tokens:10}},rate));
+assert.throws(()=>costFromUsage({input_tokens:10,output_tokens:5,input_tokens_details:{cached_tokens:11}},rate));
+assert.throws(()=>costFromUsage(null,rate));
+const ledger = new SpendLedger(2);
+ledger.reserve(1.5); assert.throws(()=>ledger.reserve(0.51));
+ledger.settle(1.5,0.25); assert.equal(ledger.committed,0.25);
+assert.throws(()=>ledger.settle(0.1,0.2));
+assert.throws(()=>new SpendLedger(3));
+assert.ok(reserveCost(1000,100,rate)>=0.0035);
+const snapshot = {system:'unchanged system',input:'unchanged user input'};
+const body = responsesRequest(snapshot,'gpt-6-sol',2400);
+assert.equal(body.instructions,snapshot.system); assert.equal(body.input,snapshot.input);
+assert.equal(body.max_output_tokens,2400); assert.equal(body.store,false);
+assert.equal(body.service_tier,'default'); assert.equal(body.reasoning.effort,'low');
+let calls=0;
+const adapter = openAIAdapter('synthetic-secret',async(url,options)=>{
+ calls++; assert.equal(url,'https://api.openai.com/v1/responses');
+ assert.equal(JSON.parse(options.body).input,snapshot.input);
+ return new Response(JSON.stringify({model:'gpt-6-sol',status:'completed',service_tier:'default',usage:{input_tokens:1000,output_tokens:100},output:[{type:'reasoning',summary:[]},{type:'message',content:[{type:'output_text',text:'answer'}]}]}),{status:200,headers:{'x-request-id':'test-id'}});
+});
+const result=await adapter.execute(body);
+assert.equal(result.response,'answer'); assert.equal(result.requestId,'test-id'); assert.equal(calls,1);
+const failed=openAIAdapter('synthetic-secret',async()=>new Response(JSON.stringify({error:{code:'model_not_found',message:'synthetic-secret'}}),{status:404}));
+assert.equal((await failed.execute(body)).error,'model_not_found');
+assert.ok(!JSON.stringify(await failed.execute(body)).includes('synthetic-secret'));
+const network=openAIAdapter('synthetic-secret',async()=>{throw new Error('synthetic-secret');});
+assert.equal((await network.execute(body)).uncertainCharge,true);
+assert.ok(!JSON.stringify(await network.execute(body)).includes('synthetic-secret'));
+console.log('Execution adapter tests passed: prompt preservation, billing, spend cap, response extraction, secret-safe errors and no retries.');

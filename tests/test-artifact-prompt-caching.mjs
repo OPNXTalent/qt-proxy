@@ -7,6 +7,6 @@ assert.match(fn, /PRISM_CANONICAL_RESPONSE_CONTRACT/);
 assert.match(fn, /cache_control: \{ type: 'ephemeral' \}/);
 assert.match(fn, /source\.slice\(PRISM_SYSTEM_PROMPT\.length\)/);
 const runtime = api.slice(api.indexOf('async function runProgressiveInitialInquiry'), api.indexOf('async function runPersistentInquiryFollowUp'));
-assert.match(runtime, /system: cachedCanonicalResponseSystem\(systemPrompt\)/);
+assert.match(runtime, /system: withLunaClosingExperiment\(cachedCanonicalResponseSystem\(systemPrompt\)\)/);
 assert.doesNotMatch(runtime, /structuredOutputSchema/);
 console.log('Canonical response prompt-cache boundary checks passed.');

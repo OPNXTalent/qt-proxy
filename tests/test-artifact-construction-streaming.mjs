@@ -4,12 +4,15 @@ import { callInquiryModel } from '../api/interpret.js';
 
 const encoder = new TextEncoder();
 const events = [
-  { type: 'message_start', message: { id: 'msg_test', usage: { input_tokens: 10 } } },
-  { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Readable ' } },
-  { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Prism response.' } },
-  { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 4 } },
+  { type: 'response.output_text.delta', delta: 'Readable ' },
+  { type: 'response.output_text.delta', delta: 'Prism response.' },
+  { type: 'response.completed', response: { id: 'resp_test', status: 'completed',
+    output: [{ type: 'message', content: [{ type: 'output_text', text: 'Readable Prism response.' }] }],
+    usage: { input_tokens: 10, output_tokens: 4 } } },
 ];
 const originalFetch = global.fetch;
+const originalKey = process.env.OPENAI_API_KEY;
+process.env.OPENAI_API_KEY = 'offline-test-key';
 global.fetch = async () => new Response(new ReadableStream({
   start(controller) {
     for (const event of events) controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
@@ -19,12 +22,16 @@ global.fetch = async () => new Response(new ReadableStream({
 const deltas = [];
 try {
   const response = await callInquiryModel({
-    model: 'claude-sonnet-4-6', maxTokens: 100, prompt: 'test', timeoutMs: 1000,
+    model: 'gpt-6-luna', maxTokens: 100, prompt: 'test', timeoutMs: 1000,
     onTextDelta: text => deltas.push(text), maxTotalMs: 2000,
   });
   assert.equal(response, 'Readable Prism response.');
   assert.deepEqual(deltas, ['Readable ', 'Prism response.']);
-} finally { global.fetch = originalFetch; }
+} finally {
+  global.fetch = originalFetch;
+  if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY = originalKey;
+}
 const api = fs.readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
 const client = fs.readFileSync(new URL('../qt.html', import.meta.url), 'utf8');
 assert.match(api, /onTextDelta: text => sse\.write\(\{ type: 'response_delta', text \}\)/);

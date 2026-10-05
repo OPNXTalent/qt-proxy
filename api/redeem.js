@@ -1,3 +1,4 @@
+import '../lib/require-preview-isolation.js';
 export const config = {
   api: {
     bodyParser: {

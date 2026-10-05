@@ -1,3 +1,4 @@
+import '../lib/require-preview-isolation.js';
 // api/migrate.js
 // One-time localStorage thread migration to Supabase
 // Called by qt.html on first authenticated load

@@ -1,3 +1,5 @@
+import { withFinanceRequest, setFinanceApplicationId, linkFinanceCompletion } from '../lib/finance-store.js';
+import '../lib/require-preview-isolation.js';
 export const config = {
   api: {
     bodyParser: {
@@ -7,6 +9,9 @@ export const config = {
   maxDuration: 60,
 };
 
+import { callLunaModel, PRISM_LUNA_MODEL } from '../lib/luna-provider.js';
+import { callEmbedding } from '../lib/embedding-provider.js';
+import { withLunaClosingExperiment } from '../lib/luna-closing-experiment.js';
 import { PRISM_EMET_COVENANT_INQUIRY } from '../lib/prompt-modules/emet-covenant-inquiry.js';
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -1993,21 +1998,13 @@ const RETRIEVAL_ELIGIBLE_TYPES = [
   'Comparative',
 ];
 
-async function embedQuery(text) {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      model: RAG_CONFIG.embeddingModel,
-      input: text,
-    }),
+async function embedQuery(text, timing, turnType) {
+  return callEmbedding({
+    input: text, model: RAG_CONFIG.embeddingModel,
+    requestId: timing?.requestId ?? null,
+    turnType,
+    onTelemetry: details => timing?.('embedding_usage', details),
   });
-  if (!response.ok) throw new Error(`Embedding error: ${response.status}`);
-  const data = await response.json();
-  return data.data[0].embedding;
 }
 
 
@@ -2210,7 +2207,7 @@ export function shouldLoadDivineHiddenness(query) {
 }
 
 
-async function getRetrievedContext(userQuery, inquiryClassification, timing) {
+async function getRetrievedContext(userQuery, inquiryClassification, timing, turnType = 'unknown') {
   // When classification is null, retrieve for all queries
   // When classification is provided, only retrieve for eligible types
   if (inquiryClassification && !RETRIEVAL_ELIGIBLE_TYPES.includes(inquiryClassification)) {
@@ -2220,7 +2217,7 @@ async function getRetrievedContext(userQuery, inquiryClassification, timing) {
   let embedding;
   timing?.('embedding_start');
   try {
-    embedding = await embedQuery(userQuery);
+    embedding = await embedQuery(userQuery, timing, turnType);
     timing?.('embedding_end', { outcome: 'success' });
   } catch (err) {
     timing?.('embedding_end', { outcome: 'error' });
@@ -2746,7 +2743,7 @@ async function registerEmail({ email, shareId }) {
 // ------------------------------------------------------------
 // Self-contained section. References no other function in this
 // file and modifies no existing state. Shared resources:
-// process.env.ANTHROPIC_API_KEY (already used by handler).
+// process.env.OPENAI_API_KEY (shared with the handler's Luna transport).
 //
 // Public surface: extractInquiryArtifacts(transcriptText, sourceMetadata)
 // Exported as a named export — coexists with the default handler
@@ -2770,7 +2767,7 @@ async function registerEmail({ email, shareId }) {
 // ============================================================
 
 const PRISM_EXTRACTION_MODEL =
-  process.env.PRISM_EXTRACTION_MODEL || 'claude-sonnet-4-6'; // matches handler's model
+  PRISM_LUNA_MODEL;
 const PRISM_EXTRACTION_MAX_TOKENS = 8000;
 const PRISM_EXTRACTION_CHUNK_CHARS = 12000;   // ~3k tokens of transcript per call
 const PRISM_EXTRACTION_CHUNK_OVERLAP = 800;   // preserves signals spanning chunk seams
@@ -3036,7 +3033,7 @@ function prismDedupeRecords(records) {
 }
 
 /**
- * One extraction call against the Anthropic API for a single chunk.
+ * One extraction call against the OpenAI Responses API for a single chunk.
  * Non-streaming, unlike the handler's call — extraction returns structured
  * JSON, not user-facing prose.
  */
@@ -3059,34 +3056,15 @@ async function prismCallExtractionModel(chunkText, sourceMetadata) {
     .filter((line) => line !== null)
     .join('\n');
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: PRISM_EXTRACTION_MODEL,
-      max_tokens: PRISM_EXTRACTION_MAX_TOKENS,
-      system: PRISM_EXTRACTION_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userContent }]
-    })
+  return callInquiryModel({
+    model: PRISM_EXTRACTION_MODEL,
+    maxTokens: PRISM_EXTRACTION_MAX_TOKENS,
+    system: PRISM_EXTRACTION_SYSTEM_PROMPT,
+    prompt: userContent,
+    timeoutMs: 60000,
+    telemetryStage: 'transcript_extraction',
+    telemetryTurnType: 'extraction',
   });
-
-  if (!response.ok) {
-    const errBody = await response.text().catch(() => '');
-    throw new Error(
-      'Extraction API call failed: ' + response.status + ' ' + errBody.slice(0, 300)
-    );
-  }
-
-  const data = await response.json();
-  const text = (data.content || [])
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n');
-  return text;
 }
 
 /**
@@ -5441,6 +5419,7 @@ export async function classifyFollowUpContext({
   inquiryToken,
   threadId,
   ownerUserId,
+  guestId = null,
   shareId,
 }) {
   if (verifyInquiryCredential(inquiryKey, inquiryToken)) {
@@ -5464,13 +5443,16 @@ export async function classifyFollowUpContext({
     }
   }
 
-  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && ownerUserId) {
+  if (/^[0-9a-f-]{36}$/i.test(threadId || '') && (ownerUserId || guestId)) {
+    const principalFilter = ownerUserId
+      ? `user_id=eq.${encodeURIComponent(ownerUserId)}`
+      : `guest_id=eq.${encodeURIComponent(guestId)}&user_id=is.null`;
     const ownedResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(ownerUserId)}&select=id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/threads?id=eq.${encodeURIComponent(threadId)}&${principalFilter}&select=id&limit=1`,
       { headers: inquiryServiceHeaders() },
     );
     const owned = ownedResponse.ok ? await ownedResponse.json() : [];
-    if (owned?.length) return { isFollowUp: true, reason: 'owned_thread' };
+    if (owned?.length) return { isFollowUp: true, reason: ownerUserId ? 'owned_thread' : 'owned_guest_thread' };
   }
 
   return {
@@ -5483,9 +5465,8 @@ async function runDisabledFollowUpFallback({ sse, timing, input, subject, tier }
   const startedAt = Date.now();
   timing('followup_fallback_start');
   const streamedResponse = await callInquiryModel({
-    model: 'claude-sonnet-4-6',
+    model: PRISM_LUNA_MODEL,
     maxTokens: 900,
-    temperature: 0.2,
     prompt: `Respond directly to this follow-up in plain prose.
 Do not return JSON or narrate internal processing. Do not infer psychology.
 Apply evidential standards symmetrically and do not manufacture certainty.
@@ -5667,304 +5648,8 @@ async function commitCanonicalInquiryState({
   };
 }
 
-export async function callInquiryModel({
-  model,
-  maxTokens,
-  prompt,
-  system,
-  temperature = 0,
-  timeoutMs = 15000,
-  structuredOutputSchema = null,
-  structuredOutputName = 'emit_structured_output',
-  structuredOutputDiagnostic = null,
-  telemetryStage = 'unspecified',
-  telemetryTurnType = 'unknown',
-  telemetryRetryOrdinal = 0,
-  onTextDelta = null,
-  onStructuredInputProgress = null,
-  maxTotalMs = null,
-}) {
-  const providerStartedAt = Date.now();
-  const controller = new AbortController();
-  let timeout;
-  let totalTimeout;
-  const streaming = typeof onTextDelta === 'function'
-    || typeof onStructuredInputProgress === 'function';
-  const armTimeout = () => {
-    clearTimeout(timeout);
-    timeout = setTimeout(
-      () => controller.abort(streaming ? 'MODEL_STREAM_STALLED' : 'MODEL_TIMEOUT'),
-      timeoutMs,
-    );
-  };
-  armTimeout();
-  if (streaming && Number.isFinite(maxTotalMs) && maxTotalMs > 0) {
-    totalTimeout = setTimeout(() => controller.abort('MODEL_STREAM_TOTAL_TIMEOUT'), maxTotalMs);
-  }
-  let response;
-  try {
-    response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        temperature,
-        ...(system ? { system } : {}),
-        ...(structuredOutputSchema ? {
-          tools: [{
-            name: structuredOutputName,
-            description: 'Return the requested structured result without commentary.',
-            input_schema: structuredOutputSchema,
-          }],
-          tool_choice: { type: 'tool', name: structuredOutputName },
-        } : {}),
-        ...(streaming ? { stream: true } : {}),
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-  } catch (error) {
-    console.log('[prism-provider-cogs]', {
-      stage: telemetryStage, turnType: telemetryTurnType, model,
-      providerRequestId: null, inputTokens: 0, outputTokens: 0,
-      cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
-      stopReason: controller.signal.aborted ? 'application_timeout' : 'transport_error',
-      latencyMs: Date.now() - providerStartedAt,
-      retryOrdinal: telemetryRetryOrdinal, succeeded: false,
-    });
-    if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
-    throw error;
-  } finally {
-    if (!streaming || !response?.ok) {
-      clearTimeout(timeout);
-      clearTimeout(totalTimeout);
-    }
-  }
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    console.log('[prism-provider-cogs]', {
-      stage: telemetryStage, turnType: telemetryTurnType, model,
-      providerRequestId: response.headers.get('request-id') || response.headers.get('x-request-id') || null,
-      inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
-      stopReason: `provider_${response.status}`, latencyMs: Date.now() - providerStartedAt,
-      retryOrdinal: telemetryRetryOrdinal, succeeded: false,
-    });
-    if (structuredOutputSchema && typeof structuredOutputDiagnostic === 'function') {
-      let providerErrorCode = null;
-      try {
-        const parsed = JSON.parse(detail);
-        const candidate = parsed?.error?.type || parsed?.error?.code || parsed?.type || parsed?.code;
-        if (typeof candidate === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(candidate)) {
-          providerErrorCode = candidate;
-        }
-      } catch (_) {
-        // Provider detail is intentionally excluded from diagnostics.
-      }
-      structuredOutputDiagnostic({
-        outcome: 'provider_rejection',
-        providerStatus: response.status,
-        providerErrorCode,
-        toolUseReturned: false,
-      });
-    }
-    throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
-  }
-  if (streaming) {
-    const reader = response.body?.getReader();
-    if (!reader) {
-      clearTimeout(timeout);
-      clearTimeout(totalTimeout);
-      throw new Error('INQUIRY_MODEL_STREAM_UNAVAILABLE');
-    }
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let text = '';
-    let providerRequestId = response.headers.get('request-id') || response.headers.get('x-request-id') || null;
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let cacheCreationInputTokens = 0;
-    let cacheReadInputTokens = 0;
-    let stopReason = null;
-    const toolBlocks = new Map();
-
-    const consumeLine = line => {
-      if (!line.startsWith('data: ')) return;
-      const payload = line.slice(6).trim();
-      if (!payload || payload === '[DONE]') return;
-      let event;
-      try { event = JSON.parse(payload); } catch { return; }
-      if (event.type === 'message_start') {
-        armTimeout();
-        providerRequestId = event.message?.id || providerRequestId;
-        const usage = event.message?.usage || {};
-        inputTokens = Number(usage.input_tokens || 0);
-        outputTokens = Number(usage.output_tokens || 0);
-        cacheCreationInputTokens = Number(usage.cache_creation_input_tokens || 0);
-        cacheReadInputTokens = Number(usage.cache_read_input_tokens || 0);
-      } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
-        armTimeout();
-        toolBlocks.set(event.index, {
-          name: event.content_block.name,
-          input: event.content_block.input,
-          partialJson: '',
-        });
-      } else if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-        armTimeout();
-        const delta = String(event.delta.text || '');
-        if (delta) {
-          text += delta;
-          onTextDelta?.(delta);
-        }
-      } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
-        armTimeout();
-        const partialJson = String(event.delta.partial_json || '');
-        const toolBlock = toolBlocks.get(event.index);
-        if (toolBlock && partialJson) {
-          toolBlock.partialJson += partialJson;
-          onStructuredInputProgress?.({
-            index: event.index,
-            name: toolBlock.name,
-            partialJson: toolBlock.partialJson,
-          });
-        }
-      } else if (event.type === 'message_delta') {
-        armTimeout();
-        stopReason = event.delta?.stop_reason || stopReason;
-        outputTokens = Number(event.usage?.output_tokens || outputTokens);
-      } else if (event.type === 'error') {
-        throw new Error(`INQUIRY_MODEL_STREAM_ERROR:${String(event.error?.type || 'provider_error')}`);
-      }
-    };
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) consumeLine(line);
-      }
-      buffer += decoder.decode();
-      for (const line of buffer.split('\n')) consumeLine(line);
-    } catch (error) {
-      console.log('[prism-provider-cogs]', {
-        stage: telemetryStage, turnType: telemetryTurnType, model,
-        providerRequestId, inputTokens, outputTokens,
-        cacheCreationInputTokens, cacheReadInputTokens,
-        stopReason: controller.signal.aborted
-          ? String(controller.signal.reason || 'application_timeout').toLowerCase()
-          : 'stream_error',
-        latencyMs: Date.now() - providerStartedAt,
-        retryOrdinal: telemetryRetryOrdinal, succeeded: false,
-      });
-      if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
-      throw error;
-    } finally {
-      clearTimeout(timeout);
-      clearTimeout(totalTimeout);
-    }
-    console.log('[prism-provider-cogs]', {
-      stage: telemetryStage, turnType: telemetryTurnType, model,
-      providerRequestId, inputTokens, outputTokens,
-      cacheCreationInputTokens, cacheReadInputTokens, stopReason,
-      latencyMs: Date.now() - providerStartedAt,
-      retryOrdinal: telemetryRetryOrdinal, succeeded: true,
-    });
-    if (stopReason === 'max_tokens') throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
-    if (structuredOutputSchema) {
-      const structuredBlock = [...toolBlocks.values()].find(
-        block => block.name === structuredOutputName,
-      );
-      let structuredInput = structuredBlock?.input;
-      if (structuredBlock?.partialJson) {
-        try {
-          structuredInput = JSON.parse(structuredBlock.partialJson);
-        } catch {
-          structuredInput = null;
-        }
-      }
-      if (!structuredInput || typeof structuredInput !== 'object' || Array.isArray(structuredInput)) {
-        if (typeof structuredOutputDiagnostic === 'function') {
-          structuredOutputDiagnostic({
-            outcome: 'tool_use_missing',
-            providerStatus: response.status,
-            providerErrorCode: null,
-            toolUseReturned: Boolean(structuredBlock),
-            errorCode: 'INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING',
-          });
-        }
-        throw new Error('INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING');
-      }
-      if (typeof structuredOutputDiagnostic === 'function') {
-        structuredOutputDiagnostic({
-          outcome: 'tool_use_returned',
-          providerStatus: response.status,
-          providerErrorCode: null,
-          toolUseReturned: true,
-        });
-      }
-      return structuredInput;
-    }
-    return text.trim();
-  }
-
-  const data = await response.json();
-  const usage = data?.usage || {};
-  console.log('[prism-provider-cogs]', {
-    stage: telemetryStage,
-    turnType: telemetryTurnType,
-    model,
-    providerRequestId: response.headers.get('request-id') || response.headers.get('x-request-id') || null,
-    inputTokens: Number(usage.input_tokens || 0),
-    outputTokens: Number(usage.output_tokens || 0),
-    cacheCreationInputTokens: Number(usage.cache_creation_input_tokens || 0),
-    cacheReadInputTokens: Number(usage.cache_read_input_tokens || 0),
-    stopReason: data?.stop_reason || null,
-    latencyMs: Date.now() - providerStartedAt,
-    retryOrdinal: telemetryRetryOrdinal,
-    succeeded: true,
-  });
-  const text = (data.content || [])
-    .filter(block => block.type === 'text')
-    .map(block => block.text)
-    .join('\n')
-    .trim();
-  if (data.stop_reason === 'max_tokens') {
-    throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
-  }
-  if (structuredOutputSchema) {
-    const structured = (data.content || []).find(
-      block => block.type === 'tool_use' && block.name === structuredOutputName,
-    );
-    if (!structured?.input || typeof structured.input !== 'object' || Array.isArray(structured.input)) {
-      if (typeof structuredOutputDiagnostic === 'function') {
-        structuredOutputDiagnostic({
-          outcome: 'tool_use_missing',
-          providerStatus: response.status,
-          providerErrorCode: null,
-          toolUseReturned: false,
-          errorCode: 'INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING',
-        });
-      }
-      throw new Error('INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING');
-    }
-    if (typeof structuredOutputDiagnostic === 'function') {
-      structuredOutputDiagnostic({
-        outcome: 'tool_use_returned',
-        providerStatus: response.status,
-        providerErrorCode: null,
-        toolUseReturned: true,
-      });
-    }
-    return structured.input;
-  }
-  return text;
+export async function callInquiryModel(options) {
+  return callLunaModel(options);
 }
 
 function progressiveSystemPrompt(systemPrompt, contract) {
@@ -5989,6 +5674,38 @@ function cachedCanonicalResponseSystem(systemPrompt) {
       ? [{ type: 'text', text: source.slice(PRISM_SYSTEM_PROMPT.length) }]
       : []),
   ];
+}
+
+// Offline qualification only. No retrieval, billing, persistence, or provider calls.
+// Caller freezes retrieved/approved-learning context once for all candidates.
+export function captureQualificationPrompt({ query, ragContext = '', learningContext = '' }) {
+  if (typeof query !== 'string' || !query.trim()) throw new Error('QUALIFICATION_QUERY_REQUIRED');
+  if (query.length > 12000) throw new Error('QUALIFICATION_QUERY_TOO_LONG');
+  const modules = {
+    theodicy: shouldLoadTheodicyModule(buildTheodicyRoutingText([], query), null),
+    relationalSalvation: shouldLoadRelationalSalvation(query),
+    divineHiddenness: shouldLoadDivineHiddenness(query),
+    covenantalRestoration: shouldLoadCovenantalRestoration(query),
+  };
+  const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
+    + ragContext
+    + learningContext
+    + (modules.theodicy ? PRISM_THEODICY_MODULE : '')
+    + (modules.relationalSalvation ? PRISM_RELATIONAL_SALVATION : '')
+    + (modules.divineHiddenness ? PRISM_DIVINE_HIDDENNESS : '')
+    + (modules.covenantalRestoration ? PRISM_COVENANTAL_RESTORATION : '');
+  return {
+    system: cachedCanonicalResponseSystem(enhancedSystemPrompt).map(block => block.text).join(''),
+    input: query,
+    modules,
+    scope: 'primary-canonical-generation',
+    retrievalStatus: ragContext || learningContext ? 'caller-supplied-frozen-context' : 'no-retrieval-smoke-only',
+  };
+}
+
+export function requireVerifiedFollowUp(clientHint, context) {
+  // A failed continuation must not silently become a paid primary generation.
+  if (clientHint && !context?.isFollowUp) throw new Error('FOLLOWUP_CONTEXT_UNVERIFIED');
 }
 
 function deterministicArtifact({ response, query, inquiryKey, revision, ownerUserId, threadId }) {
@@ -6074,6 +5791,7 @@ async function completeInterpretationArtifact(artifact, packets, options) {
   const rows = await response.json();
   const result = Array.isArray(rows) ? rows[0] : rows;
   if (!result?.completed) throw new Error('ARTIFACT_COMPLETION_UNCONFIRMED');
+  await linkFinanceCompletion({completionKey:options.completionKey,threadId:result.thread_id || artifact.threadId});
   return result;
 }
 
@@ -6120,6 +5838,7 @@ async function completeFollowUpArtifact({
   const result = Array.isArray(rows) ? rows[0] : rows;
   if (result?.conflict) return { conflict: true, version: result.state_version, state: result.canonical_state };
   if (!result?.completed) throw new Error('FOLLOWUP_COMPLETION_UNCONFIRMED');
+  await linkFinanceCompletion({completionKey,threadId:artifact.threadId});
   return { committed: true, version: result.state_version, state: result.canonical_state };
 }
 
@@ -6170,12 +5889,11 @@ async function runProgressiveInitialInquiry({
   if (!inquiryCredential?.inquiryKey) throw new Error('INQUIRY_CREDENTIAL_UNAVAILABLE');
   timing('canonical_generation_start');
   const streamedResponse = await callInquiryModel({
-    model: 'claude-sonnet-4-6',
+    model: PRISM_LUNA_MODEL,
     maxTokens: 3600,
-    temperature: 0.2,
     timeoutMs: 75000,
     maxTotalMs: 240000,
-    system: cachedCanonicalResponseSystem(systemPrompt),
+    system: withLunaClosingExperiment(cachedCanonicalResponseSystem(systemPrompt)),
     prompt: query,
     telemetryStage: 'canonical_generation',
     telemetryTurnType: 'primary',
@@ -6284,7 +6002,7 @@ async function runPersistentInquiryFollowUp({
 
   stageStartedAt = emitStage('reduce');
   const reducerText = await callInquiryModel({
-    model: 'claude-haiku-4-5-20251001',
+    model: PRISM_LUNA_MODEL,
     maxTokens: 1800,
     prompt: buildReducerPrompt({
       state: previousState,
@@ -6323,7 +6041,7 @@ async function runPersistentInquiryFollowUp({
   const retrievalQuery = buildFocusedRetrievalQuery(nextState, analysis) || input;
   const [rawRetrievedContext, curatedLearningContext] = await Promise.all([
     analysis.constraintGate.retrieval.needed
-      ? getRetrievedContext(retrievalQuery, null, timing)
+      ? getRetrievedContext(retrievalQuery, null, timing, 'follow_up')
       : Promise.resolve(''),
     getCuratedLearningContext(retrievalQuery, timing),
   ]);
@@ -6349,9 +6067,8 @@ async function runPersistentInquiryFollowUp({
     retrievedContext,
   }));
   const draft = await callInquiryModel({
-    model: 'claude-sonnet-4-6',
+    model: PRISM_LUNA_MODEL,
     maxTokens: 2400,
-    temperature: 0.2,
     timeoutMs: 75000,
     maxTotalMs: 240000,
     prompt: draftPrompt,
@@ -6365,7 +6082,7 @@ async function runPersistentInquiryFollowUp({
   stageStartedAt = emitStage('audit');
   if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
   const audited = await callInquiryModel({
-    model: 'claude-haiku-4-5-20251001',
+    model: PRISM_LUNA_MODEL,
     maxTokens: 1400,
     timeoutMs: 8000,
     prompt: assertFollowUpPromptSize(buildAuditPrompt({ input, analysis, draft })),
@@ -6465,7 +6182,11 @@ async function runPersistentInquiryFollowUp({
 }
 
 
-export default async function handler(req, res) {
+export default function handler(req, res) {
+  return withFinanceRequest(() => interpretHandler(req, res));
+}
+
+async function interpretHandler(req, res) {
   const startedAt = Date.now();
   const correlationBody = (() => {
     if (req.body && typeof req.body === 'object') return req.body;
@@ -6489,6 +6210,8 @@ export default async function handler(req, res) {
       ...details,
     });
   };
+  timing.requestId = requestId;
+  setFinanceApplicationId(requestId);
 
   let clientAborted = false;
   res.setHeader('X-Prism-Request-Id', requestId);
@@ -6721,7 +6444,7 @@ export default async function handler(req, res) {
   // Runs after the primary response is fully assembled.
   // Only fires at exchange 5+. Evaluates whether the draft ends on a momentum
   // question after a landing, and if so trims it before sending to the client.
-  // Uses claude-haiku for speed — 2000 token ceiling, non-streaming, non-critical.
+  // Uses Luna — 2000 total output-token ceiling, non-streaming, non-critical.
   const buildCoherenceCheck = async (exchangeCount, draftResponse, userMessage) => {
     if (exchangeCount < 5) return draftResponse;
     if (!draftResponse || draftResponse.trim().length === 0) return draftResponse;
@@ -6840,22 +6563,13 @@ Momentum questions to remove include: "What do you think?", "How does that feel?
 Return ONLY the final response text. No explanation. No preamble. No JSON. Just the response text, trimmed if appropriate.`;
 
     try {
-      const checkRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2000,
-          messages: [{ role: 'user', content: coherencePrompt }]
-        })
+      const corrected = await callInquiryModel({
+        model: PRISM_LUNA_MODEL,
+        maxTokens: 2000,
+        prompt: coherencePrompt,
+        telemetryStage: 'closure_check',
+        telemetryTurnType: 'follow_up',
       });
-      if (!checkRes.ok) return draftResponse;
-      const checkData = await checkRes.json();
-      const corrected = checkData?.content?.[0]?.text?.trim();
       // Safety: reject if empty or somehow longer than original
       if (!corrected) return draftResponse;
       if (corrected.length > trimmedDraft.length + 20) return draftResponse;
@@ -7097,6 +6811,7 @@ Do not add any question after the exit offer. The person chooses the next move.
             shareId: sharedFollowUpId,
           })
           : { isFollowUp: false, reason: 'no_candidate_context' };
+        requireVerifiedFollowUp(isFollowUp, followUpContext);
         timing('followup_classification_complete', {
           classified: followUpContext.isFollowUp,
           reason: followUpContext.reason,
@@ -7166,7 +6881,7 @@ Do not add any question after the exit offer. The person chooses the next move.
         // Pass null for classification — getRetrievedContext will retrieve for all queries
         timing('rag_start');
         const [ragContext, learningContext] = await Promise.all([
-          getRetrievedContext(lastUserText || rawQuery || '', null, timing),
+          getRetrievedContext(lastUserText || rawQuery || '', null, timing, 'primary'),
           getCuratedLearningContext(lastUserText || rawQuery || '', timing),
         ]);
         timing('rag_complete', { contextChars: ragContext.length });
@@ -7286,9 +7001,11 @@ Do not add any question after the exit offer. The person chooses the next move.
         inquiryToken,
         threadId,
         ownerUserId: null,
+        guestId: guestIdentity?.guestId || null,
         shareId: sharedFollowUpId,
       })
       : { isFollowUp: false, reason: 'no_candidate_context' };
+    requireVerifiedFollowUp(isFollowUp, followUpContext);
     timing('followup_classification_complete', {
       classified: followUpContext.isFollowUp,
       reason: followUpContext.reason,
@@ -7340,7 +7057,7 @@ Do not add any question after the exit offer. The person chooses the next move.
     // Pass null for classification — getRetrievedContext will retrieve for all queries
     timing('rag_start');
     const [ragContext, learningContext] = await Promise.all([
-      getRetrievedContext(lastUserText || rawQuery || '', null, timing),
+      getRetrievedContext(lastUserText || rawQuery || '', null, timing, 'primary'),
       getCuratedLearningContext(lastUserText || rawQuery || '', timing),
     ]);
     timing('rag_complete', { contextChars: ragContext.length });

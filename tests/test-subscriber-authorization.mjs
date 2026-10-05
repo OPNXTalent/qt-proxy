@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 
-process.env.SUPABASE_URL = 'https://correct-project.supabase.co';
-process.env.SUPABASE_ANON_KEY = 'anon-test-key';
-process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-test-key';
+const PREVIEW_REF = 'abcdefghijklmnopqrst';
+const mockProjectKey = role => 'header.' + Buffer.from(JSON.stringify({ ref: PREVIEW_REF, role })).toString('base64url') + '.signature';
+process.env.PRISM_PREVIEW_SUPABASE_REF = PREVIEW_REF;
+process.env.SUPABASE_URL = `https://${PREVIEW_REF}.supabase.co`;
+process.env.SUPABASE_ANON_KEY = mockProjectKey('anon');
+process.env.SUPABASE_SERVICE_ROLE_KEY = mockProjectKey('service_role');
 process.env.OPENAI_API_KEY = 'openai-test-key';
 process.env.ANTHROPIC_API_KEY = 'anthropic-test-key';
 process.env.VERCEL_ENV = 'preview';
@@ -37,7 +40,7 @@ for (const token of ['invalid-token', 'expired-token', 'wrong-project-token']) {
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
     fetchImpl: async (url, options) => {
-      assert.equal(url, 'https://correct-project.supabase.co/auth/v1/user');
+      assert.equal(url, process.env.SUPABASE_URL + '/auth/v1/user');
       assert.equal(options.headers.Authorization, `Bearer ${token}`);
       return Response.json({ message: 'invalid token' }, { status: 401 });
     },

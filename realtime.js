@@ -26,8 +26,8 @@
     document.head.appendChild(prismUi);
   }
 
-  var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  var SUPA_URL  = window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+  var SUPA_ANON = window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
 
   // ── State ──────────────────────────────────────────────────────────────────
   window._supabaseClient    = null;

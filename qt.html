@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/api/client-config"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <script>
@@ -5842,8 +5843,8 @@ function enterSharedThread(share) {
 // trusts (public anon key, read-only lookups) — mirrors the pattern
 // selectThread() already uses for its own share-status lookup just below.
 async function checkCircleParticipant(threadId, email) {
-  var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://fgngixbhpilefmyyeldr.supabase.co';
-  var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+  var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
   try {
     var subRes = await fetch(SUPA_URL + '/rest/v1/subscribers?email=eq.' + encodeURIComponent(email) + '&select=id&limit=1', {
       headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
@@ -6046,8 +6047,8 @@ function selectThread(id) {
 
     // Look up whether this thread has an active share — restore state and start polling
     (function(threadId) {
-      var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://fgngixbhpilefmyyeldr.supabase.co';
-      var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+      var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+      var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
       authenticatedFetch('/api/share?threadId=' + encodeURIComponent(threadId))
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -6307,8 +6308,8 @@ function startFollowUpPolling(threadId) {
 
 function getSupabaseClient() {
   if (_supabaseClient) return _supabaseClient;
-  var url  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  var anon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  var url  = window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+  var anon = window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
   _supabaseClient = window.supabase.createClient(url, anon);
   return _supabaseClient;
 }
@@ -7280,8 +7281,8 @@ function initSidebar() {
     // Bulk fetch open share state for all threads — populates _openThreadIds and sidebar dots
     (function(threads) {
       if (!threads || !threads.length) return;
-      var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://fgngixbhpilefmyyeldr.supabase.co';
-      var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+      var SUPA_URL  = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+      var SUPA_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
       Promise.all(threads.map(function(thread) {
         return authenticatedFetch('/api/share?threadId=' + encodeURIComponent(thread.id))
           .then(function(r) { return r.ok ? r.json() : { connections: [] }; })
@@ -7363,8 +7364,8 @@ async function handleLogout() {
   if (false) {
   // Sign out of Supabase Auth
   try {
-    var sbUrl  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-    var sbAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+    var sbUrl  = window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+    var sbAnon = window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
     await fetch(sbUrl + '/auth/v1/logout', {
       method: 'POST',
       headers: { 'apikey': sbAnon, 'Authorization': 'Bearer ' + sbAnon }
@@ -9465,8 +9466,8 @@ function startChatRealtime(shareId) {
     return;
   }
   // Reuse existing client to avoid multiple GoTrueClient instances
-  var SUPA_URL  = 'https://fgngixbhpilefmyyeldr.supabase.co';
-  var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbmdpeGJocGlsZWZteXllbGRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDg0MTgsImV4cCI6MjA5MzEyNDQxOH0.pnmRHKa3H3kjlA_8e1wpEzwP09A28MRHgQrEsPFBZS8';
+  var SUPA_URL  = window.PRISM_PUBLIC_CONFIG.supabaseUrl;
+  var SUPA_ANON = window.PRISM_PUBLIC_CONFIG.supabaseAnonKey;
   var client = window._supabaseClient || 
                (window._supabaseClient = window.supabase.createClient(SUPA_URL, SUPA_ANON));
   _chatSupabaseClient = client;

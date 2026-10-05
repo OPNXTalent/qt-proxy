@@ -1,3 +1,4 @@
+import '../lib/require-preview-isolation.js';
 // api/share.js
 // Handles all share operations for The Prism
 // POST   /api/share  — create a new share, returns { shareId, shareUrl }
