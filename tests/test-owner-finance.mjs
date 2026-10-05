@@ -16,9 +16,13 @@ assert.equal(priceUsage({usageKnown:true,provider:'openai',model:'unverified',in
 assert.equal(priceUsage({usageKnown:true,provider:'openai',model:'gpt-6-luna',serviceTier:'default',inputTokens:300000,outputTokens:100}),.060075);
 const from='2026-10-01T00:00:00.000Z',to='2026-11-01T00:00:00.000Z',at='2026-10-05T00:00:00.000Z';
 const coverage=['payments','hosting','database','other'].map(category=>({kind:'coverage',category,amount_usd:0,occurred_at:from,period_start:from,period_end:to}));
-const summary=summarizeFinance({from,to,mode:'production',captureStartedAt:from,usage:[{created_at:at,cost_usd:.1,state:'completed',cost_status:'usage_derived',completion_key:'c',thread_id:'t'},{created_at:at,cost_usd:null,state:'failed',request_id:'r'}],payments:[{payment_key:'p',event_id:'event',amount_usd:9.99,fee_usd:null,test_mode:false,occurred_at:at}],expenses:coverage,allocations:[{allocation_key:'purchase:event',allocation_type:'purchase',user_id:owner,credits:100,created_at:at}],credits:[{completion_key:'c',thread_id:'t',user_id:owner,query_cost:2,entitlement_source:'bank',created_at:at}]});
+const summary=summarizeFinance({from,to,mode:'production',captureStartedAt:from,usage:[{created_at:at,cost_usd:.1,state:'completed',cost_status:'usage_derived',completion_key:'c',thread_id:'t'},{created_at:at,cost_usd:null,state:'failed',request_id:'r'}],payments:[{payment_key:'p',event_id:'event',amount_usd:9.99,fee_usd:null,test_mode:false,occurred_at:at}],expenses:coverage,allocations:[{allocation_key:'purchase:event',allocation_type:'purchase',user_id:owner,credits:100,created_at:at}],credits:[{completion_key:'c',thread_id:'t',user_id:owner,query_cost:2,submission_type:'primary',entitlement_source:'bank',created_at:at}]});
 assert.equal(summary.totals.allocatedRevenueUsd,.1998);
 assert.equal(summary.totals.cashReceivedUsd,9.99);
+assert.equal(summary.totals.initialQueries,1);
+assert.equal(summary.totals.followUpQueries,0);
+assert.equal(summary.totals.netProfitUsd,null);
+assert.equal(summary.totals.recordedCostProfitEstimateUsd,.0998);
 assert.equal(summary.totals.unknownAttempts,1);
 assert.equal(summary.totals.operatingProfitUsd,null);
 assert(summary.alerts.some(a=>a.message.includes('invoice')));
@@ -45,3 +49,14 @@ isOwner=true;r=res();await handler({method:'POST',headers:{authorization:'Bearer
 r=res();await handler({method:'POST',headers:{authorization:'Bearer test','content-type':'application/json'},body:{...draft,freeCredits:101}},r);assert.equal(r.code,400);assert.equal(writes.length,1);
 assert.equal(PRISM_PRODUCT.subscription.monthlyPriceCents,4999,'Draft must not modify published checkout/fulfillment config');
 console.log('Owner finance: authorization, price drafts, cost math, unknown costs and FIFO attribution passed');
+
+const countReport=summarizeFinance({from,to,mode:'production',captureStartedAt:from,expenses:coverage,credits:[
+ {created_at:at,completion_key:'initial',submission_type:'primary',query_cost:2,entitlement_source:'explorer'},
+ {created_at:at,completion_key:'follow',submission_type:'follow_up',query_cost:1,entitlement_source:'explorer'},
+ {created_at:at,completion_key:'follow',submission_type:'follow_up',query_cost:1,entitlement_source:'explorer'},
+ {created_at:to,completion_key:'outside',submission_type:'primary',query_cost:2,entitlement_source:'explorer'}
+]});
+assert.equal(countReport.totals.initialQueries,1);assert.equal(countReport.totals.followUpQueries,1);assert.equal(countReport.totals.completedQueries,2);
+const profitReport=summarizeFinance({from,to,mode:'production',captureStartedAt:from,expenses:[...coverage,{kind:'expense',category:'hosting',amount_usd:1,occurred_at:from}],payments:[{event_id:'sale',amount_usd:10,fee_usd:0,test_mode:false,occurred_at:from}],allocations:[{allocation_key:'purchase:sale',allocation_type:'purchase',user_id:owner,credits:100,created_at:from}],credits:[{user_id:owner,created_at:at,completion_key:'paid',submission_type:'primary',query_cost:2,entitlement_source:'bank'}],usage:[{created_at:at,completion_key:'paid',state:'completed',cost_usd:.01,cost_status:'invoice_reconciled'}]});
+assert.equal(profitReport.totals.netProfitUsd,-.81,'Prepaid cash must not become earned profit');assert.equal(profitReport.totals.knownCashResultUsd,8.99);
+console.log('Headline counts: distinct completed queries by type; earned profit separated from prepaid cash passed');

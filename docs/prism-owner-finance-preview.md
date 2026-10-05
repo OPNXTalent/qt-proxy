@@ -8,6 +8,12 @@ The editor accepts USD membership and credit-bank prices, credits per allocation
 
 The public `?demo=1` view uses labelled sample data and simulated edits only. It performs no financial API reads or writes and does not bypass owner authorization. Actual draft persistence is in the private Supabase branch.
 
+## Headline profit and query counts
+
+The first row displays net profit beside initial and follow-up query counts for the selected period. Counts use distinct completed ledger entries (`primary` and `follow_up`), including free inquiries, rather than credit totals or internal provider stages. Failed attempts still contribute to costs but not completed-query counts. Missing submission classifications are explicit.
+
+Net profit uses FIFO-estimated revenue allocated to consumed paid credits, less recorded AI costs, payment fees and expenses. Prepaid cash remains a separate figure. When reconciliation is incomplete, the headline shows "Not reconciled" with a clearly marked recorded-cost estimate underneath. This estimate may omit unknown costs and is not final profit. Figures are before income tax; the demo uses sample values.
+
 ## Financial records
 
 Each Luna or retrieval-embedding attempt within an interpretation request first receives a durable unknown-cost placeholder. If placeholder persistence fails, that provider dispatch is prevented. Reported tokens update the record after the attempt; missing usage, unsupported models and unsuccessful persistence remain unknown. Failures and free usage count toward spending. Reasoning tokens are already part of output tokens and are not billed twice. Usage-derived costs are provisional until invoice reconciliation.
