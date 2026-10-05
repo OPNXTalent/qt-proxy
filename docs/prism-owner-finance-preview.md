@@ -12,7 +12,7 @@ The public `?demo=1` view uses labelled sample data and simulated edits only. It
 
 The first row displays net profit beside initial and follow-up query counts for the selected period. Counts use distinct completed ledger entries (`primary` and `follow_up`), including free inquiries, rather than credit totals or internal provider stages. Failed attempts still contribute to costs but not completed-query counts. Missing submission classifications are explicit.
 
-Net profit uses FIFO-estimated revenue allocated to consumed paid credits, less recorded AI costs, payment fees and expenses. Prepaid cash remains a separate figure. When reconciliation is incomplete, the headline shows "Not reconciled" with a clearly marked recorded-cost estimate underneath. This estimate may omit unknown costs and is not final profit. Figures are before income tax; the demo uses sample values.
+Net profit uses FIFO-estimated revenue allocated to consumed paid credits, less recorded AI costs, payment fees and expenses. Prepaid cash remains a separate figure. The dollar amount is the large headline. When reconciliation is incomplete, the card is labelled "Net profit (estimate)" and shows "Not reconciled · excludes unknown costs" underneath the number. This estimate may omit unknown costs and is not final profit. Figures are before income tax; the demo uses sample values.
 
 ## Financial records
 
