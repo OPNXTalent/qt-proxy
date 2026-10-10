@@ -7198,7 +7198,8 @@ Do not add any question after the exit offer. The person chooses the next move.
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '')
           + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '')
-          + (covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION : '');
+          + (covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION : '')
+          + (/universal(?:ism|ist)|apokatastasis|all (?:will|shall|must) be saved/i.test(lastUserText || rawQuery || '') ? PRISM_UNIVERSAL_SALVATION_CONSTRAINT : '');
         timing('prompt_assembly_complete', {
           promptChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
@@ -7360,7 +7361,8 @@ Do not add any question after the exit offer. The person chooses the next move.
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '')
           + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '')
-          + (covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION : '');
+          + (covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION : '')
+          + (/universal(?:ism|ist)|apokatastasis|all (?:will|shall|must) be saved/i.test(lastUserText || rawQuery || '') ? PRISM_UNIVERSAL_SALVATION_CONSTRAINT : '');
         timing('prompt_assembly_complete', {
           promptChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
