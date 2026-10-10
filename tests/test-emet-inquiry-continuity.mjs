@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PRISM_EMET_COVENANT_INQUIRY } from '../lib/prompt-modules/emet-covenant-inquiry.js';
+import { PRISM_EMET_COVENANT_INQUIRY, PRISM_UNIVERSAL_SALVATION_CONSTRAINT } from '../lib/prompt-modules/emet-covenant-inquiry.js';
 import { shouldLoadCovenantalRestoration } from '../lib/prompt-modules/prism-covenantal-restoration.js';
 import { buildDraftPrompt, buildAuditPrompt, createInitialInquiryState, assertFollowUpPromptSize } from '../lib/persistent-inquiry-runtime.js';
 
@@ -14,9 +14,12 @@ assertFollowUpPromptSize(prompt);
 const api = readFileSync(new URL('../api/interpret.js', import.meta.url), 'utf8');
 const initial = api.slice(api.indexOf('const PRISM_SYSTEM_PROMPT'), api.indexOf('CONVERSATIONAL REALITY'));
 assert.ok(initial.includes('${PRISM_EMET_COVENANT_INQUIRY}'));
+assert.ok(initial.includes('${PRISM_UNIVERSAL_SALVATION_CONSTRAINT}'));
+assert.ok(PRISM_UNIVERSAL_SALVATION_CONSTRAINT.includes('Romans 9:20'));
+assert.ok(PRISM_UNIVERSAL_SALVATION_CONSTRAINT.includes('unproved is not refuted'));
 const fallback = api.slice(api.indexOf('async function runDisabledFollowUpFallback'), api.indexOf('async function restoreCanonicalInquiryState'));
-assert.match(fallback, /system: PRISM_RESPONSE_REFRESH \+ PRISM_QUANTUM_FINGERPRINT \+ PRISM_EMET_COVENANT_INQUIRY/);
-assert.match(api, /prompt: draftPrompt,\s+system: PRISM_RESPONSE_REFRESH \+ PRISM_QUANTUM_FINGERPRINT/);
+assert.match(fallback, /system: PRISM_RESPONSE_REFRESH \+ PRISM_QUANTUM_FINGERPRINT \+ PRISM_UNIVERSAL_SALVATION_CONSTRAINT \+ PRISM_EMET_COVENANT_INQUIRY/);
+assert.match(api, /prompt: draftPrompt,\s+system: PRISM_RESPONSE_REFRESH \+ PRISM_QUANTUM_FINGERPRINT \+ PRISM_UNIVERSAL_SALVATION_CONSTRAINT/);
 assert.ok(buildAuditPrompt({ input: 'Show the evidence', analysis, draft: 'A connected reading.' }).includes('not repeated disclaimer paragraphs or a forced conclusion'));
 for (const input of ['Emet and tav', 'Gethsemane', 'He was made sin', 'Psalm 22', 'Genesis 15']) {
   assert.equal(shouldLoadCovenantalRestoration(input), true, input);
@@ -31,3 +34,4 @@ state.inquiryTrajectory = Array.from({ length: 10 }, (_, i) => ({ turn: i, chang
 const bounded = buildDraftPrompt({ state, analysis, input: 'e'.repeat(4000), retrievedContext: 'f'.repeat(14000) });
 assertFollowUpPromptSize(bounded);
 console.log('Emet initial/follow-up/fallback continuity, routing, and prompt budget checks passed.');
+
