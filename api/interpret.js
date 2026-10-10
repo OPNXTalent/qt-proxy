@@ -7,7 +7,7 @@ export const config = {
   maxDuration: 60,
 };
 
-import { PRISM_EMET_COVENANT_INQUIRY } from '../lib/prompt-modules/emet-covenant-inquiry.js';
+import { PRISM_EMET_COVENANT_INQUIRY, PRISM_UNIVERSAL_SALVATION_CONSTRAINT } from '../lib/prompt-modules/emet-covenant-inquiry.js';
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js';
@@ -83,6 +83,8 @@ Before constructing any response, run these eight questions. They are not theolo
 The Emet lens asks one thing above all: what is true here, regardless of who benefits?
 
 ${PRISM_EMET_COVENANT_INQUIRY}
+
+${PRISM_UNIVERSAL_SALVATION_CONSTRAINT}
 
 Emet is truth, faithfulness, and reliability, explored through the shared governing guidance above.
 
@@ -5493,7 +5495,7 @@ Ask a question only if ambiguity prevents a responsible answer.
 
 Original inquiry: ${String(subject || '').slice(0, MAX_QUERY_CHARS)}
 Follow-up: ${String(input || '').slice(0, MAX_QUERY_CHARS)}`,
-    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT + PRISM_EMET_COVENANT_INQUIRY,
+    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT + PRISM_UNIVERSAL_SALVATION_CONSTRAINT + PRISM_EMET_COVENANT_INQUIRY,
     telemetryStage: 'followup_fallback',
     telemetryTurnType: 'follow_up',
     onTextDelta: text => sse.write({ type: 'response_delta', text }),
@@ -6355,7 +6357,7 @@ async function runPersistentInquiryFollowUp({
     timeoutMs: 75000,
     maxTotalMs: 240000,
     prompt: draftPrompt,
-    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT,
+    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT + PRISM_UNIVERSAL_SALVATION_CONSTRAINT,
     telemetryStage: 'followup_draft',
     telemetryTurnType: 'follow_up',
     onTextDelta: text => sse.write({ type: 'response_delta', text }),
