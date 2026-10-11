@@ -693,6 +693,10 @@
     font-style: normal;
     letter-spacing: 0.02em;
   }
+  .disc-panel-nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .disc-panel-nav button { padding:7px 9px; background:transparent; border:1px solid var(--border-lit); color:#C9B8E8; font-family:var(--mono); font-size:11px; letter-spacing:0.08em; cursor:pointer; }
+  .disc-panel-nav button.active { border-color:var(--gold-dim); color:var(--text); }
+  .disc-panel-nav button:hover { color:var(--text); }
   .disc-anchor-text {
     font-family: var(--crimson);
     font-style: italic;
@@ -3050,12 +3054,16 @@
     <!-- Breadcrumb — future sprint -->
     <div class="disc-breadcrumb" id="discBreadcrumb"></div>
 
-    <!-- Top bar: current surface + count + close -->
-    <div class="disc-topbar" onclick="closeDiscussionPanel()" title="Close panel" style="cursor:pointer;">
+    <!-- Top bar: Share / Notes navigation and Close -->
+    <div class="disc-topbar">
       <span class="disc-topbar-label" id="discTopbarLabel">Notes</span>
       <div class="disc-topbar-right">
         <span style="font-family:var(--mono);font-size:11px;color:rgba(120,118,140,0.25);" id="chatBarCount"></span>
-        <button class="disc-close-btn" onclick="event.stopPropagation();closeDiscussionPanel()" title="Close">‹</button>
+        <nav class="disc-panel-nav" aria-label="Discussion panel navigation">
+          <button type="button" id="discNavShare" onclick="setRefractionView('trust_circle')" aria-label="Show shared discussion">Share</button>
+          <button type="button" id="discNavNotes" onclick="setRefractionView('private')" aria-label="Show private notes">Notes</button>
+          <button type="button" onclick="closeDiscussionPanel()" aria-label="Close panel">Close</button>
+        </nav>
       </div>
     </div>
 
@@ -8554,6 +8562,10 @@ function setRefractionView(next, shouldRender) {
   var chamberTitle = document.getElementById('discChamberTitle');
   if (topbarLabel) topbarLabel.textContent = panelTitle;
   if (chamberTitle) chamberTitle.textContent = panelTitle;
+  var shareNav = document.getElementById('discNavShare');
+  var notesNav = document.getElementById('discNavNotes');
+  if (shareNav) { shareNav.classList.toggle('active', next === 'trust_circle'); shareNav.setAttribute('aria-pressed', String(next === 'trust_circle')); }
+  if (notesNav) { notesNav.classList.toggle('active', next === 'private'); notesNav.setAttribute('aria-pressed', String(next === 'private')); }
 
   if (next === 'trust_circle') {
     label.textContent = 'Share';
