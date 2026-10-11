@@ -6075,6 +6075,7 @@ function selectThread(id) {
       authenticatedFetch('/api/share?threadId=' + encodeURIComponent(threadId))
       .then(function(r) { return r.json(); })
       .then(function(data) {
+        if (activeThreadId !== threadId) return; // Ignore an older thread's async response.
         var rows = (data && data.connections || []).filter(function(connection) {
           return connection.status === 'active' && !connection.revoked_at;
         });
@@ -6160,8 +6161,9 @@ function selectThread(id) {
         if (typeof window.startChatRealtime === 'function') {
           window.startChatRealtime(share.id);
         }
-        // Load into background — panel shows loaded data when user opens it
+        // Load messages in the background and open invitation management for shared threads.
         loadChatMessages();
+        if (activeThreadId === threadId) openSharePanel();
       })
       .catch(function() {});
     })(id);
