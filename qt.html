@@ -3251,6 +3251,10 @@ function appendProvisionalOrientation(fragment, requestId) {
   }
 }
 
+function scriptureDisplayReference(reference) {
+  return String(reference || '').replace(/\s*\((?:ESV|NRSV|NRSVue|NRSVUE|KJV|NKJV|NIV|WEB|NASB(?:1995|95)?|CSB|NLT|LSB|Sahih International)\)\s*$/i, '').trim();
+}
+
 function renderProvisionalResponse(text, requestId, targetEl) {
   if (typeof text !== 'string' || !text) return;
   var target = targetEl || document.getElementById('resultContent');
@@ -3264,10 +3268,10 @@ function renderProvisionalResponse(text, requestId, targetEl) {
     var close = quotation.search(/[”"](?=\s*(?:\n\s*\n|$))/);
     var verseText = close >= 0 ? quotation.slice(0, close) : quotation;
     bodyText = close >= 0 ? quotation.slice(close + 1).trimStart() : '';
-    verseHtml = '<div class="verse-banner"><div class="verse-ref">' + escHtml(leadingVerse[1]) + '</div><div class="verse-text">' + escHtml(verseText) + '</div></div>';
+    verseHtml = '<div class="verse-banner"><div class="verse-ref">' + escHtml(scriptureDisplayReference(leadingVerse[1])) + '</div><div class="verse-text">' + escHtml(verseText) + '</div></div>';
   }
   if (!leadingVerse && /\bshroud\b/i.test(currentSubject + '\n' + text)) {
-    verseHtml = '<div class="verse-banner"><div class="verse-ref">John 19:40 (ESV)</div><div class="verse-text">' +
+    verseHtml = '<div class="verse-banner"><div class="verse-ref">John 19:40</div><div class="verse-text">' +
       escHtml('So they took the body of Jesus and bound it in linen cloths with the spices, as is the burial custom of the Jews.') + '</div></div>';
   }
   target.innerHTML = verseHtml + '<div class="qt-core-insight" aria-live="polite">' +
@@ -4088,7 +4092,7 @@ async function callProxyStream(messages, targetEl, rawQuery, isFollowUp, request
             renderProvisionalResponse(fullText, requestId, targetEl);
           } else if (parsed.type === 'canonical_complete') {
             fullText = parsed.response || fullText;
-            var verseHtml = parsed.verse_identified && parsed.verse_text ? '<div class="verse-banner"><div class="verse-ref">' + escHtml(parsed.verse_identified) + '</div><div class="verse-text">' + escHtml(parsed.verse_text) + '</div></div>' : '';
+            var verseHtml = parsed.verse_identified && parsed.verse_text ? '<div class="verse-banner"><div class="verse-ref">' + escHtml(scriptureDisplayReference(parsed.verse_identified)) + '</div><div class="verse-text">' + escHtml(parsed.verse_text) + '</div></div>' : '';
             if (targetEl) targetEl.innerHTML = verseHtml + fullText.split(/\n\n/).map(function(p) {
               return '<p>' + escHtml(p.replace(/\n/g, ' ')) + '</p>';
             }).join('');
@@ -4739,7 +4743,7 @@ function renderResult(d) {
   let html = '';
   // Restore the existing Scripture banner for structured and archived answers.
   if (String(d.verse_identified || '').trim() && String(d.verse_text || '').trim()) {
-    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(d.verse_identified) + '</div><div class="verse-text">' + escHtml(d.verse_text) + '</div></div>';
+    html += '<div class="verse-banner"><div class="verse-ref">' + escHtml(scriptureDisplayReference(d.verse_identified)) + '</div><div class="verse-text">' + escHtml(d.verse_text) + '</div></div>';
   }
   let recognitionText = d.recognition || '';
   let coreInsightText = String(d.core_insight || '').trim();
