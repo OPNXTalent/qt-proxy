@@ -1,3 +1,4 @@
+import { marginScenario, monthlyScenario } from '/lib/margin-preview.js';
 const $=id=>document.getElementById(id);
 const demo=new URLSearchParams(location.search).get('demo')==='1';
 let sb,report,token,demoDrafts=[];
@@ -22,7 +23,7 @@ function render(r){report=r;const t=r.totals;$('environment').textContent=demo?'
  const p=r.configuredProducts;const bank=Object.entries(p.queryBanks)[0];$('configured').textContent=`Published configuration: membership ${usd(p.subscription.monthlyPriceCents/100)} / ${p.subscription.monthlyCredits} credits; bank ${usd(Number(bank[0])/100)} / ${bank[1]} credits; ${p.explorer.credits} free credits per ${p.explorer.windowHours} hours. Use Publish paid prices to update these values.`;
  const draft=r.priceDrafts[0];const sub=draft?.products.find(p=>p.key==='subscription');const b=draft?.products.find(p=>p.key==='bank');$('membership-price').value=(sub?.priceCents??p.subscription.monthlyPriceCents)/100;$('membership-credits').value=sub?.credits??p.subscription.monthlyCredits;$('bank-price').value=(b?.priceCents??Number(bank[0]))/100;$('bank-credits').value=b?.credits??bank[1];$('free-credits').value=p.explorer.credits;priceMath();$('draft-history').replaceChildren();for(const d of r.priceDrafts){const el=document.createElement('p');el.textContent=new Date(d.created_at).toLocaleString()+' · DRAFT · '+d.products.map(p=>`${p.key}: ${usd(p.priceCents/100)} / ${p.credits} credits`).join(' · ')+` · Free: ${d.free_credits}`;$('draft-history').append(el);}if(!r.priceDrafts.length)$('draft-history').textContent='No saved drafts.';$('disclosure').textContent=r.disclosure;
 }
-function priceMath(){for(const prefix of ['membership','bank']){const price=Number($(prefix+'-price').value),credits=Number($(prefix+'-credits').value),unit=price/credits;$(prefix+'-unit').textContent=credits>0?`$${unit.toFixed(4)} per credit · initial $${(unit*2).toFixed(4)} · follow-up $${unit.toFixed(4)}`:'Enter a positive credit allocation.';}}
+function priceMath(){for(const prefix of ['membership','bank']){const price=Number($(prefix+'-price').value),credits=Number($(prefix+'-credits').value),unit=price/credits;$(prefix+'-unit').textContent=credits>0?`$${unit.toFixed(4)} per credit · initial $${(unit*2).toFixed(4)} · follow-up $${unit.toFixed(4)}`:'Enter a positive credit allocation.';}renderMargins();}
 async function load(){try{render(demo?sample():await request());}catch(e){$('app').hidden=true;$('owner-login').hidden=demo || !sb || Boolean((await sb.auth.getSession()).data.session);$('access').textContent=e.message+' ';const a=document.createElement('a');a.href='/qt-gateway.html';a.textContent='Open Prism sign-in';$('access').append(a);}}
 async function save(form,body){const buttons=[...form.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);try{const r=await request(body);toast(r.message||'Saved.');await load();}catch(e){toast(e.message);}finally{buttons.forEach(b=>b.disabled=false);}}
 $('range').addEventListener('submit',e=>{e.preventDefault();load();});$('price-form').addEventListener('input',priceMath);$('price-form').addEventListener('submit',e=>{e.preventDefault();if(e.submitter?.id==='publish-prices' && !confirm(`Publish membership $${$('membership-price').value} / ${$('membership-credits').value} credits monthly and ad-hoc $${$('bank-price').value} / ${$('bank-credits').value} credits for new purchases?`))return;save(e.target,{action:e.submitter?.id==='publish-prices'?'publish_prices':'price_draft',expectedVersion:report?.pricingVersion??null,submissionId:crypto.randomUUID(),products:[{key:'subscription',priceCents:Math.round(Number($('membership-price').value)*100),credits:Number($('membership-credits').value)},{key:'bank',priceCents:Math.round(Number($('bank-price').value)*100),credits:Number($('bank-credits').value)}],freeCredits:Number($('free-credits').value)});});
@@ -32,3 +33,31 @@ if(!demo){const config=window.PRISM_PUBLIC_CONFIG;if(config?.supabaseUrl&&config
 if(demo||sb)load();
 
 $('owner-login').addEventListener('submit',async e=>{e.preventDefault();const button=e.target.querySelector('button');button.disabled=true;try{const {error}=await sb.auth.signInWithPassword({email:$('owner-email').value.trim(),password:$('owner-password').value});$('owner-password').value='';if(error)throw Error('Sign-in failed. Check your Prism account details.');await load();}catch(err){$('access').textContent=err.message;}finally{button.disabled=false;}});
+
+function renderMargins(){
+ if(!report)return;
+ const basis=report.costBasis;const cost=basis?.costPerCreditUsd??null;
+ const nonnegative=id=>Math.max(0,Number($(id).value)||0);
+ const feePercent=Math.min(100,nonnegative('margin-fee-percent')),feeFixedUsd=nonnegative('margin-fee-fixed');
+ const p=report.configuredProducts;const bank=Object.entries(p.queryBanks)[0];
+ const current=[{priceCents:p.subscription.monthlyPriceCents,credits:p.subscription.monthlyCredits},{priceCents:Number(bank[0]),credits:bank[1]}];
+ const proposed=['membership','bank'].map(prefix=>({priceCents:Math.round(nonnegative(prefix+'-price')*100),credits:nonnegative(prefix+'-credits')}));
+ const calculate=product=>marginScenario({...product,costPerCreditUsd:cost,feePercent,feeFixedUsd});
+ const old=current.map(calculate),next=proposed.map(calculate);
+ $('margin-basis').textContent=cost===null?'Cost basis unavailable: complete captured inquiries are required. Revenue per credit can still be compared.':`Provisional AI cost basis: $${cost.toFixed(6)} per credit from ${basis.completedQueries} captured completed inquiries / ${basis.credits} credits. ${basis.unknownAttempts} unknown attempts; ${basis.uncapturedQueries} historical inquiries lack capture. This sample may not represent future usage.`;
+ const rows=[];
+ for(let i=0;i<2;i++){
+  const name=i?'Ad-hoc':'Membership';const a=old[i],b=next[i];
+  const money=v=>v==null?'Unavailable':usd(v);
+  rows.push([name+' revenue / credit',money(a?.unitRevenueUsd),money(b?.unitRevenueUsd),money(a&&b?b.unitRevenueUsd-a.unitRevenueUsd:null)]);
+  rows.push([name+' contribution / package',money(a?.contributionUsd),money(b?.contributionUsd),money(a?.contributionUsd!=null&&b?.contributionUsd!=null?b.contributionUsd-a.contributionUsd:null)]);
+  const percent=v=>v==null?'Unavailable':v.toFixed(2)+'%';
+  rows.push([name+' contribution margin',percent(a?.marginPercent),percent(b?.marginPercent),a?.marginPercent!=null&&b?.marginPercent!=null?(b.marginPercent-a.marginPercent).toFixed(2)+' pp':'Unavailable']);
+ }
+ table('margin-comparison',rows,'Enter valid prices.');
+ const assumptions={membershipSales:Math.floor(nonnegative('margin-membership-sales')),bankSales:Math.floor(nonnegative('margin-bank-sales')),freeCredits:Math.floor(nonnegative('margin-free-credits')),fixedCostsUsd:nonnegative('margin-fixed'),costPerCreditUsd:cost};
+ const before=monthlyScenario({...assumptions,membership:old[0],bank:old[1]}),after=monthlyScenario({...assumptions,membership:next[0],bank:next[1]});
+ $('margin-current').textContent=before?usd(before.operatingResultUsd):'Unavailable';$('margin-proposed').textContent=after?usd(after.operatingResultUsd):'Unavailable';$('margin-impact').textContent=before&&after?usd(after.operatingResultUsd-before.operatingResultUsd):'Unavailable';
+ $('margin-break-even').textContent=after?`Proposed break-even for entered free usage and fixed expenses: ${after.membershipBreakEven??'not achievable with positive contribution'} membership purchases OR ${after.bankBreakEven??'not achievable with positive contribution'} ad-hoc purchases per month. Estimated free-use AI cost: ${usd(after.freeCostUsd)}.`:'Break-even requires a recorded cost basis and valid prices.';
+}
+$('margin-preview').addEventListener('input',renderMargins);

@@ -3,3 +3,5 @@
 @media(max-width:720px){.headline .profit{grid-column:1 / -1}}
 
 .conversation-toggle{margin-top:0;padding-top:24px}.conversation-toggle>summary{font-size:20px;color:var(--text);font-weight:500}.conversation-toggle>summary:focus-visible{outline:2px solid var(--gold);outline-offset:6px}.conversation-toggle[open]>summary{margin-bottom:16px}
+
+.margin-preview{margin-top:24px;border-top:1px solid var(--line);padding-top:20px}.margin-preview .price-grid label{margin:0}.margin-preview .expense-grid{grid-template-columns:repeat(3,1fr)}@media(max-width:720px){.margin-preview .expense-grid{grid-template-columns:1fr}}

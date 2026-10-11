@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {marginScenario,monthlyScenario} from '../lib/margin-preview.js';
+const old=marginScenario({priceCents:1999,credits:125,costPerCreditUsd:.002,feePercent:3,feeFixedUsd:.3});
+const next=marginScenario({priceCents:999,credits:100,costPerCreditUsd:.002,feePercent:3,feeFixedUsd:.3});
+assert(Math.abs(next.contributionUsd-9.1903)<1e-9);
+assert.equal(marginScenario({priceCents:999,credits:100,costPerCreditUsd:null}).marginPercent,null);
+assert.equal(marginScenario({priceCents:999,credits:0,costPerCreditUsd:.002}),null);
+const monthly=monthlyScenario({membership:old,bank:next,membershipSales:1,bankSales:2,freeCredits:1000,fixedCostsUsd:20,costPerCreditUsd:.002});
+assert(Math.abs(monthly.operatingResultUsd-(old.contributionUsd+2*next.contributionUsd-22))<1e-9);
+assert.equal(monthly.bankBreakEven,3);
+const loss=marginScenario({priceCents:50,credits:10000,costPerCreditUsd:.002});
+assert.equal(monthlyScenario({membership:loss,bank:loss,membershipSales:1,bankSales:1,freeCredits:0,fixedCostsUsd:20,costPerCreditUsd:.002}).bankBreakEven,null);
+console.log('Margin scenarios preserve fees, full package consumption, free usage, unknown basis and negative contribution');
