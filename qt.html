@@ -3030,7 +3030,7 @@
         <div class="share-card-footer">
           <div id="shareConnectionsList"><div class="share-privacy-note">No active connections yet.</div></div>
           <div id="shareGroupActions" class="share-group-actions" style="display:none;">
-            <div id="shareGroupHint" class="share-group-hint">Select the checkboxes beside at least two invitees to create a group chat.</div>
+            <div id="shareGroupHint" class="share-group-hint">Select one additional invitee to begin a group chat.</div>
             <button id="createGroupChatBtn" type="button" onclick="createGroupChat()" disabled>Create Group Chat</button>
           </div>
         </div>
@@ -7393,6 +7393,8 @@ window._shareActive     = false;  // true once share is created
 var _presencePollInterval = null;
 var _shareConnections = [];
 var _selectedGroupShareIds = new Set();
+var _groupSelectionThreadId = null;
+var _groupSelectionManuallyChanged = false;
 var _activeGroupChat = null;
 
 function titleCaseRecipientName(value) {
@@ -7472,6 +7474,11 @@ async function loadShareConnections() {
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not load connections');
     _shareConnections = Array.isArray(data.connections) ? data.connections : [];
+    if (_groupSelectionThreadId !== activeThreadId) {
+      _selectedGroupShareIds.clear();
+      _groupSelectionThreadId = activeThreadId;
+      _groupSelectionManuallyChanged = false;
+    }
     var activeIds = new Set(_shareConnections.filter(function(connection) {
       return connection.status === 'active' && !connection.revoked_at;
     }).map(function(connection) { return connection.id; }));
@@ -7500,6 +7507,9 @@ function renderShareConnections() {
     updateGroupChatSelectionUI();
     return;
   }
+  if (!_groupSelectionManuallyChanged && _selectedGroupShareIds.size === 0) {
+    _selectedGroupShareIds.add(active[0].id);
+  }
   list.innerHTML = '';
   active.forEach(function(connection) {
     var row = document.createElement('div');
@@ -7512,6 +7522,7 @@ function renderShareConnections() {
     selector.checked = _selectedGroupShareIds.has(connection.id);
     selector.setAttribute('aria-label', 'Include ' + (connection.recipient_name || 'recipient') + ' in group chat');
     selector.onchange = function() {
+      _groupSelectionManuallyChanged = true;
       if (selector.checked) _selectedGroupShareIds.add(connection.id);
       else _selectedGroupShareIds.delete(connection.id);
       updateGroupChatSelectionUI();
@@ -7564,7 +7575,7 @@ function updateGroupChatSelectionUI() {
   }
   if (hint) hint.textContent = count >= 2
     ? 'Only the selected invitees will share this discussion.'
-    : 'Select the checkboxes beside at least two invitees to create a group chat.';
+    : 'Select one additional invitee to begin a group chat.';
 }
 
 async function createGroupChat() {
