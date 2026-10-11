@@ -103,6 +103,7 @@ let queryLogReads = 0;
 let acknowledgedOwner = null;
 globalThis.fetch = async (url, options = {}) => {
   const target = String(url);
+  if(target.includes('/rest/v1/prism_pricing_versions?'))return Response.json([]);
   if (target.endsWith('/rest/v1/prism_guests') && options.method === 'POST') {
     return new Response('', { status: 201 });
   }

@@ -78,6 +78,7 @@ for (const [amount, expectedQueries] of [[1999, 125]]) {
   const calls = [];
   global.fetch = async (url, options = {}) => {
     calls.push({ url: String(url), options });
+    if (String(url).includes('api.stripe.com/v1/subscriptions/'))return Response.json({items:{data:[{price:{unit_amount:4999}}]},metadata:{}});
     if (String(url).includes('/rpc/apply_prism_subscription_by_email')) return Response.json(true);
     throw new Error(`Unexpected fetch: ${url}`);
   };
@@ -100,3 +101,15 @@ for (const [amount, expectedQueries] of [[1999, 125]]) {
 }
 
 console.log('Webhook credit bank and membership idempotency-key checks passed');
+
+{
+ const version='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';let credited;
+ global.fetch=async(url,options={})=>{
+  if(String(url).includes('prism_pricing_versions'))return Response.json([{products:[{key:'bank',priceCents:999,credits:100}]}]);
+  if(String(url).includes('/rpc/credit_prism_bank_by_email')){credited=JSON.parse(options.body);return Response.json(true);}
+  throw Error('Unexpected new price request');
+ };
+ const event={id:'evt_new_bank',type:'payment_intent.succeeded',data:{object:{id:'pi_new_bank',amount:999,receipt_email:'buyer@example.test',metadata:{prism_pricing_version:version,prism_product:'bank'}}}};
+ const res=reply();await handler(signedRequest(event),res);assert.equal(res.statusCode,200);assert.equal(credited.p_queries,100);
+}
+console.log('Published 100-credit package fulfilled from its immutable pricing version');

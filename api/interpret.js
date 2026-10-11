@@ -1,3 +1,4 @@
+import { loadPublishedPricing } from '../lib/published-pricing.js';
 import { withFinanceRequest, setFinanceApplicationId, setFinancePrincipal, linkFinanceCompletion } from '../lib/finance-store.js';
 import { callEmbedding } from '../lib/embedding-provider.js';
 import { callInquiryModel, PRISM_INQUIRY_MODEL } from '../lib/inquiry-model.js';
@@ -6283,7 +6284,7 @@ async function interpretHandler(req, res) {
         resetAt: access?.reset_at || null,
         secondsRemaining,
         previewTestAccess: Boolean(previewTestEntitlement),
-        product: publicProductConfig(),
+        product: await loadPublishedPricing(),
       });
     } catch (error) {
       timing('entitlement_status_error', { error: String(error?.message || error).slice(0, 120) });

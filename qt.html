@@ -2874,8 +2874,8 @@
           <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.6; margin-bottom:16px;">No subscription required. Credits never expire.</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
             <a href="#" data-product="bank125" class="signal-bank-link" onclick="return handlePurchaseLinkClick(event, this)" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid var(--border); background:transparent; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--gold-dim)'" onmouseout="this.style.borderColor='var(--border)'">
-              <span style="font-family:var(--crimson); font-size:17px; color:var(--text);">125 credits</span>
-              <span style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--gold-dim);">$19.99 →</span>
+              <span style="font-family:var(--crimson); font-size:17px; color:var(--text);"><span data-price-label="bank-credits">125</span> credits</span>
+              <span style="font-family:var(--mono); font-size:13px; letter-spacing:0.12em; color:var(--gold-dim);"><span data-price-label="bank-price">$19.99</span> →</span>
             </a>
           </div>
         </div>
@@ -2887,8 +2887,8 @@
           <div style="border:1px solid var(--gold-dim); padding:20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative; flex:1;">
             <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Recommended</div>
             <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px;">Subscribe</div>
-            <div style="font-family:var(--cinzel); font-size:23px; color:var(--gold-pale); margin-bottom:4px;">$49.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
-            <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">350 credits each month. Unused credits remain banked permanently.</div>
+            <div style="font-family:var(--cinzel); font-size:23px; color:var(--gold-pale); margin-bottom:4px;"><span data-price-label="subscription-price">$49.99</span><span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);">/mo</span></div>
+            <div style="font-family:var(--crimson); font-size:17px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;"><span data-price-label="subscription-credits">350</span> credits each month. Unused credits remain banked permanently.</div>
             <a href="/purchase.html" id="subscribeSeePlansLink" style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">See Plans →</a>
           </div>
 
@@ -2920,7 +2920,7 @@
       <div style="border:1px solid var(--gold-dim); padding:24px 20px; background:linear-gradient(135deg, rgba(201,168,76,0.05), var(--surface)); position:relative;">
         <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--void); padding:0 10px; font-family:var(--mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold);">Continue Now</div>
         <div style="font-family:var(--cinzel); font-size:14px; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px;">Credit Bank</div>
-        <div style="font-family:var(--cinzel); font-size:25px; color:var(--gold-pale); margin-bottom:4px;">$19.99<span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);"> / 125 credits</span></div>
+        <div style="font-family:var(--cinzel); font-size:25px; color:var(--gold-pale); margin-bottom:4px;"><span data-price-label="bank-price">$19.99</span><span style="font-size:16px; color:var(--text-dim); font-family:var(--mono);"> / <span data-price-label="bank-credits">125</span> credits</span></div>
         <div style="font-family:var(--crimson); font-size:18px; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">One-time top-up.<br>No plan change required.</div>
         <a href="#" data-product="bank125" onclick="return handlePurchaseLinkClick(event, this)" style="font-family:var(--mono); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--void); text-decoration:none; background:var(--gold-dim); border:1px solid var(--gold-dim); padding:9px 16px; display:block; text-align:center; transition:all 0.25s;" onmouseover="this.style.background='var(--gold)';" onmouseout="this.style.background='var(--gold-dim)';">Add Credits →</a>
       </div>
@@ -7130,7 +7130,7 @@ async function loadSidebarCreditsAnon() {
       cache: 'no-store'
     });
     const data = await res.json();
-    if (data.product) window._prismProduct = data.product;
+    if (data.product) applyPublishedProduct(data.product);
     previewTestAccess = data.previewTestAccess === true;
     releaseServerAuthorizedPreviewLock();
     const countEl = document.getElementById('sidebarQueryCountText');
@@ -7153,7 +7153,7 @@ async function loadSidebarCredits() {
       headers: { 'Content-Type': 'application/json' }
     });
     const data = await res.json();
-    if (data.product) window._prismProduct = data.product;
+    if (data.product) applyPublishedProduct(data.product);
     const countEl = document.getElementById('sidebarQueryCountText');
     const wrapEl  = document.getElementById('sidebarCredits');
     if (!countEl || !wrapEl) return;
@@ -10436,7 +10436,19 @@ function restoreResumeSnapshot() {
 // stops the navigation, remembers where they were headed, and opens the
 // existing "Create Your Free Account" modal — completing it continues on
 // to that same link automatically.
-function handlePurchaseLinkClick(event, anchorEl) {
+function applyPublishedProduct(product) {
+ window._prismProduct=product;
+ var bank=Object.entries(product.queryBanks)[0];
+ var values={'bank-credits':bank[1],'bank-price':'$'+(Number(bank[0])/100).toFixed(2),'subscription-price':'$'+(product.subscription.monthlyPriceCents/100).toFixed(2),'subscription-credits':product.subscription.monthlyCredits};
+ Object.keys(values).forEach(function(key){document.querySelectorAll('[data-price-label="'+key+'"]').forEach(function(el){el.textContent=values[key];});});
+}
+async function handlePurchaseLinkClick(event, anchorEl) {
+  event.preventDefault();
+  try {
+   const r=await fetch(API_BASE+'/api/interpret?_ts='+Date.now(),{headers:await getInterpretRequestHeaders(),cache:'no-store'});
+   if(!r.ok)throw Error('Pricing unavailable');
+   const data=await r.json();if(!data.product)throw Error('Pricing unavailable');applyPublishedProduct(data.product);
+  }catch(e){showQueryActionConfirm && showQueryActionConfirm('Current pricing is unavailable. Please try again.');return false;}
   saveResumeSnapshot(); // preserve the in-progress conversation either way
 
   var product = anchorEl.dataset.product;

@@ -1,3 +1,4 @@
+import { resolveStripeProduct } from '../lib/published-pricing.js';
 import { recordStripeFinance } from '../lib/finance-store.js';
 import crypto from 'crypto';
 import { PRISM_PRODUCT, queryBankCreditsForAmount } from '../lib/product-config.js';
@@ -211,6 +212,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    let financeProduct=PRISM_PRODUCT;
     switch (event.type) {
 
       // ── New or updated subscription ──────────────────────────────
@@ -221,7 +223,8 @@ export default async function handler(req, res) {
         const subscriptionId = sub.id;
         const status = sub.status === 'active' ? 'active' : 'inactive';
         const amount = sub.items?.data?.[0]?.price?.unit_amount || 0;
-        const config = TIER_CONFIG[amount];
+        const resolved=await resolveStripeProduct(sub,'subscription');
+        const config=resolved?{tier:'prism',limit:resolved.credits}:null;
         if (!config) throw new Error(`Unrecognized Prism subscription amount: ${amount}`);
         const email = await getCustomerEmail(customerId);
         const periodStart = new Date(sub.current_period_start * 1000).toISOString();
@@ -234,7 +237,7 @@ export default async function handler(req, res) {
 
           if (email && status === 'active') {
             const tierName = TIER_DISPLAY[config.tier] || 'Refraction';
-            const tierDesc = TIER_DESC[config.tier] || '';
+            const tierDesc = `${config.limit} bankable credits each month for The Prism.`;
             try {
               await sendEmail(
                 email,
@@ -293,7 +296,11 @@ export default async function handler(req, res) {
       // ── Successful invoice — bank one idempotent monthly allocation ──
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
-        if (invoice.subscription) {
+        if (invoice.subscription || invoice.parent?.subscription_details?.subscription) {
+          const subscription=invoice.subscription || invoice.parent.subscription_details.subscription;
+          const resolved=await resolveStripeProduct({...invoice,subscription},'subscription');
+          if(!resolved)throw Error('PRISM_INVOICE_PRODUCT_UNKNOWN');
+          financeProduct={...PRISM_PRODUCT,subscription:{...PRISM_PRODUCT.subscription,monthlyCredits:resolved.credits}};
           const email = invoice.customer_email || (invoice.customer ? await getCustomerEmail(invoice.customer) : null);
           const period = invoice.lines?.data?.[0]?.period;
           if (email && period?.start && period?.end) {
@@ -303,7 +310,7 @@ export default async function handler(req, res) {
               new Date(period.start * 1000).toISOString(),
               new Date(period.end * 1000).toISOString(),
               event.id,
-              PRISM_PRODUCT.subscription.monthlyCredits,
+              resolved.credits,
             );
           }
         }
@@ -341,8 +348,10 @@ export default async function handler(req, res) {
 
         // Subscription invoice PaymentIntents must never be mistaken for an
         // identically-priced one-time credit purchase.
-        if (!pi.invoice && SIGNAL_AMOUNTS.has(amount)) {
-          const credits = queryBankCreditsForAmount(amount);
+        const resolved=!pi.invoice?await resolveStripeProduct(pi,'bank'):null;
+        if (resolved) {
+          const credits=resolved.credits;
+          financeProduct={...PRISM_PRODUCT,queryBanks:{[amount]:credits}};
           const email = pi.receipt_email || (pi.customer ? await getCustomerEmail(pi.customer) : null);
 
           if (email && credits) {
@@ -419,7 +428,7 @@ export default async function handler(req, res) {
       }
 
     }
-    await recordStripeFinance(event, PRISM_PRODUCT);
+    await recordStripeFinance(event, financeProduct);
   } catch (err) {
     console.error('Webhook handler error:', err.message);
     return res.status(500).json({ error: 'Handler error' });

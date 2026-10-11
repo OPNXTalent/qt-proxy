@@ -17,6 +17,10 @@
     "api/redeem.js": {
       "memory": 128,
       "maxDuration": 10
+    },
+    "api/transcribe.js": {
+      "memory": 128,
+      "maxDuration": 90
     }
   },
   "crons": [
