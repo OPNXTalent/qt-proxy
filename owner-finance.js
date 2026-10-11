@@ -36,19 +36,15 @@ $('owner-login').addEventListener('submit',async e=>{e.preventDefault();const bu
 
 function renderMargins(){
  if(!report)return;
- const basis=report.costBasis;const p=report.configuredProducts;const bank=Object.entries(p.queryBanks)[0];
- const money=n=>n==null?'Unavailable':usd(n);
- const margin=(revenue,cost)=>cost==null||!Number.isFinite(revenue)||revenue<=0?'Unavailable':usd(revenue-cost)+' ('+((revenue-cost)/revenue*100).toFixed(2)+'%)';
- const rows=[];
- for(const [prefix,name,currentPrice,currentCredits] of [['membership','Membership',p.subscription.monthlyPriceCents/100,p.subscription.monthlyCredits],['bank','Ad-hoc',Number(bank[0])/100,bank[1]]]){
-  const proposedPrice=Number($(prefix+'-price').value),proposedCredits=Number($(prefix+'-credits').value);
-  for(const [type,label,credits] of [['initial','Initial query',p.primaryCost],['followUp','Follow-up',p.followUpCost]]){
+ const basis=report.costBasis;
+ for(const prefix of ['membership','bank']){
+  const price=Number($(prefix+'-price').value),credits=Number($(prefix+'-credits').value);
+  for(const [type,suffix,queryCredits] of [['initial','initial',report.configuredProducts.primaryCost],['followUp','followup',report.configuredProducts.followUpCost]]){
    const cost=basis?.[type]?.averageUsd??null;
-   const oldRevenue=currentPrice/currentCredits*credits;
-   const nextRevenue=proposedCredits>0&&proposedPrice>0?proposedPrice/proposedCredits*credits:null;
-   rows.push([name+' · '+label,money(cost),money(oldRevenue),margin(oldRevenue,cost),money(nextRevenue),margin(nextRevenue,cost)]);
+   const revenue=price>0&&credits>0?price/credits*queryCredits:null;
+   $(prefix+'-'+suffix+'-margin').textContent=cost!=null&&revenue>0?((revenue-cost)/revenue*100).toFixed(2)+'%':'Unavailable';
   }
  }
- table('margin-comparison',rows,'No pricing available.');
- $('margin-basis').textContent=`Estimated AI cost per initial query: ${money(basis?.initial?.averageUsd)} (${basis?.initial?.samples??0} captured queries). Per follow-up: ${money(basis?.followUp?.averageUsd)} (${basis?.followUp?.samples??0} captured queries). Updates as you edit prices; excludes all other business expenses.`;
+ const money=n=>n==null?'not yet recorded':usd(n);
+ $('margin-basis').textContent=`Estimated AI cost: initial query ${money(basis?.initial?.averageUsd)} · follow-up ${money(basis?.followUp?.averageUsd)}. Based on ${basis?.initial?.samples??0} initial and ${basis?.followUp?.samples??0} follow-up captured queries. Missing samples remain unavailable.`;
 }
