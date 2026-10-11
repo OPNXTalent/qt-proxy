@@ -49,6 +49,7 @@ import {
 import {
   getPreviewTestEntitlement,
   verifySupabaseIdentity,
+  admitPrismAiRequest,
 } from '../lib/server-auth.js';
 import {
   getOrIssueGuestIdentity,
@@ -6397,6 +6398,25 @@ async function interpretHandler(req, res) {
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Cross-instance limits for cost-bearing inquiries, separate from query credits.
+  // Guest visitors remain supported, but fresh guest cookies cannot evade the
+  // additional network-scoped rate check.
+  let aiAdmission;
+  try {
+    aiAdmission = await admitPrismAiRequest({
+      req, route:'inquiry',
+      principal: verifiedIdentity ? 'user:'+verifiedIdentity.userId : 'guest:'+guestIdentity.guestId,
+      maxPerMinute:8, maxParallel:2, leaseSeconds:300
+    });
+  } catch (error) {
+    console.error('[interpret] security admission failed',String(error?.message || error));
+    return res.status(503).json({error:'Request verification temporarily unavailable'});
+  }
+  if (!aiAdmission.allowed) return res.status(aiAdmission.status).json({error:aiAdmission.reason});
+  res.once('finish',aiAdmission.release);
+  res.once('close',aiAdmission.release);
+
 
 
   // ── COHERENCE CHECK — POST-GENERATION LANDING DETECTION ──────────────────
