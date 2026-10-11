@@ -699,9 +699,15 @@
     font-size:21.5px;
     line-height: 1.65;
     color: var(--gold-dim);
-    padding: 0 24px 16px;
+    padding: 0 24px 4px;
     flex-shrink: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
+  .disc-anchor-text.expanded { display:block; overflow:visible; }
+  .disc-anchor-toggle { display:none; margin:0 24px 12px; padding:3px 0; border:0; background:none; color:#C9B8E8; font-family:var(--mono); font-size:11px; letter-spacing:0.08em; cursor:pointer; text-align:left; align-self:flex-start; flex-shrink:0; }
   .disc-anchor-rule {
     height: 1px;
     margin: 0 24px;
@@ -3066,6 +3072,7 @@
     <!-- Attached-to context -->
     <div class="disc-attached-label">Attached to:</div>
     <div class="disc-anchor-text" id="discContextQuery">The original interpretation</div>
+    <button type="button" id="discContextToggle" class="disc-anchor-toggle" onclick="toggleDiscussionContext()" aria-expanded="false" aria-controls="discContextQuery">Show More</button>
     <div id="discGroupParticipants" style="display:none; margin:7px 24px 0; font-family:var(--mono); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:rgba(150,175,220,0.7);"></div>
     <div class="disc-anchor-rule"></div>
 
@@ -8434,6 +8441,15 @@ function getChatParticipantName() {
   document.addEventListener('touchend', onPointerUp);
 })();
 
+function toggleDiscussionContext() {
+  var query = document.getElementById('discContextQuery');
+  var button = document.getElementById('discContextToggle');
+  if (!query || !button) return;
+  var expanded = query.classList.toggle('expanded');
+  button.textContent = expanded ? 'Show Less' : 'Show More';
+  button.setAttribute('aria-expanded', String(expanded));
+}
+
 function openChatPanel() {
   var panel = document.getElementById('discussionPanel');
   if (!panel) return;
@@ -8450,6 +8466,15 @@ function openChatPanel() {
   }
   highlightRefractionNode(_activeNodeId || 'root');
   panel.classList.add('open');
+  var contextToggle = document.getElementById('discContextToggle');
+  if (ctxEl && contextToggle) {
+    ctxEl.classList.remove('expanded');
+    contextToggle.textContent = 'Show More';
+    contextToggle.setAttribute('aria-expanded', 'false');
+    requestAnimationFrame(function() {
+      contextToggle.style.display = ctxEl.scrollHeight > ctxEl.clientHeight + 2 ? 'block' : 'none';
+    });
+  }
   _chatOpen = true;
   syncRefractionButtons(_activeNodeId || 'root');
   var dot = document.getElementById('discHeaderDot');
