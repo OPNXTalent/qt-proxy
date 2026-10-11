@@ -1,3 +1,5 @@
+import { withFinanceRequest, setFinanceApplicationId, linkFinanceCompletion } from '../lib/finance-store.js';
+import { callEmbedding } from '../lib/embedding-provider.js';
 import { callInquiryModel, PRISM_INQUIRY_MODEL } from '../lib/inquiry-model.js';
 export { callInquiryModel };
 export const config = {
@@ -1998,20 +2000,7 @@ const RETRIEVAL_ELIGIBLE_TYPES = [
 ];
 
 async function embedQuery(text) {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      model: RAG_CONFIG.embeddingModel,
-      input: text,
-    }),
-  });
-  if (!response.ok) throw new Error(`Embedding error: ${response.status}`);
-  const data = await response.json();
-  return data.data[0].embedding;
+  return callEmbedding({input:text,model:RAG_CONFIG.embeddingModel});
 }
 
 
@@ -5759,6 +5748,7 @@ async function completeInterpretationArtifact(artifact, packets, options) {
   const rows = await response.json();
   const result = Array.isArray(rows) ? rows[0] : rows;
   if (!result?.completed) throw new Error('ARTIFACT_COMPLETION_UNCONFIRMED');
+  await linkFinanceCompletion({completionKey:options.completionKey,threadId:result.thread_id || artifact.threadId});
   return result;
 }
 
@@ -5805,6 +5795,7 @@ async function completeFollowUpArtifact({
   const result = Array.isArray(rows) ? rows[0] : rows;
   if (result?.conflict) return { conflict: true, version: result.state_version, state: result.canonical_state };
   if (!result?.completed) throw new Error('FOLLOWUP_COMPLETION_UNCONFIRMED');
+  await linkFinanceCompletion({completionKey,threadId:artifact.threadId});
   return { committed: true, version: result.state_version, state: result.canonical_state };
 }
 
@@ -6150,7 +6141,10 @@ async function runPersistentInquiryFollowUp({
 }
 
 
-export default async function handler(req, res) {
+export default function handler(req,res) {
+  return withFinanceRequest(() => interpretHandler(req,res));
+}
+async function interpretHandler(req, res) {
   const startedAt = Date.now();
   const correlationBody = (() => {
     if (req.body && typeof req.body === 'object') return req.body;
@@ -6176,6 +6170,7 @@ export default async function handler(req, res) {
   };
 
   let clientAborted = false;
+  setFinanceApplicationId(requestId);
   res.setHeader('X-Prism-Request-Id', requestId);
   req.once('aborted', () => {
     clientAborted = true;
