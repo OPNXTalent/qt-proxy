@@ -5162,7 +5162,7 @@ stabilizeMobileComposerInput(document.getElementById('chatInput'));
 
       try {
         const base64 = await blobToBase64(blob);
-        const res = await fetch('/api/transcribe', {
+        const res = await authenticatedFetch('/api/transcribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ audio: base64, mimeType: actualMime })
