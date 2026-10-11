@@ -900,9 +900,9 @@
   .sidebar-search { padding: 12px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .sidebar-search input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--crimson); font-size:16px; padding: 8px 12px; outline: none; transition: border-color 0.2s; }
   .sidebar-search input:focus { border-color: var(--gold-dim); }
-  .sidebar-search input::placeholder { color: #C9B8E8; font-style: italic; }
+  .sidebar-search input::placeholder { color: var(--gold-pale); font-style: italic; }
 
-  .sidebar-section-label { font-family: var(--mono); font-size:8px; letter-spacing: 0.22em; text-transform: uppercase; color: #C9B8E8; padding: 14px 20px 8px; flex-shrink: 0; }
+  .sidebar-section-label { font-family: var(--mono); font-size:8px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold-pale); padding: 14px 20px 8px; flex-shrink: 0; }
 
   .sidebar-threads { flex: 1; overflow-y: auto; padding-bottom: 16px; }
   .sidebar-threads::-webkit-scrollbar { width: 3px; }
@@ -1184,15 +1184,15 @@
   .thread-title { font-family: var(--crimson); font-size:16px; color: rgba(230,225,210,0.9); line-height: 1.45; margin-bottom: 3px; }
   .thread-item.active .thread-title { color: rgba(240,235,218,0.98); }
   .thread-item.locked .thread-title { color: var(--text-muted); }
-  .thread-subtitle { font-family: var(--mono); font-size:8px; letter-spacing: 0.1em; color: #C9B8E8; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-subtitle { font-family: var(--mono); font-size:8px; letter-spacing: 0.1em; color: var(--gold-pale); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Thread row — 3-layer structure */
-  .thread-timestamp { font-family: var(--mono); font-size:9.5px; letter-spacing: 0.05em; color: #C9B8E8; margin-top: 4px; margin-bottom: 2px; }
+  .thread-timestamp { font-family: var(--mono); font-size:9.5px; letter-spacing: 0.05em; color: var(--gold-pale); margin-top: 4px; margin-bottom: 2px; }
   /* Status row — always rendered, never hidden */
   .thread-status-row { display: flex !important; align-items: center; justify-content: space-between; margin-top: 8px; min-height: 18px; visibility: visible !important; }
   .thread-shared-indicator { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .thread-shared-dot-inline { color: rgba(80,180,120,0.85); font-size:8px; flex-shrink: 0; line-height: 1; }
   .thread-shared-word { font-family: var(--crimson); font-size:12px; font-style: italic; color: rgba(80,180,120,0.82); }
-  .thread-expiry { font-family: var(--mono); font-size:8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #C9B8E8; margin-left: auto; }
+  .thread-expiry { font-family: var(--mono); font-size:8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold-pale); margin-left: auto; }
   .thread-expiry.badge-urgent { color: rgba(192,60,60,0.75); }
   .thread-expiry.badge-expired { color: rgba(100,98,114,0.55); }
   /* Legacy compat */
