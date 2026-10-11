@@ -1,4 +1,4 @@
-import { withFinanceRequest, setFinanceApplicationId, linkFinanceCompletion } from '../lib/finance-store.js';
+import { withFinanceRequest, setFinanceApplicationId, setFinancePrincipal, linkFinanceCompletion } from '../lib/finance-store.js';
 import { callEmbedding } from '../lib/embedding-provider.js';
 import { callInquiryModel, PRISM_INQUIRY_MODEL } from '../lib/inquiry-model.js';
 export { callInquiryModel };
@@ -6205,6 +6205,7 @@ async function interpretHandler(req, res) {
     });
   }
   const verifiedIdentity = authentication.identity;
+  setFinancePrincipal(verifiedIdentity?.userId);
   const previewTestEntitlement = verifiedIdentity
     ? getPreviewTestEntitlement({ userId: verifiedIdentity.userId })
     : null;

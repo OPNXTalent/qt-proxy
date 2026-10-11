@@ -60,3 +60,11 @@ assert.equal(countReport.totals.initialQueries,1);assert.equal(countReport.total
 const profitReport=summarizeFinance({from,to,mode:'production',captureStartedAt:from,expenses:[...coverage,{kind:'expense',category:'hosting',amount_usd:1,occurred_at:from}],payments:[{event_id:'sale',amount_usd:10,fee_usd:0,test_mode:false,occurred_at:from}],allocations:[{allocation_key:'purchase:sale',allocation_type:'purchase',user_id:owner,credits:100,created_at:from}],credits:[{user_id:owner,created_at:at,completion_key:'paid',submission_type:'primary',query_cost:2,entitlement_source:'bank'}],usage:[{created_at:at,completion_key:'paid',state:'completed',cost_usd:.01,cost_status:'invoice_reconciled'}]});
 assert.equal(profitReport.totals.netProfitUsd,-.81,'Prepaid cash must not become earned profit');assert.equal(profitReport.totals.knownCashResultUsd,8.99);
 console.log('Headline counts: distinct completed queries by type; earned profit separated from prepaid cash passed');
+
+const testingReport=summarizeFinance({from,to,ownerUserId:owner,usage:[{actor_user_id:owner,created_at:at,cost_usd:.02,state:'completed'},{actor_user_id:owner,created_at:at,cost_usd:null,state:'failed'},{actor_user_id:'someone-else',created_at:at,cost_usd:1,state:'completed'}],credits:[{user_id:owner,created_at:at,completion_key:'mine',submission_type:'primary',query_cost:2,entitlement_source:'explorer'}]});
+assert.equal(testingReport.testing.knownCostUsd,.02);
+assert.equal(testingReport.testing.unknownAttempts,1);
+assert.equal(testingReport.testing.initialQueries,1);
+assert.equal(testingReport.totals.knownAiCostUsd,1.02,'Testing remains included in business costs');
+assert.equal(summarizeFinance({from,to,usage:[{created_at:at,cost_usd:1}]}).testing.knownCostUsd,0,'Unattributed activity must not be counted as owner tests');
+console.log('Owner testing attribution excludes other accounts and retains unknown costs');
