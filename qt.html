@@ -7532,14 +7532,6 @@ function renderShareConnections() {
     conversation.setAttribute('aria-label', 'Open conversation with ' + (connection.recipient_name || 'recipient'));
     conversation.onclick = function() { openConnectionConversation(connection); };
     actions.appendChild(conversation);
-    if (navigator.share) {
-      var send = document.createElement('button');
-      send.className = 'share-delivery-action selected';
-      send.textContent = 'Send Invite';
-      send.setAttribute('aria-label', 'Send invite to ' + (connection.recipient_name || 'recipient'));
-      send.onclick = function() { sendConnectionInvite(connection, send); };
-      actions.appendChild(send);
-    }
     var copy = document.createElement('button');
     copy.className = 'share-delivery-action';
     copy.textContent = 'Copy Link';
@@ -7771,7 +7763,7 @@ async function createShareConnection() {
     updateSessionGovernanceUI();
     updateSidebarSharedDot(activeThreadId, true);
     if (recipientEl) recipientEl.value = '';
-    setSharePanelStatus('Link ready for ' + (connection.recipient_name || 'your recipient') + '. Choose Send Invite or Copy Link.', false);
+    setSharePanelStatus('Link ready for ' + (connection.recipient_name || 'your recipient') + '. Use Copy Link to share.', false);
   } catch (e) {
     setSharePanelStatus(e.message || 'Could not create the connection.', true);
   } finally {
