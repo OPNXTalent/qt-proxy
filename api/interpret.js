@@ -1,3 +1,5 @@
+import { callInquiryModel, PRISM_INQUIRY_MODEL } from '../lib/inquiry-model.js';
+export { callInquiryModel };
 export const config = {
   api: {
     bodyParser: {
@@ -2748,7 +2750,7 @@ async function registerEmail({ email, shareId }) {
 // ------------------------------------------------------------
 // Self-contained section. References no other function in this
 // file and modifies no existing state. Shared resources:
-// process.env.ANTHROPIC_API_KEY (already used by handler).
+// process.env.OPENAI_API_KEY (already used by handler).
 //
 // Public surface: extractInquiryArtifacts(transcriptText, sourceMetadata)
 // Exported as a named export — coexists with the default handler
@@ -2772,7 +2774,7 @@ async function registerEmail({ email, shareId }) {
 // ============================================================
 
 const PRISM_EXTRACTION_MODEL =
-  process.env.PRISM_EXTRACTION_MODEL || 'claude-sonnet-4-6'; // matches handler's model
+  PRISM_INQUIRY_MODEL; // same production provider as initial and follow-up inquiries
 const PRISM_EXTRACTION_MAX_TOKENS = 8000;
 const PRISM_EXTRACTION_CHUNK_CHARS = 12000;   // ~3k tokens of transcript per call
 const PRISM_EXTRACTION_CHUNK_OVERLAP = 800;   // preserves signals spanning chunk seams
@@ -3061,34 +3063,15 @@ async function prismCallExtractionModel(chunkText, sourceMetadata) {
     .filter((line) => line !== null)
     .join('\n');
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: PRISM_EXTRACTION_MODEL,
-      max_tokens: PRISM_EXTRACTION_MAX_TOKENS,
-      system: PRISM_EXTRACTION_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userContent }]
-    })
+  return callInquiryModel({
+    model: PRISM_INQUIRY_MODEL,
+    maxTokens: PRISM_EXTRACTION_MAX_TOKENS,
+    system: PRISM_EXTRACTION_SYSTEM_PROMPT,
+    prompt: userContent,
+    timeoutMs: 75000,
+    telemetryStage: 'transcript_extraction',
+    telemetryTurnType: 'supporting',
   });
-
-  if (!response.ok) {
-    const errBody = await response.text().catch(() => '');
-    throw new Error(
-      'Extraction API call failed: ' + response.status + ' ' + errBody.slice(0, 300)
-    );
-  }
-
-  const data = await response.json();
-  const text = (data.content || [])
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n');
-  return text;
 }
 
 /**
@@ -5485,7 +5468,7 @@ async function runDisabledFollowUpFallback({ sse, timing, input, subject, tier }
   const startedAt = Date.now();
   timing('followup_fallback_start');
   const streamedResponse = await callInquiryModel({
-    model: 'claude-sonnet-4-6',
+    model: PRISM_INQUIRY_MODEL,
     maxTokens: 900,
     temperature: 0.2,
     prompt: `Respond directly to this follow-up in plain prose.
@@ -5667,306 +5650,6 @@ async function commitCanonicalInquiryState({
     version: canonical.version,
     state: canonical,
   };
-}
-
-export async function callInquiryModel({
-  model,
-  maxTokens,
-  prompt,
-  system,
-  temperature = 0,
-  timeoutMs = 15000,
-  structuredOutputSchema = null,
-  structuredOutputName = 'emit_structured_output',
-  structuredOutputDiagnostic = null,
-  telemetryStage = 'unspecified',
-  telemetryTurnType = 'unknown',
-  telemetryRetryOrdinal = 0,
-  onTextDelta = null,
-  onStructuredInputProgress = null,
-  maxTotalMs = null,
-}) {
-  const providerStartedAt = Date.now();
-  const controller = new AbortController();
-  let timeout;
-  let totalTimeout;
-  const streaming = typeof onTextDelta === 'function'
-    || typeof onStructuredInputProgress === 'function';
-  const armTimeout = () => {
-    clearTimeout(timeout);
-    timeout = setTimeout(
-      () => controller.abort(streaming ? 'MODEL_STREAM_STALLED' : 'MODEL_TIMEOUT'),
-      timeoutMs,
-    );
-  };
-  armTimeout();
-  if (streaming && Number.isFinite(maxTotalMs) && maxTotalMs > 0) {
-    totalTimeout = setTimeout(() => controller.abort('MODEL_STREAM_TOTAL_TIMEOUT'), maxTotalMs);
-  }
-  let response;
-  try {
-    response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        temperature,
-        ...(system ? { system } : {}),
-        ...(structuredOutputSchema ? {
-          tools: [{
-            name: structuredOutputName,
-            description: 'Return the requested structured result without commentary.',
-            input_schema: structuredOutputSchema,
-          }],
-          tool_choice: { type: 'tool', name: structuredOutputName },
-        } : {}),
-        ...(streaming ? { stream: true } : {}),
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-  } catch (error) {
-    console.log('[prism-provider-cogs]', {
-      stage: telemetryStage, turnType: telemetryTurnType, model,
-      providerRequestId: null, inputTokens: 0, outputTokens: 0,
-      cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
-      stopReason: controller.signal.aborted ? 'application_timeout' : 'transport_error',
-      latencyMs: Date.now() - providerStartedAt,
-      retryOrdinal: telemetryRetryOrdinal, succeeded: false,
-    });
-    if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
-    throw error;
-  } finally {
-    if (!streaming || !response?.ok) {
-      clearTimeout(timeout);
-      clearTimeout(totalTimeout);
-    }
-  }
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    console.log('[prism-provider-cogs]', {
-      stage: telemetryStage, turnType: telemetryTurnType, model,
-      providerRequestId: response.headers.get('request-id') || response.headers.get('x-request-id') || null,
-      inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
-      stopReason: `provider_${response.status}`, latencyMs: Date.now() - providerStartedAt,
-      retryOrdinal: telemetryRetryOrdinal, succeeded: false,
-    });
-    if (structuredOutputSchema && typeof structuredOutputDiagnostic === 'function') {
-      let providerErrorCode = null;
-      try {
-        const parsed = JSON.parse(detail);
-        const candidate = parsed?.error?.type || parsed?.error?.code || parsed?.type || parsed?.code;
-        if (typeof candidate === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(candidate)) {
-          providerErrorCode = candidate;
-        }
-      } catch (_) {
-        // Provider detail is intentionally excluded from diagnostics.
-      }
-      structuredOutputDiagnostic({
-        outcome: 'provider_rejection',
-        providerStatus: response.status,
-        providerErrorCode,
-        toolUseReturned: false,
-      });
-    }
-    throw new Error(`INQUIRY_MODEL_${response.status}:${detail.slice(0, 200)}`);
-  }
-  if (streaming) {
-    const reader = response.body?.getReader();
-    if (!reader) {
-      clearTimeout(timeout);
-      clearTimeout(totalTimeout);
-      throw new Error('INQUIRY_MODEL_STREAM_UNAVAILABLE');
-    }
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let text = '';
-    let providerRequestId = response.headers.get('request-id') || response.headers.get('x-request-id') || null;
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let cacheCreationInputTokens = 0;
-    let cacheReadInputTokens = 0;
-    let stopReason = null;
-    const toolBlocks = new Map();
-
-    const consumeLine = line => {
-      if (!line.startsWith('data: ')) return;
-      const payload = line.slice(6).trim();
-      if (!payload || payload === '[DONE]') return;
-      let event;
-      try { event = JSON.parse(payload); } catch { return; }
-      if (event.type === 'message_start') {
-        armTimeout();
-        providerRequestId = event.message?.id || providerRequestId;
-        const usage = event.message?.usage || {};
-        inputTokens = Number(usage.input_tokens || 0);
-        outputTokens = Number(usage.output_tokens || 0);
-        cacheCreationInputTokens = Number(usage.cache_creation_input_tokens || 0);
-        cacheReadInputTokens = Number(usage.cache_read_input_tokens || 0);
-      } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
-        armTimeout();
-        toolBlocks.set(event.index, {
-          name: event.content_block.name,
-          input: event.content_block.input,
-          partialJson: '',
-        });
-      } else if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-        armTimeout();
-        const delta = String(event.delta.text || '');
-        if (delta) {
-          text += delta;
-          onTextDelta?.(delta);
-        }
-      } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
-        armTimeout();
-        const partialJson = String(event.delta.partial_json || '');
-        const toolBlock = toolBlocks.get(event.index);
-        if (toolBlock && partialJson) {
-          toolBlock.partialJson += partialJson;
-          onStructuredInputProgress?.({
-            index: event.index,
-            name: toolBlock.name,
-            partialJson: toolBlock.partialJson,
-          });
-        }
-      } else if (event.type === 'message_delta') {
-        armTimeout();
-        stopReason = event.delta?.stop_reason || stopReason;
-        outputTokens = Number(event.usage?.output_tokens || outputTokens);
-      } else if (event.type === 'error') {
-        throw new Error(`INQUIRY_MODEL_STREAM_ERROR:${String(event.error?.type || 'provider_error')}`);
-      }
-    };
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) consumeLine(line);
-      }
-      buffer += decoder.decode();
-      for (const line of buffer.split('\n')) consumeLine(line);
-    } catch (error) {
-      console.log('[prism-provider-cogs]', {
-        stage: telemetryStage, turnType: telemetryTurnType, model,
-        providerRequestId, inputTokens, outputTokens,
-        cacheCreationInputTokens, cacheReadInputTokens,
-        stopReason: controller.signal.aborted
-          ? String(controller.signal.reason || 'application_timeout').toLowerCase()
-          : 'stream_error',
-        latencyMs: Date.now() - providerStartedAt,
-        retryOrdinal: telemetryRetryOrdinal, succeeded: false,
-      });
-      if (controller.signal.aborted) throw new Error('INQUIRY_MODEL_TIMEOUT');
-      throw error;
-    } finally {
-      clearTimeout(timeout);
-      clearTimeout(totalTimeout);
-    }
-    console.log('[prism-provider-cogs]', {
-      stage: telemetryStage, turnType: telemetryTurnType, model,
-      providerRequestId, inputTokens, outputTokens,
-      cacheCreationInputTokens, cacheReadInputTokens, stopReason,
-      latencyMs: Date.now() - providerStartedAt,
-      retryOrdinal: telemetryRetryOrdinal, succeeded: true,
-    });
-    if (stopReason === 'max_tokens') throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
-    if (structuredOutputSchema) {
-      const structuredBlock = [...toolBlocks.values()].find(
-        block => block.name === structuredOutputName,
-      );
-      let structuredInput = structuredBlock?.input;
-      if (structuredBlock?.partialJson) {
-        try {
-          structuredInput = JSON.parse(structuredBlock.partialJson);
-        } catch {
-          structuredInput = null;
-        }
-      }
-      if (!structuredInput || typeof structuredInput !== 'object' || Array.isArray(structuredInput)) {
-        if (typeof structuredOutputDiagnostic === 'function') {
-          structuredOutputDiagnostic({
-            outcome: 'tool_use_missing',
-            providerStatus: response.status,
-            providerErrorCode: null,
-            toolUseReturned: Boolean(structuredBlock),
-            errorCode: 'INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING',
-          });
-        }
-        throw new Error('INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING');
-      }
-      if (typeof structuredOutputDiagnostic === 'function') {
-        structuredOutputDiagnostic({
-          outcome: 'tool_use_returned',
-          providerStatus: response.status,
-          providerErrorCode: null,
-          toolUseReturned: true,
-        });
-      }
-      return structuredInput;
-    }
-    return text.trim();
-  }
-
-  const data = await response.json();
-  const usage = data?.usage || {};
-  console.log('[prism-provider-cogs]', {
-    stage: telemetryStage,
-    turnType: telemetryTurnType,
-    model,
-    providerRequestId: response.headers.get('request-id') || response.headers.get('x-request-id') || null,
-    inputTokens: Number(usage.input_tokens || 0),
-    outputTokens: Number(usage.output_tokens || 0),
-    cacheCreationInputTokens: Number(usage.cache_creation_input_tokens || 0),
-    cacheReadInputTokens: Number(usage.cache_read_input_tokens || 0),
-    stopReason: data?.stop_reason || null,
-    latencyMs: Date.now() - providerStartedAt,
-    retryOrdinal: telemetryRetryOrdinal,
-    succeeded: true,
-  });
-  const text = (data.content || [])
-    .filter(block => block.type === 'text')
-    .map(block => block.text)
-    .join('\n')
-    .trim();
-  if (data.stop_reason === 'max_tokens') {
-    throw new Error('INQUIRY_MODEL_OUTPUT_TRUNCATED');
-  }
-  if (structuredOutputSchema) {
-    const structured = (data.content || []).find(
-      block => block.type === 'tool_use' && block.name === structuredOutputName,
-    );
-    if (!structured?.input || typeof structured.input !== 'object' || Array.isArray(structured.input)) {
-      if (typeof structuredOutputDiagnostic === 'function') {
-        structuredOutputDiagnostic({
-          outcome: 'tool_use_missing',
-          providerStatus: response.status,
-          providerErrorCode: null,
-          toolUseReturned: false,
-          errorCode: 'INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING',
-        });
-      }
-      throw new Error('INQUIRY_MODEL_STRUCTURED_OUTPUT_MISSING');
-    }
-    if (typeof structuredOutputDiagnostic === 'function') {
-      structuredOutputDiagnostic({
-        outcome: 'tool_use_returned',
-        providerStatus: response.status,
-        providerErrorCode: null,
-        toolUseReturned: true,
-      });
-    }
-    return structured.input;
-  }
-  return text;
 }
 
 function progressiveSystemPrompt(systemPrompt, contract) {
@@ -6172,7 +5855,7 @@ async function runProgressiveInitialInquiry({
   if (!inquiryCredential?.inquiryKey) throw new Error('INQUIRY_CREDENTIAL_UNAVAILABLE');
   timing('canonical_generation_start');
   const streamedResponse = await callInquiryModel({
-    model: 'claude-sonnet-4-6',
+    model: PRISM_INQUIRY_MODEL,
     maxTokens: 3600,
     temperature: 0.2,
     timeoutMs: 75000,
@@ -6286,7 +5969,7 @@ async function runPersistentInquiryFollowUp({
 
   stageStartedAt = emitStage('reduce');
   const reducerText = await callInquiryModel({
-    model: 'claude-haiku-4-5-20251001',
+    model: PRISM_INQUIRY_MODEL,
     maxTokens: 1800,
     prompt: buildReducerPrompt({
       state: previousState,
@@ -6351,7 +6034,7 @@ async function runPersistentInquiryFollowUp({
     retrievedContext,
   }));
   const draft = await callInquiryModel({
-    model: 'claude-sonnet-4-6',
+    model: PRISM_INQUIRY_MODEL,
     maxTokens: 2400,
     temperature: 0.2,
     timeoutMs: 75000,
@@ -6367,7 +6050,7 @@ async function runPersistentInquiryFollowUp({
   stageStartedAt = emitStage('audit');
   if (isClientAborted()) throw new Error('FOLLOWUP_INTERRUPTED');
   const audited = await callInquiryModel({
-    model: 'claude-haiku-4-5-20251001',
+    model: PRISM_INQUIRY_MODEL,
     maxTokens: 1400,
     timeoutMs: 8000,
     prompt: assertFollowUpPromptSize(buildAuditPrompt({ input, analysis, draft })),
@@ -6723,7 +6406,7 @@ export default async function handler(req, res) {
   // Runs after the primary response is fully assembled.
   // Only fires at exchange 5+. Evaluates whether the draft ends on a momentum
   // question after a landing, and if so trims it before sending to the client.
-  // Uses claude-haiku for speed — 2000 token ceiling, non-streaming, non-critical.
+  // Uses the shared Luna provider — 2000 token ceiling, non-streaming, non-critical.
   const buildCoherenceCheck = async (exchangeCount, draftResponse, userMessage) => {
     if (exchangeCount < 5) return draftResponse;
     if (!draftResponse || draftResponse.trim().length === 0) return draftResponse;
@@ -6842,22 +6525,14 @@ Momentum questions to remove include: "What do you think?", "How does that feel?
 Return ONLY the final response text. No explanation. No preamble. No JSON. Just the response text, trimmed if appropriate.`;
 
     try {
-      const checkRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2000,
-          messages: [{ role: 'user', content: coherencePrompt }]
-        })
+      const corrected = await callInquiryModel({
+        model: PRISM_INQUIRY_MODEL,
+        maxTokens: 2000,
+        prompt: coherencePrompt,
+        timeoutMs: 15000,
+        telemetryStage: 'coherence_check',
+        telemetryTurnType: 'supporting',
       });
-      if (!checkRes.ok) return draftResponse;
-      const checkData = await checkRes.json();
-      const corrected = checkData?.content?.[0]?.text?.trim();
       // Safety: reject if empty or somehow longer than original
       if (!corrected) return draftResponse;
       if (corrected.length > trimmedDraft.length + 20) return draftResponse;

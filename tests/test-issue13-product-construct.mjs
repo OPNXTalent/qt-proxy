@@ -83,7 +83,7 @@ assert.match(client, /action: 'claim_guest'/);
 assert.match(client, /x-share-token/);
 assert.match(client, /entitlementSource === 'bank'/);
 assert.doesNotMatch(client, /entitlementSource === 'bank' \|\| entitlementSource === 'subscription'/);
-assert.match(interpret, /\[prism-provider-cogs\]/);
+assert.match(fs.readFileSync(new URL('../lib/inquiry-model.js', import.meta.url), 'utf8'), /\[prism-provider-cogs\]/);
 assert.match(interpret, /p_query_cost: queryCost/);
 assert.doesNotMatch(interpret, /async function updateQueryCount/);
 assert.doesNotMatch(interpret, /async function drawSignalSessionCredit/);

@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import { callInquiryModel } from '../api/interpret.js';
 
 const encoder = new TextEncoder();
+process.env.OPENAI_API_KEY = 'unit-test-placeholder';
 const events = [
-  { type: 'message_start', message: { id: 'msg_test', usage: { input_tokens: 10 } } },
-  { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Readable ' } },
-  { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Prism response.' } },
-  { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 4 } },
+  { type: 'response.output_text.delta', delta: 'Readable ' },
+  { type: 'response.output_text.delta', delta: 'Prism response.' },
+  { type: 'response.completed', response: { status: 'completed', usage: { input_tokens: 10, output_tokens: 4 } } },
 ];
 const originalFetch = global.fetch;
 global.fetch = async () => new Response(new ReadableStream({
@@ -19,7 +19,7 @@ global.fetch = async () => new Response(new ReadableStream({
 const deltas = [];
 try {
   const response = await callInquiryModel({
-    model: 'claude-sonnet-4-6', maxTokens: 100, prompt: 'test', timeoutMs: 1000,
+    model: 'gpt-6-luna', maxTokens: 100, prompt: 'test', timeoutMs: 1000,
     onTextDelta: text => deltas.push(text), maxTotalMs: 2000,
   });
   assert.equal(response, 'Readable Prism response.');
