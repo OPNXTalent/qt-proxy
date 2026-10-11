@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {summarizeSubscriberUsage} from '../lib/finance-summary.js';
+const from='2026-01-01',to='2026-03-01';
+const allocations=['a','b','test','unverified','partial'].map((user_id,i)=>({user_id,allocation_key:'membership:'+user_id,allocation_type:'membership',created_at:i===4?'2026-02-20':'2026-01-01'}));
+const payments=['a','b','test','partial'].map(event_id=>({event_id,test_mode:event_id==='test',amount_usd:9.99}));
+const credits=[{completion_key:'one',user_id:'a',created_at:'2026-01-02',entitlement_source:'subscription',submission_type:'primary'}];
+const r=summarizeSubscriberUsage({from,to,allocations,payments,credits:[...credits,...credits]});
+assert.equal(r.samples,2);assert.equal(r.averageQueries,.5);assert.equal(r.averageInitial,.5);assert.equal(r.subscribers,2);
+assert.equal(summarizeSubscriberUsage({from,to}).averageQueries,null);
+console.log('Subscriber windows: zero-use included; tests, unverified and partial windows excluded; completions deduplicated.');

@@ -46,5 +46,38 @@ function renderMargins(){
   }
  }
  const money=n=>n==null?'not yet recorded':usd(n);
+ renderUsageForecast();
  $('margin-basis').textContent=`Estimated AI cost: initial query ${money(basis?.initial?.averageUsd)} · follow-up ${money(basis?.followUp?.averageUsd)}. Based on ${basis?.initial?.samples??0} initial and ${basis?.followUp?.samples??0} follow-up captured queries. Missing samples remain unavailable.`;
+}
+
+function renderUsageForecast(){
+ if(!report)return;
+ const actual=report.subscriberUsage,initial=report.costBasis?.initial?.averageUsd;
+ $('actual-usage').textContent=actual?.samples?`Actual average: ${actual.averageQueries.toFixed(1)} queries per subscriber / 30 days · ${actual.samples} completed observation windows across ${actual.subscribers} subscribers, including zero usage.`:'Actual average: unavailable until complete 30-day windows with verified live membership payments are recorded.';
+ const source=$('usage-source').value,limited=$('usage-plan').value==='limited';
+ let queries=Number($('usage-estimate').value),cost=null,note='';
+ const price=Number($('membership-price').value),credits=Number($('membership-credits').value);
+ if(source==='actual'){
+  queries=actual?.averageQueries;
+  const follow=report.costBasis?.followUp?.averageUsd;
+  if(actual?.samples && !actual.unclassifiedQueries && (actual.averageInitial===0||initial!=null) && (actual.averageFollowUp===0||follow!=null)){
+   cost=actual.averageInitial*(initial??0)+actual.averageFollowUp*(follow??0);
+   const usedCredits=actual.averageInitial*report.configuredProducts.primaryCost+actual.averageFollowUp*report.configuredProducts.followUpCost;
+   if(limited && usedCredits>credits && usedCredits>0){const scale=credits/usedCredits;cost*=scale;queries*=scale;note='Scaled to the modeled credit allowance, preserving the observed query mix. ';}
+  }
+  note+='Actual usage uses completed 30-day membership windows and the observed initial/follow-up mix. Missing cost data remains unavailable.';
+ }else{
+  if(Number.isFinite(queries)&&queries>=0 && initial!=null){
+   if(limited)queries=Math.min(queries,Math.floor(credits/report.configuredProducts.primaryCost));
+   cost=queries*initial;
+  }
+  note='Estimate assumes every query is an initial query at the recorded average AI cost. '+(limited?'Usage is capped at the initial queries your credit allowance supports.':'Unlimited modeling applies no credit cap.');
+ }
+ $('monthly-usage-margin').textContent=cost!=null&&price>0?((price-cost)/price*100).toFixed(2)+'%':'Unavailable';
+ $('monthly-usage-cost').textContent=cost!=null?usd(cost):'Unavailable';
+ $('usage-explanation').textContent=(cost!=null?`${Number(queries).toFixed(1)} modeled queries per month. `:'')+note+' Other expenses are excluded.';
+}
+for(const id of ['usage-estimate','usage-source','usage-plan']){
+ try{const saved=localStorage.getItem('prism-finance-'+id);if(saved!=null)$(id).value=saved;}catch{}
+ $(id).addEventListener('input',()=>{try{localStorage.setItem('prism-finance-'+id,$(id).value);}catch{}renderUsageForecast();});
 }
