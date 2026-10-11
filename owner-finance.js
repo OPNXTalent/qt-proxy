@@ -1,4 +1,3 @@
-import { marginScenario, monthlyScenario } from '/lib/margin-preview.js';
 const $=id=>document.getElementById(id);
 const demo=new URLSearchParams(location.search).get('demo')==='1';
 let sb,report,token,demoDrafts=[];
@@ -34,30 +33,22 @@ if(demo||sb)load();
 
 $('owner-login').addEventListener('submit',async e=>{e.preventDefault();const button=e.target.querySelector('button');button.disabled=true;try{const {error}=await sb.auth.signInWithPassword({email:$('owner-email').value.trim(),password:$('owner-password').value});$('owner-password').value='';if(error)throw Error('Sign-in failed. Check your Prism account details.');await load();}catch(err){$('access').textContent=err.message;}finally{button.disabled=false;}});
 
+
 function renderMargins(){
  if(!report)return;
- const basis=report.costBasis;const cost=basis?.costPerCreditUsd??null;
- const nonnegative=id=>Math.max(0,Number($(id).value)||0);
- const feePercent=Math.min(100,nonnegative('margin-fee-percent')),feeFixedUsd=nonnegative('margin-fee-fixed');
- const p=report.configuredProducts;const bank=Object.entries(p.queryBanks)[0];
- const current=[{priceCents:p.subscription.monthlyPriceCents,credits:p.subscription.monthlyCredits},{priceCents:Number(bank[0]),credits:bank[1]}];
- const proposed=['membership','bank'].map(prefix=>({priceCents:Math.round(nonnegative(prefix+'-price')*100),credits:nonnegative(prefix+'-credits')}));
- const calculate=product=>marginScenario({...product,costPerCreditUsd:cost,feePercent,feeFixedUsd});
- const old=current.map(calculate),next=proposed.map(calculate);
- $('margin-basis').textContent=cost===null?'Cost basis unavailable: complete captured inquiries are required. Revenue per credit can still be compared.':`Provisional AI cost basis: $${cost.toFixed(6)} per credit from ${basis.completedQueries} captured completed inquiries / ${basis.credits} credits. ${basis.unknownAttempts} unknown attempts; ${basis.uncapturedQueries} historical inquiries lack capture. This sample may not represent future usage.`;
+ const basis=report.costBasis;const p=report.configuredProducts;const bank=Object.entries(p.queryBanks)[0];
+ const money=n=>n==null?'Unavailable':usd(n);
+ const margin=(revenue,cost)=>cost==null||!Number.isFinite(revenue)||revenue<=0?'Unavailable':usd(revenue-cost)+' ('+((revenue-cost)/revenue*100).toFixed(2)+'%)';
  const rows=[];
- for(let i=0;i<2;i++){
-  const name=i?'Ad-hoc':'Membership';const a=old[i],b=next[i];
-  const money=v=>v==null?'Unavailable':usd(v);
-  rows.push([name+' revenue / credit',money(a?.unitRevenueUsd),money(b?.unitRevenueUsd),money(a&&b?b.unitRevenueUsd-a.unitRevenueUsd:null)]);
-  rows.push([name+' contribution / package',money(a?.contributionUsd),money(b?.contributionUsd),money(a?.contributionUsd!=null&&b?.contributionUsd!=null?b.contributionUsd-a.contributionUsd:null)]);
-  const percent=v=>v==null?'Unavailable':v.toFixed(2)+'%';
-  rows.push([name+' contribution margin',percent(a?.marginPercent),percent(b?.marginPercent),a?.marginPercent!=null&&b?.marginPercent!=null?(b.marginPercent-a.marginPercent).toFixed(2)+' pp':'Unavailable']);
+ for(const [prefix,name,currentPrice,currentCredits] of [['membership','Membership',p.subscription.monthlyPriceCents/100,p.subscription.monthlyCredits],['bank','Ad-hoc',Number(bank[0])/100,bank[1]]]){
+  const proposedPrice=Number($(prefix+'-price').value),proposedCredits=Number($(prefix+'-credits').value);
+  for(const [type,label,credits] of [['initial','Initial query',p.primaryCost],['followUp','Follow-up',p.followUpCost]]){
+   const cost=basis?.[type]?.averageUsd??null;
+   const oldRevenue=currentPrice/currentCredits*credits;
+   const nextRevenue=proposedCredits>0&&proposedPrice>0?proposedPrice/proposedCredits*credits:null;
+   rows.push([name+' · '+label,money(cost),money(oldRevenue),margin(oldRevenue,cost),money(nextRevenue),margin(nextRevenue,cost)]);
+  }
  }
- table('margin-comparison',rows,'Enter valid prices.');
- const assumptions={membershipSales:Math.floor(nonnegative('margin-membership-sales')),bankSales:Math.floor(nonnegative('margin-bank-sales')),freeCredits:Math.floor(nonnegative('margin-free-credits')),fixedCostsUsd:nonnegative('margin-fixed'),costPerCreditUsd:cost};
- const before=monthlyScenario({...assumptions,membership:old[0],bank:old[1]}),after=monthlyScenario({...assumptions,membership:next[0],bank:next[1]});
- $('margin-current').textContent=before?usd(before.operatingResultUsd):'Unavailable';$('margin-proposed').textContent=after?usd(after.operatingResultUsd):'Unavailable';$('margin-impact').textContent=before&&after?usd(after.operatingResultUsd-before.operatingResultUsd):'Unavailable';
- $('margin-break-even').textContent=after?`Proposed break-even for entered free usage and fixed expenses: ${after.membershipBreakEven??'not achievable with positive contribution'} membership purchases OR ${after.bankBreakEven??'not achievable with positive contribution'} ad-hoc purchases per month. Estimated free-use AI cost: ${usd(after.freeCostUsd)}.`:'Break-even requires a recorded cost basis and valid prices.';
+ table('margin-comparison',rows,'No pricing available.');
+ $('margin-basis').textContent=`Estimated AI cost per initial query: ${money(basis?.initial?.averageUsd)} (${basis?.initial?.samples??0} captured queries). Per follow-up: ${money(basis?.followUp?.averageUsd)} (${basis?.followUp?.samples??0} captured queries). Updates as you edit prices; excludes all other business expenses.`;
 }
-$('margin-preview').addEventListener('input',renderMargins);

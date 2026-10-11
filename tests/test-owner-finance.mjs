@@ -68,3 +68,18 @@ assert.equal(testingReport.testing.initialQueries,1);
 assert.equal(testingReport.totals.knownAiCostUsd,1.02,'Testing remains included in business costs');
 assert.equal(summarizeFinance({from,to,usage:[{created_at:at,cost_usd:1}]}).testing.knownCostUsd,0,'Unattributed activity must not be counted as owner tests');
 console.log('Owner testing attribution excludes other accounts and retains unknown costs');
+const queryCosts=summarizeFinance({from,to,credits:[
+ {completion_key:'primary-cost',created_at:at,submission_type:'primary',query_cost:2},
+ {completion_key:'follow-cost',created_at:at,submission_type:'follow_up',query_cost:1},
+ {completion_key:'unknown-cost',created_at:at,submission_type:'primary',query_cost:2}
+],usage:[
+ {completion_key:'primary-cost',created_at:at,cost_usd:.003,state:'completed'},
+ {completion_key:'primary-cost',created_at:at,cost_usd:.0002,state:'completed'},
+ {completion_key:'follow-cost',created_at:at,cost_usd:.0008,state:'completed'},
+ {completion_key:'unknown-cost',created_at:at,cost_usd:null,state:'failed'}
+]});
+assert.equal(queryCosts.costBasis.initial.averageUsd,.0032);
+assert.equal(queryCosts.costBasis.initial.samples,1);
+assert.equal(queryCosts.costBasis.followUp.averageUsd,.0008);
+assert.equal(profitReport.costBasis.followUp.averageUsd,null);
+console.log('AI-only query cost averages sum stages and exclude incomplete samples');
