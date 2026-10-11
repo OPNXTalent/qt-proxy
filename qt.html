@@ -3060,7 +3060,8 @@
       <div class="disc-topbar-right">
         <span style="font-family:var(--mono);font-size:11px;color:rgba(120,118,140,0.25);" id="chatBarCount"></span>
         <nav class="disc-panel-nav" aria-label="Discussion panel navigation">
-          <button type="button" id="discNavShare" onclick="setRefractionView('trust_circle')" aria-label="Show shared discussion">Share</button>
+          <button type="button" onclick="openSharePanel()" aria-label="Manage invitations">Share</button>
+          <button type="button" id="discNavDiscussion" onclick="setRefractionView('trust_circle')" aria-label="Show shared discussion">Discussion</button>
           <button type="button" id="discNavNotes" onclick="setRefractionView('private')" aria-label="Show private notes">Notes</button>
           <button type="button" onclick="closeDiscussionPanel()" aria-label="Close panel">Close</button>
         </nav>
@@ -8557,14 +8558,14 @@ function setRefractionView(next, shouldRender) {
   _refractionView = next;
   btn.dataset.visibility = next;
 
-  var panelTitle = next === 'trust_circle' ? 'Share' : 'Notes';
+  var panelTitle = next === 'trust_circle' ? 'Discussion' : 'Notes';
   var topbarLabel = document.getElementById('discTopbarLabel');
   var chamberTitle = document.getElementById('discChamberTitle');
   if (topbarLabel) topbarLabel.textContent = panelTitle;
   if (chamberTitle) chamberTitle.textContent = panelTitle;
-  var shareNav = document.getElementById('discNavShare');
+  var discussionNav = document.getElementById('discNavDiscussion');
   var notesNav = document.getElementById('discNavNotes');
-  if (shareNav) { shareNav.classList.toggle('active', next === 'trust_circle'); shareNav.setAttribute('aria-pressed', String(next === 'trust_circle')); }
+  if (discussionNav) { discussionNav.classList.toggle('active', next === 'trust_circle'); discussionNav.setAttribute('aria-pressed', String(next === 'trust_circle')); }
   if (notesNav) { notesNav.classList.toggle('active', next === 'private'); notesNav.setAttribute('aria-pressed', String(next === 'private')); }
 
   if (next === 'trust_circle') {
