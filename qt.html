@@ -3007,7 +3007,11 @@
   <aside id="sharePanel" aria-label="Share this exchange" aria-hidden="true">
     <div class="share-panel-topbar">
       <span class="share-panel-title">Share</span>
-      <button class="disc-close-btn" onclick="closeSharePanel()" title="Close Share">✕</button>
+      <nav class="disc-panel-nav" aria-label="Share panel navigation">
+        <button type="button" onclick="navigateFromSharePanel('trust_circle')">Discussion</button>
+        <button type="button" onclick="navigateFromSharePanel('private')">Notes</button>
+        <button type="button" onclick="closeSharePanel()">Close</button>
+      </nav>
     </div>
     <div class="share-panel-body">
       <section class="share-invite-card" aria-labelledby="shareInviteTitle">
@@ -7468,6 +7472,11 @@ function openSharePanel() {
   loadShareConnections();
 }
 
+function navigateFromSharePanel(view) {
+  closeSharePanel();
+  openNodeSurface('root', currentSubject || '', view);
+}
+
 function closeSharePanel() {
   var panel = document.getElementById('sharePanel');
   if (!panel) return;
@@ -8565,8 +8574,8 @@ function setRefractionView(next, shouldRender) {
   if (chamberTitle) chamberTitle.textContent = panelTitle;
   var discussionNav = document.getElementById('discNavDiscussion');
   var notesNav = document.getElementById('discNavNotes');
-  if (discussionNav) { discussionNav.classList.toggle('active', next === 'trust_circle'); discussionNav.setAttribute('aria-pressed', String(next === 'trust_circle')); }
-  if (notesNav) { notesNav.classList.toggle('active', next === 'private'); notesNav.setAttribute('aria-pressed', String(next === 'private')); }
+  if (discussionNav) discussionNav.style.display = next === 'trust_circle' ? 'none' : '';
+  if (notesNav) notesNav.style.display = next === 'private' ? 'none' : '';
 
   if (next === 'trust_circle') {
     label.textContent = 'Share';
