@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { withFinanceRequest, beginFinanceAttempt, finishFinanceAttempt, linkFinanceCompletion, recordStripeFinance } from '../lib/finance-store.js';
+import { financeRest, withFinanceRequest, beginFinanceAttempt, finishFinanceAttempt, linkFinanceCompletion, recordStripeFinance } from '../lib/finance-store.js';
 import { PRISM_PRODUCT } from '../lib/product-config.js';
 process.env.VERCEL_ENV='preview';process.env.SUPABASE_URL='https://test.invalid';process.env.SUPABASE_SERVICE_ROLE_KEY='test-secret';
 const original=globalThis.fetch;let writes=[];let fail=false;
@@ -17,5 +17,7 @@ try {
  fail=true;await assert.rejects(()=>withFinanceRequest(()=>beginFinanceAttempt({model:'gpt-6-luna',stage:'initial',turnType:'initial'})),/FINANCE_CAPTURE_UNAVAILABLE/);
  fail=false;await recordStripeFinance({id:'event',created:1,type:'payment_intent.succeeded',data:{object:{id:'pi',amount:1999,amount_received:1999,currency:'usd'}}},PRISM_PRODUCT);
  assert(writes.at(-1).headers.Prefer.includes('ignore-duplicates'),'Webhook replay must preserve reconciled fees and original allocation event');
+ globalThis.fetch=async()=>new Response(null,{status:201});
+ await assert.doesNotReject(()=>financeRest('prism_finance_usage',{method:'POST',body:{},headers:{Prefer:'return=minimal'}}),'PostgREST 201 with empty success body must be accepted');
  console.log('Finance capture: pre-dispatch durability, failure unknowns, request isolation and immutable payment receipts passed');
 } finally {globalThis.fetch=original;}
