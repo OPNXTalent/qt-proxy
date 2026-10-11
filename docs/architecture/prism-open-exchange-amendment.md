@@ -1,6 +1,6 @@
 # Constitutional amendment: open exchange of ideas
 
-Version 3 — October 11, 2026
+Version 4 — October 11, 2026
 
 ## Purpose
 
@@ -35,3 +35,9 @@ The open-inquiry module is composed into the existing always-loaded quantum-fing
 ## Validation limits
 
 Integration and runtime tests establish that all response paths carry the amendment and existing bounded draft prompts remain valid. They do not guarantee that a model will follow every instruction in a long exchange. New responses must still be evaluated against the actual claim and evidence.
+
+## Conversation progression and analogy fidelity
+
+Evaluate analogies by their intended structural mapping. Do not challenge incidental mechanics as though the analogy were a literal causal explanation. A partial observation need not solve the original inquiry independently; once an explanatory limit is acknowledged, stop repeating it unless relevant new claims reopen it.
+
+The disabled-runtime fallback previously received only the original subject and latest follow-up, preventing reliable retention of concessions. The client now supplies visible prior follow-up pairs and available initial compatibility context. The server includes up to 40 user/assistant messages within 24,000 characters, explicitly labeled as untrusted context rather than instructions. Existing identity and access controls remain unchanged. This is bounded conversational context, not canonical persistent memory; very long exchanges can lose older material, and restored initial context may be unavailable. The persistent runtime mode is not enabled by this change.

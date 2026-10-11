@@ -3822,6 +3822,18 @@ async function runFollowUp(sourceInput) {
 
   // The server-side persistent runtime owns follow-up reasoning.
   const followUpPrompt = input;
+  // Include the visible exchange when the persistent runtime is disabled.
+  // The server bounds this untrusted context and retains authorization checks.
+  const followUpMessages = conversationHistory.slice(0, 2).map(function(m) { return { role: m.role, content: m.content }; });
+  document.querySelectorAll('#resultContent .fu-block').forEach(function(block) {
+    const question = block.querySelector('.fu-question');
+    const answer = block.querySelector('.fu-body');
+    if (question && answer && answer.textContent.trim() && answer.textContent.trim() !== 'interpreting…') {
+      followUpMessages.push({ role: 'user', content: question.textContent.trim() });
+      followUpMessages.push({ role: 'assistant', content: answer.textContent.trim() });
+    }
+  });
+  followUpMessages.push({ role: 'user', content: followUpPrompt });
 
   // Create follow-up element immediately so we can stream into it
   const followUpEl = document.createElement('div');
@@ -3838,7 +3850,7 @@ async function runFollowUp(sourceInput) {
 
   try {
     const followUpResult = await callProxyStream(
-      [{ role: 'user', content: followUpPrompt }],
+      followUpMessages,
       followUpTextEl,
       input,
       true,  // isFollowUp — prevents saving as new thread
