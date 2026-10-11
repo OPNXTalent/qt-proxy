@@ -3030,8 +3030,8 @@
         <div class="share-card-footer">
           <div id="shareConnectionsList"><div class="share-privacy-note">No active connections yet.</div></div>
           <div id="shareGroupActions" class="share-group-actions" style="display:none;">
+            <div id="shareGroupHint" class="share-group-hint">Select the checkboxes beside at least two invitees to create a group chat.</div>
             <button id="createGroupChatBtn" type="button" onclick="createGroupChat()" disabled>Create Group Chat</button>
-            <div id="shareGroupHint" class="share-group-hint">Select at least two invitees.</div>
           </div>
         </div>
       </section>
@@ -7564,7 +7564,7 @@ function updateGroupChatSelectionUI() {
   }
   if (hint) hint.textContent = count >= 2
     ? 'Only the selected invitees will share this discussion.'
-    : 'Select at least two invitees.';
+    : 'Select the checkboxes beside at least two invitees to create a group chat.';
 }
 
 async function createGroupChat() {
