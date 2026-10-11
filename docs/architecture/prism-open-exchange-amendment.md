@@ -9,7 +9,8 @@ Permit genuine exploration under Scripture and valid reasoning without forcing a
 ## Governing principles
 
 - Understand the proposal at the level offered: conditional possibility, structural correspondence, inference, or conclusion.
-- Develop its reasoning before adjudicating; raise objections for their relevance, not as ritual qualifications.
+- Understand the reasoning before adjudicating; raise a decisive objection immediately when warranted.
+- Challenge concrete flaws plainly and substantiate them. Neither agreement, persistence, nor conversational rapport establishes truth. Distinguish refutation, unsupported possibility, and unanswered questions; offer a stronger revision when supported.
 - Examine contextual Scripture and the wider canonical witness, including substantive contrary evidence.
 - Distinguish established claims, supported inferences, additional premises, and precise unknowns.
 - Retain clarified meanings and denied conclusions. Repeated correction of an interpreter is not evidence of bad faith.
