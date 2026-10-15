@@ -12,7 +12,7 @@ export const config = {
   maxDuration: 60,
 };
 
-import { PRISM_EMET_COVENANT_INQUIRY, PRISM_UNIVERSAL_SALVATION_CONSTRAINT } from '../lib/prompt-modules/emet-covenant-inquiry.js';
+import { PRISM_CANONICAL_COHERENCE, PRISM_EMET_COVENANT_INQUIRY, PRISM_UNIVERSAL_SALVATION_CONSTRAINT } from '../lib/prompt-modules/emet-covenant-inquiry.js';
 import { buildFollowUpContext } from '../lib/followup-context.js';
 import { PRISM_THEODICY_MODULE } from '../lib/prompt-modules/theodicy.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -90,6 +90,7 @@ Before constructing any response, run these eight questions. They are not theolo
 The Emet lens asks one thing above all: what is true here, regardless of who benefits?
 
 ${PRISM_EMET_COVENANT_INQUIRY}
+${PRISM_CANONICAL_COHERENCE}
 
 ${PRISM_UNIVERSAL_SALVATION_CONSTRAINT}
 
@@ -1448,7 +1449,7 @@ HEBREW LEXICAL PRECISION — non-negotiable:
 - Echad (\u05D0\u05B6\u05D7\u05B8\u05D3): Covenantal compound oneness. Never numerical singularity.
 - Shamayim (\u05E9\u05B8\u05C1\u05DE\u05B7\u05D9\u05B4\u05DD): Explicitly plural — layered nested dimensions. Three registers: visible sky, celestial/angelic realm (Daniel 10, Ephesians 6:12), divine throne-room (Isaiah 6, Revelation 4-5). Never collapse these.
 - Davar (\u05D3\u05B8\u05BC\u05D1\u05B8\u05E8): Word as constitutive speech-act. Reality is sustained as ongoing utterance — Colossians 1:17, Hebrews 1:3.
-- Yada (\u05D9\u05B8\u05D3\u05B7\u05E2): Intimate participatory knowing within covenant relationship. Not passive possession of information. Never frame divine knowing as omniscience in the Greek sense — a static property God possesses. God does not know about from a distance. God knows within.
+- Yada (\u05D9\u05B8\u05D3\u05B7\u05E2): Intimate participatory knowing within covenant relationship. Not passive possession of information. Preserve God’s complete knowledge (omniscience) while explaining intimate covenantal knowing; these are compatible rather than competing claims. God does not know about from a distance. God knows within.
 - Olam (\u05E2\u05D5\u05B9\u05DC\u05B8\u05DD): Age, realm, hidden dimension. Not Greek timeless eternity.
 - Emet (\u05D0\u05B6\u05DE\u05B6\u05EA): Truth as reality rightly related to its sustaining ground — full aleph/met etymology in THE EMET TEST, above. Deploy when queries press on the ground of coherence or the basis of truth claims.
 
@@ -1482,7 +1483,7 @@ ANGELIC EXISTENCE: Angels and non-human intelligences are real, personal, and ac
 
 Draw from canonical Scripture first (Daniel 10, Ezekiel 1, Isaiah 6, Job 1-2, Genesis 6, Jude 6, 2 Peter 2:4). 1 Enoch may corroborate — it was authoritative in the Second Temple epoch Jesus inhabited and is quoted directly in canonical Scripture (Jude 14-15) — but always distinguish canonical from non-canonical sources explicitly. Never speculate beyond what the canonical text and its immediate Second Temple context establishes.
 
-LANGUAGE DISCIPLINE: Use active verbs when describing divine action. Never soften a text to protect a category. Never close with: we must hold this in tension, it is a mystery, we cannot fully understand. Never deploy Greek philosophical categories — omniscience, impassibility, the unmoved mover — as the primary frame for divine attributes. Always return to the Hebrew lexical architecture and covenantal relational ontology the framework establishes.
+LANGUAGE DISCIPLINE: Use active verbs when describing divine action. Never soften a text to protect a category. Never close with: we must hold this in tension, it is a mystery, we cannot fully understand. Do not let philosophical labels replace contextual exegesis. Preserve omniscience, omnipotence, omnipresence, truthfulness and faithfulness as governing scriptural premises while examining relational language. Always return to the Hebrew lexical architecture and covenantal relational ontology the framework establishes.
 
 ───────────────────────────────────────────
 CONSTITUTIONAL RESPONSE PRINCIPLES
@@ -5475,7 +5476,7 @@ Retain explicit clarifications and accepted corrections from this exchange. Addr
 
 Original inquiry: ${String(subject || '').slice(0, MAX_QUERY_CHARS)}
 Follow-up: ${String(input || '').slice(0, MAX_QUERY_CHARS)}`,
-    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT + PRISM_UNIVERSAL_SALVATION_CONSTRAINT + PRISM_EMET_COVENANT_INQUIRY,
+    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT + PRISM_UNIVERSAL_SALVATION_CONSTRAINT + PRISM_EMET_COVENANT_INQUIRY + PRISM_CANONICAL_COHERENCE,
     telemetryStage: 'followup_fallback',
     telemetryTurnType: 'follow_up',
     onTextDelta: text => sse.write({ type: 'response_delta', text }),
@@ -6039,7 +6040,7 @@ async function runPersistentInquiryFollowUp({
     timeoutMs: 75000,
     maxTotalMs: 240000,
     prompt: draftPrompt,
-    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT + PRISM_UNIVERSAL_SALVATION_CONSTRAINT,
+    system: PRISM_RESPONSE_REFRESH + PRISM_QUANTUM_FINGERPRINT + PRISM_UNIVERSAL_SALVATION_CONSTRAINT + PRISM_CANONICAL_COHERENCE,
     telemetryStage: 'followup_draft',
     telemetryTurnType: 'follow_up',
     onTextDelta: text => sse.write({ type: 'response_delta', text }),
