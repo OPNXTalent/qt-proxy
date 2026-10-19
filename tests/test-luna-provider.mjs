@@ -24,6 +24,8 @@ try {
   assert.equal(request.temperature, undefined);
   assert.deepEqual(request.tool_choice, { type: 'function', name: 'emit_result' });
   assert.deepEqual(request.tools[0].parameters, schema);
+  await callInquiryModel({prompt:'Review the attached source.', inputFiles:[{name:'source.pdf',data:'JVBERi0x'}], structuredOutputSchema:schema, structuredOutputName:'emit_result'});
+  assert.deepEqual(request.input[0].content,[{type:'input_text',text:'Review the attached source.'},{type:'input_file',filename:'source.pdf',file_data:'data:application/pdf;base64,JVBERi0x'}]);
   const encoder = new TextEncoder();
   const stream = events => new Response(new ReadableStream({ start(controller) {
     const data = encoder.encode(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''));

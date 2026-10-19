@@ -20,7 +20,7 @@
     },
     "api/transcribe.js": {
       "memory": 128,
-      "maxDuration": 90
+      "maxDuration": 120
     }
   },
   "crons": [
@@ -37,6 +37,14 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/owner-concepts",
+      "destination": "/owner-concepts.html"
+    },
+    {
+      "source": "/api/owner-concepts",
+      "destination": "/api/transcribe?prism_owner_concepts=1"
+    },
     {
       "source": "/owner-finance",
       "destination": "/owner-finance.html"

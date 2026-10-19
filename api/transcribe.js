@@ -2,6 +2,7 @@ import { verifySupabaseIdentity, admitPrismAiRequest } from '../lib/server-auth.
 import { getOrIssueGuestIdentity, guestCookieHeader } from '../lib/guest-identity.js';
 import financeHandler from '../lib/finance-handler.js';
 import clientConfigHandler from '../lib/client-config-handler.js';
+import conceptHandler from '../lib/concept-workbench.js';
 // api/transcribe.js
 // Receives a base64-encoded audio clip from the browser (recorded via
 // MediaRecorder), forwards it to OpenAI's transcription endpoint, and
@@ -25,6 +26,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const MODEL = 'gpt-4o-mini-transcribe';
 
 export default async function handler(req, res) {
+  if (req.query?.prism_owner_concepts === '1') return conceptHandler(req,res);
   if (req.query?.prism_client_config === '1') return clientConfigHandler(req,res);
   if (req.query?.prism_owner_finance === '1') return financeHandler(req,res);
   res.setHeader('Access-Control-Allow-Origin', '*');
