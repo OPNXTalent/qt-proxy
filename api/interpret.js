@@ -57,6 +57,7 @@ import {
   guestCookieHeader,
 } from '../lib/guest-identity.js';
 import { PRISM_PRODUCT, publicProductConfig } from '../lib/product-config.js';
+import { getPrismReferenceContext } from '../lib/prism-reference.js';
 import { collapseRepeatedTerminalParagraphs } from '../lib/response-normalization.js';
 import {
   getApprovedLearningContext,
@@ -2279,15 +2280,16 @@ async function getRetrievedContext(userQuery, inquiryClassification, timing) {
 // ── END RAG RETRIEVAL LAYER ───────────────────────────────────────────────────
 
 async function getCuratedLearningContext(userQuery, timing) {
+  const referenceContext = getPrismReferenceContext(userQuery);
   timing?.('learning_retrieval_start');
   try {
-    const context = await getApprovedLearningContext(userQuery);
+    const context = referenceContext + await getApprovedLearningContext(userQuery);
     timing?.('learning_retrieval_end', { outcome: 'success', contextChars: context.length });
     return context;
   } catch (error) {
     timing?.('learning_retrieval_end', { outcome: 'error' });
     console.error('Curated learning retrieval error:', error.message);
-    return '';
+    return referenceContext;
   }
 }
 
