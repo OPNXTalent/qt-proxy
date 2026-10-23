@@ -20,6 +20,7 @@ import { PRISM_OUTPUT_CONTRACT } from '../lib/prompt-modules/output-contract.js'
 import { PRISM_RESPONSE_REFRESH } from '../lib/prompt-modules/response-refresh.js';
 import { PRISM_QUANTUM_FINGERPRINT } from '../lib/prompt-modules/quantum-fingerprint.js';
 import { PRISM_RELATIONAL_SALVATION } from '../lib/prompt-modules/relational-salvation.js';
+import { PRISM_DIVINE_REGRET, shouldLoadDivineRegret } from '../lib/prompt-modules/divine-regret.js';
 import { PRISM_DIVINE_HIDDENNESS } from '../lib/prompt-modules/divine-hiddenness.js';
 import {
   PRISM_COVENANTAL_RESTORATION,
@@ -6881,7 +6882,8 @@ Do not add any question after the exit offer. The person chooses the next move.
         const theodicyModule = shouldLoadTheodicyModule(theodicyRoutingText, inquiryClassification);
         const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
         const divineHiddennessModule = shouldLoadDivineHiddenness(lastUserText || rawQuery || '');
-        const covenantalRestorationModule = shouldLoadCovenantalRestoration(lastUserText || rawQuery || '');
+        const divineRegretModule = shouldLoadDivineRegret(lastUserText || rawQuery || '');
+    const covenantalRestorationModule = shouldLoadCovenantalRestoration(lastUserText || rawQuery || '');
 
         console.log(`[interpret:${requestId}] module-decision`, {
           inquiryClassification,
@@ -6889,6 +6891,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           theodicyRoutingChars: theodicyRoutingText.length,
           relationalSalvationModule,
           divineHiddennessModule,
+          divineRegretModule,
           covenantalRestorationModule,
           elapsedMs: Date.now() - startedAt,
         });
@@ -6900,6 +6903,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '')
           + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '')
+          + (divineRegretModule ? PRISM_DIVINE_REGRET : '')
           + (covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION : '')
           + (/universal(?:ism|ist)|apokatastasis|all (?:will|shall|must) be saved/i.test(lastUserText || rawQuery || '') ? PRISM_UNIVERSAL_SALVATION_CONSTRAINT : '');
         timing('prompt_assembly_complete', {
@@ -6916,6 +6920,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           theodicyChars: theodicyModule ? PRISM_THEODICY_MODULE.length : 0,
           relationalSalvationChars: relationalSalvationModule ? PRISM_RELATIONAL_SALVATION.length : 0,
           divineHiddennessChars: divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS.length : 0,
+          divineRegretChars: divineRegretModule ? PRISM_DIVINE_REGRET.length : 0,
           covenantalRestorationChars: covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION.length : 0,
           totalChars: enhancedSystemPrompt.length,
           approxTokens: Math.round(enhancedSystemPrompt.length / 4),
@@ -7056,6 +7061,7 @@ Do not add any question after the exit offer. The person chooses the next move.
     const theodicyModule = shouldLoadTheodicyModule(theodicyRoutingText, inquiryClassification);
     const relationalSalvationModule = shouldLoadRelationalSalvation(lastUserText || rawQuery || '');
     const divineHiddennessModule = shouldLoadDivineHiddenness(lastUserText || rawQuery || '');
+    const divineRegretModule = shouldLoadDivineRegret(lastUserText || rawQuery || '');
     const covenantalRestorationModule = shouldLoadCovenantalRestoration(lastUserText || rawQuery || '');
         const enhancedSystemPrompt = PRISM_SYSTEM_PROMPT
           + closureInjection
@@ -7064,6 +7070,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           + (theodicyModule ? PRISM_THEODICY_MODULE : '')
           + (relationalSalvationModule ? PRISM_RELATIONAL_SALVATION : '')
           + (divineHiddennessModule ? PRISM_DIVINE_HIDDENNESS : '')
+          + (divineRegretModule ? PRISM_DIVINE_REGRET : '')
           + (covenantalRestorationModule ? PRISM_COVENANTAL_RESTORATION : '')
           + (/universal(?:ism|ist)|apokatastasis|all (?:will|shall|must) be saved/i.test(lastUserText || rawQuery || '') ? PRISM_UNIVERSAL_SALVATION_CONSTRAINT : '');
         timing('prompt_assembly_complete', {
@@ -7079,6 +7086,7 @@ Do not add any question after the exit offer. The person chooses the next move.
           theodicyRoutingChars: theodicyRoutingText.length,
           relationalSalvationLoaded: relationalSalvationModule,
           divineHiddennessLoaded: divineHiddennessModule,
+          divineRegretLoaded: divineRegretModule,
           covenantalRestorationLoaded: covenantalRestorationModule,
           elapsedMs: Date.now() - startedAt,
         });
