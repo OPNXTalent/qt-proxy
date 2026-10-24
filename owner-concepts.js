@@ -1,6 +1,7 @@
 const $=id=>document.getElementById(id);
-let sb,current=null,files=[],queue=[],nextOffset=null,busy=false,sourceDirty=false,proposalDirty=false;
+let sb,current=null,files=[],queue=[],nextOffset=null,busy=false,sourceDirty=false,proposalDirty=false,pendingRevision=null;
 const labels={claims:'Claims and strongest formulation',evidence:'Evidence and source quality',scripture:'Scriptural examination',counterarguments:'Counterarguments and competing readings',frameworkFit:'Fit with The Prism',uncertainties:'Uncertainties and further checks'};
+function activity(s){$('activity-label').textContent=s;$('activity').hidden=!s;}
 function message(s,error=false){$('message').textContent=s;$('message').classList.toggle('error',error);}
 async function request(body,query=''){
  const {data}=await sb.auth.getSession();if(!data.session)throw Error('Sign in to your Prism owner account.');
@@ -18,25 +19,25 @@ async function list(append=false){const out=await request(null,'?offset='+(appen
 function drawFiles(){ $('attachments').replaceChildren();files.forEach((f,i)=>{const row=element('div',f.name);row.className='attachment';const b=element('button','Remove');b.type='button';b.className='secondary';b.onclick=()=>{files.splice(i,1);sourceDirty=true;drawFiles();syncApproval();};row.append(b);$('attachments').append(row);}); }
 function syncApproval(){ $('approve').disabled=busy||sourceDirty||proposalDirty||current?.document?.preview?.revision!==current?.revision; }
 function render(c){
- current=c;files=[...(c.document?.submission?.files||[])];sourceDirty=false;proposalDirty=false;
+ current=c;pendingRevision=null;$('comparison').hidden=true;files=[...(c.document?.submission?.files||[])];sourceDirty=false;proposalDirty=false;
  const d=c.document||{},s=d.submission||{};
  for(const [id,key] of [['title','title'],['source-url','sourceUrl'],['material','material'],['perspective','perspective']])$(id).value=s[key]||'';
  $('files').value='';drawFiles();$('editor').hidden=false;$('state').textContent=c.revision?c.status.toUpperCase()+' · v'+c.revision:'NEW DRAFT';
  $('publication').hidden=!c.active_release;$('publication').textContent=c.active_release?'Approved version '+c.active_release+' is currently active'+(c.active_release!==c.revision?'; the working draft has subsequent changes.':'.'):'';
- $('review-panel').hidden=!d.review;$('proposal-panel').hidden=!d.proposal;$('preview-panel').hidden=!d.preview;
+ $('review-panel').hidden=!d.review;$('refine-panel').hidden=!d.review;$('proposal-panel').hidden=!d.proposal;$('preview-panel').hidden=!d.preview;
  $('analysis').replaceChildren();if(d.review)for(const [k,label] of Object.entries(labels))$('analysis').append(element('h3',label),element('p',d.review[k]));
  if(d.proposal)for(const [id,key] of [['treatment','treatment'],['guidance','guidance'],['applicability','applicability'],['boundaries','boundaries'],['tags','tags'],['review-date','reviewDate']])$(id).value=d.proposal[key]||'';
- if(d.preview){$('sample-question').textContent=d.preview.question;$('sample-response').textContent=d.preview.response;}
+ $('discussion').replaceChildren();for(const entry of (c.discussion||[])){const bubble=element('div',entry.body);bubble.className='discussion-message '+(entry.role==='owner'?'owner':'assistant');bubble.prepend(element('strong',entry.role==='owner'?'You':'Workbench'));$('discussion').append(bubble);}if(d.preview){$('sample-question').textContent=d.preview.question;$('sample-response').textContent=d.preview.response;}
  $('hold').disabled=$('reject').disabled=!c.revision;syncApproval();drawQueue();
 }
 async function open(id,discard=false){
  if(!discard&&(sourceDirty||proposalDirty)&&!confirm('Discard unsaved edits and reopen the saved concept?'))return;
- const out=await request(null,'?id='+encodeURIComponent(id));render(out.concept);
+ const out=await request(null,'?id='+encodeURIComponent(id));render({...out.concept,discussion:out.discussion});
  $('releases').replaceChildren();if(!out.releases.length)$('releases').append(element('p','No approved versions yet.'));
  for(const release of out.releases){const b=element('button','Restore approved v'+release.version+' · '+new Date(release.created_at).toLocaleDateString());b.className='secondary';b.disabled=release.version===current.active_release;b.onclick=()=>run(async()=>{if(!confirm('Restore approved version '+release.version+' as the active guidance? This replaces the working draft and keeps its history.'))return;await mutate('restore',{version:release.version});message('Previously approved version restored.');});$('releases').append(b);}
  $('history').replaceChildren();for(const h of out.history)$('history').append(element('p','v'+h.revision+' · '+h.action+' · '+new Date(h.created_at).toLocaleString()));
 }
-async function run(fn){if(busy)return;busy=true;document.querySelectorAll('button').forEach(b=>b.disabled=true);try{await fn();}catch(e){message(e.message,true);}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false);$('hold').disabled=$('reject').disabled=!current?.revision;syncApproval();}}
+async function run(fn,working='Working on your request…'){if(busy)return;busy=true;activity(working);document.querySelectorAll('button').forEach(b=>b.disabled=true);try{await fn();}catch(e){message(e.message,true);}finally{busy=false;activity('');document.querySelectorAll('button').forEach(b=>b.disabled=false);$('hold').disabled=$('reject').disabled=!current?.revision;syncApproval();}}
 function submission(){return {title:$('title').value,sourceUrl:$('source-url').value,material:$('material').value,perspective:$('perspective').value,files};}
 async function saveSource(){if(!$('submission').reportValidity())throw Error('Complete the concept title and check the source link.');const out=await request({id:current.id,revision:current.revision,action:'save',submission:submission()});await open(out.id,true);await list();}
 async function saveProposal(){if(!$('proposal').reportValidity())throw Error('Complete the guidance, applicability and boundaries.');const p={};for(const [id,key] of [['treatment','treatment'],['guidance','guidance'],['applicability','applicability'],['boundaries','boundaries'],['tags','tags'],['review-date','reviewDate']])p[key]=$(id).value;await mutate('proposal',{proposal:p});}
@@ -50,9 +51,13 @@ $('files').addEventListener('change',()=>run(async()=>{
  $('files').value='';sourceDirty=true;drawFiles();message('Material added. Save the draft or review it.');
 }));
 $('submission').onsubmit=e=>{e.preventDefault();run(async()=>{await saveSource();message('Draft saved. It has not been added to responses.');});};
-$('review').onclick=()=>run(async()=>{if(sourceDirty||!current.revision)await saveSource();message('Reviewing material… This may take about a minute.');await mutate('review');message('Review and sample ready. Examine the proposed guidance before approving.');$('review-panel').scrollIntoView({behavior:'smooth'});});
+$('review').onclick=()=>run(async()=>{if(sourceDirty||!current.revision)await saveSource();message('Reviewing material… This may take about a minute.');activity('Examining claims, evidence and alternatives…');await mutate('review');message('Review and sample ready. Examine the proposed guidance before approving.');$('review-panel').scrollIntoView({behavior:'smooth'});});
+$('discuss').onclick=()=>run(async()=>{if(sourceDirty||proposalDirty)throw Error('Save or discard unsaved edits first.');const feedback=$('refinement').value.trim();if(!feedback)throw Error('Enter your insight or question first.');await request({id:current.id,revision:current.revision,action:'discuss',feedback});await open(current.id,true);$('refinement').value='';message('Discussion response saved.');$('refine-panel').scrollIntoView({behavior:'smooth'});},'Considering your insight…');
+$('refine').onclick=()=>run(async()=>{if(sourceDirty||proposalDirty)throw Error('Save or discard unsaved edits first.');const feedback=$('refinement').value.trim();const out=await request({id:current.id,revision:current.revision,action:'suggest',feedback});pendingRevision=out.proposal;$('compare-before').textContent=current.document.proposal.guidance;$('compare-after').textContent=pendingRevision.guidance;$('compare-before-app').textContent=current.document.proposal.applicability;$('compare-after-app').textContent=pendingRevision.applicability;$('compare-before-bound').textContent=current.document.proposal.boundaries;$('compare-after-bound').textContent=pendingRevision.boundaries;$('comparison').hidden=false;message('Compare the proposed revision before adopting it.');$('comparison').scrollIntoView({behavior:'smooth'});},'Drafting revised guidance…');
+$('adopt').onclick=()=>run(async()=>{if(!pendingRevision)throw Error('Request a revision first.');await mutate('proposal',{proposal:pendingRevision});message('Revision adopted. Generate a new sample before approval.');},'Saving adopted revision…');
+$('dismiss').onclick=()=>{pendingRevision=null;$('comparison').hidden=true;message('Current guidance retained.');};
 $('proposal').onsubmit=e=>{e.preventDefault();run(async()=>{if(sourceDirty)throw Error('Review your source changes before editing guidance.');await saveProposal();message('Guidance saved. Generate a new sample before approval.');});};
-$('preview').onclick=()=>run(async()=>{if(sourceDirty)throw Error('Review your source changes first.');if(proposalDirty)await saveProposal();message('Generating a sample for your saved guidance…');await mutate('preview');message('Sample ready. Check its treatment and wording before approval.');$('preview-panel').scrollIntoView({behavior:'smooth'});});
+$('preview').onclick=()=>run(async()=>{if(sourceDirty)throw Error('Review your source changes first.');if(proposalDirty)await saveProposal();message('Generating a sample for your saved guidance…');activity('Generating your sample response…');await mutate('preview');message('Sample ready. Check its treatment and wording before approval.');$('preview-panel').scrollIntoView({behavior:'smooth'});});
 $('approve').onclick=()=>run(async()=>{if(sourceDirty||proposalDirty)throw Error('Save and preview your edits first.');if(!confirm('Approve this exact guidance and treatment for relevant Prism responses? Reference-only material will remain inactive.'))return;await mutate('approve');message('Approved. Relevant responses can now draw from this version; reference-only material stays outside responses.');});
 for(const action of ['hold','reject'])$(action).onclick=()=>run(async()=>{if(!confirm('Preserve this record and remove any active version from responses? Unsaved edits will be discarded.'))return;await mutate(action);message(action==='hold'?'Concept placed on hold. It no longer influences responses.':'Concept rejected. It no longer influences responses.');});
 $('refresh').onclick=()=>run(()=>list());$('more').onclick=()=>run(()=>list(true));$('filter').onchange=drawQueue;
