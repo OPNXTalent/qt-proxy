@@ -1,7 +1,8 @@
 const $=id=>document.getElementById(id);
 let sb,current=null,files=[],queue=[],nextOffset=null,busy=false,sourceDirty=false,proposalDirty=false,pendingRevision=null;
 const labels={claims:'Claims and strongest formulation',evidence:'Evidence and source quality',scripture:'Scriptural examination',counterarguments:'Counterarguments and competing readings',frameworkFit:'Fit with The Prism',uncertainties:'Uncertainties and further checks'};
-function activity(s){$('activity-label').textContent=s;$('activity').hidden=!s;}\nfunction message(s,error=false){$('message').textContent=s;$('message').classList.toggle('error',error);}
+function activity(s){$('activity-label').textContent=s;$('activity').hidden=!s;}
+function message(s,error=false){$('message').textContent=s;$('message').classList.toggle('error',error);}
 async function request(body,query=''){
  const {data}=await sb.auth.getSession();if(!data.session)throw Error('Sign in to your Prism owner account.');
  const r=await fetch('/api/owner-concepts'+query,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+data.session.access_token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
